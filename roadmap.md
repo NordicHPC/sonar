@@ -16,7 +16,7 @@
 - Try to be compliant with PEP8 (including 4 spaces)
 - Flat hierarchy (no classes or as few as possible)
 - Create a pip-installable module
-- Use tests (TravisCI etc.)
+- Use tests (pytest and Travis CI)
 - Use argparse
 
 
