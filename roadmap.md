@@ -5,7 +5,7 @@
 - We start with saving everything into plain-text files. Later, we might use a database of some sort.
 - The code should be agnostic of any machine-specifics, except that it expects Linux with standard tools. Even Slurm should be optional.
   + The idea is that it should be debuggable as far as possible on our local computers.
-- All machine-specific stuff should be in config files of some sort (json? csv?).
+- All machine-specific stuff should be in config files in [YAML format](https://en.wikipedia.org/wiki/YAML).
 - Config folder/files and output files should be possible to specify by command line arguments.
 - Usage of Slurm should be possible to specify by command line argument.
 
