@@ -5,7 +5,7 @@
 - We start with saving everything into plain-text files. Later, we might use a database of some sort.
 - The code should be agnostic of any machine-specifics, except that it expects Linux with standard tools. Even Slurm should be optional.
   + The idea is that it should be debuggable as far as possible on our local computers.
-- All machine-specific stuff should be in config files of some sort (json? csv?).
+- All machine-specific stuff should be in config files in [YAML format](https://en.wikipedia.org/wiki/YAML).
 - Config folder/files and output files should be possible to specify by command line arguments.
 - Usage of Slurm should be possible to specify by command line argument.
 
@@ -16,16 +16,16 @@
 - Try to be compliant with PEP8 (including 4 spaces)
 - Flat hierarchy (no classes or as few as possible)
 - Create a pip-installable module
-- Use tests (TravisCI etc.)
+- Use tests (pytest and Travis CI)
 - Use argparse
 
 
 ## Module structure
 
 - Appusage should consist of three parts:
-  + Data gathering → This just gathers data and saves it. No "above-basic" parsing or processing. Should be fast and be able to run e.g. hourly.
+  + Data gathering → This just gathers data and saves it. No "above-basic" parsing or processing. Should be fast and be able to run e.g. every 30 minutes.
   + Processing → This parses the files written by the gatherer and creates standardized output depending on the use-case. Speed is not too important, should run e.g. daily.
-  + Visualising → This accepts the processed data and presents it depending on the use-case (website, shell, Excel-sheet?)
+  + Visualising → This accepts the processed data and presents it depending on the use-case (website, stdout, or csv)
 
 
 ### Module 1: Data gathering
