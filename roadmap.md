@@ -23,9 +23,9 @@
 ## Module structure
 
 - Appusage should consist of three parts:
-  + Data gathering → This just gathers data and saves it. No "above-basic" parsing or processing. Should be fast and be able to run e.g. hourly.
+  + Data gathering → This just gathers data and saves it. No "above-basic" parsing or processing. Should be fast and be able to run e.g. every 30 minutes.
   + Processing → This parses the files written by the gatherer and creates standardized output depending on the use-case. Speed is not too important, should run e.g. daily.
-  + Visualising → This accepts the processed data and presents it depending on the use-case (website, shell, Excel-sheet?)
+  + Visualising → This accepts the processed data and presents it depending on the use-case (website, stdout, or csv)
 
 
 ### Module 1: Data gathering
