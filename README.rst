@@ -1,6 +1,7 @@
 
 
-# sonar
+sonar
+=====
 
 Tool to profile usage of HPC resources by regularly probing processes using
 ps/top.
