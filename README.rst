@@ -12,3 +12,15 @@ ps/top.
 
 Reference implementation which we serves as inspiration:
 https://github.com/UNINETTSigma2/appusage
+
+
+Development
+-----------
+
+::
+
+  $ virtualenv venv
+  $ source venv/bin/activate
+  $ pip install -e .
+  $ sonar-snap --help
+  $ sonar-snap --output-file /tmp/example_output.tsv
