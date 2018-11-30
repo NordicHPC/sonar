@@ -77,7 +77,11 @@ def test_extract_processes():
 
 @click.command()
 @click.option('--output-file', help='Output file.')
-def take_snapshot(output_file):
+@click.option('--cpu-cutoff', default=0.5, help='CPU Memory consumption percentage cutoff (default: 0.5).')
+@click.option('--mem-cutoff', default=0.0, help='Memory consumption percentage cutoff (default: 0.0).')
+def take_snapshot(output_file,
+                  cpu_cutoff,
+                  mem_cutoff):
 
     # -n 1  only one iteration
     # -b    batch mode
@@ -94,5 +98,7 @@ def take_snapshot(output_file):
 
         for user, command in cpu_percentages:
             cpu_percentage = cpu_percentages[(user, command)]
-            mem_percentage = mem_percentages[(user, command)]
-            f_writer.writerow([timestamp, hostname, user, slurm_project, command, cpu_percentage, mem_percentage])
+            if cpu_percentage > cpu_cutoff:
+                mem_percentage = mem_percentages[(user, command)]
+                if mem_percentage > mem_cutoff:
+                    f_writer.writerow([timestamp, hostname, user, slurm_project, command, cpu_percentage, mem_percentage])
