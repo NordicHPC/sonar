@@ -17,7 +17,6 @@
 - Flat hierarchy (no classes or as few as possible)
 - Create a pip-installable module
 - Use tests (pytest and Travis CI)
-- Use argparse
 
 
 ## Module structure
