@@ -4,6 +4,7 @@ import datetime
 import time
 import socket
 import csv
+import click
 
 
 def get_timestamp():
@@ -74,7 +75,9 @@ def test_extract_processes():
                                ('alice', 'someapp'): 10.0}
 
 
-def take_snapshot(file_name):
+@click.command()
+@click.option('--output-file', help='Output file.')
+def take_snapshot(output_file):
 
     # -n 1  only one iteration
     # -b    batch mode
@@ -86,7 +89,7 @@ def take_snapshot(file_name):
 
     cpu_percentages, mem_percentages = extract_processes(output)
 
-    with open(file_name, mode='w') as f:
+    with open(output_file, mode='w') as f:
         f_writer = csv.writer(f, delimiter='\t', quotechar='"', quoting=csv.QUOTE_MINIMAL)
 
         for user, command in cpu_percentages:
