@@ -1,3 +1,7 @@
+.. image:: https://travis-ci.org/uit-no/sonar.svg?branch=master
+   :target: https://travis-ci.org/uit-no/sonar/builds
+.. image:: https://img.shields.io/badge/license-%20GPL--v3.0-blue.svg
+   :target: LICENSE
 
 
 sonar
