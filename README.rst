@@ -14,6 +14,16 @@ Reference implementation which we serves as inspiration:
 https://github.com/UNINETTSigma2/appusage
 
 
+Design goals
+------------
+
+- pip installable
+- minimal overhead for recording
+- super quick reporting and dashboard, both stdout and web
+- can be used as health check tool
+- data filtering/mapping is asynchronous
+
+
 Development
 -----------
 
