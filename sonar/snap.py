@@ -1,4 +1,4 @@
-#/usr/bin/env python3
+#!/usr/bin/env python3
 
 import sys
 import os
@@ -188,7 +188,7 @@ def create_snapshot(cpu_cutoff, mem_cutoff, ignored_users):
             mem_percentage = mem_percentages[(user, command)]
             if mem_percentage > mem_cutoff:
                 # Weird number is 1024*1024*100 to get MiB and %
-                mem_absolute = int(total_memory * mem_percentage/104857600)
+                mem_absolute = int(total_memory * mem_percentage / 104857600)
                 snapshot.append([timestamp, hostname, user, slurm_projects[user], command, '{:.1f}'.format(cpu_percentage), mem_absolute])
 
     return snapshot
@@ -206,12 +206,12 @@ def test_create_snapshot():
     assert len(first_line[0]) == 32
 
     try:
-        float(first_line[5]) # CPU
+        float(first_line[5])    # CPU
     except ValueError:
         raise AssertionError
 
     try:
-        int(first_line[6]) # mem in MiB
+        int(first_line[6])      # mem in MiB
     except ValueError:
         raise AssertionError
 
