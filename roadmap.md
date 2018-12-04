@@ -8,6 +8,7 @@
 - All machine-specific stuff should be in config files in [YAML format](https://en.wikipedia.org/wiki/YAML).
 - Config folder/files and output files should be possible to specify by command line arguments.
 - Usage of Slurm should be possible to specify by command line argument.
+- We should have a (rough) plan on how long we should keep files and how and when to clean old files.
 
 
 ### Python-specific
@@ -16,7 +17,8 @@
 - Try to be compliant with PEP8 (including 4 spaces)
 - Flat hierarchy (no classes or as few as possible)
 - Create a pip-installable module
-- Use tests (pytest and Travis CI)
+- Use tests (`pytest` and Travis CI)
+- Use `pycodestyle` to inforce a somewhat consistent code style
 
 
 ## Module structure
@@ -29,27 +31,41 @@
 
 ### Module 1: Data gathering
 
-- Run `top` or `ps` to gather running processes.
-  + in original appusage: `ps H -e -opid=,user:20=,pcpu=,comm=`
-- These processes should be filtered by standard Linux users (`root`, `nobody`, `syslog`, ...) either in Python or as part of the shell command, if possible.
+- Running regularly, e.g. hourly or every 30 minutes
+- Run `ps` to gather running processes.
+- These processes should be filtered by given users (`root`, `nobody`, `syslog`, ...)
 - The shell command might be extended to also gather memory usage.
 - An optional call to `squeue` could gather projects
 - Using the `squeue` call, we may find stray processes (good old `gaussian`, for example)
 - In the end, we should save (at least):
-  + Date-time in ISO 8601 with time zone: 2018-11-29T12:05:47+01:00
+  + Date-time in ISO 8601 with time zone: 2018-11-29T12:05:47.123456+01:00
   + hostname
   + username
   + optional project from Slurm (or `-` if no project or no Slurm)
   + command
-  + maybe memory and cpu usage info
+  + memory and cpu usage info
 - Preliminary format for saving is tab-separated values (tsv)
 
 
 ### Module 2: Processing
 
-- Todo
+- Running regularly, e.g. daily
+- The commands from `ps` have to be mapped onto their respective common program name.
+  + The mapping should be readable from csv/tsv.
+  + The mapping should work with regular expressions.
+  + We might want to think about performance, since processing huge amounts of data (e.g. hourly data of a whole year) with regular expressions may take ... very long. Random idea(s): Use a cache for the plain-string-to-program mapping since many programs run with exactly the same command string. This also catches programs running for weeks on several nodes.
+  + Currently, `ps` is called such that it only gives the command without arguments. That means that scripts/programs called with e.g. `python my_fancy_app` are just recognized as `python`. The question is, if we need more detail. Also, the commands with arguments will possibly yield more false assignments, simply because the strings are longer. It is possible to save both, the command name and the command with arguments as two columns in the output of `ps`. For many programs, the command is sufficient and for scripts, etc., the arguments could be evaluated. Downside would be that the output gets *much* larger with all arguments. Another problem is that `ps` `comm` (without arguments) and `command` (with arguments) may both include spaces. This could be tricky to parse. Should be doable by parsing fixed-width columns instead of simple `split()`.
+- It may be desireable to allow for some hierarchy or tags for the programs.
+  + This would allow users to group e.g. "chemical programs" or "licenced programs".
+  + May be included here or in module 3.
+- Stats for (configurable) time frames should be calculated (this allocation period, this month, last 30 days, ...).
+  + The total usage (cpu) of every program in the given period(s) should be saved.
+  + A distribution of needed memory per program at the snapshots might be interesting (total usage does not make sense for memory).
+- Output should be json and csv/tsv.
+  + json for programmatic access (web, shell), csv/tsv for manual access (tsv only on demand in module 3?).
 
 
 ### Module 3: Visualising
 
-- Todo
+- Running only on demand
+- Serving a web dashboard probably using `flask`.
