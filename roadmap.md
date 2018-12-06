@@ -45,6 +45,7 @@
   + command
   + memory and cpu usage info
 - Preliminary format for saving is tab-separated values (tsv)
+- We will append new entries to files and not create a new file for each snapshot.
 
 
 ### Module 2: Processing
