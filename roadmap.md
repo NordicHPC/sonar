@@ -45,6 +45,7 @@
   + command
   + memory and cpu usage info
 - Preliminary format for saving is tab-separated values (tsv)
+- We will append new entries to files and not create a new file for each snapshot.
 
 
 ### Module 2: Processing
@@ -55,6 +56,7 @@
   + The mapping should work with regular expressions.
   + We might want to think about performance, since processing huge amounts of data (e.g. hourly data of a whole year) with regular expressions may take ... very long. Random idea(s): Use a cache for the plain-string-to-program mapping since many programs run with exactly the same command string. This also catches programs running for weeks on several nodes.
   + Currently, `ps` is called such that it only gives the command without arguments. That means that scripts/programs called with e.g. `python my_fancy_app` are just recognized as `python`. The question is, if we need more detail. Also, the commands with arguments will possibly yield more false assignments, simply because the strings are longer. It is possible to save both, the command name and the command with arguments as two columns in the output of `ps`. For many programs, the command is sufficient and for scripts, etc., the arguments could be evaluated. Downside would be that the output gets *much* larger with all arguments. Another problem is that `ps` `comm` (without arguments) and `command` (with arguments) may both include spaces. This could be tricky to parse. Should be doable by parsing fixed-width columns instead of simple `split()`.
+  + Commands will probably have to be mapped in order: from more specific to less specific.
 - It may be desireable to allow for some hierarchy or tags for the programs.
   + This would allow users to group e.g. "chemical programs" or "licenced programs".
   + May be included here or in module 3.
