@@ -14,7 +14,8 @@ from collections import defaultdict
 
 def read_mapping(string_map_file, re_map_file):
     '''
-    Read and return a string-to-app mapping (dict) from the tsv filename `map_file`.
+    Reads string_map_file and re_map_file unless they are None.
+    Retuns string_mapping as a dictionary and returns re_mapping as a list of tuples.
     '''
 
     string_mapping = {}
