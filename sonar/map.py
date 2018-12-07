@@ -53,7 +53,7 @@ def test_map_app():
         ('^firefox$', 'Firefox'),
         ('[a-z][A-Z][0-9]', 'MyFancyApp'),
         ('^firefox$', 'NOTFirefox')
-        ]
+    ]
 
     assert map_app('asf', mapping) == 'UNKNOWN'
     assert map_app('firefox', mapping) == 'Firefox'
@@ -123,8 +123,8 @@ def write_open(filename=None):
 @click.option('--map_file', help='Path to the file with the mapping information. If empty, no mapping will be done.')
 @click.option('--snap_dir', required=True, help='Path to the directory with the results of sonar snap.')
 def do_mapping(output_file,
-                  map_file,
-                  snap_dir):
+               map_file,
+               snap_dir):
     '''
     Map sonar snap results to a provided list of programs and create an output that is suitable for the dashboard etc.
     '''
@@ -134,7 +134,6 @@ def do_mapping(output_file,
     else:
         mapping = {}
 
-    #today = datetime.date.today()
     today = datetime.datetime.now()
     yesterday = today - datetime.timedelta(days=1)
 
