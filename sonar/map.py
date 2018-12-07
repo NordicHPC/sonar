@@ -15,30 +15,30 @@ from collections import defaultdict
 def read_mapping(string_map_file, re_map_file):
     '''
     Reads string_map_file and re_map_file unless they are None.
-    Retuns string_mapping as a dictionary and returns re_mapping as a list of tuples.
+    Retuns string_map as a dictionary and returns re_map as a list of tuples.
     '''
 
-    string_mapping = {}
+    string_map = {}
     if string_map_file is not None:
         try:
             with open(string_map_file) as f:
                 f_reader = csv.reader(f, delimiter='\t', quotechar='"')
                 for k, v in f_reader:
-                    string_mapping[k] = v
+                    string_map[k] = v
         except FileNotFoundError:
             sys.stderr.write(f'ERROR: file {string_map_file} not found\n')
 
-    re_mapping = []
+    re_map = []
     if re_map_file is not None:
         try:
             with open(re_map_file) as f:
                 f_reader = csv.reader(f, delimiter='\t', quotechar='"')
                 for k, v in f_reader:
-                    re_mapping.append((k, v))
+                    re_map.append((k, v))
         except FileNotFoundError:
             sys.stderr.write(f'ERROR: file {re_map_file} not found\n')
 
-    return {'string': string_mapping, 're': re_mapping}
+    return {'string': string_map, 're': re_map}
 
 
 # Please note that map_cache is persistent between calls and should not be given as argument.
