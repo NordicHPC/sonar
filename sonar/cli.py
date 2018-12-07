@@ -12,7 +12,7 @@ def sonar_snap(args):
 def sonar_map(args):
     from sonar.map import do_mapping
 
-    do_mapping(output_file=args.output_file, map_file=args.map_file, snap_dir=args.snap_dir)
+    do_mapping(output_file=args.output_file, string_map_file=args.str_map_file, re_map_file=args.re_map_file, snap_dir=args.snap_dir)
 
 
 def main():
@@ -33,7 +33,8 @@ def main():
     parser_map = subparsers.add_parser('map', help='Parse the system snapshots and map applications. Run this only once centrally. Supposed to run e.g. once a day.')
     parser_map.add_argument('--snap-dir', default='', help='Path to the directory with the results of sonar snap. If empty, the current directory will be assumed.')
     parser_map.add_argument('--output-file', default='', help='Output file. Leave empty or provide - for stdout.')
-    parser_map.add_argument('--map-file', default='', help='Path to the file with the mapping information. If empty, no mapping will be done (all apps will be "UNKNOWN").')
+    parser_map.add_argument('--str_map-file', default='', help='Path to the file with the string mapping information. If empty, no string mapping will be done.')
+    parser_map.add_argument('--re_map-file', default='', help='Path to the file with the regexp mapping information. If empty, no regexp mapping will be done.')
     parser_map.set_defaults(func=sonar_map)
 
     # parse some argument lists
