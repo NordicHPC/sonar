@@ -18,27 +18,21 @@ def read_mapping(string_map_file, re_map_file):
     Retuns string_map as a dictionary and returns re_map as a list of tuples.
     '''
 
-    string_map = {}
-    if string_map_file is not None:
-        try:
-            with open(string_map_file) as f:
-                f_reader = csv.reader(f, delimiter='\t', quotechar='"')
-                for k, v in f_reader:
-                    string_map[k] = v
-        except FileNotFoundError:
-            sys.stderr.write(f'ERROR: file {string_map_file} not found\n')
-
+    string_map = []
     re_map = []
-    if re_map_file is not None:
-        try:
-            with open(re_map_file) as f:
-                f_reader = csv.reader(f, delimiter='\t', quotechar='"')
-                for k, v in f_reader:
-                    re_map.append((k, v))
-        except FileNotFoundError:
-            sys.stderr.write(f'ERROR: file {re_map_file} not found\n')
 
-    return {'string': string_map, 're': re_map}
+    for file_name, l in [(string_map_file, string_map),
+                         (re_map_file, re_map)]:
+        if file_name is not None:
+            try:
+                with open(file_name) as f:
+                    f_reader = csv.reader(f, delimiter='\t', quotechar='"')
+                    for k, v in f_reader:
+                        l.append((k, v))
+            except FileNotFoundError:
+                sys.stderr.write(f'ERROR: file {file_name} not found\n')
+
+    return {'string': dict(string_map), 're': re_map}
 
 
 # Please note that map_cache is persistent between calls and should not be given as argument.
