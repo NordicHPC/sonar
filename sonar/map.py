@@ -35,18 +35,26 @@ def read_mapping(string_map_file, re_map_file):
     return {'string': dict(string_map), 're': re_map}
 
 
-# Please note that map_cache is persistent between calls and should not be given as argument.
-def map_app(string, string_map, re_map, map_cache={}):
+def memoize_on_first_arg(func):
+    cache = dict()
+
+    def memoized_func(*args, **kwargs):
+        string = args[0]
+        if string in cache:
+            return cache[string]
+        result = func(*args, **kwargs)
+        cache[string] = result
+        return result
+
+    return memoized_func
+
+
+@memoize_on_first_arg
+def map_app(string, string_map, re_map):
     '''
     Map the `string` using string_map and re_map.
-    Never define `map_cache`!
     Returns the app or "UNKNOWN" if the appstring could not be identified.
     '''
-
-    try:
-        return map_cache[string]
-    except KeyError:
-        pass
 
     try:
         return string_map[string]
@@ -61,7 +69,7 @@ def map_app(string, string_map, re_map, map_cache={}):
 
 
 def test_map_app():
-    # FIXME: This needs more tests including string_map and maybe even test the cache
+    # FIXME: This needs more tests including string_map
     re_map = [
         ('^skypeforlinux$', 'Skype'),
         ('^firefox$', 'Firefox'),
@@ -73,8 +81,8 @@ def test_map_app():
     assert map_app('firefox', {}, re_map) == 'Firefox'
     assert map_app('aaaxY9zzz', {}, re_map) == 'MyFancyApp'
 
-    # here test the cache
-#   assert map_app('firefox', {}, re_map=[('^firefox$', 'redefined')]) == 'Firefox'
+    # test the cache
+    assert map_app('firefox', {}, re_map=[('^firefox$', 'redefined')]) == 'Firefox'
 
 
 def create_report(mapping, snap_dir, start, end, suffix='.tsv'):
