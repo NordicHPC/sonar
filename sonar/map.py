@@ -73,6 +73,9 @@ def test_map_app():
     assert map_app('firefox', {}, re_map) == 'Firefox'
     assert map_app('aaaxY9zzz', {}, re_map) == 'MyFancyApp'
 
+    # here test the cache
+#   assert map_app('firefox', {}, re_map=[('^firefox$', 'redefined')]) == 'Firefox'
+
 
 def create_report(mapping, snap_dir, start, end, suffix='.tsv'):
 
