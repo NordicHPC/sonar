@@ -153,7 +153,3 @@ def do_mapping(output_file, string_map_file, re_map_file, snap_dir):
             user, project, app = key
             cpu = report[key]
             f_writer.writerow([user, project, app, '{:.1f}'.format(cpu)])
-
-
-if __name__ == '__main__':
-    do_mapping()
