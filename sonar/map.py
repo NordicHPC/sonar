@@ -36,11 +36,11 @@ def read_mapping(string_map_file, re_map_file):
 
 
 # Please note that map_cache is persistent between calls and should not be given as argument.
-def map_app(string, string_map, re_map, default='UNKNOWN', map_cache={}):
+def map_app(string, string_map, re_map, map_cache={}):
     '''
     Map the `string` using string_map and re_map.
     Never define `map_cache`!
-    Returns the app or `default` if the appstring could not be identified.
+    Returns the app or "UNKNOWN" if the appstring could not be identified.
     '''
 
     try:
@@ -57,7 +57,7 @@ def map_app(string, string_map, re_map, default='UNKNOWN', map_cache={}):
         if re.search(k, string) is not None:
             return v
 
-    return default
+    return 'UNKNOWN'
 
 
 def test_map_app():
