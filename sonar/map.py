@@ -19,13 +19,11 @@ def read_mapping(map_file):
     Read and return a string-to-app mapping (dict) from the tsv filename `map_file`.
     '''
 
-    # FIXME: This kind of mapping does not preserve order (before 3.7)!
-
-    mapping = {}
+    mapping = []
     with open(map_file) as f:
         f_reader = csv.reader(f, delimiter='\t', quotechar='"')
         for line in f_reader:
-            mapping[line[0]] = line[1]
+            mapping.append((line[0], line[1]))
 
     return mapping
 
@@ -33,7 +31,7 @@ def read_mapping(map_file):
 # Please note that map_cache is persistent between calls and should not be given as argument.
 def map_app(appstring, mapping, default='UNKNOWN', map_cache={}):
     '''
-    Map the `appstring` on the given `mapping` (dict). Never give `map_cache`!
+    Map the `appstring` on the given `mapping` (list of tuples). Never define `map_cache`!
     Returns the app or `default` if the appstring could not be identified.
     '''
 
@@ -42,7 +40,7 @@ def map_app(appstring, mapping, default='UNKNOWN', map_cache={}):
     except KeyError:
         pass
 
-    for map_re, app in mapping.items():
+    for map_re, app in mapping:
         if re.search(map_re, appstring) is not None:
             return app
 
@@ -50,9 +48,12 @@ def map_app(appstring, mapping, default='UNKNOWN', map_cache={}):
 
 
 def test_map_app():
-    mapping = {'^skypeforlinux$': 'Skype',
-                '^firefox$': 'Firefox',
-                '[a-z][A-Z][0-9]': 'MyFancyApp'}
+    mapping = [
+        ('^skypeforlinux$', 'Skype'),
+        ('^firefox$', 'Firefox'),
+        ('[a-z][A-Z][0-9]', 'MyFancyApp'),
+        ('^firefox$', 'NOTFirefox')
+        ]
 
     assert map_app('asf', mapping) == 'UNKNOWN'
     assert map_app('firefox', mapping) == 'Firefox'
