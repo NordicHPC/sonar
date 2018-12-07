@@ -36,41 +36,42 @@ def read_mapping(string_map_file, re_map_file):
 
 
 # Please note that map_cache is persistent between calls and should not be given as argument.
-def map_app(appstring, string_mapping, re_mapping, default='UNKNOWN', map_cache={}):
+def map_app(string, string_map, re_map, default='UNKNOWN', map_cache={}):
     '''
-    Map the `appstring` on the given `mapping` (list of tuples). Never define `map_cache`!
+    Map the `string` using string_map and re_map.
+    Never define `map_cache`!
     Returns the app or `default` if the appstring could not be identified.
     '''
 
     try:
-        return map_cache[appstring]
+        return map_cache[string]
     except KeyError:
         pass
 
     try:
-        return string_mapping[appstring]
+        return string_map[string]
     except KeyError:
         pass
 
-    for map_re, app in re_mapping:
-        if re.search(map_re, appstring) is not None:
-            return app
+    for k, v in re_map:
+        if re.search(k, string) is not None:
+            return v
 
     return default
 
 
 def test_map_app():
-    # FIXME: This needs more tests including string_mapping and maybe even test the cache
-    re_mapping = [
+    # FIXME: This needs more tests including string_map and maybe even test the cache
+    re_map = [
         ('^skypeforlinux$', 'Skype'),
         ('^firefox$', 'Firefox'),
         ('[a-z][A-Z][0-9]', 'MyFancyApp'),
         ('^firefox$', 'NOTFirefox')
     ]
 
-    assert map_app('asf', {}, re_mapping) == 'UNKNOWN'
-    assert map_app('firefox', {}, re_mapping) == 'Firefox'
-    assert map_app('aaaxY9zzz', {}, re_mapping) == 'MyFancyApp'
+    assert map_app('asf', {}, re_map) == 'UNKNOWN'
+    assert map_app('firefox', {}, re_map) == 'Firefox'
+    assert map_app('aaaxY9zzz', {}, re_map) == 'MyFancyApp'
 
 
 def create_report(mapping, snap_dir, start, end, suffix='.tsv'):
