@@ -11,8 +11,6 @@ from contextlib import contextmanager
 from subprocess import check_output, SubprocessError, DEVNULL
 from collections import defaultdict
 
-import click
-
 
 @contextmanager
 def write_open(filename=None):
@@ -216,15 +214,9 @@ def test_create_snapshot():
         raise AssertionError
 
 
-@click.command()
-@click.option('--output-file', help='Output file. Leave empty or provide - for stdout (default: -).')
-@click.option('--cpu-cutoff', default=0.5, help='CPU Memory consumption percentage cutoff (default: 0.5).')
-@click.option('--mem-cutoff', default=0.0, help='Memory consumption percentage cutoff (default: 0.0).')
-def take_snapshot(output_file,
-                  cpu_cutoff,
-                  mem_cutoff):
+def take_snapshot(output_file, cpu_cutoff, mem_cutoff):
     '''
-    Take a snapshot of the currently running processes that use more than `cpu_cutoff` cpu and `mem_cutoff` memory.
+    Take a snapshot of the currently running processes that use more than `cpu_cutoff` cpu and `mem_cutoff` memory and save it to `output_file`.
     '''
 
     ignored_users = get_ignored_users()
