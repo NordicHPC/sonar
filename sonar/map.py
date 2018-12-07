@@ -12,22 +12,34 @@ from contextlib import contextmanager
 from collections import defaultdict
 
 
-def read_mapping(map_file):
+def read_mapping(string_map_file, re_map_file):
     '''
     Read and return a string-to-app mapping (dict) from the tsv filename `map_file`.
     '''
 
-    mapping = []
-    with open(map_file) as f:
-        f_reader = csv.reader(f, delimiter='\t', quotechar='"')
-        for line in f_reader:
-            mapping.append((line[0], line[1]))
+    string_mapping = {}
+    try:
+        with open(string_map_file) as f:
+            f_reader = csv.reader(f, delimiter='\t', quotechar='"')
+            for line in f_reader:
+                string_mapping[line[0]] = line[1]
+    except IOError:
+        pass
 
-    return mapping
+    re_mapping = []
+    try:
+        with open(re_map_file) as f:
+            f_reader = csv.reader(f, delimiter='\t', quotechar='"')
+            for line in f_reader:
+                re_mapping.append((line[0], line[1]))
+    except IOError:
+        pass
+
+    return {'string': string_mapping, 're': re_mapping}
 
 
 # Please note that map_cache is persistent between calls and should not be given as argument.
-def map_app(appstring, mapping, default='UNKNOWN', map_cache={}):
+def map_app(appstring, string_mapping, re_mapping, default='UNKNOWN', map_cache={}):
     '''
     Map the `appstring` on the given `mapping` (list of tuples). Never define `map_cache`!
     Returns the app or `default` if the appstring could not be identified.
@@ -38,7 +50,12 @@ def map_app(appstring, mapping, default='UNKNOWN', map_cache={}):
     except KeyError:
         pass
 
-    for map_re, app in mapping:
+    try:
+        return string_mapping[appstring]
+    except KeyError:
+        pass
+
+    for map_re, app in re_mapping:
         if re.search(map_re, appstring) is not None:
             return app
 
@@ -46,21 +63,23 @@ def map_app(appstring, mapping, default='UNKNOWN', map_cache={}):
 
 
 def test_map_app():
-    mapping = [
+    # FIXME: This needs more tests including string_mapping and maybe even test the cache
+    re_mapping = [
         ('^skypeforlinux$', 'Skype'),
         ('^firefox$', 'Firefox'),
         ('[a-z][A-Z][0-9]', 'MyFancyApp'),
         ('^firefox$', 'NOTFirefox')
     ]
 
-    assert map_app('asf', mapping) == 'UNKNOWN'
-    assert map_app('firefox', mapping) == 'Firefox'
-    assert map_app('aaaxY9zzz', mapping) == 'MyFancyApp'
+    assert map_app('asf', {}, re_mapping) == 'UNKNOWN'
+    assert map_app('firefox', {}, re_mapping) == 'Firefox'
+    assert map_app('aaaxY9zzz', {}, re_mapping) == 'MyFancyApp'
 
 
-def create_report(mapping, snap_dir, start, end):
+def create_report(mapping, snap_dir, start, end, suffix='.tsv'):
 
     # FIXME: This should be split into two functions, one reading the files, the other doing the actual parsing for better testing.
+    # FIXME: The suffix should be readable from config
 
     # Add the local timezone to start and end
     utc_offset_sec = time.altzone if time.localtime().tm_isdst else time.timezone
@@ -70,7 +89,7 @@ def create_report(mapping, snap_dir, start, end):
 
     report = defaultdict(float)
 
-    for filename in glob(os.path.normpath(os.path.join(snap_dir, '*'))):
+    for filename in glob(os.path.normpath(os.path.join(snap_dir, '*' + suffix))):
         with open(filename) as f:
             f_reader = csv.reader(f, delimiter='\t', quotechar='"')
             for line in f_reader:
@@ -82,7 +101,7 @@ def create_report(mapping, snap_dir, start, end):
 
                 user = line[2]
                 project = line[3]
-                app = map_app(line[4], mapping)
+                app = map_app(line[4], mapping['string'], mapping['re'])
                 cpu = float(line[5])
 
                 report[(user, project, app)] += cpu
@@ -116,15 +135,12 @@ def write_open(filename=None):
             handler.close()
 
 
-def do_mapping(output_file, map_file, snap_dir):
+def do_mapping(output_file, string_map_file, re_map_file, snap_dir):
     '''
     Map sonar snap results to a provided list of programs and create an output that is suitable for the dashboard etc.
     '''
 
-    if map_file:
-        mapping = read_mapping(map_file)
-    else:
-        mapping = {}
+    mapping = read_mapping(string_map_file, re_map_file)
 
     today = datetime.datetime.now()
     yesterday = today - datetime.timedelta(days=1)
@@ -136,7 +152,7 @@ def do_mapping(output_file, map_file, snap_dir):
         for key in sorted(report, key=lambda x: report[x], reverse=True):
             user, project, app = key
             cpu = report[key]
-            f_writer.writerow([user, project, app, cpu])
+            f_writer.writerow([user, project, app, '{:.1f}'.format(cpu)])
 
 
 if __name__ == '__main__':

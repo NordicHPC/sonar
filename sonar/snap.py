@@ -13,7 +13,7 @@ from collections import defaultdict
 
 
 @contextmanager
-def write_open(filename=None):
+def write_open(filename=None, suffix='.tsv'):
     '''
     Special wrapper to allow to write to stdout or a file nicely. If `filename` is '-' or None, everything will be written to stdout instead to a "real" file.
 
@@ -25,9 +25,13 @@ def write_open(filename=None):
     >>>     f.write(...)
     '''
 
+    # FIXME: Suffix should be readable from config
+
     # https://stackoverflow.com/q/17602878
     if filename and filename != '-':
-        handler = open(filename, 'w')
+        if not filename.endswith(suffix):
+            filename += suffix
+        handler = open(filename, 'a')
     else:
         handler = sys.stdout
 
