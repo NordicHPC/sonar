@@ -18,22 +18,24 @@ def read_mapping(string_map_file, re_map_file):
     '''
 
     string_mapping = {}
-    try:
-        with open(string_map_file) as f:
-            f_reader = csv.reader(f, delimiter='\t', quotechar='"')
-            for line in f_reader:
-                string_mapping[line[0]] = line[1]
-    except IOError:
-        pass
+    if string_map_file is not None:
+        try:
+            with open(string_map_file) as f:
+                f_reader = csv.reader(f, delimiter='\t', quotechar='"')
+                for line in f_reader:
+                    string_mapping[line[0]] = line[1]
+        except FileNotFoundError:
+            sys.stderr.write(f'ERROR: file {string_map_file} not found\n')
 
     re_mapping = []
-    try:
-        with open(re_map_file) as f:
-            f_reader = csv.reader(f, delimiter='\t', quotechar='"')
-            for line in f_reader:
-                re_mapping.append((line[0], line[1]))
-    except IOError:
-        pass
+    if re_map_file is not None:
+        try:
+            with open(re_map_file) as f:
+                f_reader = csv.reader(f, delimiter='\t', quotechar='"')
+                for line in f_reader:
+                    re_mapping.append((line[0], line[1]))
+        except FileNotFoundError:
+            sys.stderr.write(f'ERROR: file {re_map_file} not found\n')
 
     return {'string': string_mapping, 're': re_mapping}
 
