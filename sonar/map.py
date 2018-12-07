@@ -19,6 +19,8 @@ def read_mapping(map_file):
     Read and return a string-to-app mapping (dict) from the tsv filename `map_file`.
     '''
 
+    # FIXME: This kind of mapping does not preserve order (before 3.7)!
+
     mapping = {}
     with open(map_file) as f:
         f_reader = csv.reader(f, delimiter='\t', quotechar='"')
@@ -47,8 +49,19 @@ def map_app(appstring, mapping, default='UNKNOWN', map_cache={}):
     return default
 
 
+def test_map_app():
+    mapping = {'^skypeforlinux$': 'Skype',
+                '^firefox$': 'Firefox',
+                '[a-z][A-Z][0-9]': 'MyFancyApp'}
+
+    assert map_app('asf', mapping) == 'UNKNOWN'
+    assert map_app('firefox', mapping) == 'Firefox'
+    assert map_app('aaaxY9zzz', mapping) == 'MyFancyApp'
+
 
 def create_report(mapping, snap_dir, start, end):
+
+    # FIXME: This should be split into two functions, one reading the files, the other doing the actual parsing for better testing.
 
     # Add the local timezone to start and end
     utc_offset_sec = time.altzone if time.localtime().tm_isdst else time.timezone
