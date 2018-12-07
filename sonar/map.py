@@ -11,8 +11,6 @@ from glob import glob
 from contextlib import contextmanager
 from collections import defaultdict
 
-import click
-
 
 def read_mapping(map_file):
     '''
@@ -118,13 +116,7 @@ def write_open(filename=None):
             handler.close()
 
 
-@click.command()
-@click.option('--output-file', help='Output file. Leave empty or provide - for stdout (default: -).')
-@click.option('--map_file', help='Path to the file with the mapping information. If empty, no mapping will be done.')
-@click.option('--snap_dir', required=True, help='Path to the directory with the results of sonar snap.')
-def do_mapping(output_file,
-               map_file,
-               snap_dir):
+def do_mapping(output_file, map_file, snap_dir):
     '''
     Map sonar snap results to a provided list of programs and create an output that is suitable for the dashboard etc.
     '''
