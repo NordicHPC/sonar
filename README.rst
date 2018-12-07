@@ -33,8 +33,9 @@ Development
   $ virtualenv venv
   $ source venv/bin/activate
   $ pip install -e .
-  $ sonar-snap --help
-  $ sonar-snap --output-file /tmp/example_output.tsv
+  $ sonar --help
+  $ sonar snap --output-file /home/user/tmp/example.tsv
+  $ sonar map --snap-dir /home/user/tmp/
 
 
 Design decisions
