@@ -49,7 +49,7 @@ def get_timestamp():
     utc_offset_sec = time.altzone if time.localtime().tm_isdst else time.timezone
     utc_offset = datetime.timedelta(seconds=-utc_offset_sec)
 
-    return datetime.datetime.now().replace(tzinfo=datetime.timezone(offset=utc_offset)).isoformat()
+    return datetime.datetime.now().replace(tzinfo=datetime.timezone(offset=utc_offset)).strftime('%Y-%m-%dT%H:%M:%S.%f%z')
 
 
 def get_slurm_projects(hostname):
@@ -202,8 +202,8 @@ def test_create_snapshot():
 
     first_line = snapshot[0]
 
-    # The timestamp is always 32 characters long (until the year 10 000...)
-    assert len(first_line[0]) == 32
+    # The timestamp is always 31 characters long (until the year 10 000...)
+    assert len(first_line[0]) == 31
 
     try:
         float(first_line[5])    # CPU

@@ -62,8 +62,7 @@ def create_report(mapping, snap_dir, start, end):
         with open(filename) as f:
             f_reader = csv.reader(f, delimiter='\t', quotechar='"')
             for line in f_reader:
-                # FIXME This uses a really ugly hack, because the isoformat() timezone is HH:MM but the strptime timezone is HHMM (without ":"). Could be fixed by saving the datetime in snap with strftime() instead of isoformat()
-                date = datetime.datetime.strptime(line[0][:-3]+line[0][-2:], '%Y-%m-%dT%H:%M:%S.%f%z')
+                date = datetime.datetime.strptime(line[0], '%Y-%m-%dT%H:%M:%S.%f%z')
                 if date < start:
                     continue
                 if date > end:
