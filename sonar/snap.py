@@ -230,7 +230,3 @@ def take_snapshot(output_file, cpu_cutoff, mem_cutoff):
     with write_open(output_file) as f:
         f_writer = csv.writer(f, delimiter='\t', quotechar='"', quoting=csv.QUOTE_MINIMAL)
         f_writer.writerows(snapshot)
-
-
-if __name__ == '__main__':
-    take_snapshot()

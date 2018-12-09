@@ -14,66 +14,75 @@ from collections import defaultdict
 
 def read_mapping(string_map_file, re_map_file):
     '''
-    Read and return a string-to-app mapping (dict) from the tsv filename `map_file`.
+    Reads string_map_file and re_map_file unless they are None.
+    Retuns string_map as a dictionary and returns re_map as a list of tuples.
     '''
 
-    string_mapping = {}
-    try:
-        with open(string_map_file) as f:
-            f_reader = csv.reader(f, delimiter='\t', quotechar='"')
-            for line in f_reader:
-                string_mapping[line[0]] = line[1]
-    except IOError:
-        pass
+    string_map = []
+    re_map = []
 
-    re_mapping = []
-    try:
-        with open(re_map_file) as f:
-            f_reader = csv.reader(f, delimiter='\t', quotechar='"')
-            for line in f_reader:
-                re_mapping.append((line[0], line[1]))
-    except IOError:
-        pass
+    for file_name, l in [(string_map_file, string_map),
+                         (re_map_file, re_map)]:
+        if file_name is not None:
+            try:
+                with open(file_name) as f:
+                    f_reader = csv.reader(f, delimiter='\t', quotechar='"')
+                    for k, v in f_reader:
+                        l.append((k, v))
+            except FileNotFoundError:
+                print('ERROR: file {0} not found'.format(file_name), file=sys.stderr)
 
-    return {'string': string_mapping, 're': re_mapping}
+    return {'string': dict(string_map), 're': re_map}
 
 
-# Please note that map_cache is persistent between calls and should not be given as argument.
-def map_app(appstring, string_mapping, re_mapping, default='UNKNOWN', map_cache={}):
+def memoize_on_first_arg(func):
+    cache = dict()
+
+    def memoized_func(*args, **kwargs):
+        string = args[0]
+        if string in cache:
+            return cache[string]
+        result = func(*args, **kwargs)
+        cache[string] = result
+        return result
+
+    return memoized_func
+
+
+@memoize_on_first_arg
+def map_app(string, string_map, re_map):
     '''
-    Map the `appstring` on the given `mapping` (list of tuples). Never define `map_cache`!
-    Returns the app or `default` if the appstring could not be identified.
+    Map the `string` using string_map and re_map.
+    Returns the app or "UNKNOWN" if the appstring could not be identified.
     '''
 
     try:
-        return map_cache[appstring]
+        return string_map[string]
     except KeyError:
         pass
 
-    try:
-        return string_mapping[appstring]
-    except KeyError:
-        pass
+    for k, v in re_map:
+        if re.search(k, string) is not None:
+            return v
 
-    for map_re, app in re_mapping:
-        if re.search(map_re, appstring) is not None:
-            return app
-
-    return default
+    return 'UNKNOWN'
 
 
 def test_map_app():
-    # FIXME: This needs more tests including string_mapping and maybe even test the cache
-    re_mapping = [
+    # FIXME: This needs more tests including string_map
+    re_map = [
         ('^skypeforlinux$', 'Skype'),
         ('^firefox$', 'Firefox'),
         ('[a-z][A-Z][0-9]', 'MyFancyApp'),
         ('^firefox$', 'NOTFirefox')
     ]
 
-    assert map_app('asf', {}, re_mapping) == 'UNKNOWN'
-    assert map_app('firefox', {}, re_mapping) == 'Firefox'
-    assert map_app('aaaxY9zzz', {}, re_mapping) == 'MyFancyApp'
+    assert map_app('asf', {}, re_map) == 'UNKNOWN'
+    assert map_app('firefox', {}, re_map) == 'Firefox'
+    assert map_app('aaaxY9zzz', {}, re_map) == 'MyFancyApp'
+
+    # test the cache
+    assert map_app('firefox', {}, re_map=[('^firefox$', 'redefined')]) == 'Firefox'
 
 
 def create_report(mapping, snap_dir, start, end, suffix='.tsv'):
@@ -153,7 +162,3 @@ def do_mapping(output_file, string_map_file, re_map_file, snap_dir):
             user, project, app = key
             cpu = report[key]
             f_writer.writerow([user, project, app, '{:.1f}'.format(cpu)])
-
-
-if __name__ == '__main__':
-    do_mapping()
