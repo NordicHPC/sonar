@@ -30,7 +30,7 @@ def read_mapping(string_map_file, re_map_file):
                     for k, v in f_reader:
                         l.append((k, v))
             except FileNotFoundError:
-                sys.stderr.write(f'ERROR: file {file_name} not found\n')
+                print('ERROR: file {0} not found'.format(file_name), file=sys.stderr)
 
     return {'string': dict(string_map), 're': re_map}
 
