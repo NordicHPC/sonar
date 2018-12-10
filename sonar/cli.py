@@ -14,30 +14,25 @@ def sonar_snap(args):
 def sonar_map(args):
     from sonar.map import do_mapping
 
-
     do_mapping(output_file=args['output_file'], string_map_file=args['str_map_file'], re_map_file=args['re_map_file'], snap_dir=args['snap_dir'], snap_delimiter=args['snap_delimiter'], map_delimiter=args['map_delimiter'], suffix=args['snap_suffix'], default_category=args['default_category'])
 
 
 def main():
     defaults = {'snap_suffix': '.tsv',
-        'snap_delimiter': '\t',
-        'map_delimiter': '\t',
-        'cpu_cutoff': 0.5,
-        'mem_cutoff': 0.0,
-        'hostname_remove': '',
-        'ignored_users': '',
-        'snap_dir': '.',
-        'str_map_file': '',
-        're_map_file': '',
-        'default_category': 'UNKNOWN',
-        'output_file': None}
+                'snap_delimiter': '\t',
+                'map_delimiter': '\t',
+                'cpu_cutoff': 0.5,
+                'mem_cutoff': 0.0,
+                'hostname_remove': '',
+                'ignored_users': '',
+                'snap_dir': '.',
+                'str_map_file': '',
+                're_map_file': '',
+                'default_category': 'UNKNOWN',
+                'output_file': None}
 
     # Inspired by https://stackoverflow.com/q/3609852
-    parser = argparse.ArgumentParser(
-        prog='sonar',
-        description='Tool to profile usage of HPC resources by regularly probing processes.',
-        epilog='Run sonar <subcommand> -h to get more information about subcommands.'
-        )
+    parser = argparse.ArgumentParser(prog='sonar', description='Tool to profile usage of HPC resources by regularly probing processes.', epilog='Run sonar <subcommand> -h to get more information about subcommands.')
 
     subparsers = parser.add_subparsers(title='Subcommands', metavar='', dest='command')
 
