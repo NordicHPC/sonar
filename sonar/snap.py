@@ -9,11 +9,12 @@ import csv
 
 from contextlib import contextmanager
 from subprocess import check_output, SubprocessError, DEVNULL
-from collections import defaultdict
+from collections import defaultdict, namedtuple
+from configparser import ConfigParser
 
 
 @contextmanager
-def write_open(filename=None, suffix='.tsv'):
+def write_open(filename, suffix):
     '''
     Special wrapper to allow to write to stdout or a file nicely. If `filename` is '-' or None, everything will be written to stdout instead to a "real" file.
 
@@ -24,8 +25,6 @@ def write_open(filename=None, suffix='.tsv'):
     >>> with write_open() as f:
     >>>     f.write(...)
     '''
-
-    # FIXME: Suffix should be readable from config
 
     # https://stackoverflow.com/q/17602878
     if filename and filename != '-':
@@ -92,25 +91,6 @@ def get_available_memory():
     return os.sysconf('SC_PAGE_SIZE') * os.sysconf('SC_PHYS_PAGES')
 
 
-def get_ignored_users():
-    '''
-    Return a set with users that should be ignored.
-    '''
-
-    # FIXME this should be configurable
-    ignored_users = {
-        'avahi',
-        'colord',
-        'dbus',
-        'haveged',
-        'polkitd',
-        'root',
-        'rtkit'
-    }
-
-    return ignored_users
-
-
 def extract_processes(raw_text, ignored_users):
     '''
     Extract user, cpu, memory, and command from `raw_text` that should be the (special) output of a `ps` command.
@@ -163,7 +143,7 @@ def test_extract_processes():
                                ('alice', 'someapp'): 10.0}
 
 
-def create_snapshot(cpu_cutoff, mem_cutoff, ignored_users):
+def create_snapshot(cpu_cutoff, mem_cutoff, ignored_users, hostname_remove):
     '''
     Take a snapshot of the currently running processes that use more than `cpu_cutoff` cpu and `mem_cutoff` memory, ignoring the set or list `ignored_users`. Return a list of lists being lines of columns.
     '''
@@ -173,8 +153,7 @@ def create_snapshot(cpu_cutoff, mem_cutoff, ignored_users):
     output = check_output('ps -e --no-header -o pid,user:30,pcpu,pmem,comm', shell=True).decode('utf-8')
     timestamp = get_timestamp()
     hostname = socket.gethostname()
-    # FIXME: The hostname fix is specific for Stallo. Should be possible to configure!
-    hostname = hostname.split('.')[0]
+    hostname = hostname.replace(hostname_remove, '')
     slurm_projects = get_slurm_projects(hostname)
     total_memory = get_available_memory()
     if total_memory < 0:
@@ -197,7 +176,7 @@ def create_snapshot(cpu_cutoff, mem_cutoff, ignored_users):
 
 
 def test_create_snapshot():
-    snapshot = create_snapshot(0.0, 0.0, set())
+    snapshot = create_snapshot(0.0, 0.0, set(), '')
 
     # With CPU and mem cutoffs set to 0, there should be some processes running...
     assert len(snapshot)
@@ -218,15 +197,13 @@ def test_create_snapshot():
         raise AssertionError
 
 
-def take_snapshot(output_file, cpu_cutoff, mem_cutoff):
+def take_snapshot(output_file, cpu_cutoff, mem_cutoff, ignored_users, suffix, delimiter, hostname_remove):
     '''
     Take a snapshot of the currently running processes that use more than `cpu_cutoff` cpu and `mem_cutoff` memory and save it to `output_file`.
     '''
 
-    ignored_users = get_ignored_users()
+    snapshot = create_snapshot(cpu_cutoff, mem_cutoff, ignored_users, hostname_remove)
 
-    snapshot = create_snapshot(cpu_cutoff, mem_cutoff, ignored_users)
-
-    with write_open(output_file) as f:
-        f_writer = csv.writer(f, delimiter='\t', quotechar='"', quoting=csv.QUOTE_MINIMAL)
+    with write_open(output_file, suffix) as f:
+        f_writer = csv.writer(f, delimiter=delimiter, quotechar='"', quoting=csv.QUOTE_MINIMAL)
         f_writer.writerows(snapshot)

@@ -23,14 +23,14 @@ def read_mapping(string_map_file, re_map_file):
 
     for file_name, l in [(string_map_file, string_map),
                          (re_map_file, re_map)]:
-        if file_name is not None:
+        if file_name:
             try:
                 with open(file_name) as f:
                     f_reader = csv.reader(f, delimiter='\t', quotechar='"')
                     for k, v in f_reader:
                         l.append((k, v))
             except FileNotFoundError:
-                print('ERROR: file {0} not found'.format(file_name), file=sys.stderr)
+                print('ERROR: file "{0}" not found.'.format(file_name), file=sys.stderr)
 
     return {'string': dict(string_map), 're': re_map}
 
@@ -50,10 +50,10 @@ def memoize_on_first_arg(func):
 
 
 @memoize_on_first_arg
-def map_app(string, string_map, re_map):
+def map_app(string, string_map, re_map, default_category='UNKNOWN'):
     '''
     Map the `string` using string_map and re_map.
-    Returns the app or "UNKNOWN" if the appstring could not be identified.
+    Returns the app or `default_category` if the appstring could not be identified.
     '''
 
     try:
@@ -65,7 +65,7 @@ def map_app(string, string_map, re_map):
         if re.search(k, string) is not None:
             return v
 
-    return 'UNKNOWN'
+    return default_category
 
 
 def test_map_app():
@@ -85,10 +85,9 @@ def test_map_app():
     assert map_app('firefox', {}, re_map=[('^firefox$', 'redefined')]) == 'Firefox'
 
 
-def create_report(mapping, snap_dir, start, end, suffix='.tsv'):
+def create_report(mapping, snap_dir, start, end, delimiter, suffix='.tsv', default_category='UNKNOWN'):
 
     # FIXME: This should be split into two functions, one reading the files, the other doing the actual parsing for better testing.
-    # FIXME: The suffix should be readable from config
 
     # Add the local timezone to start and end
     utc_offset_sec = time.altzone if time.localtime().tm_isdst else time.timezone
@@ -100,7 +99,7 @@ def create_report(mapping, snap_dir, start, end, suffix='.tsv'):
 
     for filename in glob(os.path.normpath(os.path.join(snap_dir, '*' + suffix))):
         with open(filename) as f:
-            f_reader = csv.reader(f, delimiter='\t', quotechar='"')
+            f_reader = csv.reader(f, delimiter=delimiter, quotechar='"')
             for line in f_reader:
                 date = datetime.datetime.strptime(line[0], '%Y-%m-%dT%H:%M:%S.%f%z')
                 if date < start:
@@ -110,7 +109,7 @@ def create_report(mapping, snap_dir, start, end, suffix='.tsv'):
 
                 user = line[2]
                 project = line[3]
-                app = map_app(line[4], mapping['string'], mapping['re'])
+                app = map_app(line[4], mapping['string'], mapping['re'], default_category)
                 cpu = float(line[5])
 
                 report[(user, project, app)] += cpu
@@ -119,7 +118,7 @@ def create_report(mapping, snap_dir, start, end, suffix='.tsv'):
 
 
 @contextmanager
-def write_open(filename=None):
+def write_open(filename, suffix):
     '''
     Special wrapper to allow to write to stdout or a file nicely. If `filename` is '-' or None, everything will be written to stdout instead to a "real" file.
 
@@ -133,7 +132,9 @@ def write_open(filename=None):
 
     # https://stackoverflow.com/q/17602878
     if filename and filename != '-':
-        handler = open(filename, 'w')
+        if not filename.endswith(suffix):
+            filename += suffix
+        handler = open(filename, 'a')
     else:
         handler = sys.stdout
 
@@ -144,7 +145,7 @@ def write_open(filename=None):
             handler.close()
 
 
-def do_mapping(output_file, string_map_file, re_map_file, snap_dir):
+def do_mapping(output_file, string_map_file, re_map_file, snap_dir, snap_delimiter, map_delimiter, suffix, default_category):
     '''
     Map sonar snap results to a provided list of programs and create an output that is suitable for the dashboard etc.
     '''
@@ -154,10 +155,10 @@ def do_mapping(output_file, string_map_file, re_map_file, snap_dir):
     today = datetime.datetime.now()
     yesterday = today - datetime.timedelta(days=1)
 
-    report = create_report(mapping, snap_dir, start=yesterday, end=today)
+    report = create_report(mapping, snap_dir, start=yesterday, end=today, delimiter=snap_delimiter, suffix=suffix, default_category=default_category)
 
-    with write_open(output_file) as f:
-        f_writer = csv.writer(f, delimiter='\t', quotechar='"', quoting=csv.QUOTE_MINIMAL)
+    with write_open(output_file, suffix) as f:
+        f_writer = csv.writer(f, delimiter=map_delimiter, quotechar='"', quoting=csv.QUOTE_MINIMAL)
         for key in sorted(report, key=lambda x: report[x], reverse=True):
             user, project, app = key
             cpu = report[key]
