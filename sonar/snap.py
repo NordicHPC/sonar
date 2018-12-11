@@ -53,32 +53,33 @@ def get_timestamp():
     return datetime.datetime.now().replace(tzinfo=datetime.timezone(offset=utc_offset)).strftime('%Y-%m-%dT%H:%M:%S.%f%z')
 
 
-def get_slurm_projects(hostname):
+def get_slurm_info(hostname):
     '''
-    Try to get the users and projects from the current `hostname`.
-    If a user should run two jobs with two different projects, only the last discovered project will be assumed for the user.
+    Try to get the users, jobids, and projects from the current `hostname`.
+    If a user should run two jobs with two different projects or jobids, only the last discovered values will be assumed for the user.
 
     :returns: A defaultdict with the mapping from user to project. Project is '-' if the user is not found or slurm is not available.
     '''
 
-    user_to_project = defaultdict(lambda: '-')
+    user_to_slurminfo = defaultdict(lambda: {'jobid': '-', 'project': '-'})
 
+    # %j  Job ID (or <jobid>_<arrayid> for job arrays)
     # %a  Account (project)
     # %u  User
     try:
-        output = check_output('squeue --noheader --nodelist={} --format=%a,%u'.format(hostname), shell=True, stderr=DEVNULL).decode('utf8')
+        output = check_output('squeue --noheader --nodelist={} --format=%j,%a,%u'.format(hostname), shell=True, stderr=DEVNULL).decode('utf8')
     except SubprocessError:
         # if Slurm is not available, return the empty defaultdict that will return '-' for any key call.
-        return user_to_project
+        return user_to_slurminfo
 
     for line in output.split('\n'):
         line = line.strip()
         if not line:
             continue
-        project, user = line.split(',')
-        user_to_project[user] = project
+        jobid, project, user = line.split(',')
+        user_to_slurminfo[user] = {'jobid': jobid, 'project': project}
 
-    return user_to_project
+    return user_to_slurminfo
 
 
 def get_available_memory():
@@ -154,7 +155,7 @@ def create_snapshot(cpu_cutoff, mem_cutoff, ignored_users, hostname_remove):
     timestamp = get_timestamp()
     hostname = socket.gethostname()
     hostname = hostname.replace(hostname_remove, '')
-    slurm_projects = get_slurm_projects(hostname)
+    slurm_info = get_slurm_info(hostname)
     total_memory = get_available_memory()
     if total_memory < 0:
         total_memory = 1
@@ -170,7 +171,7 @@ def create_snapshot(cpu_cutoff, mem_cutoff, ignored_users, hostname_remove):
             if mem_percentage > mem_cutoff:
                 # Weird number is 1024*1024*100 to get MiB and %
                 mem_absolute = int(total_memory * mem_percentage / 104857600)
-                snapshot.append([timestamp, hostname, user, slurm_projects[user], command, '{:.1f}'.format(cpu_percentage), mem_absolute])
+                snapshot.append([timestamp, hostname, user, slurm_info[user]['project'], slurm_info[user]['jobid'], command, '{:.1f}'.format(cpu_percentage), mem_absolute])
 
     return snapshot
 
