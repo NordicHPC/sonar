@@ -188,12 +188,12 @@ def test_create_snapshot():
     assert len(first_line[0]) == 31
 
     try:
-        float(first_line[5])    # CPU
+        float(first_line[6])    # CPU
     except ValueError:
         raise AssertionError
 
     try:
-        int(first_line[6])      # mem in MiB
+        int(first_line[7])      # mem in MiB
     except ValueError:
         raise AssertionError
 

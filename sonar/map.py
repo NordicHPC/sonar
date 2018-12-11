@@ -109,8 +109,9 @@ def create_report(mapping, snap_dir, start, end, delimiter, suffix='.tsv', defau
 
                 user = line[2]
                 project = line[3]
-                app = map_app(line[4], mapping['string'], mapping['re'], default_category)
-                cpu = float(line[5])
+                jobid = line[4]
+                app = map_app(line[5], mapping['string'], mapping['re'], default_category)
+                cpu = float(line[6])
 
                 report[(user, project, app)] += cpu
 
