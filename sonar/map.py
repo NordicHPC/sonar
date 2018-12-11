@@ -145,20 +145,20 @@ def write_open(filename, suffix):
             handler.close()
 
 
-def do_mapping(output_file, string_map_file, re_map_file, snap_dir, snap_delimiter, map_delimiter, suffix, default_category):
+def do_mapping(config):
     '''
     Map sonar snap results to a provided list of programs and create an output that is suitable for the dashboard etc.
     '''
 
-    mapping = read_mapping(string_map_file, re_map_file)
+    mapping = read_mapping(config['str_map_file'], config['re_map_file'])
 
     today = datetime.datetime.now()
     yesterday = today - datetime.timedelta(days=1)
 
-    report = create_report(mapping, snap_dir, start=yesterday, end=today, delimiter=snap_delimiter, suffix=suffix, default_category=default_category)
+    report = create_report(mapping, config['snap_dir'], start=yesterday, end=today, delimiter=config['snap_delimiter'], suffix=config['snap_suffix'], default_category=config['default_category'])
 
-    with write_open(output_file, suffix) as f:
-        f_writer = csv.writer(f, delimiter=map_delimiter, quotechar='"', quoting=csv.QUOTE_MINIMAL)
+    with write_open(config['output_file'], config['map_suffix']) as f:
+        f_writer = csv.writer(f, delimiter=config['map_delimiter'], quotechar='"', quoting=csv.QUOTE_MINIMAL)
         for key in sorted(report, key=lambda x: report[x], reverse=True):
             user, project, app = key
             cpu = report[key]

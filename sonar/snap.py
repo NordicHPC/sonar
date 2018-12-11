@@ -197,13 +197,13 @@ def test_create_snapshot():
         raise AssertionError
 
 
-def take_snapshot(output_file, cpu_cutoff, mem_cutoff, ignored_users, suffix, delimiter, hostname_remove):
+def take_snapshot(config):
     '''
     Take a snapshot of the currently running processes that use more than `cpu_cutoff` cpu and `mem_cutoff` memory and save it to `output_file`.
     '''
 
-    snapshot = create_snapshot(cpu_cutoff, mem_cutoff, ignored_users, hostname_remove)
+    snapshot = create_snapshot(config['cpu_cutoff'], config['mem_cutoff'], config['ignored_users'], config['hostname_remove'])
 
-    with write_open(output_file, suffix) as f:
-        f_writer = csv.writer(f, delimiter=delimiter, quotechar='"', quoting=csv.QUOTE_MINIMAL)
+    with write_open(config['output_file'], config['snap_suffix']) as f:
+        f_writer = csv.writer(f, delimiter=config['snap_delimiter'], quotechar='"', quoting=csv.QUOTE_MINIMAL)
         f_writer.writerows(snapshot)

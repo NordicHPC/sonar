@@ -8,17 +8,18 @@ import configparser
 def sonar_snap(args):
     from sonar.snap import take_snapshot
 
-    take_snapshot(output_file=args['output_file'], cpu_cutoff=args['cpu_cutoff'], mem_cutoff=args['mem_cutoff'], ignored_users=args['ignored_users'], suffix=args['snap_suffix'], delimiter=args['snap_delimiter'], hostname_remove=args['hostname_remove'])
+    take_snapshot(args)
 
 
 def sonar_map(args):
     from sonar.map import do_mapping
 
-    do_mapping(output_file=args['output_file'], string_map_file=args['str_map_file'], re_map_file=args['re_map_file'], snap_dir=args['snap_dir'], snap_delimiter=args['snap_delimiter'], map_delimiter=args['map_delimiter'], suffix=args['snap_suffix'], default_category=args['default_category'])
+    do_mapping(args)
 
 
 def main():
     defaults = {'snap_suffix': '.tsv',
+                'map_suffix': '.tsv',
                 'snap_delimiter': '\t',
                 'map_delimiter': '\t',
                 'cpu_cutoff': 0.5,
