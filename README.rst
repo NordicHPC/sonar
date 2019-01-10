@@ -22,7 +22,7 @@ Design goals
 - can be used as health check tool
 - data filtering/mapping is asynchronous
 
-More details are in the `roadmap.md <roadmap.md>`_.
+For more details please see `the roadmap <roadmap.rst>`_.
 
 
 Development
