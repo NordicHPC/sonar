@@ -38,7 +38,7 @@ def main():
     subparsers = parser.add_subparsers(title='Subcommands', metavar='', dest='command')
 
     # create the parser for the "snap" command
-    parser_snap = subparsers.add_parser('snap', help='Take a snapshot of the system. Run this on every node! Supposed to run often (e.g. every 15 minutes).')
+    parser_snap = subparsers.add_parser('snap', help='Take a snapshot of the system. Run this on every node and often (e.g. every 15 minutes).')
     parser_snap.add_argument('--config', default='example_config.conf', help='Path to config file')
     parser_snap.add_argument('--output-file', metavar='FILE', help='Output file. Provide - for stdout.')
     parser_snap.add_argument('--cpu-cutoff', metavar='FLOAT', type=float, help='CPU Memory consumption percentage cutoff (default: 0.5).')
@@ -46,7 +46,7 @@ def main():
     parser_snap.set_defaults(func=sonar_snap)
 
     # create the parser for the "map" command
-    parser_map = subparsers.add_parser('map', help='Parse the system snapshots and map applications. Run this only once centrally. Supposed to run e.g. once a day.')
+    parser_map = subparsers.add_parser('map', help='Parse the system snapshots and map applications. Run this only once centrally and typically once a day.')
     parser_map.add_argument('--config', default='example_config.conf', help='Path to config file')
     parser_map.add_argument('--snap-dir', metavar='DIR', help='Path to the directory with the results of sonar snap. If empty, the current directory will be assumed.')
     parser_map.add_argument('--output-file', metavar='FILE', help='Output file. Provide - for stdout.')
