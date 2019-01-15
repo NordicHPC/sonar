@@ -53,6 +53,7 @@ def main():
         sys.exit()
 
     try:
+        # vars() converts object into a dictionary
         args = vars(args)
         args['func'](args)
     except AttributeError:
