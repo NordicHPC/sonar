@@ -118,34 +118,6 @@ def create_report(mapping, input_dir, start, end, delimiter, suffix='.tsv', defa
     return report
 
 
-@contextmanager
-def write_open(filename, suffix):
-    '''
-    Special wrapper to allow to write to stdout or a file nicely. If `filename` is '-' or None, everything will be written to stdout instead to a "real" file.
-
-    Use like:
-    >>> with write_open('myfile') as f:
-    >>>     f.write(...)
-    or
-    >>> with write_open() as f:
-    >>>     f.write(...)
-    '''
-
-    # https://stackoverflow.com/q/17602878
-    if filename and filename != '-':
-        if not filename.endswith(suffix):
-            filename += suffix
-        handler = open(filename, 'a')
-    else:
-        handler = sys.stdout
-
-    try:
-        yield handler
-    finally:
-        if handler is not sys.stdout:
-            handler.close()
-
-
 def do_mapping(config):
     '''
     Map sonar snap results to a provided list of programs and create an output that is suitable for the dashboard etc.
@@ -158,9 +130,8 @@ def do_mapping(config):
 
     report = create_report(mapping, config['input_dir'], start=yesterday, end=today, delimiter=config['snap_delimiter'], suffix=config['snap_suffix'], default_category=config['default_category'])
 
-    with write_open(config['output_file'], config['map_suffix']) as f:
-        f_writer = csv.writer(f, delimiter=config['map_delimiter'], quotechar='"', quoting=csv.QUOTE_MINIMAL)
-        for key in sorted(report, key=lambda x: report[x], reverse=True):
-            user, project, app = key
-            cpu = report[key]
-            f_writer.writerow([user, project, app, '{:.1f}'.format(cpu)])
+    f_writer = csv.writer(sys.stdout, delimiter=config['map_delimiter'], quotechar='"', quoting=csv.QUOTE_MINIMAL)
+    for key in sorted(report, key=lambda x: report[x], reverse=True):
+        user, project, app = key
+        cpu = report[key]
+        f_writer.writerow([user, project, app, '{:.1f}'.format(cpu)])

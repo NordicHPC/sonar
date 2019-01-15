@@ -28,13 +28,11 @@ def main():
     # create the parser for the "map" command
     parser_map = subparsers.add_parser('map', help='Parse the system snapshots and map applications. Run this only once centrally and typically once a day.')
     parser_map.add_argument('--input-dir', metavar='DIR', help='Path to the directory with the results of sonar snap. If empty, the current directory will be assumed.')
-    parser_map.add_argument('--output-file', metavar='FILE', help='Output file. Provide - for stdout.')
     parser_map.add_argument('--str-map-file', metavar='FILE', help='Path to the file with the string mapping information.')
     parser_map.add_argument('--re-map-file', metavar='FILE', help='Path to the file with the regexp mapping information.')
     parser_map.add_argument('--default-category', metavar='STR', help='Default category for programs that are not recognized.')
     parser_map.add_argument('--snap-suffix', default='.tsv', help='Snap file suffix.')
     parser_map.add_argument('--snap-delimiter', default='\t', help='Snap delimiter.')
-    parser_map.add_argument('--map-suffix', default='.tsv', help='Map file suffix.')
     parser_map.add_argument('--map-delimiter', default='\t', help='Map delimiter.')
     parser_map.set_defaults(func=do_mapping)
 
