@@ -5,14 +5,6 @@ from sonar.snap import take_snapshot
 from sonar.map import do_mapping
 
 
-def sonar_snap(args):
-    take_snapshot(args)
-
-
-def sonar_map(args):
-    do_mapping(args)
-
-
 def main():
 
     # Inspired by https://stackoverflow.com/q/3609852
@@ -31,7 +23,7 @@ def main():
     parser_snap.add_argument('--hostname-remove', default='.local', help='Hostnames to remove.')
     parser_snap.add_argument('--snap-suffix', default='.tsv', help='Snap file suffix.')
     parser_snap.add_argument('--snap-delimiter', default='\t', help='Snap delimiter.')
-    parser_snap.set_defaults(func=sonar_snap)
+    parser_snap.set_defaults(func=take_snapshot)
 
     # create the parser for the "map" command
     parser_map = subparsers.add_parser('map', help='Parse the system snapshots and map applications. Run this only once centrally and typically once a day.')
@@ -44,7 +36,7 @@ def main():
     parser_map.add_argument('--snap-delimiter', default='\t', help='Snap delimiter.')
     parser_map.add_argument('--map-suffix', default='.tsv', help='Map file suffix.')
     parser_map.add_argument('--map-delimiter', default='\t', help='Map delimiter.')
-    parser_map.set_defaults(func=sonar_map)
+    parser_map.set_defaults(func=do_mapping)
 
     args = parser.parse_args()
 
