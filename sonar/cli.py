@@ -27,7 +27,7 @@ def main():
 
     # create the parser for the "map" command
     parser_map = subparsers.add_parser('map', help='Parse the system snapshots and map applications. Run this only once centrally and typically once a day.')
-    parser_map.add_argument('--snap-dir', metavar='DIR', help='Path to the directory with the results of sonar snap. If empty, the current directory will be assumed.')
+    parser_map.add_argument('--input-dir', metavar='DIR', help='Path to the directory with the results of sonar snap. If empty, the current directory will be assumed.')
     parser_map.add_argument('--output-file', metavar='FILE', help='Output file. Provide - for stdout.')
     parser_map.add_argument('--str-map-file', metavar='FILE', help='Path to the file with the string mapping information.')
     parser_map.add_argument('--re-map-file', metavar='FILE', help='Path to the file with the regexp mapping information.')
