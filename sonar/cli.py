@@ -16,12 +16,10 @@ def main():
 
     # create the parser for the "snap" command
     parser_snap = subparsers.add_parser('snap', help='Take a snapshot of the system. Run this on every node and often (e.g. every 15 minutes).')
-    parser_snap.add_argument('--output-file', metavar='FILE', help='Output file. Provide - for stdout.')
     parser_snap.add_argument('--cpu-cutoff', metavar='FLOAT', type=float, default=0.5, help='CPU Memory consumption percentage cutoff (default: 0.5).')
     parser_snap.add_argument('--mem-cutoff', metavar='FLOAT', type=float, default=0.0, help='Memory consumption percentage cutoff (default: 0.0).')
     parser_snap.add_argument('--ignored-users', default='avahi, colord, dbus, haveged, polkitd, root, rtkit', help='Users to ignore.')
     parser_snap.add_argument('--hostname-remove', default='.local', help='Hostnames to remove.')
-    parser_snap.add_argument('--snap-suffix', default='.tsv', help='Snap file suffix.')
     parser_snap.add_argument('--snap-delimiter', default='\t', help='Snap delimiter.')
     parser_snap.set_defaults(func=take_snapshot)
 

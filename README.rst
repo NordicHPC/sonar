@@ -35,5 +35,5 @@ Development
   $ source venv/bin/activate
   $ pip install -e .
   $ sonar --help
-  $ sonar snap --output-file /home/user/tmp/example.tsv
+  $ sonar snap >> /home/user/tmp/example.tsv
   $ sonar map --input-dir /home/user/tmp/
