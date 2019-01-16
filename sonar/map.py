@@ -85,7 +85,7 @@ def test_map_app():
     assert map_app('firefox', {}, re_map=[('^firefox$', 'redefined')]) == 'Firefox'
 
 
-def create_report(mapping, snap_dir, start, end, delimiter, suffix='.tsv', default_category='UNKNOWN'):
+def create_report(mapping, input_dir, start, end, delimiter, suffix='.tsv', default_category='UNKNOWN'):
 
     # FIXME: This should be split into two functions, one reading the files, the other doing the actual parsing for better testing.
 
@@ -97,7 +97,7 @@ def create_report(mapping, snap_dir, start, end, delimiter, suffix='.tsv', defau
 
     report = defaultdict(float)
 
-    for filename in glob(os.path.normpath(os.path.join(snap_dir, '*' + suffix))):
+    for filename in glob(os.path.normpath(os.path.join(input_dir, '*' + suffix))):
         with open(filename) as f:
             f_reader = csv.reader(f, delimiter=delimiter, quotechar='"')
             for line in f_reader:
@@ -118,34 +118,6 @@ def create_report(mapping, snap_dir, start, end, delimiter, suffix='.tsv', defau
     return report
 
 
-@contextmanager
-def write_open(filename, suffix):
-    '''
-    Special wrapper to allow to write to stdout or a file nicely. If `filename` is '-' or None, everything will be written to stdout instead to a "real" file.
-
-    Use like:
-    >>> with write_open('myfile') as f:
-    >>>     f.write(...)
-    or
-    >>> with write_open() as f:
-    >>>     f.write(...)
-    '''
-
-    # https://stackoverflow.com/q/17602878
-    if filename and filename != '-':
-        if not filename.endswith(suffix):
-            filename += suffix
-        handler = open(filename, 'a')
-    else:
-        handler = sys.stdout
-
-    try:
-        yield handler
-    finally:
-        if handler is not sys.stdout:
-            handler.close()
-
-
 def do_mapping(config):
     '''
     Map sonar snap results to a provided list of programs and create an output that is suitable for the dashboard etc.
@@ -156,11 +128,10 @@ def do_mapping(config):
     today = datetime.datetime.now()
     yesterday = today - datetime.timedelta(days=1)
 
-    report = create_report(mapping, config['snap_dir'], start=yesterday, end=today, delimiter=config['snap_delimiter'], suffix=config['snap_suffix'], default_category=config['default_category'])
+    report = create_report(mapping, config['input_dir'], start=yesterday, end=today, delimiter=config['snap_delimiter'], suffix=config['snap_suffix'], default_category=config['default_category'])
 
-    with write_open(config['output_file'], config['map_suffix']) as f:
-        f_writer = csv.writer(f, delimiter=config['map_delimiter'], quotechar='"', quoting=csv.QUOTE_MINIMAL)
-        for key in sorted(report, key=lambda x: report[x], reverse=True):
-            user, project, app = key
-            cpu = report[key]
-            f_writer.writerow([user, project, app, '{:.1f}'.format(cpu)])
+    f_writer = csv.writer(sys.stdout, delimiter=config['map_delimiter'], quotechar='"', quoting=csv.QUOTE_MINIMAL)
+    for key in sorted(report, key=lambda x: report[x], reverse=True):
+        user, project, app = key
+        cpu = report[key]
+        f_writer.writerow([user, project, app, '{:.1f}'.format(cpu)])

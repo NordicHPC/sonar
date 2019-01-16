@@ -13,34 +13,6 @@ from collections import defaultdict, namedtuple
 from configparser import ConfigParser
 
 
-@contextmanager
-def write_open(filename, suffix):
-    '''
-    Special wrapper to allow to write to stdout or a file nicely. If `filename` is '-' or None, everything will be written to stdout instead to a "real" file.
-
-    Use like:
-    >>> with write_open('myfile') as f:
-    >>>     f.write(...)
-    or
-    >>> with write_open() as f:
-    >>>     f.write(...)
-    '''
-
-    # https://stackoverflow.com/q/17602878
-    if filename and filename != '-':
-        if not filename.endswith(suffix):
-            filename += suffix
-        handler = open(filename, 'a')
-    else:
-        handler = sys.stdout
-
-    try:
-        yield handler
-    finally:
-        if handler is not sys.stdout:
-            handler.close()
-
-
 def get_timestamp():
     '''
     Returns time stamp as string in ISO 8601 with time zone information.
@@ -200,11 +172,10 @@ def test_create_snapshot():
 
 def take_snapshot(config):
     '''
-    Take a snapshot of the currently running processes that use more than `cpu_cutoff` cpu and `mem_cutoff` memory and save it to `output_file`.
+    Take a snapshot of the currently running processes that use more than `cpu_cutoff` cpu and `mem_cutoff` memory and print it to stdout.
     '''
 
     snapshot = create_snapshot(config['cpu_cutoff'], config['mem_cutoff'], config['ignored_users'], config['hostname_remove'])
 
-    with write_open(config['output_file'], config['snap_suffix']) as f:
-        f_writer = csv.writer(f, delimiter=config['snap_delimiter'], quotechar='"', quoting=csv.QUOTE_MINIMAL)
-        f_writer.writerows(snapshot)
+    f_writer = csv.writer(sys.stdout, delimiter=config['snap_delimiter'], quotechar='"', quoting=csv.QUOTE_MINIMAL)
+    f_writer.writerows(snapshot)
