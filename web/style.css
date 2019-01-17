@@ -1,0 +1,28 @@
+body {
+  font: 10px sans-serif;
+}
+
+div, table {
+  display: inline-block;
+  vertical-align: top;
+}
+
+.barchart {
+  background-color: #ffffff;
+}
+
+.piechart {
+  background-color: #ffffff;
+}
+
+svg {
+  font: 10px sans-serif;
+}
+
+.bar rect {
+  fill: #5555ff;
+}
+
+.bar rect:hover {
+  fill: #0000ff;
+}
