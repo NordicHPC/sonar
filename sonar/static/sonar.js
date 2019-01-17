@@ -4,8 +4,6 @@ const json_data = '{"software": {"Vasp": {"percent": 24.3,"subcalls": {"vasp_std
 
 const parsed_data = JSON.parse(json_data);
 
-//console.log(parsed_data);
-
 let histo_dataset = [];
 let pie_dataset = {};
 
@@ -25,8 +23,6 @@ for (let swname in parsed_data.software) {
     }
     pie_dataset[swname] = subcall_list;
 }
-
-console.log(pie_dataset);
 
 function color(i) {
     let colors = ["#3366cc", "#dc3912", "#ff9900", "#109618", "#990099", "#0099c6", "#dd4477", "#66aa00", "#b82e2e", "#316395", "#994499", "#22aa99", "#aaaa11", "#6633cc", "#e67300", "#8b0707", "#651067", "#329262", "#5574a6", "#3b3eac"];
