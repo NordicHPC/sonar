@@ -8,7 +8,7 @@ def _generate_example_data():
     data["Vasp"] = {"percent": 24.3,
                     "subcalls": {"vasp_std": 43.6, "vasp.5.3.2": 16.8, "std": 15.6, "vasp.NGZhalf": 10.3, "vasp.5.3.5": 9.5}}
     data["foo"] = {"percent": 24.3,
-                    "subcalls": {"vasp_std": 13.6, "vasp.5.3.2": 16.8, "std": 35.6, "vasp.NGZhalf": 10.3, "vasp.5.3.5": 9.5}}
+                   "subcalls": {"vasp_std": 13.6, "vasp.5.3.2": 16.8, "std": 35.6, "vasp.NGZhalf": 10.3, "vasp.5.3.5": 9.5}}
     return data
 
 
