@@ -225,8 +225,8 @@ function Legend(dataset, id) {
 axios.get("/data/example/")
     .then(function(response) {
         var pie_dataset = get_pie_dataset(response.data);
-        var p = new Piechart(pie_dataset, '#chart');
+        var p = new Piechart(pie_dataset, '#pie_chart');
 
         var histo_dataset = get_histo_dataset(response.data);
-        histogram(p, histo_dataset, '#chart');
+        histogram(p, histo_dataset, '#bar_chart');
     })
