@@ -125,10 +125,17 @@ def main(config):
 
     mapping = read_mapping(config['str_map_file'], config['re_map_file'])
 
-    today = datetime.datetime.now()
-    yesterday = today - datetime.timedelta(days=1)
+    try:
+        start = datetime.datetime.strptime(config['start_date'], '%Y-%m-%d')
+    except (ValueError, TypeError):
+        start = datetime.datetime.now() - datetime.timedelta(hours=24)
 
-    report = create_report(mapping, config['input_dir'], start=yesterday, end=today, delimiter=config['snap_delimiter'], suffix=config['snap_suffix'], default_category=config['default_category'])
+    try:
+        end = datetime.datetime.strptime(config['end_date'], '%Y-%m-%d')
+    except (ValueError, TypeError):
+        end = datetime.datetime.now()
+
+    report = create_report(mapping, config['input_dir'], start=start, end=end, delimiter=config['snap_delimiter'], suffix=config['snap_suffix'], default_category=config['default_category'])
 
     f_writer = csv.writer(sys.stdout, delimiter=config['map_delimiter'], quotechar='"', quoting=csv.QUOTE_MINIMAL)
     for key in sorted(report, key=lambda x: report[x], reverse=True):
