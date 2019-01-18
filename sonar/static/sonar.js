@@ -229,4 +229,4 @@ axios.get("/data/example/")
 
         var histo_dataset = get_histo_dataset(response.data);
         histogram(p, histo_dataset, '#bar_chart');
-    })
+    });

@@ -14,8 +14,8 @@ from collections import defaultdict
 
 def read_mapping(string_map_file, re_map_file):
     '''
-    Reads string_map_file and re_map_file unless they are None.
-    Retuns string_map as a dictionary and returns re_map as a list of tuples.
+    Reads string_map_file and re_map_file unless they are falsy.
+    Retuns a dictionary with string_map as a dictionary and re_map as a list of tuples.
     '''
 
     string_map = []
@@ -118,17 +118,24 @@ def create_report(mapping, input_dir, start, end, delimiter, suffix='.tsv', defa
     return report
 
 
-def do_mapping(config):
+def main(config):
     '''
     Map sonar snap results to a provided list of programs and create an output that is suitable for the dashboard etc.
     '''
 
     mapping = read_mapping(config['str_map_file'], config['re_map_file'])
 
-    today = datetime.datetime.now()
-    yesterday = today - datetime.timedelta(days=1)
+    try:
+        start = datetime.datetime.strptime(config['start_date'], '%Y-%m-%d')
+    except (ValueError, TypeError):
+        start = datetime.datetime.now() - datetime.timedelta(hours=24)
 
-    report = create_report(mapping, config['input_dir'], start=yesterday, end=today, delimiter=config['snap_delimiter'], suffix=config['snap_suffix'], default_category=config['default_category'])
+    try:
+        end = datetime.datetime.strptime(config['end_date'], '%Y-%m-%d')
+    except (ValueError, TypeError):
+        end = datetime.datetime.now()
+
+    report = create_report(mapping, config['input_dir'], start=start, end=end, delimiter=config['snap_delimiter'], suffix=config['snap_suffix'], default_category=config['default_category'])
 
     f_writer = csv.writer(sys.stdout, delimiter=config['map_delimiter'], quotechar='"', quoting=csv.QUOTE_MINIMAL)
     for key in sorted(report, key=lambda x: report[x], reverse=True):
