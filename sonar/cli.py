@@ -58,6 +58,7 @@ def main():
     try:
         # vars() converts object into a dictionary
         args = vars(args)
-        args['func'](args)
     except AttributeError:
         parser.print_help()
+
+    args['func'](args)
