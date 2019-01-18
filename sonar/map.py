@@ -14,8 +14,8 @@ from collections import defaultdict
 
 def read_mapping(string_map_file, re_map_file):
     '''
-    Reads string_map_file and re_map_file unless they are None.
-    Retuns string_map as a dictionary and returns re_map as a list of tuples.
+    Reads string_map_file and re_map_file unless they are falsy.
+    Retuns a dictionary with string_map as a dictionary and re_map as a list of tuples.
     '''
 
     string_map = []
@@ -118,7 +118,7 @@ def create_report(mapping, input_dir, start, end, delimiter, suffix='.tsv', defa
     return report
 
 
-def do_mapping(config):
+def main(config):
     '''
     Map sonar snap results to a provided list of programs and create an output that is suitable for the dashboard etc.
     '''

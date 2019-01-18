@@ -2,9 +2,13 @@ import os
 import sys
 import argparse
 import configparser
-from sonar.snap import take_snapshot
-from sonar.map import do_mapping
+from sonar.snap import main as snap_main
+from sonar.map import main as map_main
 from sonar.web import main as web_main
+
+
+def make_list(s, delimiter=','):
+    return s.split(delimiter)
 
 
 def main():
@@ -20,21 +24,21 @@ def main():
     parser_snap = subparsers.add_parser('snap', help='Take a snapshot of the system. Run this on every node and often (e.g. every 15 minutes).')
     parser_snap.add_argument('--cpu-cutoff', metavar='FLOAT', type=float, default=0.5, help='CPU Memory consumption percentage cutoff (default: 0.5).')
     parser_snap.add_argument('--mem-cutoff', metavar='FLOAT', type=float, default=0.0, help='Memory consumption percentage cutoff (default: 0.0).')
-    parser_snap.add_argument('--ignored-users', default='avahi, colord, dbus, haveged, polkitd, root, rtkit', help='Users to ignore.')
-    parser_snap.add_argument('--hostname-remove', default='.local', help='Hostnames to remove.')
-    parser_snap.add_argument('--snap-delimiter', default='\t', help='Snap delimiter.')
-    parser_snap.set_defaults(func=take_snapshot)
+    parser_snap.add_argument('--ignored-users', metavar='STR,STR', default='avahi,colord,dbus,haveged,polkitd,root,rtkit', type=make_list, help='Users to ignore as comma-separated list.')
+    parser_snap.add_argument('--hostname-remove', metavar='STR', default='.local', help='Hostnames to remove.')
+    parser_snap.add_argument('--snap-delimiter', metavar='STR', default='\t', help='Snap delimiter.')
+    parser_snap.set_defaults(func=snap_main)
 
     # parser for "map"
     parser_map = subparsers.add_parser('map', help='Parse the system snapshots and map applications. Run this only once centrally and typically once a day.')
-    parser_map.add_argument('--input-dir', metavar='DIR', help='Path to the directory with the results of sonar snap. If empty, the current directory will be assumed.')
+    parser_map.add_argument('--input-dir', metavar='DIR', required=True, help='Path to the directory with the results of sonar snap. Required!')
     parser_map.add_argument('--str-map-file', metavar='FILE', help='Path to the file with the string mapping information.')
     parser_map.add_argument('--re-map-file', metavar='FILE', help='Path to the file with the regexp mapping information.')
     parser_map.add_argument('--default-category', metavar='STR', help='Default category for programs that are not recognized.')
-    parser_map.add_argument('--snap-suffix', default='.tsv', help='Snap file suffix.')
-    parser_map.add_argument('--snap-delimiter', default='\t', help='Snap delimiter.')
-    parser_map.add_argument('--map-delimiter', default='\t', help='Map delimiter.')
-    parser_map.set_defaults(func=do_mapping)
+    parser_map.add_argument('--snap-suffix', metavar='STR', default='.tsv', help='Snap file suffix.')
+    parser_map.add_argument('--snap-delimiter', metavar='STR', default='\t', help='Snap delimiter.')
+    parser_map.add_argument('--map-delimiter', metavar='STR', default='\t', help='Map delimiter.')
+    parser_map.set_defaults(func=map_main)
 
     # parser for the web frontend
     parser_map = subparsers.add_parser('web', help='Run the web frontend to visualize results. This can run locally or on a server (via uWSGI).')

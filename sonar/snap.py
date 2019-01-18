@@ -170,7 +170,7 @@ def test_create_snapshot():
         raise AssertionError
 
 
-def take_snapshot(config):
+def main(config):
     '''
     Take a snapshot of the currently running processes that use more than `cpu_cutoff` cpu and `mem_cutoff` memory and print it to stdout.
     '''
