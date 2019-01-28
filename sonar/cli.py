@@ -4,7 +4,13 @@ import argparse
 import configparser
 from sonar.snap import main as snap_main
 from sonar.map import main as map_main
-from sonar.web import main as web_main
+
+# The following hack will allow snap and map to run without flask being installed
+try:
+    from sonar.web import main as web_main
+except ModuleNotFoundError:
+    def web_main(*args, **kwargs):
+        print('Could not load Flask', file=sys.stderr)
 
 
 def make_list(s, delimiter=','):
