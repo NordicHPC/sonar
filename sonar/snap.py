@@ -35,11 +35,11 @@ def get_slurm_info(hostname):
 
     user_to_slurminfo = defaultdict(lambda: {'jobid': '-', 'project': '-'})
 
-    # %j  Job ID (or <jobid>_<arrayid> for job arrays)
+    # %i  Job ID (or <jobid>_<arrayid> for job arrays)
     # %a  Account (project)
     # %u  User
     try:
-        output = check_output('squeue --noheader --nodelist={} --format=%j,%a,%u'.format(hostname), shell=True, stderr=DEVNULL).decode('utf8')
+        output = check_output('squeue --noheader --nodelist={} --format=%i,%a,%u'.format(hostname), shell=True, stderr=DEVNULL).decode('utf8')
     except SubprocessError:
         # if Slurm is not available, return the empty defaultdict that will return '-' for any key call.
         return user_to_slurminfo
