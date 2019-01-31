@@ -97,10 +97,17 @@ def create_report(mapping, input_dir, start, end, delimiter, suffix='.tsv', defa
 
     report = defaultdict(float)
 
+    mapping_dict = {}
+
     for filename in glob(os.path.normpath(os.path.join(input_dir, '*' + suffix))):
         with open(filename) as f:
             f_reader = csv.reader(f, delimiter=delimiter, quotechar='"')
             for line in f_reader:
+                if line[5] not in mapping_dict:
+                    app = map_app(line[5], mapping['string'], mapping['re'], default_category)
+                    mapping_dict[line[5]] = app
+                continue
+
                 date = datetime.datetime.strptime(line[0], '%Y-%m-%dT%H:%M:%S.%f%z')
                 if date < start:
                     continue
@@ -114,6 +121,11 @@ def create_report(mapping, input_dir, start, end, delimiter, suffix='.tsv', defa
                 cpu = float(line[6])
 
                 report[(user, project, app)] += cpu
+
+    for elem in sorted(mapping_dict, key=lambda x: str(mapping_dict[x])):
+        print('{}\t{}'.format(elem, mapping_dict[elem]))
+
+    sys.exit()
 
     return report
 
