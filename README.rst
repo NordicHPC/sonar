@@ -37,3 +37,11 @@ Development
   $ sonar --help
   $ sonar snap >> /home/user/tmp/example.tsv
   $ sonar map --input-dir /home/user/tmp/
+
+
+Authors
+-------
+
+- Henrik Rojas Nagel
+- Mathias Bockwoldt
+- [Radovan Bast](https://bast.fr)
