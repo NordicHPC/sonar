@@ -35,14 +35,31 @@ We will document this once the code is on PyPI.
 Quickstart for developers
 -------------------------
 
-::
+Clone and install the code::
 
   $ virtualenv venv
   $ source venv/bin/activate
   $ pip install -e .
+
+Get help text::
+
   $ sonar --help
+
+Take a snapshot::
+
   $ sonar snap >> /home/user/tmp/example.tsv
+
+Map processes to applications::
+
   $ sonar map --input-dir /home/user/tmp/
+
+Visualize results using a web server::
+
+  # this is unfinished
+
+Test your changes::
+
+  $ pytest -vv -s sonar
 
 
 Authors
