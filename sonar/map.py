@@ -83,15 +83,18 @@ def test_map_app():
     assert map_app('firefox', {}, re_map=[('^firefox$', 'redefined')]) == 'Firefox'
 
 
+def _normalize_date(date):
+    _intermediate = datetime.datetime.strftime(date, '%Y-%m-%d')
+    date_normalized = datetime.datetime.strptime(_intermediate, '%Y-%m-%d')
+    return date_normalized
+
+
 def create_report(mapping, input_dir, start, end, delimiter, suffix='.tsv', default_category='UNKNOWN'):
 
     # FIXME: This should be split into two functions, one reading the files, the other doing the actual parsing for better testing.
 
-    # Add the local timezone to start and end
-    utc_offset_sec = time.altzone if time.localtime().tm_isdst else time.timezone
-    utc_offset = datetime.timedelta(seconds=-utc_offset_sec)
-    start = start.replace(tzinfo=datetime.timezone(offset=utc_offset))
-    end = end.replace(tzinfo=datetime.timezone(offset=utc_offset))
+    start_normalized = _normalize_date(start)
+    end_normalized = _normalize_date(end)
 
     report = defaultdict(float)
 
@@ -104,12 +107,11 @@ def create_report(mapping, input_dir, start, end, delimiter, suffix='.tsv', defa
                 if line[5] not in mapping_dict:
                     app = map_app(line[5], mapping['string'], mapping['re'], default_category)
                     mapping_dict[line[5]] = app
-                continue
 
-                date = datetime.datetime.strptime(line[0], '%Y-%m-%dT%H:%M:%S.%f%z')
-                if date < start:
+                date_normalized = _normalize_date(datetime.datetime.strptime(line[0], '%Y-%m-%dT%H:%M:%S.%f%z'))
+                if date_normalized < start_normalized:
                     continue
-                if date > end:
+                if date_normalized > end_normalized:
                     break
 
                 user = line[2]
@@ -119,11 +121,6 @@ def create_report(mapping, input_dir, start, end, delimiter, suffix='.tsv', defa
                 cpu = float(line[6])
 
                 report[(user, project, app)] += cpu
-
-    for elem in sorted(mapping_dict, key=lambda x: str(mapping_dict[x])):
-        print('{}\t{}'.format(elem, mapping_dict[elem]))
-
-    sys.exit()
 
     return report
 
