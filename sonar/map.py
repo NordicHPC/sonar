@@ -145,9 +145,9 @@ def main(config):
     except (ValueError, TypeError):
         end = datetime.datetime.now()
 
-    report = create_report(mapping, config['input_dir'], start=start, end=end, delimiter=config['snap_delimiter'], suffix=config['snap_suffix'], default_category=config['default_category'])
+    report = create_report(mapping, config['input_dir'], start=start, end=end, delimiter=config['input_delimiter'], suffix=config['input_suffix'], default_category=config['default_category'])
 
-    f_writer = csv.writer(sys.stdout, delimiter=config['map_delimiter'], quotechar='"', quoting=csv.QUOTE_MINIMAL)
+    f_writer = csv.writer(sys.stdout, delimiter=config['output_delimiter'], quotechar='"', quoting=csv.QUOTE_MINIMAL)
     for key in sorted(report, key=lambda x: report[x], reverse=True):
         user, project, app = key
         cpu = report[key]

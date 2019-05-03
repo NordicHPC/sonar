@@ -37,14 +37,14 @@ def main():
     # parser for "map"
     parser_map = subparsers.add_parser('map', help='Parse the system snapshots and map applications. Run this only once centrally and typically once a day.')
     parser_map.add_argument('--input-dir', metavar='DIR', required=True, help='Path to the directory with the results of sonar snap. Required!')
-    parser_map.add_argument('--str-map-file', metavar='FILE', help='Path to the file with the string mapping information.')
-    parser_map.add_argument('--re-map-file', metavar='FILE', help='Path to the file with the regexp mapping information.')
+    parser_map.add_argument('--str-map-file', metavar='FILE', help='File with the string mapping information.')
+    parser_map.add_argument('--re-map-file', metavar='FILE', help='File with the regular expression mapping information.')
     parser_map.add_argument('--default-category', metavar='STR', help='Default category for programs that are not recognized.')
     parser_map.add_argument('--start-date', metavar='YYYY-MM-DD', help='Start date for report.')
     parser_map.add_argument('--end-date', metavar='YYYY-MM-DD', help='End date for report.')
-    parser_map.add_argument('--snap-suffix', metavar='STR', default='.tsv', help='Snap file suffix.')
-    parser_map.add_argument('--snap-delimiter', metavar='STR', default='\t', help='Snap delimiter.')
-    parser_map.add_argument('--map-delimiter', metavar='STR', default='\t', help='Map delimiter.')
+    parser_map.add_argument('--input-suffix', metavar='STR', default='.tsv', help='Input file suffix (default: .tsv).')
+    parser_map.add_argument('--input-delimiter', metavar='STR', default='\t', help=r'Delimiter for input columns (default: "\t").')
+    parser_map.add_argument('--output-delimiter', metavar='STR', default='\t', help=r'Delimiter for output columns (default: "\t").')
     parser_map.set_defaults(func=map_main)
 
     # parser for the web frontend
