@@ -1,7 +1,7 @@
 
 
-Roadmap to appusage2
-====================
+Roadmap
+=======
 
 General considerations
 ----------------------
@@ -32,13 +32,13 @@ Python-specific
 -  Flat hierarchy (no classes or as few as possible)
 -  Create a pip-installable module
 -  Use tests (``pytest`` and Travis CI)
--  Use ``pycodestyle`` to inforce a somewhat consistent code style
+-  Use ``pycodestyle`` to enforce a somewhat consistent code style
 
 
 Module structure
 ----------------
 
--  Appusage should consist of three parts:
+-  Sonar should consist of three parts:
 
    -  Data gathering → This just gathers data and saves it. No
       “above-basic” parsing or processing. Should be fast and be able to
@@ -108,11 +108,11 @@ Module 2: Processing
    -  Commands will probably have to be mapped in order: from more
       specific to less specific.
 
--  It may be desireable to allow for some hierarchy or tags for the
+-  It may be desirable to allow for some hierarchy or tags for the
    programs.
 
    -  This would allow users to group e.g. “chemical programs” or
-      “licenced programs”.
+      “licensed programs”.
    -  May be included here or in module 3.
 
 -  Stats for (configurable) time frames should be calculated (this
