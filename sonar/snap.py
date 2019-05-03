@@ -176,5 +176,5 @@ def main(config):
 
     snapshot = create_snapshot(config['cpu_cutoff'], config['mem_cutoff'], config['ignored_users'])
 
-    f_writer = csv.writer(sys.stdout, delimiter=config['snap_delimiter'], quotechar='"', quoting=csv.QUOTE_MINIMAL)
+    f_writer = csv.writer(sys.stdout, delimiter=config['output_delimiter'], quotechar='"', quoting=csv.QUOTE_MINIMAL)
     f_writer.writerows(snapshot)
