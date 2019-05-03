@@ -50,4 +50,4 @@ Authors
 
 - Henrik Rojas Nagel
 - Mathias Bockwoldt
-- [Radovan Bast](https://bast.fr)
+- `Radovan Bast <https://bast.fr>`_
