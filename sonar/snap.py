@@ -93,7 +93,7 @@ def test_extract_processes():
      2093 alice                  10.0   5.0   someapp
     '''
 
-    cpu_percentages, mem_percentages = extract_processes(text, set())
+    cpu_percentages, mem_percentages = extract_processes(raw_text=text, ignored_users=[])
 
     assert cpu_percentages == {('bob', 'slack'): 10.0,
                                ('bob', 'chromium'): 20.0,
@@ -106,7 +106,7 @@ def test_extract_processes():
                                ('bob', 'someapp'): 5.0,
                                ('alice', 'someapp'): 10.0}
 
-    cpu_percentages, mem_percentages = extract_processes(text, ['bob'])
+    cpu_percentages, mem_percentages = extract_processes(raw_text=text, ignored_users=['bob'])
 
     assert cpu_percentages == {('alice', 'slack'): 10.0,
                                ('alice', 'someapp'): 20.0}
@@ -129,7 +129,7 @@ def create_snapshot(cpu_cutoff, mem_cutoff, ignored_users):
     if total_memory < 0:
         total_memory = 1
 
-    cpu_percentages, mem_percentages = extract_processes(output, ignored_users=ignored_users)
+    cpu_percentages, mem_percentages = extract_processes(raw_text=output, ignored_users=ignored_users)
 
     snapshot = []
 
