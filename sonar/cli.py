@@ -39,10 +39,10 @@ def main():
 
     # parser for "snap"
     parser_snap = subparsers.add_parser('snap', help='Take a snapshot of the system. Run this on every node and often (e.g. every 15 minutes).')
-    parser_snap.add_argument('--cpu-cutoff', metavar='FLOAT', type=float, default=0.5, help='CPU Memory consumption percentage cutoff (default: 0.5).')
-    parser_snap.add_argument('--mem-cutoff', metavar='FLOAT', type=float, default=0.0, help='Memory consumption percentage cutoff (default: 0.0).')
-    parser_snap.add_argument('--ignored-users', metavar='STR,STR', default='', type=make_list, help='Users to ignore as comma-separated list (default: None).')
-    parser_snap.add_argument('--output-delimiter', metavar='STR', default='\t', help=r'Delimiter for output columns (default: "\t").')
+    parser_snap.add_argument('--cpu-cutoff', metavar='FLOAT', type=float, default=0.5, help='CPU Memory consumption percentage cutoff [default: %(default)s].')
+    parser_snap.add_argument('--mem-cutoff', metavar='FLOAT', type=float, default=0.0, help='Memory consumption percentage cutoff [default: %(default)s].')
+    parser_snap.add_argument('--ignored-users', metavar='STR,STR', default='', type=make_list, help='Users to ignore as comma-separated list [default: None].')
+    parser_snap.add_argument('--output-delimiter', metavar='STR', default='\t', help=r'Delimiter for output columns [default: %(default)s].')
     parser_snap.set_defaults(func=snap_main)
 
     # parser for "map"
@@ -53,9 +53,9 @@ def main():
     parser_map.add_argument('--default-category', metavar='STR', help='Default category for programs that are not recognized.')
     parser_map.add_argument('--start-date', metavar='YYYY-MM-DD', default=yesterday(), help='Start date for report [default: %(default)s].')
     parser_map.add_argument('--end-date', metavar='YYYY-MM-DD', default=today(), help='End date for report [default: %(default)s].')
-    parser_map.add_argument('--input-suffix', metavar='STR', default='.tsv', help='Input file suffix (default: .tsv).')
-    parser_map.add_argument('--input-delimiter', metavar='STR', default='\t', help=r'Delimiter for input columns (default: "\t").')
-    parser_map.add_argument('--output-delimiter', metavar='STR', default='\t', help=r'Delimiter for output columns (default: "\t").')
+    parser_map.add_argument('--input-suffix', metavar='STR', default='.tsv', help='Input file suffix [default: %(default)s].')
+    parser_map.add_argument('--input-delimiter', metavar='STR', default='\t', help=r'Delimiter for input columns [default: %(default)s].')
+    parser_map.add_argument('--output-delimiter', metavar='STR', default='\t', help=r'Delimiter for output columns [default: %(default)s].')
     parser_map.set_defaults(func=map_main)
 
     # parser for the web frontend
