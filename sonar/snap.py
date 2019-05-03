@@ -116,7 +116,7 @@ def test_extract_processes():
                                ('alice', 'someapp'): 10.0}
 
 
-def create_snapshot(cpu_cutoff, mem_cutoff, ignored_users, hostname_remove):
+def create_snapshot(cpu_cutoff, mem_cutoff, ignored_users):
     '''
     Take a snapshot of the currently running processes that use more than `cpu_cutoff` cpu and `mem_cutoff` memory, ignoring the set or list `ignored_users`. Return a list of lists being lines of columns.
     '''
@@ -126,7 +126,6 @@ def create_snapshot(cpu_cutoff, mem_cutoff, ignored_users, hostname_remove):
     output = check_output('ps -e --no-header -o pid,user:30,pcpu,pmem,comm', shell=True).decode('utf-8')
     timestamp = get_timestamp()
     hostname = socket.gethostname()
-    hostname = hostname.replace(hostname_remove, '')
     slurm_info = get_slurm_info(hostname)
     total_memory = get_available_memory()
     if total_memory < 0:
@@ -175,7 +174,7 @@ def main(config):
     Take a snapshot of the currently running processes that use more than `cpu_cutoff` cpu and `mem_cutoff` memory and print it to stdout.
     '''
 
-    snapshot = create_snapshot(config['cpu_cutoff'], config['mem_cutoff'], config['ignored_users'], config['hostname_remove'])
+    snapshot = create_snapshot(config['cpu_cutoff'], config['mem_cutoff'], config['ignored_users'])
 
     f_writer = csv.writer(sys.stdout, delimiter=config['snap_delimiter'], quotechar='"', quoting=csv.QUOTE_MINIMAL)
     f_writer.writerows(snapshot)
