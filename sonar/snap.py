@@ -148,10 +148,10 @@ def create_snapshot(cpu_cutoff, mem_cutoff, ignored_users):
 
 
 def test_create_snapshot():
-    snapshot = create_snapshot(0.0, 0.0, set(), '')
+    snapshot = create_snapshot(cpu_cutoff=0.0, mem_cutoff=0.0, ignored_users=[])
 
     # With CPU and mem cutoffs set to 0, there should be some processes running...
-    assert len(snapshot)
+    assert len(snapshot) > 0
 
     first_line = snapshot[0]
 
