@@ -21,7 +21,7 @@ def main():
 
     # Inspired by https://stackoverflow.com/q/3609852
     parser = argparse.ArgumentParser(prog='sonar',
-                                     description='Tool to profile usage of HPC resources by regularly probing processes.',
+                                     description='Tool to profile usage of HPC resources by regularly probing processes using ps.',
                                      epilog='Run sonar <subcommand> -h to get more information about subcommands.')
 
     subparsers = parser.add_subparsers(title='Subcommands', metavar='', dest='command')
