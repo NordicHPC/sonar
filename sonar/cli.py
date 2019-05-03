@@ -50,7 +50,7 @@ def main():
     parser_map.add_argument('--input-dir', metavar='DIR', required=True, help='Path to the directory with the results of sonar snap. Required!')
     parser_map.add_argument('--str-map-file', metavar='FILE', help='File with the string mapping information.')
     parser_map.add_argument('--re-map-file', metavar='FILE', help='File with the regular expression mapping information.')
-    parser_map.add_argument('--default-category', metavar='STR', help='Default category for programs that are not recognized.')
+    parser_map.add_argument('--default-category', metavar='STR', default='unknown', help='Default category for programs that are not recognized [default: %(default)s].')
     parser_map.add_argument('--start-date', metavar='YYYY-MM-DD', default=yesterday(), help='Start date for report [default: %(default)s].')
     parser_map.add_argument('--end-date', metavar='YYYY-MM-DD', default=today(), help='End date for report [default: %(default)s].')
     parser_map.add_argument('--input-suffix', metavar='STR', default='.tsv', help='Input file suffix [default: %(default)s].')

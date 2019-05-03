@@ -48,7 +48,7 @@ def memoize_on_first_arg(func):
 
 
 @memoize_on_first_arg
-def map_app(string, string_map, re_map, default_category='UNKNOWN'):
+def map_app(string, string_map, re_map, default_category):
     '''
     Map the `string` using string_map and re_map.
     Returns the app or `default_category` if the appstring could not be identified.
@@ -75,9 +75,9 @@ def test_map_app():
         ('^firefox$', 'NOTFirefox')
     ]
 
-    assert map_app('asf', {}, re_map) == 'UNKNOWN'
-    assert map_app('firefox', {}, re_map) == 'Firefox'
-    assert map_app('aaaxY9zzz', {}, re_map) == 'MyFancyApp'
+    assert map_app('asf', {}, re_map, 'unknown') == 'unknown'
+    assert map_app('firefox', {}, re_map, '') == 'Firefox'
+    assert map_app('aaaxY9zzz', {}, re_map, '') == 'MyFancyApp'
 
     # test the cache
     assert map_app('firefox', {}, re_map=[('^firefox$', 'redefined')]) == 'Firefox'
@@ -89,7 +89,7 @@ def _normalize_date(date):
     return date_normalized
 
 
-def create_report(mapping, input_dir, start, end, delimiter, suffix, default_category='UNKNOWN'):
+def create_report(mapping, input_dir, start, end, delimiter, suffix, default_category):
 
     # FIXME: This should be split into two functions, one reading the files, the other doing the actual parsing for better testing.
 
