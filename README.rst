@@ -26,8 +26,14 @@ For more details please see `the roadmap <doc/roadmap.rst>`_. See also
 our `design decisions <doc/design-decisions.rst>`_.
 
 
-Development
------------
+Quickstart for users
+--------------------
+
+We will document this once the code is on PyPI.
+
+
+Quickstart for developers
+-------------------------
 
 ::
 
