@@ -2,6 +2,7 @@ import os
 import sys
 import argparse
 import configparser
+import datetime
 from sonar.snap import main as snap_main
 from sonar.map import main as map_main
 
@@ -15,6 +16,16 @@ except ModuleNotFoundError:
 
 def make_list(s):
     return s.split(',')
+
+
+def yesterday():
+    d = datetime.datetime.now() - datetime.timedelta(hours=24)
+    return datetime.datetime.strftime(d, '%Y-%m-%d')
+
+
+def today():
+    d = datetime.datetime.now()
+    return datetime.datetime.strftime(d, '%Y-%m-%d')
 
 
 def main():
@@ -40,8 +51,8 @@ def main():
     parser_map.add_argument('--str-map-file', metavar='FILE', help='File with the string mapping information.')
     parser_map.add_argument('--re-map-file', metavar='FILE', help='File with the regular expression mapping information.')
     parser_map.add_argument('--default-category', metavar='STR', help='Default category for programs that are not recognized.')
-    parser_map.add_argument('--start-date', metavar='YYYY-MM-DD', help='Start date for report.')
-    parser_map.add_argument('--end-date', metavar='YYYY-MM-DD', help='End date for report.')
+    parser_map.add_argument('--start-date', metavar='YYYY-MM-DD', default=yesterday(), help='Start date for report [default: %(default)s].')
+    parser_map.add_argument('--end-date', metavar='YYYY-MM-DD', default=today(), help='End date for report [default: %(default)s].')
     parser_map.add_argument('--input-suffix', metavar='STR', default='.tsv', help='Input file suffix (default: .tsv).')
     parser_map.add_argument('--input-delimiter', metavar='STR', default='\t', help=r'Delimiter for input columns (default: "\t").')
     parser_map.add_argument('--output-delimiter', metavar='STR', default='\t', help=r'Delimiter for output columns (default: "\t").')

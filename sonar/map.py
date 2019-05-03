@@ -135,15 +135,8 @@ def main(config):
 
     mapping = read_mapping(config['str_map_file'], config['re_map_file'])
 
-    try:
-        start = datetime.datetime.strptime(config['start_date'], '%Y-%m-%d')
-    except (ValueError, TypeError):
-        start = datetime.datetime.now() - datetime.timedelta(hours=24)
-
-    try:
-        end = datetime.datetime.strptime(config['end_date'], '%Y-%m-%d')
-    except (ValueError, TypeError):
-        end = datetime.datetime.now()
+    start = datetime.datetime.strptime(config['start_date'], '%Y-%m-%d')
+    end = datetime.datetime.strptime(config['end_date'], '%Y-%m-%d')
 
     report = create_report(mapping, config['input_dir'], start=start, end=end, delimiter=config['input_delimiter'], suffix=config['input_suffix'], default_category=config['default_category'])
 
