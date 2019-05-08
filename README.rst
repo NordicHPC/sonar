@@ -50,7 +50,8 @@ Soon (TM) we will share the code via PyPI and then installation will become simp
 Using sonar
 ===========
 
-Currently you can do two things with the code (soon more), take snapshots, and map them to applications/projects/users::
+Currently you can do two things with the code (soon more), take snapshots (``sonar snap``),
+and map them (``sonar map``) to applications/projects/users::
 
   $ sonar --help
 
@@ -72,9 +73,30 @@ Currently you can do two things with the code (soon more), take snapshots, and m
 
   Run sonar <subcommand> -h to get more information about subcommands.
 
-Take a snapshot::
+
+Taking snapshots with ``sonar snap``
+------------------------------------
+
+This is me running ``sonar snap`` on a compute node::
+
+  $ sonar snap
+
+  2019-05-08T15:48:31.369139+0200	c61-8	someuser	someproject	1602448	oceanM	1597.9	1539
+  2019-05-08T15:48:31.369139+0200	c61-8	me	-	-	sonar	17.0	0
+  2019-05-08T15:48:31.369139+0200	c61-8	me	-	-	ps	1.0	0
+
+The columns are: timestamp, hostname, user, Slurm project, Slurm job id,
+process, CPU percentage (this is a multi-core node), and memory percentage.
+They are tab-separated but you can change the separator (``sonar snap
+--help``). You can also change cutoffs to not measure the tool itself.
+
+It can be useful to redirect the result to a file::
 
   $ sonar snap >> /home/user/tmp/example.tsv
+
+
+Map processes to applications/projects/users with ``sonar map``
+---------------------------------------------------------------
 
 Map processes to applications::
 
