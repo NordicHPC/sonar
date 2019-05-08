@@ -10,6 +10,7 @@ using [ps]{.title-ref}.
 - Reference implementation which serves as inspiration: <https://github.com/UNINETTSigma2/appusage>
 - [Design goals and design decisions](doc/design.md)
 - [Roadmap](doc/roadmap.md)
+- [Contributing](doc/contributing.md)
 
 
 ## Authors
@@ -93,15 +94,4 @@ Map processes to applications:
 
 ```
 $ sonar map --input-dir /home/user/tmp/
-```
-
-
-# Contributing
-
-## How to test your changes
-
-Before contributing code changes, please run the test set:
-
-```
-$ pytest -vv -s sonar
 ```
