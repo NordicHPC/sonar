@@ -58,6 +58,41 @@ $ sonar snap >> /home/user/tmp/example.tsv
 ```
 
 
+## Running sonar snap on a cluster
+
+We let cron execute a script every 20 minutes:
+
+```
+10,30,50 * * * * /global/work/sonar/sonar/cron-sonar.sh
+```
+
+The script `cron-sonar.sh` creates a list of active nodes and executes `run-snap.sh` on all of these nodes:
+
+```bash
+#!/bin/bash
+
+SONAR_ROOT="/global/work/sonar"
+
+# get list of all available nodes
+/usr/bin/sinfo -h -r -o '%n' > ${SONAR_ROOT}/tmp/list-of-nodes 2> ${SONAR_ROOT}/tmp/list-of-nodes.err
+
+# run sonar snap on all available nodes
+/usr/bin/pdsh -w \^${SONAR_ROOT}/tmp/list-of-nodes ${SONAR_ROOT}/sonar/run-snap.sh >> ${SONAR_ROOT}/tmp/pdsh.log 2>> ${SONAR_ROOT}/tmp/pdsh.err
+```
+
+In `run-snap.sh` we load the Python environment and wrap around `sonar snap`:
+
+```bash
+#!/usr/bin/env bash
+
+source /global/work/sonar/python/environment
+pyenv shell 3.6.7
+
+source /global/work/sonar/sonar/venv/bin/activate
+sonar snap >> /global/work/sonar/snap-outputs/${HOSTNAME}.tsv
+```
+
+
 ## Map processes to applications with sonar map
 
 Map processes to applications:
