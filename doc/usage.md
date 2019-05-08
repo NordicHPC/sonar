@@ -2,6 +2,8 @@
 
 # Using sonar
 
+## Overview
+
 Currently you can do two things with the code (soon more), take
 snapshots (`sonar snap`), and map them (`sonar map`) to
 applications/projects/users:
