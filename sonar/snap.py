@@ -142,9 +142,9 @@ def create_snapshot(cpu_cutoff, mem_cutoff, ignored_users):
 
     for user, command in cpu_percentages:
         cpu_percentage = cpu_percentages[(user, command)]
-        if cpu_percentage > cpu_cutoff:
+        if cpu_percentage >= cpu_cutoff:
             mem_percentage = mem_percentages[(user, command)]
-            if mem_percentage > mem_cutoff:
+            if mem_percentage >= mem_cutoff:
                 # Weird number is 1024*1024*100 to get MiB and %
                 mem_absolute = int(total_memory * mem_percentage / 104857600)
                 snapshot.append([timestamp, hostname, user, slurm_info[user]['project'], slurm_info[user]['jobid'], command, '{:.1f}'.format(cpu_percentage), mem_absolute])
