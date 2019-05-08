@@ -53,7 +53,11 @@ Map processes to applications::
 
   $ sonar map --input-dir /home/user/tmp/
 
-Test your changes::
+
+How to test your changes
+------------------------
+
+Before contributing code changes, please run the test set::
 
   $ pytest -vv -s sonar
 
