@@ -4,9 +4,8 @@
    :target: LICENSE
 
 
-=====
 sonar
-=====
+*****
 
 Tool to profile usage of HPC resources by regularly probing processes using `ps`.
 
@@ -86,7 +85,8 @@ This is me running ``sonar snap`` on a compute node::
   2019-05-08T15:54:06.292155+0200,c61-8,me,-,-,ps,1.0,0
 
 The columns are: time stamp, hostname, user, Slurm project, Slurm job id,
-process, CPU percentage (this is a multi-core node), and memory percentage.
+process, CPU percentage (this is a multi-core node), and memory percentage (again, multi-core node).
+
 By default they are tab-separated but here I chose to display the result comma-separated.
 You can also change cutoffs to not measure the tool itself (``sonar snap --help``).
 
