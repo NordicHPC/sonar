@@ -5,7 +5,7 @@
 # sonar
 
 Tool to profile usage of HPC resources by regularly probing processes
-using [ps]{.title-ref}.
+using `ps`.
 
 - Reference implementation which serves as inspiration: <https://github.com/UNINETTSigma2/appusage>
 - [Design goals and design decisions](doc/design.md)
