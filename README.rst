@@ -13,6 +13,14 @@ Reference implementation which serves as inspiration:
 https://github.com/UNINETTSigma2/appusage
 
 
+Authors
+-------
+
+- Henrik Rojas Nagel
+- Mathias Bockwoldt
+- `Radovan Bast <https://bast.fr>`_
+
+
 Design goals
 ------------
 
@@ -60,11 +68,3 @@ How to test your changes
 Before contributing code changes, please run the test set::
 
   $ pytest -vv -s sonar
-
-
-Authors
--------
-
-- Henrik Rojas Nagel
-- Mathias Bockwoldt
-- `Radovan Bast <https://bast.fr>`_
