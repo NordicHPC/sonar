@@ -11,66 +11,70 @@ from configparser import ConfigParser
 
 
 def get_timestamp():
-    '''
+    """
     Returns time stamp as string in ISO 8601 with time zone information.
-    '''
+    """
 
     # https://stackoverflow.com/a/28147286
     utc_offset_sec = time.altzone if time.localtime().tm_isdst else time.timezone
     utc_offset = datetime.timedelta(seconds=-utc_offset_sec)
 
-    return datetime.datetime.now().replace(tzinfo=datetime.timezone(offset=utc_offset)).strftime('%Y-%m-%dT%H:%M:%S.%f%z')
+    return (
+        datetime.datetime.now()
+        .replace(tzinfo=datetime.timezone(offset=utc_offset))
+        .strftime("%Y-%m-%dT%H:%M:%S.%f%z")
+    )
 
 
 def get_slurm_info(hostname):
-    '''
+    """
     Try to get the users, jobids, and projects from the current `hostname`.
     If a user should run two jobs with two different projects or jobids, only the last discovered values will be assumed for the user.
 
     :returns: A defaultdict with the mapping from user to project. Project is '-' if the user is not found or slurm is not available.
-    '''
+    """
 
-    user_to_slurminfo = defaultdict(lambda: {'jobid': '-', 'project': '-'})
+    user_to_slurminfo = defaultdict(lambda: {"jobid": "-", "project": "-"})
 
     # %i  Job ID (or <jobid>_<arrayid> for job arrays)
     # %a  Account (project)
     # %u  User
     try:
-        command = 'squeue --noheader --nodelist={} --format=%i,%a,%u'.format(hostname)
-        output = check_output(command, shell=True, stderr=DEVNULL).decode('utf8')
+        command = "squeue --noheader --nodelist={} --format=%i,%a,%u".format(hostname)
+        output = check_output(command, shell=True, stderr=DEVNULL).decode("utf8")
     except SubprocessError:
         # if Slurm is not available, return the empty defaultdict that will return '-' for any key call.
         return user_to_slurminfo
 
-    for line in output.split('\n'):
+    for line in output.split("\n"):
         line = line.strip()
         if not line:
             continue
-        jobid, project, user = line.split(',')
-        user_to_slurminfo[user] = {'jobid': jobid, 'project': project}
+        jobid, project, user = line.split(",")
+        user_to_slurminfo[user] = {"jobid": jobid, "project": project}
 
     return user_to_slurminfo
 
 
 def get_available_memory():
-    '''
+    """
     Tries to return the memory available on the current node in bytes. Returns a negative number if the value cannot be determined.
     This is Unix-specific.
-    '''
+    """
 
     # Another possibility would be to read /proc/meminfo
-    return os.sysconf('SC_PAGE_SIZE') * os.sysconf('SC_PHYS_PAGES')
+    return os.sysconf("SC_PAGE_SIZE") * os.sysconf("SC_PHYS_PAGES")
 
 
 def extract_processes(raw_text, ignored_users):
-    '''
+    """
     Extract user, cpu, memory, and command from `raw_text` that should be the (special) output of a `ps` command.
     `ignored_users` should be a list with users that shall be ignored.
-    '''
+    """
 
     cpu_percentages = defaultdict(float)
     mem_percentages = defaultdict(float)
-    for line in raw_text.split('\n'):
+    for line in raw_text.split("\n"):
         # Using maxsplit to prevent commands to be split. This is unstable if the `ps` call is altered!
         words = line.split(maxsplit=4)
         if len(words) == 5:
@@ -83,7 +87,7 @@ def extract_processes(raw_text, ignored_users):
 
 
 def test_extract_processes():
-    text = '''
+    text = """
      2011 bob                    10.0  20.0   slack
      2022 bob                    10.0  15.0   chromium
     12057 bob                    10.0  15.0   chromium
@@ -91,44 +95,52 @@ def test_extract_processes():
      2087 bob                    10.0   5.0   someapp
      2090 alice                  10.0   5.0   someapp
      2093 alice                  10.0   5.0   someapp
-    '''
+    """
 
-    cpu_percentages, mem_percentages = extract_processes(raw_text=text, ignored_users=[])
+    cpu_percentages, mem_percentages = extract_processes(
+        raw_text=text, ignored_users=[]
+    )
 
-    assert cpu_percentages == {('bob', 'slack'): 10.0,
-                               ('bob', 'chromium'): 20.0,
-                               ('alice', 'slack'): 10.0,
-                               ('bob', 'someapp'): 10.0,
-                               ('alice', 'someapp'): 20.0}
-    assert mem_percentages == {('bob', 'slack'): 20.0,
-                               ('bob', 'chromium'): 30.0,
-                               ('alice', 'slack'): 5.0,
-                               ('bob', 'someapp'): 5.0,
-                               ('alice', 'someapp'): 10.0}
+    assert cpu_percentages == {
+        ("bob", "slack"): 10.0,
+        ("bob", "chromium"): 20.0,
+        ("alice", "slack"): 10.0,
+        ("bob", "someapp"): 10.0,
+        ("alice", "someapp"): 20.0,
+    }
+    assert mem_percentages == {
+        ("bob", "slack"): 20.0,
+        ("bob", "chromium"): 30.0,
+        ("alice", "slack"): 5.0,
+        ("bob", "someapp"): 5.0,
+        ("alice", "someapp"): 10.0,
+    }
 
-    cpu_percentages, mem_percentages = extract_processes(raw_text=text, ignored_users=['bob'])
+    cpu_percentages, mem_percentages = extract_processes(
+        raw_text=text, ignored_users=["bob"]
+    )
 
-    assert cpu_percentages == {('alice', 'slack'): 10.0,
-                               ('alice', 'someapp'): 20.0}
-    assert mem_percentages == {('alice', 'slack'): 5.0,
-                               ('alice', 'someapp'): 10.0}
+    assert cpu_percentages == {("alice", "slack"): 10.0, ("alice", "someapp"): 20.0}
+    assert mem_percentages == {("alice", "slack"): 5.0, ("alice", "someapp"): 10.0}
 
 
 def get_hostname():
     # We could use socket.gethostname() instead but the motivation to ask `hostname -a` is to get
     # the alias. As an example on the Stallo cluster there is a node with hostname "c61-8.local",
     # and alias "c61-8". For Slurm, this node is only "c61-8".
-    return check_output(['hostname', '-a']).rstrip().decode('utf-8')
+    return check_output(["hostname", "-a"]).rstrip().decode("utf-8")
 
 
 def create_snapshot(cpu_cutoff, mem_cutoff, ignored_users):
-    '''
+    """
     Take a snapshot of the currently running processes that use more than `cpu_cutoff` cpu and `mem_cutoff` memory, ignoring the set or list `ignored_users`. Return a list of lists being lines of columns.
-    '''
+    """
 
     # -e      show all processes
     # -o      output formatting. user:30 is a hack to prevent cut-off user names
-    output = check_output('ps -e --no-header -o pid,user:30,pcpu,pmem,comm', shell=True).decode('utf-8')
+    output = check_output(
+        "ps -e --no-header -o pid,user:30,pcpu,pmem,comm", shell=True
+    ).decode("utf-8")
     timestamp = get_timestamp()
     hostname = get_hostname()
     slurm_info = get_slurm_info(hostname)
@@ -136,7 +148,9 @@ def create_snapshot(cpu_cutoff, mem_cutoff, ignored_users):
     if total_memory < 0:
         total_memory = 1
 
-    cpu_percentages, mem_percentages = extract_processes(raw_text=output, ignored_users=ignored_users)
+    cpu_percentages, mem_percentages = extract_processes(
+        raw_text=output, ignored_users=ignored_users
+    )
 
     snapshot = []
 
@@ -147,7 +161,18 @@ def create_snapshot(cpu_cutoff, mem_cutoff, ignored_users):
             if mem_percentage >= mem_cutoff:
                 # Weird number is 1024*1024*100 to get MiB and %
                 mem_absolute = int(total_memory * mem_percentage / 104857600)
-                snapshot.append([timestamp, hostname, user, slurm_info[user]['project'], slurm_info[user]['jobid'], command, '{:.1f}'.format(cpu_percentage), mem_absolute])
+                snapshot.append(
+                    [
+                        timestamp,
+                        hostname,
+                        user,
+                        slurm_info[user]["project"],
+                        slurm_info[user]["jobid"],
+                        command,
+                        "{:.1f}".format(cpu_percentage),
+                        mem_absolute,
+                    ]
+                )
 
     return snapshot
 
@@ -164,22 +189,29 @@ def test_create_snapshot():
     assert len(first_line[0]) == 31
 
     try:
-        float(first_line[6])    # CPU
+        float(first_line[6])  # CPU
     except ValueError:
         raise AssertionError
 
     try:
-        int(first_line[7])      # mem in MiB
+        int(first_line[7])  # mem in MiB
     except ValueError:
         raise AssertionError
 
 
 def main(config):
-    '''
+    """
     Take a snapshot of the currently running processes that use more than `cpu_cutoff` cpu and `mem_cutoff` memory and print it to stdout.
-    '''
+    """
 
-    snapshot = create_snapshot(config['cpu_cutoff'], config['mem_cutoff'], config['ignored_users'])
+    snapshot = create_snapshot(
+        config["cpu_cutoff"], config["mem_cutoff"], config["ignored_users"]
+    )
 
-    f_writer = csv.writer(sys.stdout, delimiter=config['output_delimiter'], quotechar='"', quoting=csv.QUOTE_MINIMAL)
+    f_writer = csv.writer(
+        sys.stdout,
+        delimiter=config["output_delimiter"],
+        quotechar='"',
+        quoting=csv.QUOTE_MINIMAL,
+    )
     f_writer.writerows(snapshot)
