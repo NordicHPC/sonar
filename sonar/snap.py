@@ -2,7 +2,6 @@ import sys
 import os
 import datetime
 import time
-import socket
 import csv
 
 from contextlib import contextmanager
@@ -37,7 +36,8 @@ def get_slurm_info(hostname):
     # %a  Account (project)
     # %u  User
     try:
-        output = check_output('squeue --noheader --nodelist={} --format=%i,%a,%u'.format(hostname), shell=True, stderr=DEVNULL).decode('utf8')
+        command = 'squeue --noheader --nodelist={} --format=%i,%a,%u'.format(hostname)
+        output = check_output(command, shell=True, stderr=DEVNULL).decode('utf8')
     except SubprocessError:
         # if Slurm is not available, return the empty defaultdict that will return '-' for any key call.
         return user_to_slurminfo
@@ -114,6 +114,13 @@ def test_extract_processes():
                                ('alice', 'someapp'): 10.0}
 
 
+def get_hostname():
+    # We could use socket.gethostname() instead but the motivation to ask `hostname -a` is to get
+    # the alias. As an example on the Stallo cluster there is a node with hostname "c61-8.local",
+    # and alias "c61-8". For Slurm, this node is only "c61-8".
+    return check_output(['hostname', '-a']).rstrip().decode('utf-8')
+
+
 def create_snapshot(cpu_cutoff, mem_cutoff, ignored_users):
     '''
     Take a snapshot of the currently running processes that use more than `cpu_cutoff` cpu and `mem_cutoff` memory, ignoring the set or list `ignored_users`. Return a list of lists being lines of columns.
@@ -123,7 +130,7 @@ def create_snapshot(cpu_cutoff, mem_cutoff, ignored_users):
     # -o      output formatting. user:30 is a hack to prevent cut-off user names
     output = check_output('ps -e --no-header -o pid,user:30,pcpu,pmem,comm', shell=True).decode('utf-8')
     timestamp = get_timestamp()
-    hostname = socket.gethostname()
+    hostname = get_hostname()
     slurm_info = get_slurm_info(hostname)
     total_memory = get_available_memory()
     if total_memory < 0:
