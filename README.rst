@@ -26,20 +26,20 @@ For more details please see `the roadmap <doc/roadmap.rst>`_. See also
 our `design decisions <doc/design-decisions.rst>`_.
 
 
-Quickstart for users
---------------------
+Installation
+------------
 
-We will document this once the code is on PyPI.
+Soon (TM) we will share the code via PyPI and then installation will become simpler. Until then::
+
+  $ git clone https://github.com/uit-no/sonar.git
+  $ cd sonar
+  $ virtualenv venv
+  $ source venv/bin/activate
+  $ pip install -e .
 
 
 Quickstart for developers
 -------------------------
-
-Clone and install the code::
-
-  $ virtualenv venv
-  $ source venv/bin/activate
-  $ pip install -e .
 
 Get help text::
 
