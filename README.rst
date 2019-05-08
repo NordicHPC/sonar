@@ -4,6 +4,7 @@
    :target: LICENSE
 
 
+=====
 sonar
 =====
 
@@ -14,7 +15,7 @@ https://github.com/UNINETTSigma2/appusage
 
 
 Authors
--------
+=======
 
 - Henrik Rojas Nagel
 - Mathias Bockwoldt
@@ -22,7 +23,7 @@ Authors
 
 
 Design goals
-------------
+============
 
 - pip installable
 - minimal overhead for recording
@@ -35,7 +36,7 @@ our `design decisions <doc/design-decisions.rst>`_.
 
 
 Installation
-------------
+============
 
 Soon (TM) we will share the code via PyPI and then installation will become simpler. Until then::
 
@@ -46,12 +47,30 @@ Soon (TM) we will share the code via PyPI and then installation will become simp
   $ pip install -e .
 
 
-Quickstart for developers
--------------------------
+Using sonar
+===========
 
-Get help text::
+Currently you can do two things with the code (soon more), take snapshots, and map them to applications/projects/users::
 
   $ sonar --help
+
+  usage: sonar [-h]  ...
+
+  Tool to profile usage of HPC resources by regularly probing processes using ps.
+
+  optional arguments:
+    -h, --help  show this help message and exit
+
+  Subcommands:
+
+      snap      Take a snapshot of the system. Run this on every node and often
+                (e.g. every 15 minutes).
+      map       Parse the system snapshots and map applications. Run this only
+                once centrally and typically once a day.
+      web       Run the web frontend to visualize results. This can run locally
+                or on a server (via uWSGI).
+
+  Run sonar <subcommand> -h to get more information about subcommands.
 
 Take a snapshot::
 
@@ -61,6 +80,9 @@ Map processes to applications::
 
   $ sonar map --input-dir /home/user/tmp/
 
+
+Contributing
+============
 
 How to test your changes
 ------------------------
