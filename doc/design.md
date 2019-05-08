@@ -1,11 +1,14 @@
 
+# Design goals
+
+- pip installable
+- minimal overhead for recording
+- super quick reporting and dashboard, both stdout and web
+- can be used as health check tool
+- data filtering/mapping is asynchronous
+
 
 # Design decisions
-
-We made few design decisions which were controversially discussed. To
-allow our future selves or other developers to not go through the same
-struggle again, they are shortly summarized.
-
 
 ## `ps` instead of `top`
 

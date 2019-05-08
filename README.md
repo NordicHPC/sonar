@@ -7,8 +7,9 @@
 Tool to profile usage of HPC resources by regularly probing processes
 using [ps]{.title-ref}.
 
-Reference implementation which serves as inspiration:
-<https://github.com/UNINETTSigma2/appusage>
+- Reference implementation which serves as inspiration: <https://github.com/UNINETTSigma2/appusage>
+- [Design goals and design decisions](doc/design.md)
+- [Roadmap](doc/roadmap.md)
 
 
 ## Authors
@@ -16,18 +17,6 @@ Reference implementation which serves as inspiration:
 - Henrik Rojas Nagel
 - Mathias Bockwoldt
 - [Radovan Bast](https://bast.fr)
-
-
-## Design goals
-
-- pip installable
-- minimal overhead for recording
-- super quick reporting and dashboard, both stdout and web
-- can be used as health check tool
-- data filtering/mapping is asynchronous
-
-For more details please see [the roadmap](doc/roadmap.md). See also our
-[design decisions](doc/design-decisions.md).
 
 
 ## Installation
