@@ -53,10 +53,6 @@ Map processes to applications::
 
   $ sonar map --input-dir /home/user/tmp/
 
-Visualize results using a web server::
-
-  # this is unfinished
-
 Test your changes::
 
   $ pytest -vv -s sonar
