@@ -8,8 +8,8 @@
   might use a database of some sort.
 - The code should be agnostic of any machine-specifics, except that it
   expects Linux with standard tools. Even Slurm should be optional.
-  - The idea is that it should be debuggable as far as possible on
-    our local computers.
+  The idea is that it should be debuggable as far as possible on
+  our local computers.
 - All machine-specific stuff should be in config files in [YAML format](https://en.wikipedia.org/wiki/YAML).
 - Config folder/files and output files should be possible to specify
   by command line arguments.
@@ -19,50 +19,34 @@
   how and when to clean old files.
 
 
-### Python-specific
+## Python-specific
 
-- Use Python 3 (Python 2 is dead (as is Python 1))
-- Try to be compliant with PEP8 (including 4 spaces)
+- Support only Python 3
+- PEP8 compliant (spaces, no tabs)
 - Flat hierarchy (no classes or as few as possible)
 - Create a pip-installable module
 - Use tests (`pytest` and Travis CI)
 - Use `pycodestyle` to enforce a somewhat consistent code style
+- Use `black` to autoformat code
 
 
 ## Module structure
 
-- Sonar should consist of three parts:
-  - Data gathering → This just gathers data and saves it. No
-    "above-basic" parsing or processing. Should be fast and be able
-    to run e.g. every 30 minutes.
-  - Processing → This parses the files written by the gatherer and
-    creates standardized output depending on the use-case. Speed is
-    not too important, should run e.g. daily.
-  - Visualising → This accepts the processed data and presents it
-    depending on the use-case (website, stdout, or csv)
+Sonar should consist of three parts:
+
+- Data gathering → This just gathers data and saves it. No
+  "above-basic" parsing or processing. Should be fast and be able
+  to run e.g. every 15 minutes.
+- Mapping → This parses the files written by the gatherer and
+  creates standardized output depending on the use-case. Speed is
+  not too important, should run e.g. daily.
+- Visualising → This accepts the processed data and presents it
+  depending on the use-case (website, stdout, or csv).
 
 
 ### Module 1: Data gathering
 
-- Running regularly, e.g. hourly or every 30 minutes
-- Run `ps` to gather running processes.
-- These processes should be filtered by given users (`root`, `nobody`,
-  `syslog`, ...)
-- The shell command might be extended to also gather memory usage.
-- An optional call to `squeue` could gather projects
-- Using the `squeue` call, we may find stray processes (good old
-  `gaussian`, for example)
-- In the end, we should save (at least):
-  - Date-time in ISO 8601 with time zone:
-    2018-11-29T12:05:47.123456+01:00
-  - hostname
-  - username
-  - optional project from Slurm (or `-` if no project or no Slurm)
-  - command
-  - memory and cpu usage info
-- Preliminary format for saving is tab-separated values (tsv)
-- We will append new entries to files and not create a new file for
-  each snapshot.
+This milestone is in principle complete.
 
 
 ### Module 2: Processing
