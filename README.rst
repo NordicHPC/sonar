@@ -79,16 +79,16 @@ Taking snapshots with ``sonar snap``
 
 This is me running ``sonar snap`` on a compute node::
 
-  $ sonar snap
+  $ sonar snap --output-delimiter ","
 
-  2019-05-08T15:48:31.369139+0200	c61-8	someuser	someproject	1602448	oceanM	1597.9	1539
-  2019-05-08T15:48:31.369139+0200	c61-8	me	-	-	sonar	17.0	0
-  2019-05-08T15:48:31.369139+0200	c61-8	me	-	-	ps	1.0	0
+  2019-05-08T15:54:06.292155+0200,c61-8,someuser,someproject,1602448,oceanM,1598.1,1539
+  2019-05-08T15:54:06.292155+0200,c61-8,me,-,-,sonar,16.5,0
+  2019-05-08T15:54:06.292155+0200,c61-8,me,-,-,ps,1.0,0
 
-The columns are: timestamp, hostname, user, Slurm project, Slurm job id,
+The columns are: time stamp, hostname, user, Slurm project, Slurm job id,
 process, CPU percentage (this is a multi-core node), and memory percentage.
-They are tab-separated but you can change the separator (``sonar snap
---help``). You can also change cutoffs to not measure the tool itself.
+By default they are tab-separated but here I chose to display the result comma-separated.
+You can also change cutoffs to not measure the tool itself (``sonar snap --help``).
 
 It can be useful to redirect the result to a file::
 
