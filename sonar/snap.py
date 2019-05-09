@@ -3,6 +3,7 @@ import os
 import datetime
 import time
 import csv
+import socket
 
 from contextlib import contextmanager
 from subprocess import check_output, SubprocessError, DEVNULL
@@ -125,10 +126,15 @@ def test_extract_processes():
 
 
 def get_hostname():
-    # We could use socket.gethostname() instead but the motivation to ask `hostname -a` is to get
-    # the alias. As an example on the Stallo cluster there is a node with hostname "c61-8.local",
-    # and alias "c61-8". For Slurm, this node is only "c61-8".
-    return check_output(["hostname", "-a"]).rstrip().decode("utf-8")
+    # we first try to get the hostname alias
+    # we do this because at least on our cluster slurm uses
+    # the alias ("c61-8") instead of the full hostname (e.g. "c61-8.local")
+    result = check_output(["hostname", "-a"]).rstrip().decode("utf-8")
+    if result != "":
+        return result
+    else:
+        # if alias is empty, we try hostname
+        return socket.gethostname()
 
 
 def create_snapshot(cpu_cutoff, mem_cutoff, ignored_users):
