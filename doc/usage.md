@@ -44,8 +44,8 @@ $ sonar snap --output-delimiter ","
 ```
 
 The columns are: time stamp, hostname, number of cores on this node, user, Slurm project, Slurm job
-id, process, CPU percentage (this is a multi-core node), and memory
-percentage (again, multi-core node).
+id, process, CPU percentage (this is a 20-core node), and memory
+percentage (again, 20-core node).
 
 By default they are tab-separated but here I chose to display the result
 comma-separated. You can also change cutoffs to not measure the tool
