@@ -4,6 +4,7 @@ import datetime
 import time
 import csv
 import socket
+import multiprocessing
 
 from contextlib import contextmanager
 from subprocess import check_output, SubprocessError, DEVNULL
@@ -149,6 +150,7 @@ def create_snapshot(cpu_cutoff, mem_cutoff, ignored_users):
     ).decode("utf-8")
     timestamp = get_timestamp()
     hostname = get_hostname()
+    num_cores = multiprocessing.cpu_count()
     slurm_info = get_slurm_info(hostname)
     total_memory = get_available_memory()
     if total_memory < 0:
@@ -171,6 +173,7 @@ def create_snapshot(cpu_cutoff, mem_cutoff, ignored_users):
                     [
                         timestamp,
                         hostname,
+                        num_cores,
                         user,
                         slurm_info[user]["project"],
                         slurm_info[user]["jobid"],
@@ -195,12 +198,12 @@ def test_create_snapshot():
     assert len(first_line[0]) == 31
 
     try:
-        float(first_line[6])  # CPU
+        float(first_line[7])  # CPU
     except ValueError:
         raise AssertionError
 
     try:
-        int(first_line[7])  # mem in MiB
+        int(first_line[8])  # mem in MiB
     except ValueError:
         raise AssertionError
 

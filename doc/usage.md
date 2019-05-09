@@ -38,12 +38,12 @@ This is me running `sonar snap` on a compute node:
 ```
 $ sonar snap --output-delimiter ","
 
-2019-05-08T15:54:06.292155+0200,c61-8,someuser,someproject,1602448,oceanM,1598.1,1539
-2019-05-08T15:54:06.292155+0200,c61-8,me,-,-,sonar,16.5,0
-2019-05-08T15:54:06.292155+0200,c61-8,me,-,-,ps,1.0,0
+2019-05-08T15:54:06.292155+0200,c61-8,20,someuser,someproject,1602448,oceanM,1598.1,1539
+2019-05-08T15:54:06.292155+0200,c61-8,20,me,-,-,sonar,16.5,0
+2019-05-08T15:54:06.292155+0200,c61-8,20,me,-,-,ps,1.0,0
 ```
 
-The columns are: time stamp, hostname, user, Slurm project, Slurm job
+The columns are: time stamp, hostname, number of cores on this node, user, Slurm project, Slurm job
 id, process, CPU percentage (this is a multi-core node), and memory
 percentage (again, multi-core node).
 
