@@ -99,6 +99,7 @@ def create_report(string_map, re_map, input_dir, start, end, delimiter, suffix, 
     end_normalized = _normalize_date(end)
 
     report = defaultdict(float)
+    only_sum = defaultdict(float)
 
     for filename in glob(os.path.normpath(os.path.join(input_dir, "*" + suffix))):
         with open(filename) as f:
@@ -114,8 +115,9 @@ def create_report(string_map, re_map, input_dir, start, end, delimiter, suffix, 
                     cpu = float(line[6])
 
                     report[(user, project, app)] += cpu
+                    only_sum[(app, process)] += cpu
 
-    return report
+    return report, only_sum
 
 
 def main(config):
@@ -128,7 +130,7 @@ def main(config):
     start = datetime.datetime.strptime(config["start_date"], "%Y-%m-%d")
     end = datetime.datetime.strptime(config["end_date"], "%Y-%m-%d")
 
-    report = create_report(
+    report, only_sum = create_report(
         string_map,
         re_map,
         config["input_dir"],
@@ -138,6 +140,29 @@ def main(config):
         suffix=config["input_suffix"],
         default_category=config["default_category"],
     )
+
+    if config["only_check_mapping"]:
+
+        cpu_sum = 0.0
+        for key in only_sum:
+            cpu_sum += only_sum[key]
+
+        cpu_sum_unknown = 0.0
+        for key in only_sum:
+            if key[0] == config["default_category"]:
+                cpu_sum_unknown += only_sum[key]
+
+        for app, process in sorted(only_sum, key=lambda x: only_sum[x], reverse=True):
+            cpu = only_sum[(app, process)]
+            if app != config["default_category"]:
+                print(f'- {app:10s} {process:20s} {100.0*cpu/cpu_sum:6.2f}%')
+
+        print(f'\nunknown processes ({100.0*cpu_sum_unknown/cpu_sum:.2f}%):')
+        for app, process in sorted(only_sum, key=lambda x: only_sum[x], reverse=True):
+            cpu = only_sum[(app, process)]
+            if app == config["default_category"]:
+                print(f'- {process:20s} {100.0*cpu/cpu_sum:6.2f}%')
+        return
 
     f_writer = csv.writer(
         sys.stdout,
