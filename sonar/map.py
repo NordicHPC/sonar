@@ -158,10 +158,13 @@ def main(config):
                 print(f'- {app:20s} {process:20s} {100.0*cpu/cpu_sum:6.2f}%')
 
         print(f'\nunknown processes ({100.0*cpu_sum_unknown/cpu_sum:.2f}%):')
+        print(f'(only contributions above 0.1% shown)')
         for app, process in sorted(only_sum, key=lambda x: only_sum[x], reverse=True):
             cpu = only_sum[(app, process)]
+            percentage = 100.0*cpu/cpu_sum
             if app == config["default_category"]:
-                print(f'- {process:20s} {100.0*cpu/cpu_sum:6.2f}%')
+                if percentage > 0.1:
+                    print(f'- {process:20s} {percentage:6.2f}%')
         return
 
     f_writer = csv.writer(
