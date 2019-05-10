@@ -92,6 +92,8 @@ source /global/work/sonar/sonar/venv/bin/activate
 sonar snap --ignored-users root >> /global/work/sonar/snap-outputs/${HOSTNAME}.tsv
 ```
 
+This produces ca. 10 MB data per day.
+
 
 ## Map processes to applications with sonar map
 
