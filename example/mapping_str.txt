@@ -21,3 +21,6 @@ Qdyn5p          Qdyn
 namd2           NAMD
 fiber           fiber
 orca_scf_mpi    Orca
+mdrun_mpi       GROMACS
+stagyympi       StagYY
+lmp_mpi         LAMMPS
