@@ -124,27 +124,32 @@ def main(config):
 
     if config["only_check_mapping"]:
 
+        percentage_cutoff = 0.5
+        print(f'(only contributions above {percentage_cutoff}% shown)')
+
         cpu_sum = 0.0
         for key in only_sum:
             cpu_sum += only_sum[key]
 
-        cpu_sum_unknown = 0.0
-        for key in only_sum:
-            if key[0] == config["default_category"]:
-                cpu_sum_unknown += only_sum[key]
-
-        for app, process in sorted(only_sum, key=lambda x: only_sum[x], reverse=True):
-            cpu = only_sum[(app, process)]
+        only_sum_known = defaultdict(float)
+        for app, process in only_sum:
             if app != config["default_category"]:
-                print(f'- {app:20s} {process:20s} {100.0*cpu/cpu_sum:6.2f}%')
+                only_sum_known[app] += only_sum[(app, process)]
+        for app in sorted(only_sum_known, key=lambda x: only_sum_known[x], reverse=True):
+            percentage = 100.0 * only_sum_known[app] / cpu_sum
+            if percentage > percentage_cutoff:
+                print(f'- {app:20s} {percentage:6.2f}%')
 
-        print(f'\nunknown processes ({100.0*cpu_sum_unknown/cpu_sum:.2f}%):')
-        print(f'(only contributions above 0.1% shown)')
-        for app, process in sorted(only_sum, key=lambda x: only_sum[x], reverse=True):
-            cpu = only_sum[(app, process)]
-            percentage = 100.0 * cpu / cpu_sum
+        cpu_sum_unknown = 0.0
+        for app, process in only_sum:
             if app == config["default_category"]:
-                if percentage > 0.1:
+                cpu_sum_unknown += only_sum[(app, process)]
+        print(f'\nunknown processes ({100.0*cpu_sum_unknown/cpu_sum:.2f}%):')
+        for app, process in sorted(only_sum, key=lambda x: only_sum[x], reverse=True):
+            if app == config["default_category"]:
+                cpu = only_sum[(app, process)]
+                percentage = 100.0 * cpu / cpu_sum
+                if percentage > percentage_cutoff:
                     print(f'- {process:20s} {percentage:6.2f}%')
         return
 
