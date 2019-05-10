@@ -17,5 +17,7 @@ mrchem.x        MRChem
 fvcom.bin       FVCOM
 iSALE2D         iSALE2D
 qdyn5p          Qdyn
+Qdyn5p          Qdyn
 namd2           NAMD
 fiber           fiber
+orca_scf_mpi    Orca
