@@ -104,6 +104,36 @@ def create_report(string_map, re_map, input_dir, delimiter, suffix, default_cate
     return report, only_sum
 
 
+def output(report, only_sum, default_category):
+    percentage_cutoff = 0.5
+    print(f'(only contributions above {percentage_cutoff}% shown)')
+
+    cpu_sum = 0.0
+    for key in only_sum:
+        cpu_sum += only_sum[key]
+
+    only_sum_known = defaultdict(float)
+    for app, process in only_sum:
+        if app != default_category:
+            only_sum_known[app] += only_sum[(app, process)]
+    for app in sorted(only_sum_known, key=lambda x: only_sum_known[x], reverse=True):
+        percentage = 100.0 * only_sum_known[app] / cpu_sum
+        if percentage > percentage_cutoff:
+            print(f'- {app:20s} {percentage:6.2f}%')
+
+    cpu_sum_unknown = 0.0
+    for app, process in only_sum:
+        if app == default_category:
+            cpu_sum_unknown += only_sum[(app, process)]
+    print(f'\nunknown processes ({100.0*cpu_sum_unknown/cpu_sum:.2f}%):')
+    for app, process in sorted(only_sum, key=lambda x: only_sum[x], reverse=True):
+        if app == default_category:
+            cpu = only_sum[(app, process)]
+            percentage = 100.0 * cpu / cpu_sum
+            if percentage > percentage_cutoff:
+                print(f'- {process:20s} {percentage:6.2f}%')
+
+
 def main(config):
     """
     Map sonar snap results to a provided list of programs and create an output that is suitable for the dashboard etc.
@@ -121,34 +151,7 @@ def main(config):
     )
 
     if config["only_check_mapping"]:
-
-        percentage_cutoff = 0.5
-        print(f'(only contributions above {percentage_cutoff}% shown)')
-
-        cpu_sum = 0.0
-        for key in only_sum:
-            cpu_sum += only_sum[key]
-
-        only_sum_known = defaultdict(float)
-        for app, process in only_sum:
-            if app != config["default_category"]:
-                only_sum_known[app] += only_sum[(app, process)]
-        for app in sorted(only_sum_known, key=lambda x: only_sum_known[x], reverse=True):
-            percentage = 100.0 * only_sum_known[app] / cpu_sum
-            if percentage > percentage_cutoff:
-                print(f'- {app:20s} {percentage:6.2f}%')
-
-        cpu_sum_unknown = 0.0
-        for app, process in only_sum:
-            if app == config["default_category"]:
-                cpu_sum_unknown += only_sum[(app, process)]
-        print(f'\nunknown processes ({100.0*cpu_sum_unknown/cpu_sum:.2f}%):')
-        for app, process in sorted(only_sum, key=lambda x: only_sum[x], reverse=True):
-            if app == config["default_category"]:
-                cpu = only_sum[(app, process)]
-                percentage = 100.0 * cpu / cpu_sum
-                if percentage > percentage_cutoff:
-                    print(f'- {process:20s} {percentage:6.2f}%')
+        output(report, only_sum, config["default_category"])
         return
 
     f_writer = csv.writer(
