@@ -1,4 +1,0 @@
-^vasp.+	Vasp
-^l[0-9]+\.exe[l]?	Gaussian
-^python[0-9\.]*	Script
-^blast.*	Blast

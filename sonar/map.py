@@ -23,7 +23,7 @@ def read_mapping(string_map_file, re_map_file):
         if file_name:
             try:
                 with open(file_name) as f:
-                    f_reader = csv.reader(f, delimiter="\t", quotechar='"')
+                    f_reader = csv.reader(f, skipinitialspace=True, delimiter=" ", quotechar='"')
                     for k, v in f_reader:
                         l.append((k, v))
             except FileNotFoundError:

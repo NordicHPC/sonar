@@ -1,0 +1,15 @@
+london.x        London
+MATLAB          Matlab
+oceanM          ROMS
+adf.exe         ADF
+wrf.exe         WRF
+issm.exe        ISSM
+std             Vasp
+ccsm.exe        CCSM
+gpaw-python     GPAW
+lsdalton.x      Dalton
+java            Script
+g16nbo.i8.exe   NBO
+hfst_tokenize   HFST
+mrchem.x        MRChem
+fvcom.bin       FVCOM

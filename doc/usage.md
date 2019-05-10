@@ -100,3 +100,5 @@ Map processes to applications:
 ```
 $ sonar map --input-dir /home/user/tmp/
 ```
+
+Mapping files contain a space-separated (does not matter how many spaces) mapping from process to application.
