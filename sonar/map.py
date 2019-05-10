@@ -47,7 +47,7 @@ def memoize_on_first_arg(func):
 
 
 @memoize_on_first_arg
-def map_app(string, string_map, re_map, default_category):
+def map_process(string, string_map, re_map, default_category):
     """
     Map the `string` using string_map and re_map.
     Returns the app or `default_category` if the appstring could not be identified.
@@ -65,7 +65,7 @@ def map_app(string, string_map, re_map, default_category):
     return default_category
 
 
-def test_map_app():
+def test_map_process():
     # FIXME: This needs more tests including string_map
     re_map = [
         ("^skypeforlinux$", "Skype"),
@@ -74,12 +74,12 @@ def test_map_app():
         ("^firefox$", "NOTFirefox"),
     ]
 
-    assert map_app("asf", {}, re_map, "unknown") == "unknown"
-    assert map_app("firefox", {}, re_map, "") == "Firefox"
-    assert map_app("aaaxY9zzz", {}, re_map, "") == "MyFancyApp"
+    assert map_process("asf", {}, re_map, "unknown") == "unknown"
+    assert map_process("firefox", {}, re_map, "") == "Firefox"
+    assert map_process("aaaxY9zzz", {}, re_map, "") == "MyFancyApp"
 
     # test the cache
-    assert map_app("firefox", {}, re_map=[("^firefox$", "redefined")]) == "Firefox"
+    assert map_process("firefox", {}, re_map=[("^firefox$", "redefined")]) == "Firefox"
 
 
 def _normalize_date(date):
@@ -103,11 +103,12 @@ def create_report(mapping, input_dir, start, end, delimiter, suffix, default_cat
         with open(filename) as f:
             f_reader = csv.reader(f, delimiter=delimiter, quotechar='"')
             for line in f_reader:
-                if line[5] not in mapping_dict:
-                    app = map_app(
-                        line[5], mapping["string"], mapping["re"], default_category
+                process = line[-3]
+                if process not in mapping_dict:
+                    app = map_process(
+                        process, mapping["string"], mapping["re"], default_category
                     )
-                    mapping_dict[line[5]] = app
+                    mapping_dict[process] = app
 
                 date_normalized = _normalize_date(
                     datetime.datetime.strptime(line[0], "%Y-%m-%dT%H:%M:%S.%f%z")
@@ -120,8 +121,8 @@ def create_report(mapping, input_dir, start, end, delimiter, suffix, default_cat
                 user = line[2]
                 project = line[3]
                 jobid = line[4]
-                app = map_app(
-                    line[5], mapping["string"], mapping["re"], default_category
+                app = map_process(
+                    process, mapping["string"], mapping["re"], default_category
                 )
                 cpu = float(line[6])
 
