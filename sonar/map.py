@@ -47,19 +47,19 @@ def memoize_on_first_arg(func):
 
 
 @memoize_on_first_arg
-def map_process(string, string_map, re_map, default_category):
+def map_process(process, string_map, re_map, default_category):
     """
-    Map the `string` using string_map and re_map.
-    Returns the app or `default_category` if the appstring could not be identified.
+    Map the process using string_map and re_map.
+    Returns the app or `default_category` if the process could not be identified.
     """
 
     try:
-        return string_map[string]
+        return string_map[process]
     except KeyError:
         pass
 
     for k, v in re_map:
-        if re.search(k, string) is not None:
+        if re.search(k, process) is not None:
             return v
 
     return default_category
