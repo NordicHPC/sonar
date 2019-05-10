@@ -84,8 +84,6 @@ def test_map_process():
 
 def create_report(string_map, re_map, input_dir, delimiter, suffix, default_category):
 
-    # FIXME: This should be split into two functions, one reading the files, the other doing the actual parsing for better testing.
-
     report = defaultdict(float)
     only_sum = defaultdict(float)
 
@@ -93,15 +91,15 @@ def create_report(string_map, re_map, input_dir, delimiter, suffix, default_cate
         with open(filename) as f:
             f_reader = csv.reader(f, delimiter=delimiter, quotechar='"')
             for line in f_reader:
-                user = line[2]
-                project = line[3]
-                jobid = line[4]
-                process = line[-3]
+                _, node, num_cores, user, project, job_id, process, cpu_percentage, mem_percentage = tuple(line)
+                num_cores = int(num_cores)
+                job_id = int(job_id)
+                cpu_percentage = float(cpu_percentage)
+                mem_percentage = float(mem_percentage)
                 app = map_process(process, string_map, re_map, default_category)
-                cpu = float(line[6])
 
-                report[(user, project, app)] += cpu
-                only_sum[(app, process)] += cpu
+                report[(user, project, app)] += cpu_percentage
+                only_sum[(app, process)] += cpu_percentage
 
     return report, only_sum
 
