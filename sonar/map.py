@@ -29,7 +29,7 @@ def read_mapping(string_map_file, re_map_file):
             except FileNotFoundError:
                 print('ERROR: file "{0}" not found.'.format(file_name), file=sys.stderr)
 
-    return {"string": dict(string_map), "re": re_map}
+    return dict(string_map), re_map
 
 
 def memoize_on_first_arg(func):
@@ -91,7 +91,7 @@ def _normalize_date(date):
     return date_normalized
 
 
-def create_report(mapping, input_dir, start, end, delimiter, suffix, default_category):
+def create_report(string_map, re_map, input_dir, start, end, delimiter, suffix, default_category):
 
     # FIXME: This should be split into two functions, one reading the files, the other doing the actual parsing for better testing.
 
@@ -110,9 +110,7 @@ def create_report(mapping, input_dir, start, end, delimiter, suffix, default_cat
                     project = line[3]
                     jobid = line[4]
                     process = line[-3]
-                    app = map_process(
-                        process, mapping["string"], mapping["re"], default_category
-                    )
+                    app = map_process(process, string_map, re_map, default_category)
                     cpu = float(line[6])
 
                     report[(user, project, app)] += cpu
@@ -125,13 +123,14 @@ def main(config):
     Map sonar snap results to a provided list of programs and create an output that is suitable for the dashboard etc.
     """
 
-    mapping = read_mapping(config["str_map_file"], config["re_map_file"])
+    string_map, re_map = read_mapping(config["str_map_file"], config["re_map_file"])
 
     start = datetime.datetime.strptime(config["start_date"], "%Y-%m-%d")
     end = datetime.datetime.strptime(config["end_date"], "%Y-%m-%d")
 
     report = create_report(
-        mapping,
+        string_map,
+        re_map,
         config["input_dir"],
         start=start,
         end=end,
