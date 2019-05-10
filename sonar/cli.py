@@ -19,11 +19,6 @@ def make_list(s):
     return s.split(",")
 
 
-def yesterday():
-    d = datetime.datetime.now() - datetime.timedelta(hours=24)
-    return datetime.datetime.strftime(d, "%Y-%m-%d")
-
-
 def today():
     d = datetime.datetime.now()
     return datetime.datetime.strftime(d, "%Y-%m-%d")
@@ -104,7 +99,7 @@ def main():
     parser_map.add_argument(
         "--start-date",
         metavar="YYYY-MM-DD",
-        default=yesterday(),
+        default="1970-01-01",
         help="Start date for report [default: %(default)s].",
     )
     parser_map.add_argument(
