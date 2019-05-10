@@ -97,18 +97,6 @@ def main():
         help="Default category for programs that are not recognized [default: %(default)s].",
     )
     parser_map.add_argument(
-        "--start-date",
-        metavar="YYYY-MM-DD",
-        default="1970-01-01",
-        help="Start date for report [default: %(default)s].",
-    )
-    parser_map.add_argument(
-        "--end-date",
-        metavar="YYYY-MM-DD",
-        default=today(),
-        help="End date for report [default: %(default)s].",
-    )
-    parser_map.add_argument(
         "--input-suffix",
         metavar="STR",
         default=".tsv",

@@ -82,21 +82,9 @@ def test_map_process():
     assert map_process("firefox", {}, re_map=[("^firefox$", "redefined")]) == "Firefox"
 
 
-def _normalize_date(date):
-    """
-    Normalizes a datetime to YYYY-MM-DD.
-    """
-    _intermediate = datetime.datetime.strftime(date, "%Y-%m-%d")
-    date_normalized = datetime.datetime.strptime(_intermediate, "%Y-%m-%d")
-    return date_normalized
-
-
-def create_report(string_map, re_map, input_dir, start, end, delimiter, suffix, default_category):
+def create_report(string_map, re_map, input_dir, delimiter, suffix, default_category):
 
     # FIXME: This should be split into two functions, one reading the files, the other doing the actual parsing for better testing.
-
-    start_normalized = _normalize_date(start)
-    end_normalized = _normalize_date(end)
 
     report = defaultdict(float)
     only_sum = defaultdict(float)
@@ -105,17 +93,15 @@ def create_report(string_map, re_map, input_dir, start, end, delimiter, suffix, 
         with open(filename) as f:
             f_reader = csv.reader(f, delimiter=delimiter, quotechar='"')
             for line in f_reader:
-                date_normalized = _normalize_date(datetime.datetime.strptime(line[0], "%Y-%m-%dT%H:%M:%S.%f%z"))
-                if start_normalized <= date_normalized <= end_normalized:
-                    user = line[2]
-                    project = line[3]
-                    jobid = line[4]
-                    process = line[-3]
-                    app = map_process(process, string_map, re_map, default_category)
-                    cpu = float(line[6])
+                user = line[2]
+                project = line[3]
+                jobid = line[4]
+                process = line[-3]
+                app = map_process(process, string_map, re_map, default_category)
+                cpu = float(line[6])
 
-                    report[(user, project, app)] += cpu
-                    only_sum[(app, process)] += cpu
+                report[(user, project, app)] += cpu
+                only_sum[(app, process)] += cpu
 
     return report, only_sum
 
@@ -127,15 +113,10 @@ def main(config):
 
     string_map, re_map = read_mapping(config["str_map_file"], config["re_map_file"])
 
-    start = datetime.datetime.strptime(config["start_date"], "%Y-%m-%d")
-    end = datetime.datetime.strptime(config["end_date"], "%Y-%m-%d")
-
     report, only_sum = create_report(
         string_map,
         re_map,
         config["input_dir"],
-        start=start,
-        end=end,
         delimiter=config["input_delimiter"],
         suffix=config["input_suffix"],
         default_category=config["default_category"],
