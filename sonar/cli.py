@@ -114,11 +114,6 @@ def main():
         default="\t",
         help=r"Delimiter for output columns [default: %(default)s].",
     )
-    parser_map.add_argument(
-        "--only-check-mapping",
-        action='store_true',
-        help="Sum up processes and map them [default: %(default)s]. This is useful to check whether the mapping files are sufficiently complete.",
-    )
     parser_map.set_defaults(func=map_main)
 
     # parser for the web frontend

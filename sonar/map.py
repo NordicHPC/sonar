@@ -150,17 +150,20 @@ def main(config):
         default_category=config["default_category"],
     )
 
-    if config["only_check_mapping"]:
-        output(report, only_sum, config["default_category"])
-        return
+    output(report, only_sum, config["default_category"])
 
-    f_writer = csv.writer(
-        sys.stdout,
-        delimiter=config["output_delimiter"],
-        quotechar='"',
-        quoting=csv.QUOTE_MINIMAL,
-    )
-    for key in sorted(report, key=lambda x: report[x], reverse=True):
-        user, project, app = key
-        cpu = report[key]
-        f_writer.writerow([user, project, app, "{:.1f}".format(cpu)])
+#   let's do file export a bit later
+#   first i want to know what data i would like to plot and this will
+#   be prototyped using CLI alone
+#   later: data export and web
+
+#   f_writer = csv.writer(
+#       sys.stdout,
+#       delimiter=config["output_delimiter"],
+#       quotechar='"',
+#       quoting=csv.QUOTE_MINIMAL,
+#   )
+#   for key in sorted(report, key=lambda x: report[x], reverse=True):
+#       user, project, app = key
+#       cpu = report[key]
+#       f_writer.writerow([user, project, app, "{:.1f}".format(cpu)])
