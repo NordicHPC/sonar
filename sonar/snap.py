@@ -188,28 +188,6 @@ def create_snapshot(cpu_cutoff, mem_cutoff, ignored_users):
     return snapshot
 
 
-def test_create_snapshot():
-    snapshot = create_snapshot(cpu_cutoff=0.0, mem_cutoff=0.0, ignored_users=[])
-
-    # With CPU and mem cutoffs set to 0, there should be some processes running...
-    assert len(snapshot) > 0
-
-    first_line = snapshot[0]
-
-    # The timestamp is always 31 characters long (until the year 10 000...)
-    assert len(first_line[0]) == 31
-
-    try:
-        float(first_line[7])  # CPU
-    except ValueError:
-        raise AssertionError
-
-    try:
-        int(first_line[8])  # mem in MiB
-    except ValueError:
-        raise AssertionError
-
-
 def main(config):
     """
     Take a snapshot of the currently running processes that use more than `cpu_cutoff` cpu and `mem_cutoff` memory and print it to stdout.
