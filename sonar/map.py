@@ -100,25 +100,16 @@ def create_report(mapping, input_dir, start, end, delimiter, suffix, default_cat
 
     report = defaultdict(float)
 
-    mapping_dict = {}
-
     for filename in glob(os.path.normpath(os.path.join(input_dir, "*" + suffix))):
         with open(filename) as f:
             f_reader = csv.reader(f, delimiter=delimiter, quotechar='"')
             for line in f_reader:
-                process = line[-3]
-                if process not in mapping_dict:
-                    app = map_process(
-                        process, mapping["string"], mapping["re"], default_category
-                    )
-                    mapping_dict[process] = app
-
                 date_normalized = _normalize_date(datetime.datetime.strptime(line[0], "%Y-%m-%dT%H:%M:%S.%f%z"))
                 if start_normalized <= date_normalized <= end_normalized:
-
                     user = line[2]
                     project = line[3]
                     jobid = line[4]
+                    process = line[-3]
                     app = map_process(
                         process, mapping["string"], mapping["re"], default_category
                     )
