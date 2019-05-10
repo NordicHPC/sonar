@@ -4,10 +4,11 @@ oceanM          ROMS
 adf.exe         ADF
 wrf.exe         WRF
 issm.exe        ISSM
-std             Vasp
+std             VASP
 ccsm.exe        CCSM
 gpaw-python     GPAW
-lsdalton.x      Dalton
+lsdalton.x      LSDalton
+dalton.x        Dalton
 java            "Java script"
 g16nbo.i8.exe   NBO
 hfst_tokenize   HFST
