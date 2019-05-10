@@ -83,6 +83,9 @@ def test_map_process():
 
 
 def _normalize_date(date):
+    """
+    Normalizes a datetime to YYYY-MM-DD.
+    """
     _intermediate = datetime.datetime.strftime(date, "%Y-%m-%d")
     date_normalized = datetime.datetime.strptime(_intermediate, "%Y-%m-%d")
     return date_normalized
