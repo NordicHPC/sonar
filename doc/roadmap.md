@@ -15,7 +15,7 @@
   by command line arguments.
 - Usage of Slurm should be possible to specify by command line
   argument.
-- We should have a (rough) plan on how long we should keep files and
+- We should recommendations on how long to keep files and
   how and when to clean old files.
 
 
@@ -34,17 +34,17 @@
 
 Sonar should consist of three parts:
 
-- Data gathering → This just gathers data and saves it. No
+- Snapshotting of "ps". This just gathers data and saves it. No
   "above-basic" parsing or processing. Should be fast and be able
   to run e.g. every 20 minutes.
-- Mapping → This parses the files written by the gatherer and
+- Mapping: This parses the files written by the gatherer and
   creates standardized output depending on the use-case. Speed is
   not too important, should run e.g. daily.
-- Visualising → This accepts the processed data and presents it
+- Visualising: This accepts the processed data and presents it
   depending on the use-case (website, stdout, or csv).
 
 
-### Module 1: Data gathering
+### Module 1: Snapshotting
 
 This milestone is in principle complete.
 
