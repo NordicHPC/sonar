@@ -5,6 +5,7 @@ adf.exe         ADF
 wrf.exe         WRF
 issm.exe        ISSM
 std             VASP
+vasp            VASP
 ccsm.exe        CCSM
 gpaw-python     GPAW
 lsdalton.x      LSDalton
@@ -14,3 +15,7 @@ g16nbo.i8.exe   NBO
 hfst_tokenize   HFST
 mrchem.x        MRChem
 fvcom.bin       FVCOM
+iSALE2D         iSALE2D
+qdyn5p          Qdyn
+namd2           NAMD
+fiber           fiber

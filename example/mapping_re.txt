@@ -5,3 +5,4 @@
 ^xpatmos.*          Patmos
 ^cp2k.*             cp2k
 .*ReSpect.*         ReSpect
+^KMCART.*           KMCART
