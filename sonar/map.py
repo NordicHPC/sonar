@@ -155,7 +155,7 @@ def main(config):
         for app, process in sorted(only_sum, key=lambda x: only_sum[x], reverse=True):
             cpu = only_sum[(app, process)]
             if app != config["default_category"]:
-                print(f'- {app:10s} {process:20s} {100.0*cpu/cpu_sum:6.2f}%')
+                print(f'- {app:20s} {process:20s} {100.0*cpu/cpu_sum:6.2f}%')
 
         print(f'\nunknown processes ({100.0*cpu_sum_unknown/cpu_sum:.2f}%):')
         for app, process in sorted(only_sum, key=lambda x: only_sum[x], reverse=True):
