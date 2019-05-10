@@ -97,7 +97,9 @@ source /global/work/sonar/python/environment
 pyenv shell 3.6.7
 
 source /global/work/sonar/sonar/venv/bin/activate
-sonar snap --ignored-users root >> /global/work/sonar/snap-outputs/${HOSTNAME}.tsv
+current_year=$(date +'%Y')
+mkdir -p /global/work/sonar/snap-outputs/${current_year}
+sonar snap --ignored-users root >> /global/work/sonar/snap-outputs/${current_year}/${HOSTNAME}.tsv
 ```
 
 This produces ca. 10 MB data per day.
