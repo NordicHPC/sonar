@@ -9,7 +9,7 @@ using `ps`.
 
 - Reference implementation which serves as inspiration: <https://github.com/UNINETTSigma2/appusage>
 - [Design goals and design decisions](doc/design.md)
-- [Roadmap](doc/roadmap.md)
+- [Roadmap](doc/roadmap.md) (not yet production ready, but soon)
 - [Contributing](doc/contributing.md)
 
 
