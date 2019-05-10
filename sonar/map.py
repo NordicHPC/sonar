@@ -142,7 +142,7 @@ def main(config):
         print(f'(only contributions above 0.1% shown)')
         for app, process in sorted(only_sum, key=lambda x: only_sum[x], reverse=True):
             cpu = only_sum[(app, process)]
-            percentage = 100.0*cpu/cpu_sum
+            percentage = 100.0 * cpu / cpu_sum
             if app == config["default_category"]:
                 if percentage > 0.1:
                     print(f'- {process:20s} {percentage:6.2f}%')
