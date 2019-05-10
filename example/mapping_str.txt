@@ -8,7 +8,7 @@ std             Vasp
 ccsm.exe        CCSM
 gpaw-python     GPAW
 lsdalton.x      Dalton
-java            Script
+java            "Java script"
 g16nbo.i8.exe   NBO
 hfst_tokenize   HFST
 mrchem.x        MRChem
