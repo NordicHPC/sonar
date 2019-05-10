@@ -82,7 +82,7 @@ def test_map_process():
     assert map_process("firefox", {}, re_map=[("^firefox$", "redefined")]) == "Firefox"
 
 
-def create_report(string_map, re_map, input_dir, delimiter, suffix, default_category):
+def extract_and_map_data(string_map, re_map, input_dir, delimiter, suffix, default_category):
 
     report = defaultdict(float)
     only_sum = defaultdict(float)
@@ -141,7 +141,7 @@ def main(config):
 
     string_map, re_map = read_mapping(config["str_map_file"], config["re_map_file"])
 
-    report, only_sum = create_report(
+    report, only_sum = extract_and_map_data(
         string_map,
         re_map,
         config["input_dir"],
