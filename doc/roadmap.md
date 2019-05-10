@@ -36,7 +36,7 @@ Sonar should consist of three parts:
 
 - Data gathering → This just gathers data and saves it. No
   "above-basic" parsing or processing. Should be fast and be able
-  to run e.g. every 15 minutes.
+  to run e.g. every 20 minutes.
 - Mapping → This parses the files written by the gatherer and
   creates standardized output depending on the use-case. Speed is
   not too important, should run e.g. daily.

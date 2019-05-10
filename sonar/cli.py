@@ -38,7 +38,7 @@ def main():
     # parser for "snap"
     parser_snap = subparsers.add_parser(
         "snap",
-        help="Take a snapshot of the system. Run this on every node and often (e.g. every 15 minutes).",
+        help="Take a snapshot of the system. Run this on every node and often (e.g. every 20 minutes).",
     )
     parser_snap.add_argument(
         "--cpu-cutoff",

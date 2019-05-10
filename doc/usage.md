@@ -21,7 +21,7 @@ optional arguments:
 Subcommands:
 
     snap      Take a snapshot of the system. Run this on every node and often
-              (e.g. every 15 minutes).
+              (e.g. every 20 minutes).
     map       Parse the system snapshots and map applications. Run this only
               once centrally and typically once a day.
     web       Run the web frontend to visualize results. This can run locally
