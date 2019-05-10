@@ -113,23 +113,18 @@ def create_report(mapping, input_dir, start, end, delimiter, suffix, default_cat
                     )
                     mapping_dict[process] = app
 
-                date_normalized = _normalize_date(
-                    datetime.datetime.strptime(line[0], "%Y-%m-%dT%H:%M:%S.%f%z")
-                )
-                if date_normalized < start_normalized:
-                    continue
-                if date_normalized > end_normalized:
-                    break
+                date_normalized = _normalize_date(datetime.datetime.strptime(line[0], "%Y-%m-%dT%H:%M:%S.%f%z"))
+                if start_normalized <= date_normalized <= end_normalized:
 
-                user = line[2]
-                project = line[3]
-                jobid = line[4]
-                app = map_process(
-                    process, mapping["string"], mapping["re"], default_category
-                )
-                cpu = float(line[6])
+                    user = line[2]
+                    project = line[3]
+                    jobid = line[4]
+                    app = map_process(
+                        process, mapping["string"], mapping["re"], default_category
+                    )
+                    cpu = float(line[6])
 
-                report[(user, project, app)] += cpu
+                    report[(user, project, app)] += cpu
 
     return report
 
