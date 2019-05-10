@@ -36,13 +36,13 @@ def get_slurm_info(hostname):
     :returns: A defaultdict with the mapping from user to project. Project is '-' if the user is not found or slurm is not available.
     """
 
-    user_to_slurminfo = defaultdict(lambda: {"jobid": "-", "project": "-"})
+    user_to_slurminfo = defaultdict(lambda: {"jobid": "-", "project": "-", "num_cores": "-", "min_mem": "-"})
 
     # %i  Job ID (or <jobid>_<arrayid> for job arrays)
     # %a  Account (project)
     # %u  User
     try:
-        command = "squeue --noheader --nodelist={} --format=%i,%a,%u".format(hostname)
+        command = f"squeue --noheader --nodelist={hostname} --format=%i,%a,%u,%m,%C"
         output = check_output(command, shell=True, stderr=DEVNULL).decode("utf8")
     except SubprocessError:
         # if Slurm is not available, return the empty defaultdict that will return '-' for any key call.
@@ -52,8 +52,8 @@ def get_slurm_info(hostname):
         line = line.strip()
         if not line:
             continue
-        jobid, project, user = line.split(",")
-        user_to_slurminfo[user] = {"jobid": jobid, "project": project}
+        jobid, project, user, min_mem, num_cores = line.split(",")
+        user_to_slurminfo[user] = {"jobid": jobid, "project": project, "num_cores": num_cores, "min_mem": min_mem}
 
     return user_to_slurminfo
 
@@ -175,11 +175,13 @@ def create_snapshot(cpu_cutoff, mem_cutoff, ignored_users):
                         hostname,
                         num_cores,
                         user,
-                        slurm_info[user]["project"],
-                        slurm_info[user]["jobid"],
                         command,
                         "{:.1f}".format(cpu_percentage),
                         mem_absolute,
+                        slurm_info[user]["project"],
+                        slurm_info[user]["jobid"],
+                        slurm_info[user]["num_cores"],
+                        slurm_info[user]["min_mem"],
                     ]
                 )
 
