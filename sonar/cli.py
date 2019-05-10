@@ -83,17 +83,17 @@ def main():
         "--input-dir",
         metavar="DIR",
         required=True,
-        help="Path to the directory with the results of sonar snap. Required!",
+        help="Path to the directory with the results of sonar snap (required).",
     )
     parser_map.add_argument(
         "--str-map-file",
         metavar="FILE",
-        help="File with the string mapping information.",
+        help="File with the string mapping information (process -> application).",
     )
     parser_map.add_argument(
         "--re-map-file",
         metavar="FILE",
-        help="File with the regular expression mapping information.",
+        help="File with the regular expression mapping information (process -> application).",
     )
     parser_map.add_argument(
         "--default-category",
