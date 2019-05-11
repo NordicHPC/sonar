@@ -146,15 +146,19 @@ def _output_section(cpu_load, cpu_load_sum, cpu_res, cpu_res_sum, percentage_cut
             users = {u: cpu_res[(k, u)] for k, u in cpu_res.keys() if k == key}
             top_user = sorted(users, key=lambda x: users[x], reverse=True)[0]
             top_user_res_percentage = 100.0 * cpu_res[(key, top_user)] / cpu_res_sum
-            print(f'- {key:20s} {cpu_load_percentage:6.2f}% (load) {cpu_res_percentage:6.2f}% (res)'
-                  f' ({top_user} with {top_user_res_percentage:.2f}%)')
+            print(f'- {key:16s} {cpu_load_percentage:6.2f}% {cpu_res_percentage:6.2f}%'
+                  f'   {top_user} ({top_user_res_percentage:.2f}%)')
 
 
 def output(data, default_category, percentage_cutoff):
 
     print(f'sonar v{__version__}')
     print(f'summary generated on {datetime.datetime.now()}')
-    print(f'percentage cutoff: {percentage_cutoff}%\n')
+    print(f'percentage cutoff: {percentage_cutoff}%')
+    print()
+
+    print(f'  app                load  reserved  top user')
+    print(f'=============================================')
 
     app_cpu_load_sum = sum(data['app_cpu_load'].values())
     unknown_process_cpu_load_sum = sum(data['unknown_process_cpu_load'].values())
@@ -166,8 +170,12 @@ def output(data, default_category, percentage_cutoff):
 
     _output_section(data['app_cpu_load'], cpu_load_sum, data['app_cpu_res'], cpu_res_sum, percentage_cutoff)
 
-    unknown_process_cpu_load_percentage = 100.0 * unknown_process_cpu_load_sum / cpu_load_sum
-    print(f'\nunknown processes ({unknown_process_cpu_load_percentage:.2f}%):')
+    _load_percentage = 100.0 * unknown_process_cpu_load_sum / cpu_load_sum
+    _res_percentage = 100.0 * unknown_process_cpu_res_sum / cpu_res_sum
+
+    print()
+    print(f'  unmapped         {_load_percentage:6.2f}% {_res_percentage:6.2f}%')
+    print(f'----------------------------------')
 
     _output_section(data['unknown_process_cpu_load'], cpu_load_sum, data['unknown_process_cpu_res'], cpu_res_sum, percentage_cutoff)
 
