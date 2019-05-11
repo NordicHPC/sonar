@@ -87,6 +87,9 @@ def extract_and_map_data(string_map, re_map, input_dir, delimiter, suffix, defau
     unknown_process_cpu_load = defaultdict(float)
     app_cpu_load = defaultdict(float)
 
+    unknown_process_cpu_res = defaultdict(int)
+    app_cpu_res = defaultdict(int)
+
     for filename in glob(os.path.normpath(os.path.join(input_dir, "*" + suffix))):
         with open(filename) as f:
             f_reader = csv.reader(f, delimiter=delimiter, quotechar='"')
@@ -112,40 +115,50 @@ def extract_and_map_data(string_map, re_map, input_dir, delimiter, suffix, defau
                 project = line[7]
 
                 app = map_process(process, string_map, re_map, default_category)
-                cpu_load = 0.01*cpu_percentage*num_cores_on_node
+                cpu_load = 0.01*cpu_percentage
 
+                # WARNING: calculation of blocked resources is imprecise if different users or different jobs
+                # run on the same node
                 if app == default_category:
                     unknown_process_cpu_load[process] += cpu_load
+                    unknown_process_cpu_res[process] += num_cores_on_node
                 else:
                     app_cpu_load[app] += cpu_load
+                    app_cpu_res[app] += num_cores_on_node
 
     return {
         'unknown_process_cpu_load': unknown_process_cpu_load,
+        'unknown_process_cpu_res': unknown_process_cpu_res,
         'app_cpu_load': app_cpu_load,
+        'app_cpu_res': app_cpu_res,
     }
 
 
 def output(data, default_category):
-    percentage_cutoff = 0.1
+    percentage_cutoff = 0.2
     print(f'(only contributions above {percentage_cutoff}% shown)')
 
     app_cpu_load_sum = sum(data['app_cpu_load'].values())
     unknown_process_cpu_load_sum = sum(data['unknown_process_cpu_load'].values())
     cpu_load_sum = app_cpu_load_sum + unknown_process_cpu_load_sum
 
-    for app in sorted(data['app_cpu_load'], key=lambda x: data['app_cpu_load'][x], reverse=True):
-        cpu_load = data['app_cpu_load'][app]
-        percentage = 100.0 * cpu_load / cpu_load_sum
-        if percentage > percentage_cutoff:
-            print(f'- {app:20s} {percentage:6.2f}%')
+    app_cpu_res_sum = sum(data['app_cpu_res'].values())
+    unknown_process_cpu_res_sum = sum(data['unknown_process_cpu_res'].values())
+    cpu_res_sum = app_cpu_res_sum + unknown_process_cpu_res_sum
+
+    for key in sorted(data['app_cpu_res'], key=lambda x: data['app_cpu_res'][x], reverse=True):
+        cpu_load_percentage = 100.0 * data['app_cpu_load'][key] / cpu_load_sum
+        cpu_res_percentage = 100.0 * data['app_cpu_res'][key] / cpu_res_sum
+        if cpu_res_percentage > percentage_cutoff:
+            print(f'- {key:20s} {cpu_load_percentage:6.2f}% (load) {cpu_res_percentage:6.2f}% (res)')
 
     unknown_process_cpu_load_percentage = 100.0*unknown_process_cpu_load_sum/cpu_load_sum
     print(f'\nunknown processes ({unknown_process_cpu_load_percentage:.2f}%):')
-    for process in sorted(data['unknown_process_cpu_load'], key=lambda x: data['unknown_process_cpu_load'][x], reverse=True):
-        cpu_load = data['unknown_process_cpu_load'][process]
-        percentage = 100.0 * cpu_load / cpu_load_sum
-        if percentage > percentage_cutoff:
-            print(f'- {process:20s} {percentage:6.2f}%')
+    for key in sorted(data['unknown_process_cpu_res'], key=lambda x: data['unknown_process_cpu_res'][x], reverse=True):
+        cpu_load_percentage = 100.0 * data['unknown_process_cpu_load'][key] / cpu_load_sum
+        cpu_res_percentage = 100.0 * data['unknown_process_cpu_res'][key] / cpu_res_sum
+        if cpu_res_percentage > percentage_cutoff:
+            print(f'- {key:20s} {cpu_load_percentage:6.2f}% (load) {cpu_res_percentage:6.2f}% (res)')
 
 
 def main(config):
