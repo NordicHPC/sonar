@@ -24,3 +24,4 @@ mdrun_mpi       GROMACS
 stagyympi       StagYY
 lmp_mpi         LAMMPS
 paradis         ParaDiS
+ricc2_omp       TURBOMOLE
