@@ -8,6 +8,7 @@ import datetime
 from glob import glob
 from contextlib import contextmanager
 from collections import defaultdict
+from .version import __version__
 
 
 def read_mapping(string_map_file, re_map_file):
@@ -150,8 +151,12 @@ def _output_section(cpu_load, cpu_load_sum, cpu_res, cpu_res_sum, percentage_cut
 
 
 def output(data, default_category):
+
     percentage_cutoff = 0.5
-    print(f'(only contributions above {percentage_cutoff}% shown)')
+
+    print(f'sonar v{__version__}')
+    print(f'summary generated on {datetime.datetime.now()}')
+    print(f'percentage cutoff: {percentage_cutoff}%\n')
 
     app_cpu_load_sum = sum(data['app_cpu_load'].values())
     unknown_process_cpu_load_sum = sum(data['unknown_process_cpu_load'].values())
