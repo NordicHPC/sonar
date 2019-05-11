@@ -115,7 +115,7 @@ def extract_and_map_data(string_map, re_map, input_dir, delimiter, suffix, defau
                 project = line[7]
 
                 app = map_process(process, string_map, re_map, default_category)
-                cpu_load = 0.01*cpu_percentage
+                cpu_load = 0.01 * cpu_percentage
 
                 # WARNING: calculation of blocked resources is imprecise if different users or different jobs
                 # run on the same node
@@ -152,7 +152,7 @@ def output(data, default_category):
         if cpu_res_percentage > percentage_cutoff:
             print(f'- {key:20s} {cpu_load_percentage:6.2f}% (load) {cpu_res_percentage:6.2f}% (res)')
 
-    unknown_process_cpu_load_percentage = 100.0*unknown_process_cpu_load_sum/cpu_load_sum
+    unknown_process_cpu_load_percentage = 100.0 * unknown_process_cpu_load_sum / cpu_load_sum
     print(f'\nunknown processes ({unknown_process_cpu_load_percentage:.2f}%):')
     for key in sorted(data['unknown_process_cpu_res'], key=lambda x: data['unknown_process_cpu_res'][x], reverse=True):
         cpu_load_percentage = 100.0 * data['unknown_process_cpu_load'][key] / cpu_load_sum
