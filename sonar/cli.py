@@ -114,6 +114,13 @@ def main():
         default="\t",
         help=r"Delimiter for output columns [default: %(default)s].",
     )
+    parser_map.add_argument(
+        "--percentage-cutoff",
+        metavar="FLOAT",
+        type=float,
+        default=0.5,
+        help="Percentage cutoff for summary printout [default: %(default)s].",
+    )
     parser_map.set_defaults(func=map_main)
 
     # parser for the web frontend

@@ -150,9 +150,7 @@ def _output_section(cpu_load, cpu_load_sum, cpu_res, cpu_res_sum, percentage_cut
                   f' ({top_user} with {top_user_res_percentage:.2f}%)')
 
 
-def output(data, default_category):
-
-    percentage_cutoff = 0.5
+def output(data, default_category, percentage_cutoff):
 
     print(f'sonar v{__version__}')
     print(f'summary generated on {datetime.datetime.now()}')
@@ -190,7 +188,7 @@ def main(config):
         default_category=config["default_category"],
     )
 
-    output(data, config["default_category"])
+    output(data, config["default_category"], config["percentage_cutoff"])
 
 #   let's do file export a bit later
 #   first i want to know what data i would like to plot and this will
