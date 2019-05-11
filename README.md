@@ -23,8 +23,16 @@ using `ps`.
 
 ## Installation
 
-Soon (TM) we will share the code via PyPI and then installation will
-become simpler. Until then:
+### Installing from PyPI
+
+Ideally install into a virtual environment or Pipenv:
+
+```
+$ pip install sonar
+```
+
+
+### Installing from sources
 
 ```
 $ git clone https://github.com/uit-no/sonar.git
