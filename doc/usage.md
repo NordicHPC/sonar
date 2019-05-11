@@ -65,6 +65,21 @@ It can be useful to redirect the result to a file:
 $ sonar snap >> /home/user/tmp/example.tsv
 ```
 
+This is how it looks when I run `sonar snap` on my laptop (without Slurm):
+
+```
+$ sonar snap --output-delimiter ","
+
+2019-05-11T14:54:16.940502+0200,laptop,4,root,Xorg,0.7,47,-,-,-,-
+2019-05-11T14:54:16.940502+0200,laptop,4,me,gnome-shell,0.7,188,-,-,-,-
+2019-05-11T14:54:16.940502+0200,laptop,4,me,pulseaudio,0.6,7,-,-,-,-
+2019-05-11T14:54:16.940502+0200,laptop,4,me,chromium,16.9,3283,-,-,-,-
+2019-05-11T14:54:16.940502+0200,laptop,4,me,fish,0.5,23,-,-,-,-
+2019-05-11T14:54:16.940502+0200,laptop,4,me,vim,0.6,7,-,-,-,-
+2019-05-11T14:54:16.940502+0200,laptop,4,me,sonar,23.0,23,-,-,-,-
+2019-05-11T14:54:16.940502+0200,laptop,4,me,gnome-terminal-,0.9,47,-,-,-,-
+```
+
 
 ## Running sonar snap on a cluster
 
