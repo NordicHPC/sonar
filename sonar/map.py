@@ -135,7 +135,7 @@ def extract_and_map_data(string_map, re_map, input_dir, delimiter, suffix, defau
 
 
 def output(data, default_category):
-    percentage_cutoff = 0.2
+    percentage_cutoff = 0.5
     print(f'(only contributions above {percentage_cutoff}% shown)')
 
     app_cpu_load_sum = sum(data['app_cpu_load'].values())
