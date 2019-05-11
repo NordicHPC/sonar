@@ -21,7 +21,9 @@ Qdyn5p          Qdyn
 namd2           NAMD
 fiber           fiber
 mdrun_mpi       GROMACS
+gmx_mpi         GROMACS
 stagyympi       StagYY
 lmp_mpi         LAMMPS
 paradis         ParaDiS
 ricc2_omp       TURBOMOLE
+norwecom.e2e.rh NORWECOM.E2E
