@@ -142,7 +142,7 @@ def _output_section(cpu_load, cpu_load_sum, cpu_res, cpu_res_sum, percentage_cut
         cpu_load_percentage = 100.0 * cpu_load[key] / cpu_load_sum
         cpu_res_percentage = 100.0 * _res[key] / cpu_res_sum
         if cpu_res_percentage > percentage_cutoff:
-            users = {u:cpu_res[(k, u)] for k, u in cpu_res.keys() if k == key}
+            users = {u: cpu_res[(k, u)] for k, u in cpu_res.keys() if k == key}
             top_user = sorted(users, key=lambda x: users[x], reverse=True)[0]
             top_user_res_percentage = 100.0 * cpu_res[(key, top_user)] / cpu_res_sum
             print(f'- {key:20s} {cpu_load_percentage:6.2f}% (load) {cpu_res_percentage:6.2f}% (res)'
