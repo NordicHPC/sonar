@@ -84,8 +84,8 @@ def test_map_process():
 
 def extract_and_map_data(string_map, re_map, input_dir, delimiter, suffix, default_category):
 
-    report = defaultdict(float)
-    only_sum = defaultdict(float)
+    unknown_process_cpu_load = defaultdict(float)
+    app_cpu_load = defaultdict(float)
 
     for filename in glob(os.path.normpath(os.path.join(input_dir, "*" + suffix))):
         with open(filename) as f:
@@ -105,46 +105,47 @@ def extract_and_map_data(string_map, re_map, input_dir, delimiter, suffix, defau
                 #  9 - Number of CPUs requested by the job
                 # 10 - Minimum size of memory requested by the job
 
+                num_cores_on_node = int(line[2])
                 user = line[3]
                 process = line[4]
                 cpu_percentage = float(line[5])
                 project = line[7]
+
                 app = map_process(process, string_map, re_map, default_category)
+                cpu_load = 0.01*cpu_percentage*num_cores_on_node
 
-                report[(user, project, app)] += cpu_percentage
-                only_sum[(app, process)] += cpu_percentage
+                if app == default_category:
+                    unknown_process_cpu_load[process] += cpu_load
+                else:
+                    app_cpu_load[app] += cpu_load
 
-    return report, only_sum
+    return {
+        'unknown_process_cpu_load': unknown_process_cpu_load,
+        'app_cpu_load': app_cpu_load,
+    }
 
 
-def output(report, only_sum, default_category):
-    percentage_cutoff = 0.5
+def output(data, default_category):
+    percentage_cutoff = 0.1
     print(f'(only contributions above {percentage_cutoff}% shown)')
 
-    cpu_sum = 0.0
-    for key in only_sum:
-        cpu_sum += only_sum[key]
+    app_cpu_load_sum = sum(data['app_cpu_load'].values())
+    unknown_process_cpu_load_sum = sum(data['unknown_process_cpu_load'].values())
+    cpu_load_sum = app_cpu_load_sum + unknown_process_cpu_load_sum
 
-    only_sum_known = defaultdict(float)
-    for app, process in only_sum:
-        if app != default_category:
-            only_sum_known[app] += only_sum[(app, process)]
-    for app in sorted(only_sum_known, key=lambda x: only_sum_known[x], reverse=True):
-        percentage = 100.0 * only_sum_known[app] / cpu_sum
+    for app in sorted(data['app_cpu_load'], key=lambda x: data['app_cpu_load'][x], reverse=True):
+        cpu_load = data['app_cpu_load'][app]
+        percentage = 100.0 * cpu_load / cpu_load_sum
         if percentage > percentage_cutoff:
             print(f'- {app:20s} {percentage:6.2f}%')
 
-    cpu_sum_unknown = 0.0
-    for app, process in only_sum:
-        if app == default_category:
-            cpu_sum_unknown += only_sum[(app, process)]
-    print(f'\nunknown processes ({100.0*cpu_sum_unknown/cpu_sum:.2f}%):')
-    for app, process in sorted(only_sum, key=lambda x: only_sum[x], reverse=True):
-        if app == default_category:
-            cpu = only_sum[(app, process)]
-            percentage = 100.0 * cpu / cpu_sum
-            if percentage > percentage_cutoff:
-                print(f'- {process:20s} {percentage:6.2f}%')
+    unknown_process_cpu_load_percentage = 100.0*unknown_process_cpu_load_sum/cpu_load_sum
+    print(f'\nunknown processes ({unknown_process_cpu_load_percentage:.2f}%):')
+    for process in sorted(data['unknown_process_cpu_load'], key=lambda x: data['unknown_process_cpu_load'][x], reverse=True):
+        cpu_load = data['unknown_process_cpu_load'][process]
+        percentage = 100.0 * cpu_load / cpu_load_sum
+        if percentage > percentage_cutoff:
+            print(f'- {process:20s} {percentage:6.2f}%')
 
 
 def main(config):
@@ -154,7 +155,7 @@ def main(config):
 
     string_map, re_map = read_mapping(config["str_map_file"], config["re_map_file"])
 
-    report, only_sum = extract_and_map_data(
+    data = extract_and_map_data(
         string_map,
         re_map,
         config["input_dir"],
@@ -163,7 +164,7 @@ def main(config):
         default_category=config["default_category"],
     )
 
-    output(report, only_sum, config["default_category"])
+    output(data, config["default_category"])
 
 #   let's do file export a bit later
 #   first i want to know what data i would like to plot and this will
