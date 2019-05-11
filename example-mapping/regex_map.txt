@@ -6,3 +6,4 @@
 ^cp2k.*             cp2k
 .*ReSpect.*         ReSpect
 ^KMCART.*           KMCART
+^orca_.*            Orca
