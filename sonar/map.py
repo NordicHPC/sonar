@@ -91,11 +91,24 @@ def extract_and_map_data(string_map, re_map, input_dir, delimiter, suffix, defau
         with open(filename) as f:
             f_reader = csv.reader(f, delimiter=delimiter, quotechar='"')
             for line in f_reader:
-                _, node, num_cores, user, project, job_id, process, cpu_percentage, mem_percentage = tuple(line)
-                num_cores = int(num_cores)
-                job_id = int(job_id)
-                cpu_percentage = float(cpu_percentage)
-                mem_percentage = float(mem_percentage)
+
+                # The columns are:
+                #  0 - time stamp
+                #  1 - hostname
+                #  2 - number of cores on this node
+                #  3 - user
+                #  4 - process
+                #  5 - CPU percentage (this is a 20-core node)
+                #  6 - memory used in MB
+                #  7 - Slurm project
+                #  8 - Slurm job ID
+                #  9 - Number of CPUs requested by the job
+                # 10 - Minimum size of memory requested by the job
+
+                user = line[3]
+                process = line[4]
+                cpu_percentage = float(line[5])
+                project = line[7]
                 app = map_process(process, string_map, re_map, default_category)
 
                 report[(user, project, app)] += cpu_percentage
