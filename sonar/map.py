@@ -121,10 +121,10 @@ def extract_and_map_data(string_map, re_map, input_dir, delimiter, suffix, defau
                 # WARNING: calculation of blocked resources is imprecise if different users or different jobs
                 # run on the same node
                 if app == default_category:
-                    unknown_process_cpu_load[process] += cpu_load
+                    unknown_process_cpu_load[(process, user)] += cpu_load
                     unknown_process_cpu_res[(process, user)] += num_cores_on_node
                 else:
-                    app_cpu_load[app] += cpu_load
+                    app_cpu_load[(app, user)] += cpu_load
                     app_cpu_res[(app, user)] += num_cores_on_node
 
     return {
@@ -135,19 +135,29 @@ def extract_and_map_data(string_map, re_map, input_dir, delimiter, suffix, defau
     }
 
 
+def take_max(how_many, collection):
+    zipped = zip(collection, range(how_many))
+    return list(zip(*zipped))[0]
+
+
 def _output_section(cpu_load, cpu_load_sum, cpu_res, cpu_res_sum, percentage_cutoff):
     _res = defaultdict(int)
     for key in cpu_res:
         _res[key[0]] += cpu_res[key]
+    _load = defaultdict(int)
+    for key in cpu_load:
+        _load[key[0]] += cpu_load[key]
     for key in sorted(_res, key=lambda x: _res[x], reverse=True):
-        cpu_load_percentage = 100.0 * cpu_load[key] / cpu_load_sum
+        cpu_load_percentage = 100.0 * _load[key] / cpu_load_sum
         cpu_res_percentage = 100.0 * _res[key] / cpu_res_sum
         if cpu_res_percentage > percentage_cutoff:
+            print(f'\n- {key:36s} {cpu_load_percentage:6.2f}% {cpu_res_percentage:6.2f}%')
             users = {u: cpu_res[(k, u)] for k, u in cpu_res.keys() if k == key}
-            top_user = sorted(users, key=lambda x: users[x], reverse=True)[0]
-            top_user_res_percentage = 100.0 * cpu_res[(key, top_user)] / cpu_res_sum
-            print(f'- {key:16s} {cpu_load_percentage:6.2f}% {cpu_res_percentage:6.2f}%'
-                  f'   {top_user} ({top_user_res_percentage:.2f}%)')
+            users_sorted = sorted(users, key=lambda x: users[x], reverse=True)
+            for user in take_max(2, users_sorted):
+                user_res_percentage = 100.0 * cpu_res[(key, user)] / cpu_res_sum
+                user_load_percentage = 100.0 * cpu_load[(key, user)] / cpu_load_sum
+                print(f'{" ":18s} {user:19s} {user_load_percentage:6.2f}% {user_res_percentage:6.2f}%')
 
 
 def output(data, default_category, percentage_cutoff):
@@ -157,8 +167,8 @@ def output(data, default_category, percentage_cutoff):
     print(f'percentage cutoff: {percentage_cutoff}%')
     print()
 
-    print(f'  app                load  reserved  top user')
-    print(f'=============================================')
+    print(f'  app              top users            load  resource')
+    print(f'======================================================')
 
     app_cpu_load_sum = sum(data['app_cpu_load'].values())
     unknown_process_cpu_load_sum = sum(data['unknown_process_cpu_load'].values())
@@ -174,8 +184,8 @@ def output(data, default_category, percentage_cutoff):
     _res_percentage = 100.0 * unknown_process_cpu_res_sum / cpu_res_sum
 
     print()
-    print(f'  unmapped         {_load_percentage:6.2f}% {_res_percentage:6.2f}%')
-    print(f'----------------------------------')
+    print(f'  {"unmapped":36s} {_load_percentage:6.2f}% {_res_percentage:6.2f}%')
+    print(f'------------------------------------------------------')
 
     _output_section(data['unknown_process_cpu_load'], cpu_load_sum, data['unknown_process_cpu_res'], cpu_res_sum, percentage_cutoff)
 
