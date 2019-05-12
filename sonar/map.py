@@ -85,13 +85,13 @@ def test_map_process():
 
 def extract_and_map_data(string_map, re_map, input_dir, delimiter, suffix, default_category):
 
-    unknown_process_cpu_load = defaultdict(float)
+    unmapped_cpu_load = defaultdict(float)
     app_cpu_load = defaultdict(float)
 
-    unknown_process_cpu_res = defaultdict(int)
+    unmapped_cpu_res = defaultdict(int)
     app_cpu_res = defaultdict(int)
 
-    unknown_process_num_cores_requested = defaultdict(lambda: (sys.maxsize, -sys.maxsize))
+    unmapped_num_cores_requested = defaultdict(lambda: (sys.maxsize, -sys.maxsize))
     app_num_cores_requested = defaultdict(lambda: (sys.maxsize, -sys.maxsize))
 
     for filename in glob(os.path.normpath(os.path.join(input_dir, "*" + suffix))):
@@ -125,12 +125,12 @@ def extract_and_map_data(string_map, re_map, input_dir, delimiter, suffix, defau
                 # WARNING: calculation of blocked resources is imprecise if different users or different jobs
                 # run on the same node
                 if app == default_category:
-                    unknown_process_cpu_load[(process, user)] += cpu_load
-                    unknown_process_cpu_res[(process, user)] += num_cores_on_node
-                    _min, _max = unknown_process_num_cores_requested[(process, user)]
+                    unmapped_cpu_load[(process, user)] += cpu_load
+                    unmapped_cpu_res[(process, user)] += num_cores_on_node
+                    _min, _max = unmapped_num_cores_requested[(process, user)]
                     _min = min(_min, num_cores_requested)
                     _max = max(_max, num_cores_requested)
-                    unknown_process_num_cores_requested[(process, user)] = (_min, _max)
+                    unmapped_num_cores_requested[(process, user)] = (_min, _max)
                 else:
                     app_cpu_load[(app, user)] += cpu_load
                     app_cpu_res[(app, user)] += num_cores_on_node
@@ -140,9 +140,9 @@ def extract_and_map_data(string_map, re_map, input_dir, delimiter, suffix, defau
                     app_num_cores_requested[(app, user)] = (_min, _max)
 
     return {
-        'unknown_process_cpu_load': unknown_process_cpu_load,
-        'unknown_process_cpu_res': unknown_process_cpu_res,
-        'unknown_process_num_cores_requested': unknown_process_num_cores_requested,
+        'unmapped_cpu_load': unmapped_cpu_load,
+        'unmapped_cpu_res': unmapped_cpu_res,
+        'unmapped_num_cores_requested': unmapped_num_cores_requested,
         'app_cpu_load': app_cpu_load,
         'app_cpu_res': app_cpu_res,
         'app_num_cores_requested': app_num_cores_requested,
@@ -194,12 +194,12 @@ def output(data, default_category, percentage_cutoff):
     print(f'======================================================')
 
     app_cpu_load_sum = sum(data['app_cpu_load'].values())
-    unknown_process_cpu_load_sum = sum(data['unknown_process_cpu_load'].values())
-    cpu_load_sum = app_cpu_load_sum + unknown_process_cpu_load_sum
+    unmapped_cpu_load_sum = sum(data['unmapped_cpu_load'].values())
+    cpu_load_sum = app_cpu_load_sum + unmapped_cpu_load_sum
 
     app_cpu_res_sum = sum(data['app_cpu_res'].values())
-    unknown_process_cpu_res_sum = sum(data['unknown_process_cpu_res'].values())
-    cpu_res_sum = app_cpu_res_sum + unknown_process_cpu_res_sum
+    unmapped_cpu_res_sum = sum(data['unmapped_cpu_res'].values())
+    cpu_res_sum = app_cpu_res_sum + unmapped_cpu_res_sum
 
     _output_section(data['app_cpu_load'],
                     cpu_load_sum,
@@ -208,18 +208,18 @@ def output(data, default_category, percentage_cutoff):
                     data['app_num_cores_requested'],
                     percentage_cutoff)
 
-    _load_percentage = 100.0 * unknown_process_cpu_load_sum / cpu_load_sum
-    _res_percentage = 100.0 * unknown_process_cpu_res_sum / cpu_res_sum
+    _load_percentage = 100.0 * unmapped_cpu_load_sum / cpu_load_sum
+    _res_percentage = 100.0 * unmapped_cpu_res_sum / cpu_res_sum
 
     print()
     print(f'  {"unmapped":36s} {_load_percentage:6.2f}% {_res_percentage:6.2f}%')
     print(f'------------------------------------------------------')
 
-    _output_section(data['unknown_process_cpu_load'],
+    _output_section(data['unmapped_cpu_load'],
                     cpu_load_sum,
-                    data['unknown_process_cpu_res'],
+                    data['unmapped_cpu_res'],
                     cpu_res_sum,
-                    data['unknown_process_num_cores_requested'],
+                    data['unmapped_num_cores_requested'],
                     percentage_cutoff)
 
 
