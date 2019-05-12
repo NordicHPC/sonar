@@ -83,6 +83,23 @@ def test_map_process():
     assert map_process("firefox", {}, re_map=[("^firefox$", "redefined")]) == "Firefox"
 
 
+def _cast_to_mb(s):
+    if s.endswith('M'):
+        return int(s[:-1])
+    elif s.endswith('G'):
+        return 1000 * int(s[:-1])
+    else:
+        sys.stderr.write(f'unexpected input to _cast_to_mb: {s}\n')
+        sys.exit(1)
+
+
+def _adjust_min_max(t, value):
+    _min, _max = t
+    _min = min(_min, value)
+    _max = max(_max, value)
+    return (_min, _max)
+
+
 def extract_and_map_data(string_map, re_map, input_dir, delimiter, suffix, default_category):
 
     unmapped_cpu_load = defaultdict(float)
@@ -93,6 +110,9 @@ def extract_and_map_data(string_map, re_map, input_dir, delimiter, suffix, defau
 
     unmapped_num_cores_requested = defaultdict(lambda: (sys.maxsize, -sys.maxsize))
     app_num_cores_requested = defaultdict(lambda: (sys.maxsize, -sys.maxsize))
+
+    unmapped_mem_requested = defaultdict(lambda: (sys.maxsize, -sys.maxsize))
+    app_mem_requested = defaultdict(lambda: (sys.maxsize, -sys.maxsize))
 
     for filename in glob(os.path.normpath(os.path.join(input_dir, "*" + suffix))):
         with open(filename) as f:
@@ -118,6 +138,7 @@ def extract_and_map_data(string_map, re_map, input_dir, delimiter, suffix, defau
                 cpu_percentage = float(line[5])
                 project = line[7]
                 num_cores_requested = int(line[9])
+                mem_requested = _cast_to_mb(line[10])
 
                 app = map_process(process, string_map, re_map, default_category)
                 cpu_load = 0.01 * cpu_percentage
@@ -127,25 +148,23 @@ def extract_and_map_data(string_map, re_map, input_dir, delimiter, suffix, defau
                 if app == default_category:
                     unmapped_cpu_load[(process, user)] += cpu_load
                     unmapped_cpu_res[(process, user)] += num_cores_on_node
-                    _min, _max = unmapped_num_cores_requested[(process, user)]
-                    _min = min(_min, num_cores_requested)
-                    _max = max(_max, num_cores_requested)
-                    unmapped_num_cores_requested[(process, user)] = (_min, _max)
+                    unmapped_num_cores_requested[(process, user)] = _adjust_min_max(unmapped_num_cores_requested[(process, user)], num_cores_requested)
+                    unmapped_mem_requested[(process, user)] = _adjust_min_max(unmapped_mem_requested[(process, user)], mem_requested)
                 else:
                     app_cpu_load[(app, user)] += cpu_load
                     app_cpu_res[(app, user)] += num_cores_on_node
-                    _min, _max = app_num_cores_requested[(app, user)]
-                    _min = min(_min, num_cores_requested)
-                    _max = max(_max, num_cores_requested)
-                    app_num_cores_requested[(app, user)] = (_min, _max)
+                    app_num_cores_requested[(app, user)] = _adjust_min_max(app_num_cores_requested[(app, user)], num_cores_requested)
+                    app_mem_requested[(app, user)] = _adjust_min_max(app_mem_requested[(app, user)], mem_requested)
 
     return {
         'unmapped_cpu_load': unmapped_cpu_load,
         'unmapped_cpu_res': unmapped_cpu_res,
         'unmapped_num_cores_requested': unmapped_num_cores_requested,
+        'unmapped_mem_requested': unmapped_mem_requested,
         'app_cpu_load': app_cpu_load,
         'app_cpu_res': app_cpu_res,
         'app_num_cores_requested': app_num_cores_requested,
+        'app_mem_requested': app_mem_requested,
     }
 
 
@@ -154,15 +173,21 @@ def take_max(how_many, collection):
     return list(zip(*zipped))[0]
 
 
-def _core_range(num_cores_requested):
-    _min_cores, _max_cores = num_cores_requested
-    if _min_cores == _max_cores:
-        return f'{_min_cores} cores'
+def _range_helper(r, unit):
+    _min, _max = r
+    if _min == _max:
+        return f'{_min} {unit}'
     else:
-        return f'{_min_cores}-{_max_cores} cores'
+        return f'{_min}-{_max} {unit}'
 
 
-def _output_section(cpu_load, cpu_load_sum, cpu_res, cpu_res_sum, num_cores_requested, percentage_cutoff):
+def _output_section(cpu_load,
+                    cpu_load_sum,
+                    cpu_res,
+                    cpu_res_sum,
+                    num_cores_requested,
+                    mem_requested,
+                    percentage_cutoff):
     _res = defaultdict(int)
     for key in cpu_res:
         _res[key[0]] += cpu_res[key]
@@ -180,7 +205,8 @@ def _output_section(cpu_load, cpu_load_sum, cpu_res, cpu_res_sum, num_cores_requ
                 user_res_percentage = 100.0 * cpu_res[(key, user)] / cpu_res_sum
                 user_load_percentage = 100.0 * cpu_load[(key, user)] / cpu_load_sum
                 print(f'{" ":18s} {user:19s} {user_load_percentage:6.2f}% {user_res_percentage:6.2f}%'
-                      f' ({_core_range(num_cores_requested[(key, user)])})')
+                      f' ({_range_helper(num_cores_requested[(key, user)], "cores")})'
+                      f' ({_range_helper(mem_requested[(key, user)], "mb")})')
 
 
 def output(data, default_category, percentage_cutoff):
@@ -190,7 +216,7 @@ def output(data, default_category, percentage_cutoff):
     print(f'percentage cutoff: {percentage_cutoff}%')
     print()
 
-    print(f'  app              top users            load  resource')
+    print(f'  app              top users              use  reserve')
     print(f'======================================================')
 
     app_cpu_load_sum = sum(data['app_cpu_load'].values())
@@ -206,6 +232,7 @@ def output(data, default_category, percentage_cutoff):
                     data['app_cpu_res'],
                     cpu_res_sum,
                     data['app_num_cores_requested'],
+                    data['app_mem_requested'],
                     percentage_cutoff)
 
     _load_percentage = 100.0 * unmapped_cpu_load_sum / cpu_load_sum
@@ -220,6 +247,7 @@ def output(data, default_category, percentage_cutoff):
                     data['unmapped_cpu_res'],
                     cpu_res_sum,
                     data['unmapped_num_cores_requested'],
+                    data['unmapped_mem_requested'],
                     percentage_cutoff)
 
 
