@@ -205,8 +205,8 @@ def _output_section(cpu_load,
                 user_res_percentage = 100.0 * cpu_res[(key, user)] / cpu_res_sum
                 user_load_percentage = 100.0 * cpu_load[(key, user)] / cpu_load_sum
                 print(f'{" ":18s} {user:19s} {user_load_percentage:6.2f}% {user_res_percentage:6.2f}%'
-                      f' ({_range_helper(num_cores_requested[(key, user)], "cores")})'
-                      f' ({_range_helper(mem_requested[(key, user)], "mb")})')
+                      f' ({_range_helper(num_cores_requested[(key, user)], "cores")},'
+                      f' {_range_helper(mem_requested[(key, user)], "mb")})')
 
 
 def output(data, default_category, percentage_cutoff):
