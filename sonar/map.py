@@ -95,8 +95,9 @@ def _cast_to_mb(s):
 
 def _adjust_min_max(t, value):
     _min, _max = t
-    _min = min(_min, value)
-    _max = max(_max, value)
+    if value is not None:
+        _min = min(_min, value)
+        _max = max(_max, value)
     return (_min, _max)
 
 
@@ -136,9 +137,14 @@ def extract_and_map_data(string_map, re_map, input_dir, delimiter, suffix, defau
                 user = line[3]
                 process = line[4]
                 cpu_percentage = float(line[5])
-                project = line[7]
-                num_cores_requested = int(line[9])
-                mem_requested = _cast_to_mb(line[10])
+                if line[7] == '-':
+                    project = None
+                    num_cores_requested = None
+                    mem_requested = None
+                else:
+                    project = line[7]
+                    num_cores_requested = int(line[9])
+                    mem_requested = _cast_to_mb(line[10])
 
                 app = map_process(process, string_map, re_map, default_category)
                 cpu_load = 0.01 * cpu_percentage
