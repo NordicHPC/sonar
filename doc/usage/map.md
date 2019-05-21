@@ -15,3 +15,77 @@ The mapping files (`string_map.txt` and `regex_map.txt`) contain a space-separat
 Example mapping files: https://github.com/uit-no/sonar/tree/master/example-mapping
 
 You are welcome to use your own but encouraged to contribute mappings to our example files.
+
+
+## Example output
+
+In this example the top users have been redacted:
+
+```
+sonar v0.1.0
+summary generated on 2019-05-21 16:58:23.457775
+percentage cutoff: 0.5%
+
+  app              top users              use  reserve
+======================================================
+
+- Gaussian                              26.17%  31.35%
+                   user                 15.48%  16.83% (16-160 cores, 1875 MB)
+                   user                  1.25%   2.56% (64-160 cores, 2000-6400 MB)
+
+- VASP                                  19.07%  16.35%
+                   user                  6.71%   4.80% (64-80 cores, 2000 MB)
+                   user                  3.14%   3.59% (16-160 cores, 2000 MB)
+
+- GPAW                                  19.38%  12.30%
+                   user                 18.82%  11.92% (40 cores, 1523 MB)
+                   user                  0.31%   0.22% (32 cores, 31000 MB)
+
+- Qdyn                                  11.49%   9.16%
+                   user                 11.16%   8.94% (16 cores, 1523 MB)
+                   user                  0.21%   0.14% (20 cores, 1024 MB)
+
+- StagYY                                 4.11%   7.61%
+                   user                  2.00%   3.84% (32-64 cores, 4000 MB)
+                   user                  2.10%   3.77% (64 cores, 4000 MB)
+
+- GROMACS                                3.49%   3.30%
+                   user                  3.41%   2.50% (32 cores, 1523 MB)
+                   user                  0.08%   0.80% (3-6 cores, 1523 MB)
+
+- NAMD                                   1.02%   2.32%
+                   user                  1.02%   2.32% (256 cores, 500 MB)
+
+- LAMMPS                                 3.45%   2.21%
+                   user                  2.85%   1.81% (32-128 cores, 1523 MB)
+                   user                  0.53%   0.34% (80 cores, 1523 MB)
+
+- Orca                                   1.88%   1.37%
+                   user                  1.67%   1.17% (32-64 cores, 96000 MB)
+                   user                  0.20%   0.20% (16 cores, 96000 MB)
+
+- ISSM                                   1.58%   1.10%
+                   user                  0.78%   0.54% (16 cores, 1500-1600 MB)
+                   user                  0.69%   0.48% (16 cores, 1600 MB)
+
+- ROMS                                   1.21%   0.95%
+                   user                  1.19%   0.93% (320 cores, 1600 MB)
+                   user                  0.01%   0.01% (16-320 cores, 1600 MB)
+
+- TURBOMOLE                              0.06%   0.83%
+                   user                  0.06%   0.83% (1-20 cores, 1500 MB)
+
+- Python script                          0.12%   0.61%
+                   user                  0.08%   0.43% (20-50 cores, 5000 MB)
+                   user                  0.00%   0.05% (1-8 cores, 2000 MB)
+
+  unmapped                               4.71%   7.94%
+------------------------------------------------------
+
+- lmp                                    2.08%   3.09%
+                   user                  2.08%   3.09% (1 cores, 1523 MB)
+
+- pmi_proxy                              0.09%   1.14%
+                   user                  0.09%   1.07% (16-160 cores, 2000 MB)
+                   user                  0.00%   0.04% (20 cores, 1523 MB)
+```
