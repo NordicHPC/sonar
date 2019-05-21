@@ -5,7 +5,9 @@
 Map processes to applications:
 
 ```
-$ sonar map --input-dir /home/user/snap-outputs --str-map-file example-mapping/string_map.txt --re-map-file example-mapping/regex_map.txt
+$ sonar map --input-dir /home/user/snap-outputs \
+            --str-map-file example-mapping/string_map.txt \
+            --re-map-file example-mapping/regex_map.txt
 ```
 
 The mapping files (`string_map.txt` and `regex_map.txt`) contain a space-separated
