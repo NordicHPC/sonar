@@ -4,8 +4,8 @@
 
 ## Overview
 
-Currently you can do two things with the code (soon more), take
-snapshots (`sonar snap`), and map them (`sonar map`) to
+The code can do two things: take snapshots (`sonar snap`, typically every 20
+minutes or so), and map them (`sonar map`, whenever you like) to
 applications/projects/users:
 
 ```
@@ -54,7 +54,7 @@ The columns are:
 - Minimum size of memory requested by the job
 
 By default they are tab-separated but here I chose to display the result
-comma-separated. You can also change cutoffs to not measure the tool
+comma-separated. You can also change cutoffs or ignore users to not measure the tool
 itself (`sonar snap --help`).
 
 It can be useful to redirect the result to a file:
@@ -126,7 +126,7 @@ Map processes to applications:
 $ sonar map --input-dir /home/user/snap-outputs --str-map-file example-mapping/string_map.txt --re-map-file example-mapping/regex_map.txt
 ```
 
-Mapping files (string_map.txt and regex_map.txt) contain a space-separated
+The mapping files (`string_map.txt` and `regex_map.txt`) contain a space-separated
 (does not matter how many spaces) mapping from process to application.
 Example mapping files: https://github.com/uit-no/sonar/tree/master/example-mapping
 
