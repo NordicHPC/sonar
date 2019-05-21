@@ -45,7 +45,6 @@ $ pip install -e .
 
 ## Using sonar
 
-- [Overview](doc/usage.md#overview)
-- [Taking snapshots with sonar snap](doc/usage.md#taking-snapshots-with-sonar-snap)
-- [Running sonar snap on a cluster](doc/usage.md#running-sonar-snap-on-a-cluster)
-- [Map processes to applications with sonar map](doc/usage.md#map-processes-to-applications-with-sonar-map)
+- [Overview](doc/usage/overview.md)
+- [Taking snapshots with sonar snap](doc/usage/snap.md)
+- [Map processes to applications with sonar map](doc/usage/map.md)

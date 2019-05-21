@@ -1,35 +1,6 @@
 
 
-# Using sonar
-
-## Overview
-
-The code can do two things: take snapshots (`sonar snap`, typically every 20
-minutes or so), and map them (`sonar map`, whenever you like) to
-applications/projects/users:
-
-```
-$ sonar --help
-
-usage: sonar [-h]  ...
-
-Tool to profile usage of HPC resources by regularly probing processes using ps.
-
-optional arguments:
-  -h, --help  show this help message and exit
-
-Subcommands:
-
-    snap      Take a snapshot of the system. Run this on every node and often
-              (e.g. every 20 minutes).
-    map       Parse the system snapshots and map applications. Run this only
-              once centrally and typically once a day.
-
-Run sonar <subcommand> -h to get more information about subcommands.
-```
-
-
-## Taking snapshots with sonar snap
+# Taking snapshots with sonar snap
 
 This is me running `sonar snap` on a compute node:
 
@@ -116,18 +87,3 @@ sonar snap --ignored-users root >> /global/work/sonar/snap-outputs/${current_yea
 ```
 
 This produces ca. 10 MB data per day.
-
-
-## Map processes to applications with sonar map
-
-Map processes to applications:
-
-```
-$ sonar map --input-dir /home/user/snap-outputs --str-map-file example-mapping/string_map.txt --re-map-file example-mapping/regex_map.txt
-```
-
-The mapping files (`string_map.txt` and `regex_map.txt`) contain a space-separated
-(does not matter how many spaces) mapping from process to application.
-Example mapping files: https://github.com/uit-no/sonar/tree/master/example-mapping
-
-You are welcome to use your own but encouraged to contribute mappings to our example files.
