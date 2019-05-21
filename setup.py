@@ -19,9 +19,6 @@ setup(
     long_description_content_type='text/markdown',
     packages=find_packages(),
     entry_points={'console_scripts': ['sonar = sonar.cli:main']},
-    install_requires=[
-        'flask==1.0.2'
-    ],
     classifiers=[
         'Development Status :: 3 - Alpha',
         'Intended Audience :: Science/Research',

@@ -6,14 +6,6 @@ import datetime
 from sonar.snap import main as snap_main
 from sonar.map import main as map_main
 
-# The following hack will allow snap and map to run without flask being installed
-try:
-    from sonar.web import main as web_main
-except ModuleNotFoundError:
-
-    def web_main(*args, **kwargs):
-        print("Could not load Flask", file=sys.stderr)
-
 
 def make_list(s):
     return s.split(",")
@@ -121,20 +113,6 @@ def main():
         help="Instead of reporting the sum, export daily percentages to be used in Sonar web [default: %(default)s].",
     )
     parser_map.set_defaults(func=map_main)
-
-    # parser for the web frontend
-    parser_map = subparsers.add_parser(
-        "web",
-        help="Run the web frontend to visualize results. This can run locally or on a server (via uWSGI).",
-    )
-    parser_map.add_argument("--debug", dest="debug", action="store_true", default=False)
-    parser_map.add_argument(
-        "--host", dest="host", default=os.environ.get("HOST", "127.0.0.1")
-    )
-    parser_map.add_argument(
-        "--port", dest="port", type=int, default=int(os.environ.get("PORT", 5000))
-    )
-    parser_map.set_defaults(func=web_main)
 
     args = parser.parse_args()
 

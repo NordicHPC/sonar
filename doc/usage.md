@@ -24,8 +24,6 @@ Subcommands:
               (e.g. every 20 minutes).
     map       Parse the system snapshots and map applications. Run this only
               once centrally and typically once a day.
-    web       Run the web frontend to visualize results. This can run locally
-              or on a server (via uWSGI).
 
 Run sonar <subcommand> -h to get more information about subcommands.
 ```
