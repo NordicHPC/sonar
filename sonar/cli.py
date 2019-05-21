@@ -109,17 +109,16 @@ def main():
         help=r"Delimiter for input columns [default: %(default)s].",
     )
     parser_map.add_argument(
-        "--output-delimiter",
-        metavar="STR",
-        default="\t",
-        help=r"Delimiter for output columns [default: %(default)s].",
-    )
-    parser_map.add_argument(
         "--percentage-cutoff",
         metavar="FLOAT",
         type=float,
         default=0.5,
         help="Percentage cutoff for summary printout [default: %(default)s].",
+    )
+    parser_map.add_argument(
+        "--export-csv",
+        action='store_true',
+        help="Instead of reporting the sum, export daily percentages to be used in Sonar web [default: %(default)s].",
     )
     parser_map.set_defaults(func=map_main)
 

@@ -101,7 +101,27 @@ def _adjust_min_max(t, value):
     return (_min, _max)
 
 
+def normalize_time_stamp(time_stamp):
+    return time_stamp.split('T')[0]
+
+
+def test_normalize_time_stamp():
+    assert normalize_time_stamp('2019-05-10T20:50:14.659307+0200') == '2019-05-10'
+
+
+def sort_dates(dates):
+    datetimes_sorted = sorted([datetime.datetime.strptime(d, "%Y-%m-%d") for d in dates])
+    return [datetime.datetime.strftime(d, "%Y-%m-%d") for d in datetimes_sorted]
+
+
+def test_sort_dates():
+    dates_unsorted = ['2019-05-10', '2019-05-08', '2006-01-10', '2021-01-01']
+    assert sort_dates(dates_unsorted) == ['2006-01-10', '2019-05-08', '2019-05-10', '2021-01-01']
+
+
 def extract_and_map_data(string_map, re_map, input_dir, delimiter, suffix, default_category):
+
+    daily_cpu_load = defaultdict(lambda: defaultdict(float))
 
     unmapped_cpu_load = defaultdict(float)
     app_cpu_load = defaultdict(float)
@@ -114,6 +134,8 @@ def extract_and_map_data(string_map, re_map, input_dir, delimiter, suffix, defau
 
     unmapped_mem_requested = defaultdict(lambda: (sys.maxsize, -sys.maxsize))
     app_mem_requested = defaultdict(lambda: (sys.maxsize, -sys.maxsize))
+
+    dates = set()
 
     for filename in glob(os.path.normpath(os.path.join(input_dir, "*" + suffix))):
         with open(filename) as f:
@@ -132,6 +154,9 @@ def extract_and_map_data(string_map, re_map, input_dir, delimiter, suffix, defau
                 #  8 - Slurm job ID
                 #  9 - Number of CPUs requested by the job
                 # 10 - Minimum size of memory requested by the job
+
+                time_stamp = normalize_time_stamp(line[0])
+                dates.add(time_stamp)
 
                 num_cores_on_node = int(line[2])
                 user = line[3]
@@ -161,6 +186,7 @@ def extract_and_map_data(string_map, re_map, input_dir, delimiter, suffix, defau
                     app_cpu_res[(app, user)] += num_cores_on_node
                     app_num_cores_requested[(app, user)] = _adjust_min_max(app_num_cores_requested[(app, user)], num_cores_requested)
                     app_mem_requested[(app, user)] = _adjust_min_max(app_mem_requested[(app, user)], mem_requested)
+                daily_cpu_load[time_stamp][app] += cpu_load
 
     return {
         'unmapped_cpu_load': unmapped_cpu_load,
@@ -171,6 +197,8 @@ def extract_and_map_data(string_map, re_map, input_dir, delimiter, suffix, defau
         'app_cpu_res': app_cpu_res,
         'app_num_cores_requested': app_num_cores_requested,
         'app_mem_requested': app_mem_requested,
+        'dates': sort_dates(list(dates)),
+        'daily_cpu_load': daily_cpu_load,
     }
 
 
@@ -197,7 +225,7 @@ def _output_section(cpu_load,
     _res = defaultdict(int)
     for key in cpu_res:
         _res[key[0]] += cpu_res[key]
-    _load = defaultdict(int)
+    _load = defaultdict(float)
     for key in cpu_load:
         _load[key[0]] += cpu_load[key]
     for key in sorted(_res, key=lambda x: _res[x], reverse=True):
@@ -257,6 +285,33 @@ def output(data, default_category, percentage_cutoff):
                     percentage_cutoff)
 
 
+def compute_daily_sums(data, default_category, percentage_cutoff):
+
+    _load = defaultdict(float)
+    for key in data['app_cpu_load']:
+        _load[key[0]] += data['app_cpu_load'][key]
+    apps = sorted(_load, key=lambda x: _load[x], reverse=True)[:9]
+    apps.append(default_category)
+
+    daily_sums = {}
+    for date in data["dates"]:
+        total = sum(data['daily_cpu_load'][date][app] for app in data['daily_cpu_load'][date])
+        daily_sums[date] = ["{:.2f}".format(100.0 * data['daily_cpu_load'][date][app] / total) for app in apps]
+    return apps, daily_sums
+
+
+def _csv_report(columns, daily_sums):
+    f_writer = csv.writer(
+        sys.stdout,
+        quotechar='"',
+        quoting=csv.QUOTE_MINIMAL,
+        lineterminator="\n",
+    )
+    f_writer.writerow(['date'] + columns)
+    for day in daily_sums:
+        f_writer.writerow([day] + daily_sums[day])
+
+
 def main(config):
     """
     Map sonar snap results to a provided list of programs and create an output that is suitable for the dashboard etc.
@@ -273,20 +328,8 @@ def main(config):
         default_category=config["default_category"],
     )
 
-    output(data, config["default_category"], config["percentage_cutoff"])
-
-#   let's do file export a bit later
-#   first i want to know what data i would like to plot and this will
-#   be prototyped using CLI alone
-#   later: data export and web
-
-#   f_writer = csv.writer(
-#       sys.stdout,
-#       delimiter=config["output_delimiter"],
-#       quotechar='"',
-#       quoting=csv.QUOTE_MINIMAL,
-#   )
-#   for key in sorted(report, key=lambda x: report[x], reverse=True):
-#       user, project, app = key
-#       cpu = report[key]
-#       f_writer.writerow([user, project, app, "{:.1f}".format(cpu)])
+    if config["export_csv"]:
+        columns, daily_sums = compute_daily_sums(data, config["default_category"], config["percentage_cutoff"])
+        _csv_report(columns, daily_sums)
+    else:
+        output(data, config["default_category"], config["percentage_cutoff"])
