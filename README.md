@@ -11,7 +11,6 @@ using `ps`.
 - Reference implementation which serves as inspiration: <https://github.com/UNINETTSigma2/appusage>
 - [Design goals and design decisions](doc/design.md)
 - Status: not yet production ready, but soon
-- [Roadmap](doc/roadmap.md)
 - [Contributing](doc/contributing.md)
 
 
