@@ -3,7 +3,7 @@
 
 - pip installable
 - minimal overhead for recording
-- super quick reporting and dashboard, both stdout and web
+- super quick reporting and dashboard, both stdout and csv for web postprocessing
 - can be used as health check tool
 - data filtering/mapping is asynchronous
 
