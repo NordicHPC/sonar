@@ -10,7 +10,7 @@ using `ps`.
 
 - Reference implementation which serves as inspiration: <https://github.com/UNINETTSigma2/appusage>
 - [Design goals and design decisions](doc/design.md)
-- Status: not yet production ready, but soon
+- Status: alpha, API might change, but we already use it on one cluster
 - [Contributing](doc/contributing.md)
 
 
