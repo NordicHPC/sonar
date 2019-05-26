@@ -13,7 +13,7 @@ setup(
     name="sonar",
     version=version['__version__'],
     description='Tool to profile usage of HPC resources by regularly probing processes using ps.',
-    url='https://github.com/uit-no/sonar',
+    url='https://github.com/nordichpc/sonar',
     maintainer='Radovan Bast',
     long_description=long_description,
     long_description_content_type='text/markdown',

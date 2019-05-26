@@ -35,7 +35,7 @@ $ pip install sonar
 ### Installing from sources
 
 ```
-$ git clone https://github.com/uit-no/sonar.git
+$ git clone https://github.com/nordichpc/sonar.git
 $ cd sonar
 $ virtualenv venv
 $ source venv/bin/activate

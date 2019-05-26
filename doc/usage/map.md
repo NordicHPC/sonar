@@ -12,7 +12,7 @@ $ sonar map --input-dir /home/user/snap-outputs \
 
 The mapping files (`string_map.txt` and `regex_map.txt`) contain a space-separated
 (does not matter how many spaces) mapping from process to application.
-Example mapping files: https://github.com/uit-no/sonar/tree/master/example-mapping
+Example mapping files: https://github.com/nordichpc/sonar/tree/master/example-mapping
 
 You are welcome to use your own but encouraged to contribute mappings to our example files.
 
