@@ -94,7 +94,7 @@ percentage cutoff: 0.5%
 ## Exporting CSV data
 
 You can also export daily CPU load percentages in CSV format for further postprocessing, e.g.
-using https://github.com/bast/sonar-web.
+using https://github.com/NordicHPC/sonar-web.
 
 ```
 $ sonar map --input-dir /home/user/snap-outputs \
