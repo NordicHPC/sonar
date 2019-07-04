@@ -14,6 +14,16 @@ using `ps`.
 - [Contributing](doc/contributing.md)
 
 
+## Similar tools
+
+- [TACC Stats](https://github.com/TACC/tacc_stats)
+
+
+## Related tools which integrate with Sonar
+
+- [sonar-web](https://github.com/NordicHPC/sonar-web): Plots daily/weekly/monthly CPU usage summary on clusters.
+
+
 ## Authors
 
 - Henrik Rojas Nagel
