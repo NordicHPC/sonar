@@ -119,7 +119,19 @@ def test_sort_dates():
     assert sort_dates(dates_unsorted) == ['2006-01-10', '2019-05-08', '2019-05-10', '2021-01-01']
 
 
-def extract_and_map_data(string_map, re_map, input_dir, delimiter, suffix, default_category):
+def difference_days(date1, date2):
+    (y1, m1, d1) = date1.split('-')
+    (y2, m2, d2) = date2.split('-')
+    delta = datetime.date(int(y2), int(m2), int(d2)) - datetime.date(int(y1), int(m1), int(d1))
+    return delta.days
+
+
+def test_difference_days():
+    assert difference_days('2019-07-01', '2019-07-04') == 3
+    assert difference_days('2019-06-01', '2019-07-04') == 33
+
+
+def extract_and_map_data(string_map, re_map, input_dir, delimiter, suffix, default_category, num_days):
 
     daily_cpu_load = defaultdict(lambda: defaultdict(float))
 
@@ -134,6 +146,8 @@ def extract_and_map_data(string_map, re_map, input_dir, delimiter, suffix, defau
 
     unmapped_mem_requested = defaultdict(lambda: (sys.maxsize, -sys.maxsize))
     app_mem_requested = defaultdict(lambda: (sys.maxsize, -sys.maxsize))
+
+    today = datetime.datetime.today().strftime('%Y-%m-%d')
 
     dates = set()
 
@@ -156,6 +170,10 @@ def extract_and_map_data(string_map, re_map, input_dir, delimiter, suffix, defau
                 # 10 - Minimum size of memory requested by the job
 
                 time_stamp = normalize_time_stamp(line[0])
+
+                if difference_days(time_stamp, today) > num_days:
+                    continue
+
                 dates.add(time_stamp)
 
                 num_cores_on_node = int(line[2])
@@ -186,6 +204,7 @@ def extract_and_map_data(string_map, re_map, input_dir, delimiter, suffix, defau
                     app_cpu_res[(app, user)] += num_cores_on_node
                     app_num_cores_requested[(app, user)] = _adjust_min_max(app_num_cores_requested[(app, user)], num_cores_requested)
                     app_mem_requested[(app, user)] = _adjust_min_max(app_mem_requested[(app, user)], mem_requested)
+
                 daily_cpu_load[time_stamp][app] += cpu_load
 
     return {
@@ -326,6 +345,7 @@ def main(config):
         delimiter=config["input_delimiter"],
         suffix=config["input_suffix"],
         default_category=config["default_category"],
+        num_days=config["num_days"],
     )
 
     if config["export_csv"]:

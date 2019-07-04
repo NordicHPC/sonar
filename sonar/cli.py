@@ -108,6 +108,13 @@ def main():
         help="Percentage cutoff for summary printout [default: %(default)s].",
     )
     parser_map.add_argument(
+        "--num-days",
+        metavar="INT",
+        type=int,
+        default=7,
+        help="Ignore records older than this value [default: %(default)s].",
+    )
+    parser_map.add_argument(
         "--export-csv",
         action='store_true',
         help="Instead of reporting the sum, export daily percentages to be used in Sonar web [default: %(default)s].",
