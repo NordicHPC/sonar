@@ -27,3 +27,4 @@ lmp_mpi           LAMMPS
 paradis           ParaDiS
 ricc2_omp         TURBOMOLE
 norwecom.e2e.rh   NORWECOM.E2E
+texas             TEXAS
