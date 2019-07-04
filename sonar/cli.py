@@ -115,9 +115,10 @@ def main():
         help="Ignore records older than this value [default: %(default)s].",
     )
     parser_map.add_argument(
-        "--export-csv-daily",
-        action='store_true',
-        help="Instead of reporting the sum, export daily percentages to be used in Sonar web [default: %(default)s].",
+        "--export-csv",
+        metavar="STR",
+        default=None,
+        help="Instead of reporting the sum, export daily/weekly/monthly percentages to be used in Sonar web [default: %(default)s, options: daily, weekly, or monthly].",
     )
     parser_map.set_defaults(func=map_main)
 

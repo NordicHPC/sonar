@@ -304,7 +304,7 @@ def output(data, default_category, percentage_cutoff):
                     percentage_cutoff)
 
 
-def compute_daily_sums(data, default_category, percentage_cutoff):
+def compute_sums(granularity, data, default_category, percentage_cutoff):
 
     _load = defaultdict(float)
     for key in data['app_cpu_load']:
@@ -312,11 +312,30 @@ def compute_daily_sums(data, default_category, percentage_cutoff):
     apps = sorted(_load, key=lambda x: _load[x], reverse=True)[:9]
     apps.append(default_category)
 
-    daily_sums = {}
+    sums = {}
     for date in data["dates"]:
-        total = sum(data['daily_cpu_load'][date][app] for app in data['daily_cpu_load'][date])
-        daily_sums[date] = ["{:.2f}".format(100.0 * data['daily_cpu_load'][date][app] / total) for app in apps]
-    return apps, daily_sums
+        numbers = [data['daily_cpu_load'][date][app] for app in apps]
+
+        if granularity == 'daily':
+            key = date
+        elif granularity == 'weekly':
+            year = date.split('-')[0]
+            week = datetime.datetime.strptime(date, '%Y-%m-%d').isocalendar()[1]
+            key = f'{year}-{week}'
+        elif granularity == 'monthly':
+            key = '-'.join(date.split('-')[:2])
+
+        if key in sums:
+            sums[key] = [sums[key][i] + numbers[i] for i in range(len(numbers))]
+        else:
+            sums[key] = numbers
+
+    # adjust to percentages
+    for key in sums:
+        total = sum(sums[key])
+        sums[key] = ["{:.2f}".format(100.0 * e / total) for e in sums[key]]
+
+    return apps, sums
 
 
 def _csv_report(first_column, columns, sums):
@@ -335,6 +354,11 @@ def main(config):
     """
     Map sonar snap results to a provided list of programs and create an output that is suitable for the dashboard etc.
     """
+    if config["export_csv"] is not None:
+        granularity = config["export_csv"]
+        if granularity not in ['daily', 'weekly', 'monthly']:
+            sys.stderr.write(f'unexpected option to export_csv: {granularity}\n')
+            sys.exit(1)
 
     string_map, re_map = read_mapping(config["str_map_file"], config["re_map_file"])
 
@@ -348,8 +372,10 @@ def main(config):
         num_days=config["num_days"],
     )
 
-    if config["export_csv_daily"]:
-        columns, daily_sums = compute_daily_sums(data, config["default_category"], config["percentage_cutoff"])
-        _csv_report('date', columns, daily_sums)
+    if config["export_csv"] is not None:
+        granularity = config["export_csv"]
+        column = {'daily': 'date', 'weekly': 'week', 'monthly': 'month'}
+        columns, sums = compute_sums(granularity, data, config["default_category"], config["percentage_cutoff"])
+        _csv_report(column[granularity], columns, sums)
     else:
         output(data, config["default_category"], config["percentage_cutoff"])

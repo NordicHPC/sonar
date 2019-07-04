@@ -93,14 +93,15 @@ percentage cutoff: 0.5%
 
 ## Exporting CSV data
 
-You can also export daily CPU load percentages in CSV format for further postprocessing, e.g.
+You can also export daily, weekly, and monthly CPU load percentages in CSV format for further postprocessing, e.g.
 using https://github.com/NordicHPC/sonar-web.
 
+Example daily sums:
 ```
 $ sonar map --input-dir /home/user/snap-outputs \
             --str-map-file example-mapping/string_map.txt \
             --re-map-file example-mapping/regex_map.txt \
-            --export-csv-daily
+            --export-csv daily
 
 date,Gaussian,GPAW,VASP,Qdyn,StagYY,GROMACS,LAMMPS,Orca,ISSM,unknown
 2019-05-10,20.54,30.10,29.41,0.03,2.15,3.86,2.09,2.05,1.46,1.21
@@ -115,4 +116,23 @@ date,Gaussian,GPAW,VASP,Qdyn,StagYY,GROMACS,LAMMPS,Orca,ISSM,unknown
 2019-05-19,23.12,8.28,25.91,0.76,10.41,9.20,5.63,2.37,0.91,6.34
 2019-05-20,29.28,18.00,22.43,0.24,5.15,4.20,6.65,5.49,0.83,4.17
 2019-05-21,40.74,2.11,21.85,2.45,2.68,6.52,4.61,4.96,1.48,11.59
+```
+
+Example weekly sums:
+```
+$ sonar map --input-dir /home/user/snap-outputs \
+            --str-map-file example-mapping/string_map.txt \
+            --re-map-file example-mapping/regex_map.txt \
+            --export-csv weekly --num-days 200
+
+week,VASP,Gaussian,Qdyn,LAMMPS,GPAW,TEXAS,StagYY,ROMS,ParaDiS,unknown
+2019-19,24.06,25.27,1.06,3.78,36.94,0.70,3.02,3.50,0.26,1.41
+2019-20,19.33,28.57,19.46,3.27,17.66,0.42,5.10,0.82,0.00,5.36
+2019-21,21.72,36.73,12.26,11.00,3.27,0.19,4.62,4.46,0.00,5.76
+2019-22,22.97,24.44,15.80,10.15,6.15,0.00,3.94,4.89,0.30,11.36
+2019-23,21.66,15.71,23.12,7.88,15.59,0.00,4.14,5.94,2.02,3.93
+2019-24,30.84,10.10,24.08,16.94,0.40,0.00,2.73,0.56,7.48,6.87
+2019-25,37.83,15.42,17.77,13.99,0.00,0.00,1.66,2.24,0.71,10.38
+2019-26,35.78,19.53,1.89,4.08,0.00,19.70,2.95,1.21,6.83,8.03
+2019-27,26.48,9.06,0.00,8.42,0.00,54.53,0.86,0.00,0.00,0.65
 ```
