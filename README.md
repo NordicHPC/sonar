@@ -21,7 +21,7 @@ using `ps`.
 
 ## Related tools which integrate with Sonar
 
-- [sonar-web](https://github.com/NordicHPC/sonar-web): Plots daily/weekly/monthly CPU usage summary on clusters.
+- [sonar-web](https://github.com/NordicHPC/sonar-web): Plots daily/weekly/monthly CPU usage summary for clusters.
 
 
 ## Authors
