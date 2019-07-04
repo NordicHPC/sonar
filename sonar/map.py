@@ -313,6 +313,7 @@ def compute_sums(granularity, data, default_category, percentage_cutoff):
     apps.append(default_category)
 
     sums = {}
+    totals = defaultdict(float)
     for date in data["dates"]:
         numbers = [data['daily_cpu_load'][date][app] for app in apps]
 
@@ -330,10 +331,11 @@ def compute_sums(granularity, data, default_category, percentage_cutoff):
         else:
             sums[key] = numbers
 
+        totals[key] += sum([data['daily_cpu_load'][date][app] for app in data['daily_cpu_load'][date]])
+
     # adjust to percentages
     for key in sums:
-        total = sum(sums[key])
-        sums[key] = ["{:.2f}".format(100.0 * e / total) for e in sums[key]]
+        sums[key] = ["{:.2f}".format(100.0 * e / totals[key]) for e in sums[key]]
 
     return apps, sums
 
