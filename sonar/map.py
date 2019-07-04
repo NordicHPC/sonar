@@ -348,7 +348,7 @@ def main(config):
         num_days=config["num_days"],
     )
 
-    if config["export_csv"]:
+    if config["export_csv_daily"]:
         columns, daily_sums = compute_daily_sums(data, config["default_category"], config["percentage_cutoff"])
         _csv_report(columns, daily_sums)
     else:

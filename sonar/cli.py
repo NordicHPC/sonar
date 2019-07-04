@@ -115,7 +115,7 @@ def main():
         help="Ignore records older than this value [default: %(default)s].",
     )
     parser_map.add_argument(
-        "--export-csv",
+        "--export-csv-daily",
         action='store_true',
         help="Instead of reporting the sum, export daily percentages to be used in Sonar web [default: %(default)s].",
     )

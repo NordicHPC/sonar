@@ -100,7 +100,7 @@ using https://github.com/NordicHPC/sonar-web.
 $ sonar map --input-dir /home/user/snap-outputs \
             --str-map-file example-mapping/string_map.txt \
             --re-map-file example-mapping/regex_map.txt \
-            --export-csv
+            --export-csv-daily
 
 date,Gaussian,GPAW,VASP,Qdyn,StagYY,GROMACS,LAMMPS,Orca,ISSM,unknown
 2019-05-10,20.54,30.10,29.41,0.03,2.15,3.86,2.09,2.05,1.46,1.21
