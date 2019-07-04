@@ -319,16 +319,16 @@ def compute_daily_sums(data, default_category, percentage_cutoff):
     return apps, daily_sums
 
 
-def _csv_report(columns, daily_sums):
+def _csv_report(first_column, columns, sums):
     f_writer = csv.writer(
         sys.stdout,
         quotechar='"',
         quoting=csv.QUOTE_MINIMAL,
         lineterminator="\n",
     )
-    f_writer.writerow(['date'] + columns)
-    for day in daily_sums:
-        f_writer.writerow([day] + daily_sums[day])
+    f_writer.writerow([first_column] + columns)
+    for key in sums:
+        f_writer.writerow([key] + sums[key])
 
 
 def main(config):
@@ -350,6 +350,6 @@ def main(config):
 
     if config["export_csv_daily"]:
         columns, daily_sums = compute_daily_sums(data, config["default_category"], config["percentage_cutoff"])
-        _csv_report(columns, daily_sums)
+        _csv_report('date', columns, daily_sums)
     else:
         output(data, config["default_category"], config["percentage_cutoff"])
