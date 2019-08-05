@@ -20,7 +20,17 @@ def read_mapping(string_map_file, re_map_file):
     string_map = []
     re_map = []
 
-    for file_name, l in [(string_map_file, string_map), (re_map_file, re_map)]:
+    _this_dir = os.path.dirname(os.path.realpath(__file__))
+    if string_map_file is None:
+        _string_map_file = os.path.join(_this_dir, 'mapping', 'string_map.txt')
+    else:
+        _string_map_file = string_map_file
+    if re_map_file is None:
+        _re_map_file = os.path.join(_this_dir, 'mapping', 'regex_map.txt')
+    else:
+        _re_map_file = re_map_file
+
+    for file_name, l in [(_string_map_file, string_map), (_re_map_file, re_map)]:
         if file_name:
             try:
                 with open(file_name) as f:

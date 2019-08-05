@@ -75,12 +75,12 @@ def main():
     parser_map.add_argument(
         "--str-map-file",
         metavar="FILE",
-        help="File with the string mapping information (process -> application).",
+        help="File with the string mapping information (process -> application) [default: use internal mapping file].",
     )
     parser_map.add_argument(
         "--re-map-file",
         metavar="FILE",
-        help="File with the regular expression mapping information (process -> application).",
+        help="File with the regular expression mapping information (process -> application) [default: use internal mapping file].",
     )
     parser_map.add_argument(
         "--default-category",

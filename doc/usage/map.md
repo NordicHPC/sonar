@@ -5,16 +5,8 @@
 Map processes to applications:
 
 ```
-$ sonar map --input-dir /home/user/snap-outputs \
-            --str-map-file example-mapping/string_map.txt \
-            --re-map-file example-mapping/regex_map.txt
+$ sonar map --input-dir /home/user/snap-outputs
 ```
-
-The mapping files (`string_map.txt` and `regex_map.txt`) contain a space-separated
-(does not matter how many spaces) mapping from process to application.
-Example mapping files: https://github.com/nordichpc/sonar/tree/master/example-mapping
-
-You are welcome to use your own but encouraged to contribute mappings to our example files.
 
 
 ## Example output
@@ -91,6 +83,25 @@ percentage cutoff: 0.5%
 ```
 
 
+## How to use your own mapping files
+
+Sonar uses the following mapping files: https://github.com/nordichpc/sonar/tree/master/sonar/mapping
+
+The mapping files (`string_map.txt` and `regex_map.txt`) contain a space-separated
+(does not matter how many spaces) mapping from process to application.
+
+You can use your own mapping files instead:
+
+```
+$ sonar map --input-dir /home/user/snap-outputs \
+            --str-map-file /home/user/my-own-mapping/string_map.txt \
+            --re-map-file /home/user/my-own-mapping/regex_map.txt
+```
+
+
+You are welcome to use your own but encouraged to contribute mappings to https://github.com/nordichpc/sonar/tree/master/sonar/mapping.
+
+
 ## Exporting CSV data
 
 You can also export daily, weekly, and monthly CPU load percentages in CSV format for further postprocessing, e.g.
@@ -99,8 +110,6 @@ using https://github.com/NordicHPC/sonar-web.
 Example daily sums:
 ```
 $ sonar map --input-dir /home/user/snap-outputs \
-            --str-map-file example-mapping/string_map.txt \
-            --re-map-file example-mapping/regex_map.txt \
             --export-csv daily
 
 date,VASP,Gaussian,Qdyn,LAMMPS,GPAW,TEXAS,StagYY,ROMS,ParaDiS,unknown
@@ -118,8 +127,6 @@ date,VASP,Gaussian,Qdyn,LAMMPS,GPAW,TEXAS,StagYY,ROMS,ParaDiS,unknown
 Example weekly sums:
 ```
 $ sonar map --input-dir /home/user/snap-outputs \
-            --str-map-file example-mapping/string_map.txt \
-            --re-map-file example-mapping/regex_map.txt \
             --export-csv weekly --num-days 200
 
 week,VASP,Gaussian,Qdyn,LAMMPS,GPAW,TEXAS,StagYY,ROMS,ParaDiS,unknown
