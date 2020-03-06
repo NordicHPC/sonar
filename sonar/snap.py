@@ -130,12 +130,16 @@ def get_hostname():
     # we first try to get the hostname alias
     # we do this because at least on our cluster slurm uses
     # the alias ("c61-8") instead of the full hostname (e.g. "c61-8.local")
-    result = check_output(["hostname", "-a"]).rstrip().decode("utf-8")
-    if result != "":
-        return result
-    else:
+    hostname = check_output(["hostname", "-a"]).rstrip().decode("utf-8")
+    if hostname == "":
         # if alias is empty, we try hostname
-        return socket.gethostname()
+        hostname = socket.gethostname()
+    # workaround: on one machine hostname -a yields a long (full?) hostname which
+    #             confused Slurm
+    #             here we assume that Slurm hosts never contain "."
+    #             and cut away the part after the dot
+    #             this might be wrong
+    return hostname.split('.')[0]
 
 
 def create_snapshot(cpu_cutoff, mem_cutoff, ignored_users):
