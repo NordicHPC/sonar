@@ -18,6 +18,7 @@ fvcom.bin         FVCOM
 iSALE2D           iSALE2D
 qdyn5p            Qdyn
 Qdyn5p            Qdyn
+Qdyn6p            Qdyn
 namd2             NAMD
 fiber             fiber
 mdrun_mpi         GROMACS
@@ -29,3 +30,9 @@ ricc2_omp         TURBOMOLE
 ridft             TURBOMOLE
 norwecom.e2e.rh   NORWECOM.E2E
 texas             TEXAS
+nwchem            NWChem
+rasscf.exe        Molcas
+seward.exe        Molcas
+scf.exe           Molcas
+pw.x              "Quantum ESPRESSO"
+eT                eT
