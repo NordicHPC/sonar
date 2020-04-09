@@ -98,6 +98,8 @@ def _cast_to_mb(s):
         return int(s[:-1])
     elif s.endswith('G'):
         return 1000 * int(s[:-1])
+    elif s == '0':
+        return 0
     else:
         sys.stderr.write(f'unexpected input to _cast_to_mb: {s}\n')
         sys.exit(1)
