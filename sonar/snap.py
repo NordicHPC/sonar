@@ -7,7 +7,7 @@ import socket
 import multiprocessing
 
 from contextlib import contextmanager
-from subprocess import check_output, SubprocessError, DEVNULL
+from subprocess import check_output, SubprocessError, TimeoutExpired, DEVNULL
 from collections import defaultdict, namedtuple
 from configparser import ConfigParser
 
@@ -43,7 +43,12 @@ def get_slurm_info(hostname):
     # %u  User
     try:
         command = f"squeue --noheader --nodelist={hostname} --format=%i,%a,%u,%m,%C"
-        output = check_output(command, shell=True, stderr=DEVNULL).decode("utf8")
+        output = check_output(command, shell=True, stderr=DEVNULL, timeout=3).decode("utf8")
+    except TimeoutExpired:
+        # Slurm took too more than 3 seconds to respond, perhaps the node is ill
+        # we had a case where this lead to Sonar jobs piling up since they were waiting for
+        # a stuck Slurm
+        return user_to_slurminfo
     except SubprocessError:
         # if Slurm is not available, return the empty defaultdict that will return '-' for any key call.
         return user_to_slurminfo
