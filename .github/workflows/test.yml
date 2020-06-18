@@ -23,7 +23,9 @@ jobs:
       with:
         python-version: ${{ matrix.python-version }}
     - name: Install Python dependencies
-      run: pip install -r requirements.txt
+      run: |
+        pip install -r requirements.txt
+        flit install --symlink
     - name: Run tests
       run: |
         pytest -vv -s sonar/*py
