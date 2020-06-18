@@ -59,30 +59,6 @@ Authors
 -  `Radovan Bast <https://bast.fr>`__
 
 
-Installation
-------------
-
-Ideally install into a virtual environment::
-
-  $ pip install sonar
-
-If you develop sonar, you can install like this::
-
-  $ git clone https://github.com/nordichpc/sonar.git
-  $ cd sonar
-  $ virtualenv venv
-  $ source venv/bin/activate
-  $ pip install -r requirements.txt
-  $ flit install --symlink
-
-
-Using sonar
------------
-
--  `Taking snapshots with sonar snap <doc/usage/snap.md>`__
--  `Map processes to applications with sonar map <doc/usage/map.md>`__
-
-
 Design goals and design decisions
 ---------------------------------
 
@@ -100,6 +76,23 @@ many non-English locales. ``ps`` always uses decimal points. In
 addition, ``ps`` is (arguably) more versatile/configurable and does not
 print the header that ``top`` prints. All these properties make the
 ``ps`` output easier to parse than the ``top`` output.
+
+
+Installation
+------------
+
+Ideally install into a virtual environment::
+
+  $ pip install sonar
+
+If you develop sonar, you can install like this::
+
+  $ git clone https://github.com/nordichpc/sonar.git
+  $ cd sonar
+  $ virtualenv venv
+  $ source venv/bin/activate
+  $ pip install -r requirements.txt
+  $ flit install --symlink
 
 
 How to analyze sonar logs
