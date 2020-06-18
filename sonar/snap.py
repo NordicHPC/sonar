@@ -36,14 +36,18 @@ def get_slurm_info(hostname):
     :returns: A defaultdict with the mapping from user to project. Project is '-' if the user is not found or slurm is not available.
     """
 
-    user_to_slurminfo = defaultdict(lambda: {"jobid": "-", "project": "-", "num_cores": "-", "min_mem": "-"})
+    user_to_slurminfo = defaultdict(
+        lambda: {"jobid": "-", "project": "-", "num_cores": "-", "min_mem": "-"}
+    )
 
     # %i  Job ID (or <jobid>_<arrayid> for job arrays)
     # %a  Account (project)
     # %u  User
     try:
         command = f"squeue --noheader --nodelist={hostname} --format=%i,%a,%u,%m,%C"
-        output = check_output(command, shell=True, stderr=DEVNULL, timeout=3).decode("utf8")
+        output = check_output(command, shell=True, stderr=DEVNULL, timeout=3).decode(
+            "utf8"
+        )
     except TimeoutExpired:
         # Slurm took too more than 3 seconds to respond, perhaps the node is ill
         # we had a case where this lead to Sonar jobs piling up since they were waiting for
@@ -58,7 +62,12 @@ def get_slurm_info(hostname):
         if not line:
             continue
         jobid, project, user, min_mem, num_cores = line.split(",")
-        user_to_slurminfo[user] = {"jobid": jobid, "project": project, "num_cores": num_cores, "min_mem": min_mem}
+        user_to_slurminfo[user] = {
+            "jobid": jobid,
+            "project": project,
+            "num_cores": num_cores,
+            "min_mem": min_mem,
+        }
 
     return user_to_slurminfo
 
@@ -144,7 +153,7 @@ def get_hostname():
     #             here we assume that Slurm hosts never contain "."
     #             and cut away the part after the dot
     #             this might be wrong
-    return hostname.split('.')[0]
+    return hostname.split(".")[0]
 
 
 def create_snapshot(cpu_cutoff, mem_cutoff, ignored_users):
