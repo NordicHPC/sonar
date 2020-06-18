@@ -7,6 +7,9 @@ module = "sonar"
 author = "Radovan Bast"
 author-email = "radovan.bast@uit.no"
 home-page = "https://github.com/NordicHPC/sonar"
+requires=[
+    "tqdm",
+]
 description-file="README.rst"
 classifiers = ["License :: OSI Approved :: GNU General Public License v3 (GPLv3)"]
 

@@ -6,6 +6,7 @@ import time
 import datetime
 
 from glob import glob
+from tqdm import tqdm
 from contextlib import contextmanager
 from collections import defaultdict
 from .version import __version__
@@ -176,7 +177,9 @@ def extract_and_map_data(
 
     dates = set()
 
-    for filename in glob(os.path.normpath(os.path.join(input_dir, "*" + suffix))):
+    files = glob(os.path.normpath(os.path.join(input_dir, "*" + suffix)))
+    print("reading log files ...")
+    for filename in tqdm(files):
         with open(filename) as f:
             f_reader = csv.reader(f, delimiter=delimiter, quotechar='"')
             for line in f_reader:
