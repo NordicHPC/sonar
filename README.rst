@@ -100,3 +100,36 @@ many non-English locales. ``ps`` always uses decimal points. In
 addition, ``ps`` is (arguably) more versatile/configurable and does not
 print the header that ``top`` prints. All these properties make the
 ``ps`` output easier to parse than the ``top`` output.
+
+
+How to analyze sonar logs
+-------------------------
+
+For this run ``sonar map`` which will go through the logs,
+and map processes to applications::
+
+  $ sonar map --input-dir /home/user/folder/with/logs
+
+By default you will see data for the past 7 days. But you can change this::
+
+  $ sonar map --input-dir /home/user/folder/with/logs --num-days 300
+
+Sonar uses the following mapping files: https://github.com/nordichpc/sonar/tree/master/sonar/mapping
+
+The mapping files (`string_map.txt` and `regex_map.txt`) contain a space-separated
+(does not matter how many spaces) mapping from process to application.
+
+You can use your own mapping files instead::
+
+  $ sonar map --input-dir /home/user/folder/with/logs \
+              --str-map-file /home/user/my-own-mapping/string_map.txt \
+              --re-map-file /home/user/my-own-mapping/regex_map.txt
+
+You are welcome to use your own but encouraged to contribute mappings to
+https://github.com/nordichpc/sonar/tree/master/sonar/mapping.
+
+You can also export daily, weekly, and monthly CPU load percentages in CSV format for further postprocessing, e.g.
+using https://github.com/NordicHPC/sonar-web::
+
+  $ sonar map --input-dir /home/user/folder/with/logs --export-csv daily
+  $ sonar map --input-dir /home/user/folder/with/logs --export-csv weekly --num-days 200
