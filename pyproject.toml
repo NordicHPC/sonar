@@ -1,0 +1,14 @@
+[build-system]
+requires = ["flit_core >=2,<4"]
+build-backend = "flit_core.buildapi"
+
+[tool.flit.metadata]
+module = "sonar"
+author = "Radovan Bast"
+author-email = "radovan.bast@uit.no"
+home-page = "https://github.com/NordicHPC/sonar"
+description-file="README.rst"
+classifiers = ["License :: OSI Approved :: GNU General Public License v3 (GPLv3)"]
+
+[tool.flit.scripts]
+sonar = "sonar.cli:main"
