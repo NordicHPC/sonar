@@ -15,7 +15,6 @@ using ``ps``.
 .. contents:: Table of contents
 
 
--  `Design goals and design decisions <doc/design.md>`__
 -  `Contributing <doc/contributing.md>`__
 
 
@@ -60,3 +59,22 @@ Using sonar
 -  `Overview <doc/usage/overview.md>`__
 -  `Taking snapshots with sonar snap <doc/usage/snap.md>`__
 -  `Map processes to applications with sonar map <doc/usage/map.md>`__
+
+
+Design goals and design decisions
+---------------------------------
+
+- Pip installable
+- Minimal overhead for recording
+- Super quick reporting and dashboard, both stdout and csv for web
+  postprocessing
+- Can be used as health check tool
+
+``ps`` instead of ``top``:
+
+We started using ``top`` but it turned out that ``top`` is dependent on
+locale, so it displays floats with comma instead of decimal point in
+many non-English locales. ``ps`` always uses decimal points. In
+addition, ``ps`` is (arguably) more versatile/configurable and does not
+print the header that ``top`` prints. All these properties make the
+``ps`` output easier to parse than the ``top`` output.
