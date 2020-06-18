@@ -1,4 +1,3 @@
-[![Builds](https://travis-ci.org/nordichpc/sonar.svg?branch=master)](https://travis-ci.org/nordichpc/sonar/builds)
 [![License](https://img.shields.io/badge/license-%20GPL--v3.0-blue.svg)](LICENSE)
 [![PyPI version](https://badge.fury.io/py/sonar.svg)](https://badge.fury.io/py/sonar)
 
