@@ -15,9 +15,6 @@ using ``ps``.
 .. contents:: Table of contents
 
 
--  `Contributing <doc/contributing.md>`__
-
-
 Similar and related tools
 -------------------------
 
