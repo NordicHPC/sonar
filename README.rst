@@ -171,7 +171,6 @@ This is how it looks when I run ``sonar snap`` on my laptop (without Slurm)::
   2019-05-11T14:54:16.940502+0200,laptop,4,me,vim,0.6,7,-,-,-,-
   2019-05-11T14:54:16.940502+0200,laptop,4,me,sonar,23.0,23,-,-,-,-
   2019-05-11T14:54:16.940502+0200,laptop,4,me,gnome-terminal-,0.9,47,-,-,-,-
-```
 
 
 Running sonar snap on a cluster
@@ -182,9 +181,7 @@ We let cron execute a script every 20 minutes::
   10,30,50 * * * * /global/work/sonar/sonar/cron-sonar.sh
 
 The script ``cron-sonar.sh`` creates a list of active nodes and executes
-``run-snap.sh`` on all of these nodes:
-
-.. code-block:: bash
+``run-snap.sh`` on all of these nodes::
 
   #!/bin/bash
 
@@ -195,11 +192,9 @@ The script ``cron-sonar.sh`` creates a list of active nodes and executes
 
   # run sonar snap on all available nodes
   /usr/bin/pdsh -w \^${SONAR_ROOT}/tmp/list-of-nodes ${SONAR_ROOT}/sonar/run-snap.sh >> ${SONAR_ROOT}/tmp/pdsh.log 2>> ${SONAR_ROOT}/tmp/pdsh.err
-```
 
-In ``run-snap.sh`` we load the Python environment and wrap around ``sonar snap``:
 
-.. code-block:: bash
+In ``run-snap.sh`` we load the Python environment and wrap around ``sonar snap``::
 
   #!/usr/bin/env bash
 
