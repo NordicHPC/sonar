@@ -15,22 +15,19 @@ using ``ps``.
 .. contents:: Table of contents
 
 
--  Reference implementation which serves as inspiration:
-   https://github.com/UNINETTSigma2/appusage
 -  `Design goals and design decisions <doc/design.md>`__
--  Status: alpha, API might change, but we already use it on one cluster
 -  `Contributing <doc/contributing.md>`__
 
-Similar tools
--------------
 
+Similar and related tools
+-------------------------
+
+-  Reference implementation which serves as inspiration:
+   https://github.com/UNINETTSigma2/appusage
 -  `TACC Stats <https://github.com/TACC/tacc_stats>`__
-
-Related tools which integrate with Sonar
-----------------------------------------
-
 -  `sonar-web <https://github.com/NordicHPC/sonar-web>`__: Plots
    daily/weekly/monthly CPU usage summary for clusters.
+
 
 Authors
 -------
