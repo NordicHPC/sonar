@@ -1,4 +1,8 @@
-|License| |PyPI version|
+.. image:: https://img.shields.io/badge/license-%20GPL--v3.0-blue.svg
+   :target: LICENSE
+.. image:: https://badge.fury.io/py/sonar.svg
+   :target: https://badge.fury.io/py/sonar
+
 
 sonar
 =====
@@ -59,8 +63,3 @@ Using sonar
 -  `Overview <doc/usage/overview.md>`__
 -  `Taking snapshots with sonar snap <doc/usage/snap.md>`__
 -  `Map processes to applications with sonar map <doc/usage/map.md>`__
-
-.. |License| image:: https://img.shields.io/badge/license-%20GPL--v3.0-blue.svg
-   :target: LICENSE
-.. |PyPI version| image:: https://badge.fury.io/py/sonar.svg
-   :target: https://badge.fury.io/py/sonar
