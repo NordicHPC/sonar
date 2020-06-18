@@ -68,8 +68,7 @@ Design goals and design decisions
   postprocessing
 - Can be used as health check tool
 
-``ps`` instead of ``top``:
-
+Why ``ps`` instead of ``top``?
 We started using ``top`` but it turned out that ``top`` is dependent on
 locale, so it displays floats with comma instead of decimal point in
 many non-English locales. ``ps`` always uses decimal points. In
