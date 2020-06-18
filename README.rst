@@ -39,28 +39,23 @@ Authors
 -  Mathias Bockwoldt
 -  `Radovan Bast <https://bast.fr>`__
 
+
 Installation
 ------------
 
-Installing from PyPI
-~~~~~~~~~~~~~~~~~~~~
+Ideally install into a virtual environment::
 
-Ideally install into a virtual environment or Pipenv:
+  $ pip install sonar
 
-::
+If you develop sonar, you can install like this::
 
-    $ pip install sonar
+  $ git clone https://github.com/nordichpc/sonar.git
+  $ cd sonar
+  $ virtualenv venv
+  $ source venv/bin/activate
+  $ pip install -r requirements.txt
+  $ flit install --symlink
 
-Installing from sources
-~~~~~~~~~~~~~~~~~~~~~~~
-
-::
-
-    $ git clone https://github.com/nordichpc/sonar.git
-    $ cd sonar
-    $ virtualenv venv
-    $ source venv/bin/activate
-    $ pip install -e .
 
 Using sonar
 -----------
