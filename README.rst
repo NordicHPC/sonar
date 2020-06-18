@@ -1,3 +1,5 @@
+.. image:: https://github.com/NordicHPC/sonar/workflows/Test/badge.svg
+   :target: https://github.com/NordicHPC/sonar/actions
 .. image:: https://img.shields.io/badge/license-%20GPL--v3.0-blue.svg
    :target: LICENSE
 .. image:: https://badge.fury.io/py/sonar.svg
