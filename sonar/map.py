@@ -100,7 +100,7 @@ def _cast_to_mb(s):
     if s.endswith("M"):
         return int(s[:-1])
     elif s.endswith("G"):
-        return 1000 * int(s[:-1])
+        return 1000 * float(s[:-1])
     elif s == "0":
         return 0
     else:
