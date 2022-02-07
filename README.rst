@@ -106,7 +106,7 @@ By default you will see data for the past 7 days. But you can change this::
 
   $ sonar map --input-dir /home/user/folder/with/logs --num-days 300
 
-Sonar uses the following mapping files: https://github.com/nordichpc/sonar/tree/master/sonar/mapping
+Sonar uses the following mapping files: https://github.com/nordichpc/sonar/tree/main/sonar/mapping
 
 The mapping files (`string_map.txt` and `regex_map.txt`) contain a space-separated
 (does not matter how many spaces) mapping from process to application.
@@ -118,7 +118,7 @@ You can use your own mapping files instead::
               --re-map-file /home/user/my-own-mapping/regex_map.txt
 
 You are welcome to use your own but encouraged to contribute mappings to
-https://github.com/nordichpc/sonar/tree/master/sonar/mapping.
+https://github.com/nordichpc/sonar/tree/main/sonar/mapping.
 
 You can also export daily, weekly, and monthly CPU load percentages in CSV format for further postprocessing, e.g.
 using https://github.com/NordicHPC/sonar-web::
