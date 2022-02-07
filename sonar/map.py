@@ -403,7 +403,7 @@ def _csv_report(first_column, columns, sums):
 
 def main(config):
     """
-    Map sonar snap results to a provided list of programs and create an output that is suitable for the dashboard etc.
+    Map 'sonar probe' results to a provided list of programs and create an output that is suitable for the dashboard etc.
     """
     if config["export_csv"] is not None:
         granularity = config["export_csv"]

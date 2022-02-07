@@ -18,7 +18,7 @@ using ``ps``.
 Overview
 --------
 
-The code can do two things: take snapshots (``sonar snap``, typically every 20
+The code can do two things: take snapshots (``sonar probe``, typically every 20
 minutes or so), and map them (``sonar map``, whenever you like) to
 applications/projects/users::
 
@@ -33,7 +33,7 @@ applications/projects/users::
 
   Subcommands:
 
-      snap      Take a snapshot of the system. Run this on every node and often
+      probe     Take a snapshot of the system. Run this on every node and often
                 (e.g. every 20 minutes).
       map       Parse the system snapshots and map applications. Run this only
                 once centrally and typically once a day.
@@ -127,12 +127,12 @@ using https://github.com/NordicHPC/sonar-web::
   $ sonar map --input-dir /home/user/folder/with/logs --export-csv weekly --num-days 200
 
 
-Taking snapshots with sonar snap
---------------------------------
+Taking snapshots with sonar probe
+---------------------------------
 
-This is me running `sonar snap` on a compute node::
+This is me running `sonar probe` on a compute node::
 
-  $ sonar snap --output-delimiter ","
+  $ sonar probe --output-delimiter ","
 
   2019-05-10T17:11:34.585859+0200,c10-4,16,me,sonar,31.0,0,-,-,-,-
   2019-05-10T17:11:34.585859+0200,c10-4,16,somebody,vasp.5.3.5,1506.4,5151,someproject,1598301,64,2000M
@@ -152,15 +152,15 @@ The columns are:
 
 By default they are tab-separated but here I chose to display the result
 comma-separated. You can also change cutoffs or ignore users to not measure the tool
-itself (``sonar snap --help``).
+itself (``sonar probe --help``).
 
 It can be useful to redirect the result to a file::
 
-  $ sonar snap >> /home/user/tmp/example.tsv
+  $ sonar probe >> /home/user/tmp/example.tsv
 
-This is how it looks when I run ``sonar snap`` on my laptop (without Slurm)::
+This is how it looks when I run ``sonar probe`` on my laptop (without Slurm)::
 
-  $ sonar snap --output-delimiter ","
+  $ sonar probe --output-delimiter ","
 
   2019-05-11T14:54:16.940502+0200,laptop,4,root,Xorg,0.7,47,-,-,-,-
   2019-05-11T14:54:16.940502+0200,laptop,4,me,gnome-shell,0.7,188,-,-,-,-
@@ -172,15 +172,15 @@ This is how it looks when I run ``sonar snap`` on my laptop (without Slurm)::
   2019-05-11T14:54:16.940502+0200,laptop,4,me,gnome-terminal-,0.9,47,-,-,-,-
 
 
-Running sonar snap on a cluster
--------------------------------
+Running sonar probe on a cluster
+--------------------------------
 
 We let cron execute a script every 20 minutes::
 
   10,30,50 * * * * /global/work/sonar/sonar/cron-sonar.sh
 
 The script ``cron-sonar.sh`` creates a list of active nodes and executes
-``run-snap.sh`` on all of these nodes::
+``run-probe.sh`` on all of these nodes::
 
   #!/bin/bash
 
@@ -189,11 +189,11 @@ The script ``cron-sonar.sh`` creates a list of active nodes and executes
   # get list of all available nodes
   /usr/bin/sinfo -h -r -o '%n' > ${SONAR_ROOT}/tmp/list-of-nodes 2> ${SONAR_ROOT}/tmp/list-of-nodes.err
 
-  # run sonar snap on all available nodes
-  /usr/bin/pdsh -w \^${SONAR_ROOT}/tmp/list-of-nodes ${SONAR_ROOT}/sonar/run-snap.sh >> ${SONAR_ROOT}/tmp/pdsh.log 2>> ${SONAR_ROOT}/tmp/pdsh.err
+  # run sonar probe on all available nodes
+  /usr/bin/pdsh -w \^${SONAR_ROOT}/tmp/list-of-nodes ${SONAR_ROOT}/sonar/run-probe.sh >> ${SONAR_ROOT}/tmp/pdsh.log 2>> ${SONAR_ROOT}/tmp/pdsh.err
 
 
-In ``run-snap.sh`` we load the Python environment and wrap around ``sonar snap``::
+In ``run-probe.sh`` we load the Python environment and wrap around ``sonar probe``::
 
   #!/usr/bin/env bash
 
@@ -202,7 +202,7 @@ In ``run-snap.sh`` we load the Python environment and wrap around ``sonar snap``
 
   source /global/work/sonar/sonar/venv/bin/activate
   current_year=$(date +'%Y')
-  mkdir -p /global/work/sonar/snap-outputs/${current_year}
-  sonar snap --ignored-users root >> /global/work/sonar/snap-outputs/${current_year}/${HOSTNAME}.tsv
+  mkdir -p /global/work/sonar/probe-outputs/${current_year}
+  sonar probe --ignored-users root >> /global/work/sonar/probe-outputs/${current_year}/${HOSTNAME}.tsv
 
 This produces ca. 10 MB data per day.
