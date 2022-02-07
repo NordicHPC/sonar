@@ -391,7 +391,10 @@ def compute_sums(granularity, data, default_category, percentage_cutoff):
 
 def _csv_report(first_column, columns, sums):
     f_writer = csv.writer(
-        sys.stdout, quotechar='"', quoting=csv.QUOTE_MINIMAL, lineterminator="\n",
+        sys.stdout,
+        quotechar='"',
+        quoting=csv.QUOTE_MINIMAL,
+        lineterminator="\n",
     )
     f_writer.writerow([first_column] + columns)
     for key in sums:

@@ -94,7 +94,7 @@ def extract_processes(raw_text, ignored_users):
         # Using maxsplit to prevent commands to be split. This is unstable if the `ps` call is altered!
         words = line.split(maxsplit=4)
         if len(words) == 5:
-            pid, user, cpu_percentage, mem_percentage, command = words
+            _pid, user, cpu_percentage, mem_percentage, command = words
             if user not in ignored_users:
                 cpu_percentages[(user, command)] += float(cpu_percentage)
                 mem_percentages[(user, command)] += float(mem_percentage)
