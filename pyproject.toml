@@ -10,6 +10,7 @@ home-page = "https://github.com/NordicHPC/sonar"
 requires=[
     "tqdm",
     "psutil",
+    "tabulate",
     "click",
 ]
 description-file="README.md"
