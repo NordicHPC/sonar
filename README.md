@@ -135,10 +135,18 @@ This is me running [sonar probe]{.title-ref} on a compute node:
     2019-05-10T17:11:34.585859+0200,c10-4,16,me,sonar,31.0,0,-,-,-,-
     2019-05-10T17:11:34.585859+0200,c10-4,16,somebody,vasp.5.3.5,1506.4,5151,someproject,1598301,64,2000M
 
-The columns are: - time stamp - hostname - number of cores on this node
-- user - process - CPU percentage (this is a 20-core node) - memory used
-in MB - Slurm project - Slurm job ID - Number of CPUs requested by the
-job - Minimum size of memory requested by the job
+The columns are:
+- time stamp
+- hostname
+- number of cores on this node
+- user
+- process
+- CPU percentage (this is a 20-core node)
+- memory used in MB
+- Slurm project
+- Slurm job ID
+- Number of CPUs requested by the job
+- Memory requested by the job
 
 By default they are tab-separated but here I chose to display the result
 comma-separated. You can also change cutoffs or ignore users to not
