@@ -1,18 +1,66 @@
 [![image](https://github.com/NordicHPC/sonar/workflows/Test/badge.svg)](https://github.com/NordicHPC/sonar/actions)
-
 [![image](https://img.shields.io/badge/license-%20GPL--v3.0-blue.svg)](LICENSE)
-
 [![image](https://badge.fury.io/py/sonar.svg)](https://badge.fury.io/py/sonar)
 
-sonar
-=====
 
-Tool to profile usage of HPC resources by regularly probing processes
-using `ps`.
+# sonar
 
-::: {.contents}
-Table of contents
-:::
+Tool to profile usage of HPC resources by regularly probing processes using
+`ps`.
+
+
+## Similar and related tools
+
+- Reference implementation which serves as inspiration:
+  <https://github.com/UNINETTSigma2/appusage>
+- [TACC Stats](https://github.com/TACC/tacc_stats)
+
+
+## Authors
+
+- Henrik Rojas Nagel
+- Mathias Bockwoldt
+- [Radovan Bast](https://bast.fr)
+
+
+## Design goals and design decisions
+
+- Pip-installable
+- Minimal overhead for recording
+- Can be used as health check tool
+- Do not interact with Slurm from each node to not overload it: one process
+  talks to Slurm, all others only ask `ps`
+
+Why `ps` instead of `top`? We started using `top` but it turned out that
+`top` is dependent on locale, so it displays floats with comma instead
+of decimal point in many non-English locales. `ps` always uses decimal
+points. In addition, `ps` is (arguably) more versatile/configurable and
+does not print the header that `top` prints. All these properties make
+the `ps` output easier to parse than the `top` output.
+
+
+## Installation
+
+Ideally install into a virtual environment:
+```
+$ pip install sonar
+```
+
+If you develop sonar, you can install like this:
+```
+$ git clone https://github.com/nordichpc/sonar.git
+$ cd sonar
+$ virtualenv venv
+$ source venv/bin/activate
+$ pip install -r requirements.txt
+$ flit install --symlink
+```
+
+
+## Outdated docs below
+
+---
+
 
 Overview
 --------
@@ -38,58 +86,6 @@ to applications/projects/users:
                   once centrally and typically once a day.
 
     Run sonar <subcommand> -h to get more information about subcommands.
-
-Similar and related tools
--------------------------
-
--   Reference implementation which serves as inspiration:
-    <https://github.com/UNINETTSigma2/appusage>
--   [TACC Stats](https://github.com/TACC/tacc_stats)
--   [sonar-web](https://github.com/NordicHPC/sonar-web): Plots
-    daily/weekly/monthly CPU usage summary for clusters.
-
-Authors
--------
-
--   Henrik Rojas Nagel
--   Mathias Bockwoldt
--   [Radovan Bast](https://bast.fr)
-
-
-Design goals and design decisions
----------------------------------
-
-- Pip-installable
-- Minimal overhead for recording
-- Can be used as health check tool
-- Do not interact with Slurm from each node to not overload it: one process
-  talks to Slurm, all others only ask `ps`
-
-Why `ps` instead of `top`? We started using `top` but it turned out that
-`top` is dependent on locale, so it displays floats with comma instead
-of decimal point in many non-English locales. `ps` always uses decimal
-points. In addition, `ps` is (arguably) more versatile/configurable and
-does not print the header that `top` prints. All these properties make
-the `ps` output easier to parse than the `top` output.
-
-
-Installation
-------------
-
-Ideally install into a virtual environment:
-```
-$ pip install sonar
-```
-
-If you develop sonar, you can install like this:
-```
-$ git clone https://github.com/nordichpc/sonar.git
-$ cd sonar
-$ virtualenv venv
-$ source venv/bin/activate
-$ pip install -r requirements.txt
-$ flit install --symlink
-```
 
 
 How to analyze sonar logs
@@ -128,6 +124,7 @@ CSV format for further postprocessing, e.g. using
     $ sonar map --input-dir /home/user/folder/with/logs --export-csv daily
     $ sonar map --input-dir /home/user/folder/with/logs --export-csv weekly --num-days 200
 
+
 Taking snapshots with sonar probe
 ---------------------------------
 
@@ -164,6 +161,7 @@ Slurm):
     2019-05-11T14:54:16.940502+0200,laptop,4,me,vim,0.6,7,-,-,-,-
     2019-05-11T14:54:16.940502+0200,laptop,4,me,sonar,23.0,23,-,-,-,-
     2019-05-11T14:54:16.940502+0200,laptop,4,me,gnome-terminal-,0.9,47,-,-,-,-
+
 
 Running sonar probe on a cluster
 --------------------------------
