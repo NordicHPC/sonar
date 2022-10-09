@@ -5,9 +5,9 @@ import multiprocessing
 import psutil
 import platform
 import click
-
-from subprocess import check_output
 from collections import defaultdict
+
+from sonar.command import safe_command
 
 
 def extract_processes(raw_text: str):
@@ -63,9 +63,9 @@ def create_snapshot(cpu_cutoff_percent: float, mem_cutoff_percent: float):
 
     # -e      show all processes
     # -o      output formatting. user:30 is a hack to prevent cut-off user names
-    output = check_output(
-        "ps -e --no-header -o pid,user:30,pcpu,pmem,comm", shell=True
-    ).decode("utf-8")
+    command = "ps -e --no-header -o pid,user:30,pcpu,pmem,comm"
+
+    output = safe_command(command=command, timeout_seconds=2)
 
     cpu_percentages, mem_percentages = extract_processes(output)
 
