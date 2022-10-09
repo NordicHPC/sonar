@@ -6,7 +6,7 @@ import configparser
 import datetime
 from sonar.probe import main as probe_main
 from sonar.map import main as map_main
-from sonar.ps import print_snapshot
+from sonar.ps import print_ps_info
 
 
 @click.group()
@@ -14,7 +14,7 @@ def group():
     pass
 
 
-group.add_command(print_snapshot, name="ps")
+group.add_command(print_ps_info, name="ps")
 
 
 def make_list(s):

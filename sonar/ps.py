@@ -105,7 +105,7 @@ def create_snapshot(cpu_cutoff_percent: float, mem_cutoff_percent: float):
 @click.option(
     "--mem-cutoff-percent", default=0.5, help="Memory consumption percentage cutoff."
 )
-def print_snapshot(cpu_cutoff_percent, mem_cutoff_percent):
+def print_ps_info(cpu_cutoff_percent, mem_cutoff_percent):
     """
     Take a snapshot of the currently running processes that use more than
     `cpu_cutoff_percent` cpu and `mem_cutoff_percent` memory and print it to stdout.
@@ -121,4 +121,4 @@ def print_snapshot(cpu_cutoff_percent, mem_cutoff_percent):
 
 
 if __name__ == "__main__":
-    print_snapshot()
+    print_ps_info()
