@@ -58,7 +58,7 @@ def create_snapshot(cpu_cutoff_percent: float, mem_cutoff_percent: float):
     """
     Take a snapshot of the currently running processes that use more than
     `cpu_cutoff_percent` cpu and `mem_cutoff_percent` memory, ignoring the set
-    or list `ignored_users`. Returns a list of listsC. being lines of columns.
+    or list `ignored_users`. Returns a list of lists. being lines of columns.
     """
 
     # -e      show all processes
@@ -108,7 +108,8 @@ def create_snapshot(cpu_cutoff_percent: float, mem_cutoff_percent: float):
 def print_ps_info(cpu_cutoff_percent, mem_cutoff_percent):
     """
     Take a snapshot of the currently running processes that use more than
-    `cpu_cutoff_percent` cpu and `mem_cutoff_percent` memory and print it to stdout.
+    `cpu_cutoff_percent` cpu and `mem_cutoff_percent` memory and print it
+    comma-separated to stdout.
     """
     snapshot = create_snapshot(cpu_cutoff_percent, mem_cutoff_percent)
 
