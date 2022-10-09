@@ -4,7 +4,6 @@ import sys
 import argparse
 import configparser
 import datetime
-from sonar.probe import main as probe_main
 from sonar.map import main as map_main
 from sonar.ps import print_ps_info
 
@@ -36,40 +35,6 @@ def main():
     )
 
     subparsers = parser.add_subparsers(title="Subcommands", metavar="", dest="command")
-
-    # parser for "probe"
-    parser_probe = subparsers.add_parser(
-        "probe",
-        help="Take a snapshot of the system. Run this on every node and often (e.g. every 20 minutes).",
-    )
-    parser_probe.add_argument(
-        "--cpu-cutoff",
-        metavar="FLOAT",
-        type=float,
-        default=0.5,
-        help="CPU Memory consumption percentage cutoff [default: %(default)s].",
-    )
-    parser_probe.add_argument(
-        "--mem-cutoff",
-        metavar="FLOAT",
-        type=float,
-        default=0.0,
-        help="Memory consumption percentage cutoff [default: %(default)s].",
-    )
-    parser_probe.add_argument(
-        "--ignored-users",
-        metavar="STR,STR",
-        default="",
-        type=make_list,
-        help="Users to ignore as comma-separated list [default: None].",
-    )
-    parser_probe.add_argument(
-        "--output-delimiter",
-        metavar="STR",
-        default="\t",
-        help=r"Delimiter for output columns [default: %(default)s].",
-    )
-    parser_probe.set_defaults(func=probe_main)
 
     # parser for "map"
     parser_map = subparsers.add_parser(
