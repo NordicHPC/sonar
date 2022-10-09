@@ -28,15 +28,21 @@ Tool to profile usage of HPC resources by regularly probing processes using
 - Pip-installable
 - Minimal overhead for recording
 - Can be used as health check tool
-- Do not interact with Slurm from each node to not overload it: one process
-  talks to Slurm, all others only ask `ps`
 
-Why `ps` instead of `top`? We started using `top` but it turned out that
-`top` is dependent on locale, so it displays floats with comma instead
-of decimal point in many non-English locales. `ps` always uses decimal
-points. In addition, `ps` is (arguably) more versatile/configurable and
-does not print the header that `top` prints. All these properties make
-the `ps` output easier to parse than the `top` output.
+**Use `ps` instead of `top`**:
+We started using `top` but it turned out that `top` is dependent on locale, so
+it displays floats with comma instead of decimal point in many non-English
+locales. `ps` always uses decimal points. In addition, `ps` is (arguably) more
+versatile/configurable and does not print the header that `top` prints. All
+these properties make the `ps` output easier to parse than the `top` output.
+
+**Do not interact with Slurm at all**:
+The initial version correlated information we gathered from `ps` (what is
+actually running) with information from Slurm (what was requested). This was
+useful and nice to have but became complicated to maintain since Slurm could
+become unresponsive and then processes were piling up. In later versions this
+got removed.  Job efficiency based on Slurm data (e.g. `seff`) should be
+collected with a separate tool.  "Do one thing only and do it well".
 
 
 ## Installation
@@ -166,52 +172,6 @@ CSV format for further postprocessing, e.g. using
 
     $ sonar map --input-dir /home/user/folder/with/logs --export-csv daily
     $ sonar map --input-dir /home/user/folder/with/logs --export-csv weekly --num-days 200
-
-
-Taking snapshots with sonar probe
----------------------------------
-
-This is me running [sonar probe]{.title-ref} on a compute node:
-
-    $ sonar probe --output-delimiter ","
-
-    2019-05-10T17:11:34.585859+0200,c10-4,16,me,sonar,31.0,0,-,-,-,-
-    2019-05-10T17:11:34.585859+0200,c10-4,16,somebody,vasp.5.3.5,1506.4,5151,someproject,1598301,64,2000M
-
-The columns are:
-- time stamp
-- hostname
-- number of cores on this node
-- user
-- process
-- CPU percentage (this is a 20-core node)
-- memory used in MB
-- Slurm project
-- Slurm job ID
-- Number of CPUs requested by the job
-- Memory requested by the job
-
-By default they are tab-separated but here I chose to display the result
-comma-separated. You can also change cutoffs or ignore users to not
-measure the tool itself (`sonar probe --help`).
-
-It can be useful to redirect the result to a file:
-
-    $ sonar probe >> /home/user/tmp/example.tsv
-
-This is how it looks when I run `sonar probe` on my laptop (without
-Slurm):
-
-    $ sonar probe --output-delimiter ","
-
-    2019-05-11T14:54:16.940502+0200,laptop,4,root,Xorg,0.7,47,-,-,-,-
-    2019-05-11T14:54:16.940502+0200,laptop,4,me,gnome-shell,0.7,188,-,-,-,-
-    2019-05-11T14:54:16.940502+0200,laptop,4,me,pulseaudio,0.6,7,-,-,-,-
-    2019-05-11T14:54:16.940502+0200,laptop,4,me,chromium,16.9,3283,-,-,-,-
-    2019-05-11T14:54:16.940502+0200,laptop,4,me,fish,0.5,23,-,-,-,-
-    2019-05-11T14:54:16.940502+0200,laptop,4,me,vim,0.6,7,-,-,-,-
-    2019-05-11T14:54:16.940502+0200,laptop,4,me,sonar,23.0,23,-,-,-,-
-    2019-05-11T14:54:16.940502+0200,laptop,4,me,gnome-terminal-,0.9,47,-,-,-,-
 
 
 Running sonar probe on a cluster
