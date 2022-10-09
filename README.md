@@ -55,14 +55,15 @@ Authors
 -   Mathias Bockwoldt
 -   [Radovan Bast](https://bast.fr)
 
+
 Design goals and design decisions
 ---------------------------------
 
--   Pip installable
--   Minimal overhead for recording
--   Super quick reporting and dashboard, both stdout and csv for web
-    postprocessing
--   Can be used as health check tool
+- Pip-installable
+- Minimal overhead for recording
+- Can be used as health check tool
+- Do not interact with Slurm from each node to not overload it: one process
+  talks to Slurm, all others only ask `ps`
 
 Why `ps` instead of `top`? We started using `top` but it turned out that
 `top` is dependent on locale, so it displays floats with comma instead
