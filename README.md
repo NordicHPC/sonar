@@ -56,6 +56,46 @@ $ pip install -r requirements.txt
 $ flit install --symlink
 ```
 
+## Collect processes with `sonar ps`
+
+Available options:
+```console
+$ sonar ps --help
+Usage: sonar ps [OPTIONS]
+
+  Take a snapshot of the currently running processes that use more than
+  `cpu_cutoff_percent` cpu and `mem_cutoff_percent` memory and print it comma-
+  separated to stdout.
+
+Options:
+  --cpu-cutoff-percent FLOAT  CPU consumption percentage cutoff.
+  --mem-cutoff-percent FLOAT  Memory consumption percentage cutoff.
+  --help                      Show this message and exit.
+```
+
+You want to **run this every 10 or 20 minutes on every compute node**.
+
+Here is an example:
+```console
+$ sonar ps
+
+2022-10-09T14:29:05.824096+02:00,somehost,12,someuser,somecode,3.5,636
+2022-10-09T14:29:05.824096+02:00,somehost,12,someuser,anothercode,0.9,159
+2022-10-09T14:29:05.824096+02:00,somehost,12,someuser,slack,0.5,763
+2022-10-09T14:29:05.824096+02:00,somehost,12,someuser,something,6.3,700
+2022-10-09T14:29:05.824096+02:00,somehost,12,someuser,firefox,8.0,2577
+2022-10-09T14:29:05.824096+02:00,somehost,12,someuser,alacritty,1.1,190
+```
+
+The columns are:
+- time stamp
+- hostname
+- number of cores on this node
+- user
+- process
+- CPU percentage (this is a 12-core node)
+- memory used in MB
+
 
 ## Outdated docs below
 
