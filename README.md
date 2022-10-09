@@ -61,6 +61,7 @@ $ flit install --symlink
 Available options:
 ```console
 $ sonar ps --help
+
 Usage: sonar ps [OPTIONS]
 
   Take a snapshot of the currently running processes that use more than
@@ -68,8 +69,10 @@ Usage: sonar ps [OPTIONS]
   separated to stdout.
 
 Options:
-  --cpu-cutoff-percent FLOAT  CPU consumption percentage cutoff.
-  --mem-cutoff-percent FLOAT  Memory consumption percentage cutoff.
+  --cpu-cutoff-percent FLOAT  CPU consumption percentage cutoff.  [default:
+                              0.5]
+  --mem-cutoff-percent FLOAT  Memory consumption percentage cutoff.  [default:
+                              0.5]
   --help                      Show this message and exit.
 ```
 

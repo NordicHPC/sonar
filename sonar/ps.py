@@ -98,7 +98,7 @@ def create_snapshot(cpu_cutoff_percent: float, mem_cutoff_percent: float):
     return snapshot
 
 
-@click.command()
+@click.command("cli", context_settings={'show_default': True})
 @click.option(
     "--cpu-cutoff-percent", default=0.5, help="CPU consumption percentage cutoff."
 )
