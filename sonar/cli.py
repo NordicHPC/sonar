@@ -1,3 +1,4 @@
+import click
 import os
 import sys
 import argparse
@@ -5,6 +6,15 @@ import configparser
 import datetime
 from sonar.probe import main as probe_main
 from sonar.map import main as map_main
+from sonar.ps import print_snapshot
+
+
+@click.group()
+def group():
+    pass
+
+
+group.add_command(print_snapshot, name="ps")
 
 
 def make_list(s):
