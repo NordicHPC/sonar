@@ -120,13 +120,7 @@ The columns are:
 - memory used in MB
 
 
-## Outdated docs below
-
----
-
-
-Overview
---------
+## Outdated: Overview
 
 The code can do two things: take snapshots (`sonar probe`, typically
 every 20 minutes or so), and map them (`sonar map`, whenever you like)
@@ -151,8 +145,7 @@ to applications/projects/users:
     Run sonar <subcommand> -h to get more information about subcommands.
 
 
-How to analyze sonar logs
--------------------------
+## Outdated: How to analyze sonar logs
 
 For this run `sonar map` which will go through the logs, and map
 processes to applications:
@@ -188,8 +181,7 @@ CSV format for further postprocessing, e.g. using
     $ sonar map --input-dir /home/user/folder/with/logs --export-csv weekly --num-days 200
 
 
-Running sonar probe on a cluster
---------------------------------
+## Outdated: Running sonar probe on a cluster
 
 We let cron execute a script every 20 minutes:
 
