@@ -86,6 +86,17 @@ $ flit install --symlink
 ```
 
 
+## Security and robustness
+
+The tool does **not** need root permissions.
+
+It does not modify anything and only writes to stdout.
+
+The only external command called by `sonar ps` is `ps -e --no-header -o
+pid,user:30,pcpu,pmem,comm` and the tool gives up and stops if the latter
+subprocess does not return within 2 seconds to avoid a pile-up of processes.
+
+
 ## Collect processes with `sonar ps`
 
 Available options:
