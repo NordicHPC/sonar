@@ -59,6 +59,12 @@ become unresponsive and then processes were piling up. In later versions this
 got removed.  Job efficiency based on Slurm data (e.g. `seff`) should be
 collected with a separate tool.  "Do one thing only and do it well".
 
+**Why not also recording the `pid`**?:
+Because we sum over processes of the same name that may be running over many
+cores to have less output so that we can keep logs in plain text
+([csv](https://en.wikipedia.org/wiki/Comma-separated_values)) and don't have to
+maintain a database or such.
+
 
 ## Installation
 
