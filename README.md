@@ -9,6 +9,20 @@ Tool to profile usage of HPC resources by regularly probing processes using
 `ps`.
 
 
+
+## Changes since v0.5.0
+
+You can find the old code on
+https://github.com/NordicHPC/sonar/tree/with-slurm-data.  Since then, the code
+has been simplified and the part that queried Slurm information has been
+removed. The reason for the removal was that as we went to more and more nodes,
+this could overload Slurm.
+
+**This tool focuses on how resources are used**. What is actually running.  Its
+focus is not (anymore) whether and how resources are under-used compared to
+Slurm allocations. This is an important question but for another tool.
+
+
 ## Similar and related tools
 
 - Reference implementation which serves as inspiration:
