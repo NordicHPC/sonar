@@ -42,6 +42,7 @@ Slurm allocations. This is an important question but for another tool.
 - Pip-installable
 - Minimal overhead for recording
 - Can be used as health check tool
+- Does not need root permissions
 
 **Use `ps` instead of `top`**:
 We started using `top` but it turned out that `top` is dependent on locale, so
@@ -66,6 +67,8 @@ Ideally install into a virtual environment:
 $ pip install sonar
 ```
 
+The tool does **not** need root permissions.
+
 If you develop sonar, you can install like this:
 ```
 $ git clone https://github.com/nordichpc/sonar.git
@@ -75,6 +78,7 @@ $ source venv/bin/activate
 $ pip install -r requirements.txt
 $ flit install --symlink
 ```
+
 
 ## Collect processes with `sonar ps`
 
