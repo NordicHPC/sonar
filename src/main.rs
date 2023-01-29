@@ -1,6 +1,6 @@
 mod command;
+mod ps;
 
 fn main() {
-    let output = command::safe_command("ps -e --no-header -o pid,user:30,pcpu,pmem,comm", 2);
-    println!("{output:?}");
+    ps::create_snapshot(0.5, 0.5);
 }
