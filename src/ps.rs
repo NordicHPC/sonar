@@ -80,7 +80,11 @@ mod test {
     }
 }
 
-pub fn create_snapshot(cpu_cutoff_percent: f64, mem_cutoff_percent: f64) {
+pub fn create_snapshot(
+    cpu_cutoff_percent: f64,
+    mem_cutoff_percent: f64,
+    mem_cutoff_percent_idle: f64,
+) {
     let timestamp = time_iso8601();
     let hostname = hostname::get().unwrap().into_string().unwrap();
     let num_cores = num_cpus::get();
@@ -89,15 +93,15 @@ pub fn create_snapshot(cpu_cutoff_percent: f64, mem_cutoff_percent: f64) {
     let processes = extract_processes(&output.unwrap());
 
     for ((user, command), (cpu_percentage, mem_percentage, mem_size)) in processes {
-        if cpu_percentage >= cpu_cutoff_percent {
-            if mem_percentage >= mem_cutoff_percent {
-                // round cpu_percentage to 3 decimal places
-                let cpu_percentage = (cpu_percentage * 1000.0).round() / 1000.0;
+        if (cpu_percentage >= cpu_cutoff_percent && mem_percentage >= mem_cutoff_percent)
+            || mem_percentage >= mem_cutoff_percent_idle
+        {
+            // round cpu_percentage to 3 decimal places
+            let cpu_percentage = (cpu_percentage * 1000.0).round() / 1000.0;
 
-                println!(
-                    "{timestamp},{hostname},{num_cores},{user},{command},{cpu_percentage},{mem_size}"
-                );
-            }
+            println!(
+                "{timestamp},{hostname},{num_cores},{user},{command},{cpu_percentage},{mem_size}"
+            );
         }
     }
 }
