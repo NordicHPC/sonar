@@ -1,30 +1,25 @@
+use std::process::{Command, Stdio};
 use std::time::Duration;
-use subprocess::{Exec, Redirection};
+use wait_timeout::ChildExt;
 
-pub fn safe_command(command: &str, timeout_seconds: u64) -> Option<String> {
-    let mut p = Exec::shell(command)
-        .stdout(Redirection::Pipe)
-        .stderr(Redirection::Pipe)
-        .popen()
-        .ok()?;
+pub fn safe_command(command: &str, args: Vec<&str>, timeout_seconds: u64) -> Option<String> {
+    let mut child = Command::new(command)
+        .args(&args)
+        .stdout(Stdio::piped())
+        .spawn()
+        .unwrap();
 
-    if (p.wait_timeout(Duration::new(timeout_seconds, 0)).ok()?).is_some() {
-        let (out, err) = p.communicate(None).ok()?;
-
-        match err {
-            Some(e) => {
-                if e.is_empty() {
-                    out
-                } else {
-                    None
-                }
-            }
-            None => out,
+    let duration = Duration::from_secs(timeout_seconds);
+    match child.wait_timeout(duration).unwrap() {
+        Some(_status) => {
+            let out = child.wait_with_output().ok()?;
+            Some(String::from_utf8(out.stdout).unwrap())
         }
-    } else {
-        p.kill().ok()?;
-        p.wait().ok()?;
-
-        None
+        None => {
+            // child hasn't exited yet
+            child.kill().unwrap();
+            child.wait().unwrap();
+            None
+        }
     }
 }

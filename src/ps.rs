@@ -89,7 +89,11 @@ pub fn create_snapshot(
     let hostname = hostname::get().unwrap().into_string().unwrap();
     let num_cores = num_cpus::get();
 
-    let output = command::safe_command("ps -e --no-header -o pid,user:30,pcpu,pmem,size,comm", 2);
+    let command = "ps";
+    let args = vec!["-e", "--no-header", "-o", "pid,user:22,pcpu,pmem,size,comm"];
+    let timeout_seconds = 2;
+
+    let output = command::safe_command(command, args, timeout_seconds);
     let processes = extract_processes(&output.unwrap());
 
     for ((user, command), (cpu_percentage, mem_percentage, mem_size)) in processes {
