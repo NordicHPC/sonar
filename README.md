@@ -14,11 +14,11 @@ the output and prints it to stdout, comma-separated.
 
 ## Changes since v0.5.0
 
-You can find the old code on
-https://github.com/NordicHPC/sonar/tree/with-slurm-data.  Since then, the code
-has been simplified and the part that queried Slurm information has been
-removed. The reason for the removal was that as we went to more and more nodes,
-this could overload Slurm.
+You can find the old code on the
+[with-slurm-data](https://github.com/NordicHPC/sonar/tree/with-slurm-data)
+branch.  Since then, the code has been simplified and the part that queried
+Slurm information has been removed. The reason for the removal was that as we
+went to more and more nodes, this could overload Slurm.
 
 **This tool focuses on how resources are used**. What is actually running.  Its
 focus is not (anymore) whether and how resources are under-used compared to
@@ -27,7 +27,8 @@ Slurm allocations. This is an important question but for another tool.
 **We have rewritten it from Python to Rust**. The motivation was to have one
 self-contained binary, without any other dependencies or environments to load,
 so that the call can execute in milliseconds and so that it has minimal impact
-on the resources on a large computing cluster.
+on the resources on a large computing cluster. You can find the Python version
+on the [python](https://github.com/NordicHPC/sonar/tree/python) branch.
 
 Versions until 0.5.0 are available on [PyPI](https://pypi.org/project/sonar/).
 
