@@ -39,34 +39,45 @@ Slurm allocations. This is an important question but for another tool.
 
 Available options:
 ```console
+$ sonar
+
+Usage: sonar <COMMAND>
+
+Commands:
+  ps       Take a snapshot of the currently running processes
+  analyze  Not yet implemented
+  help     Print this message or the help of the given subcommand(s)
+
+Options:
+  -h, --help     Print help
+  -V, --version  Print version
+```
+
+We run `sonar ps` every 5 minutes on every compute node.
+
+```console
 $ sonar ps --help
+
+Take a snapshot of the currently running processes
 
 Usage: sonar ps [OPTIONS]
 
-  Take a snapshot of the currently running processes that use more than
-  `cpu_cutoff_percent` cpu and `mem_cutoff_percent` memory and print it comma-
-  separated to stdout.
-
 Options:
-  --cpu-cutoff-percent FLOAT  CPU consumption percentage cutoff.  [default:
-                              0.5]
-  --mem-cutoff-percent FLOAT  Memory consumption percentage cutoff.  [default:
-                              0.5]
-  --help                      Show this message and exit.
+      --cpu-cutoff-percent <CPU_CUTOFF_PERCENT>            [default: 0.5]
+      --mem-cutoff-percent <MEM_CUTOFF_PERCENT>            [default: 0.5]
+      --mem-cutoff-percent-idle <MEM_CUTOFF_PERCENT_IDLE>  [default: 50]
+  -h, --help                                               Print help
 ```
 
-You want to **run this every 10 or 20 minutes on every compute node**.
-
-Here is an example:
+Here is an example output:
 ```console
 $ sonar ps
 
-2022-10-09T14:29:05.824096+02:00,somehost,12,someuser,somecode,3.5,636
-2022-10-09T14:29:05.824096+02:00,somehost,12,someuser,anothercode,0.9,159
-2022-10-09T14:29:05.824096+02:00,somehost,12,someuser,slack,0.5,763
-2022-10-09T14:29:05.824096+02:00,somehost,12,someuser,something,6.3,700
-2022-10-09T14:29:05.824096+02:00,somehost,12,someuser,firefox,8.0,2577
-2022-10-09T14:29:05.824096+02:00,somehost,12,someuser,alacritty,1.1,190
+2023-01-31T13:34:47.683582663+00:00,somehost,8,user,alacritty,3.7,214932
+2023-01-31T13:34:47.683582663+00:00,somehost,8,user,slack,2.4,1328412
+2023-01-31T13:34:47.683582663+00:00,somehost,8,user,X,0.8,173148
+2023-01-31T13:34:47.683582663+00:00,somehost,8,user,brave,15.5,7085968
+2023-01-31T13:34:47.683582663+00:00,somehost,8,user,.zoom,37.8,1722564
 ```
 
 The columns are:
@@ -75,8 +86,8 @@ The columns are:
 - number of cores on this node
 - user
 - process
-- CPU percentage (this is a 12-core node)
-- memory used in MB
+- CPU percentage
+- memory used in KiB
 
 
 ## Authors
