@@ -28,6 +28,7 @@ Slurm allocations. This is an important question but for another tool.
 - Reference implementation which serves as inspiration:
   <https://github.com/UNINETTSigma2/appusage>
 - [TACC Stats](https://github.com/TACC/tacc_stats)
+- [Ganglia Monitoring System](http://ganglia.info/)
 
 
 ## Authors
