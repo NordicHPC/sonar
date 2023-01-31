@@ -8,6 +8,9 @@
 Tool to profile usage of HPC resources by regularly probing processes using
 `ps`.
 
+All it really does is to run `ps -e --no-header -o
+pid,user:22,pcpu,pmem,size,comm` under the hood, and then filters and groups
+the output and prints it to stdout, comma-separated.
 
 
 ## Changes since v0.5.0
