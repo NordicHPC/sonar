@@ -90,6 +90,12 @@ The columns are:
 - memory used in KiB
 
 
+## Collect results with `sonar analyze` :construction:
+
+This part is work in progress. Currently we only collect the data since we use
+it also in another tool.
+
+
 ## Authors
 
 - Henrik Rojas Nagel
