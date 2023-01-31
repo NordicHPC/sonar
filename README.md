@@ -28,22 +28,11 @@ Slurm allocations. This is an important question but for another tool.
 
 ## Installation
 
-Ideally install into a virtual environment:
-```
-$ pip install sonar
-```
-
-The tool does **not** need root permissions.
-
-If you develop sonar, you can install like this:
-```
-$ git clone https://github.com/nordichpc/sonar.git
-$ cd sonar
-$ virtualenv venv
-$ source venv/bin/activate
-$ pip install -r requirements.txt
-$ flit install --symlink
-```
+- Make sure you have [Rust installed](https://www.rust-lang.org/learn/get-started) (I install Rust through `rustup`)
+- Clone this project
+- Build it: `cargo build --release`
+- The binary is then located at `target/release/sonar`
+- Copy it to where-ever it needs to be
 
 
 ## Collect processes with `sonar ps`
