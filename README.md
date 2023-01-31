@@ -46,17 +46,6 @@ $ flit install --symlink
 ```
 
 
-## Security and robustness
-
-The tool does **not** need root permissions.
-
-It does not modify anything and only writes to stdout.
-
-The only external command called by `sonar ps` is `ps -e --no-header -o
-pid,user:22,pcpu,pmem,size,comm` and the tool gives up and stops if the latter
-subprocess does not return within 2 seconds to avoid a pile-up of processes.
-
-
 ## Collect processes with `sonar ps`
 
 Available options:
@@ -135,6 +124,17 @@ Because we sum over processes of the same name that may be running over many
 cores to have less output so that we can keep logs in plain text
 ([csv](https://en.wikipedia.org/wiki/Comma-separated_values)) and don't have to
 maintain a database or such.
+
+
+## Security and robustness
+
+The tool does **not** need root permissions.
+
+It does not modify anything and only writes to stdout.
+
+The only external command called by `sonar ps` is `ps -e --no-header -o
+pid,user:22,pcpu,pmem,size,comm` and the tool gives up and stops if the latter
+subprocess does not return within 2 seconds to avoid a pile-up of processes.
 
 
 ## How we run sonar on a cluster
