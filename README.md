@@ -142,36 +142,19 @@ The columns are:
 - memory used in MB
 
 
-## Outdated: Running sonar probe on a cluster
+## How we run sonar on a cluster
 
-We let cron execute a script every 20 minutes:
+We let cron execute the following script every 5 minutes on every compute node:
+```bash
+#!/usr/bin/env bash
 
-    10,30,50 * * * * /global/work/sonar/sonar/cron-sonar.sh
+set -euf -o pipefail
 
-The script `cron-sonar.sh` creates a list of active nodes and executes
-`run-probe.sh` on all of these nodes:
+sonar_directory=/cluster/shared/sonar/data
 
-    #!/bin/bash
+current_year=$(date +'%Y')
 
-    SONAR_ROOT="/global/work/sonar"
+mkdir -p ${sonar_directory}/${current_year}
 
-    # get list of all available nodes
-    /usr/bin/sinfo -h -r -o '%n' > ${SONAR_ROOT}/tmp/list-of-nodes 2> ${SONAR_ROOT}/tmp/list-of-nodes.err
-
-    # run sonar probe on all available nodes
-    /usr/bin/pdsh -w \^${SONAR_ROOT}/tmp/list-of-nodes ${SONAR_ROOT}/sonar/run-probe.sh >> ${SONAR_ROOT}/tmp/pdsh.log 2>> ${SONAR_ROOT}/tmp/pdsh.err
-
-In `run-probe.sh` we load the Python environment and wrap around
-`sonar probe`:
-
-    #!/usr/bin/env bash
-
-    source /global/work/sonar/python/environment
-    pyenv shell 3.6.7
-
-    source /global/work/sonar/sonar/venv/bin/activate
-    current_year=$(date +'%Y')
-    mkdir -p /global/work/sonar/probe-outputs/${current_year}
-    sonar probe --ignored-users root >> /global/work/sonar/probe-outputs/${current_year}/${HOSTNAME}.tsv
-
-This produces ca. 10 MB data per day.
+/cluster/bin/sonar ps >> ${sonar_directory}/${current_year}/${HOSTNAME}.csv
+```
