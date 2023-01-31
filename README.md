@@ -40,7 +40,7 @@ Slurm allocations. This is an important question but for another tool.
 
 ## Design goals and design decisions
 
-- Pip-installable
+- Easy installation
 - Minimal overhead for recording
 - Can be used as health check tool
 - Does not need root permissions
