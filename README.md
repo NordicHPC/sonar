@@ -26,50 +26,6 @@ focus is not (anymore) whether and how resources are under-used compared to
 Slurm allocations. This is an important question but for another tool.
 
 
-## Similar and related tools
-
-- Reference implementation which serves as inspiration:
-  <https://github.com/UNINETTSigma2/appusage>
-- [TACC Stats](https://github.com/TACC/tacc_stats)
-- [Ganglia Monitoring System](http://ganglia.info/)
-
-
-## Authors
-
-- Henrik Rojas Nagel
-- Mathias Bockwoldt
-- [Radovan Bast](https://bast.fr)
-
-
-## Design goals and design decisions
-
-- Easy installation
-- Minimal overhead for recording
-- Can be used as health check tool
-- Does not need root permissions
-
-**Use `ps` instead of `top`**:
-We started using `top` but it turned out that `top` is dependent on locale, so
-it displays floats with comma instead of decimal point in many non-English
-locales. `ps` always uses decimal points. In addition, `ps` is (arguably) more
-versatile/configurable and does not print the header that `top` prints. All
-these properties make the `ps` output easier to parse than the `top` output.
-
-**Do not interact with Slurm at all**:
-The initial version correlated information we gathered from `ps` (what is
-actually running) with information from Slurm (what was requested). This was
-useful and nice to have but became complicated to maintain since Slurm could
-become unresponsive and then processes were piling up. In later versions this
-got removed.  Job efficiency based on Slurm data (e.g. `seff`) should be
-collected with a separate tool.  "Do one thing only and do it well".
-
-**Why not also recording the `pid`**?:
-Because we sum over processes of the same name that may be running over many
-cores to have less output so that we can keep logs in plain text
-([csv](https://en.wikipedia.org/wiki/Comma-separated_values)) and don't have to
-maintain a database or such.
-
-
 ## Installation
 
 Ideally install into a virtual environment:
@@ -97,7 +53,7 @@ The tool does **not** need root permissions.
 It does not modify anything and only writes to stdout.
 
 The only external command called by `sonar ps` is `ps -e --no-header -o
-pid,user:30,pcpu,pmem,comm` and the tool gives up and stops if the latter
+pid,user:22,pcpu,pmem,size,comm` and the tool gives up and stops if the latter
 subprocess does not return within 2 seconds to avoid a pile-up of processes.
 
 
@@ -145,6 +101,42 @@ The columns are:
 - memory used in MB
 
 
+## Authors
+
+- Henrik Rojas Nagel
+- Mathias Bockwoldt
+- [Radovan Bast](https://bast.fr)
+
+
+## Design goals and design decisions
+
+- Easy installation
+- Minimal overhead for recording
+- Can be used as health check tool
+- Does not need root permissions
+
+**Use `ps` instead of `top`**:
+We started using `top` but it turned out that `top` is dependent on locale, so
+it displays floats with comma instead of decimal point in many non-English
+locales. `ps` always uses decimal points. In addition, `ps` is (arguably) more
+versatile/configurable and does not print the header that `top` prints. All
+these properties make the `ps` output easier to parse than the `top` output.
+
+**Do not interact with Slurm at all**:
+The initial version correlated information we gathered from `ps` (what is
+actually running) with information from Slurm (what was requested). This was
+useful and nice to have but became complicated to maintain since Slurm could
+become unresponsive and then processes were piling up. In later versions this
+got removed.  Job efficiency based on Slurm data (e.g. `seff`) should be
+collected with a separate tool.  "Do one thing only and do it well".
+
+**Why not also recording the `pid`**?:
+Because we sum over processes of the same name that may be running over many
+cores to have less output so that we can keep logs in plain text
+([csv](https://en.wikipedia.org/wiki/Comma-separated_values)) and don't have to
+maintain a database or such.
+
+
 ## How we run sonar on a cluster
 
 We let cron execute the following script every 5 minutes on every compute node:
@@ -161,3 +153,11 @@ mkdir -p ${sonar_directory}/${current_year}
 
 /cluster/bin/sonar ps >> ${sonar_directory}/${current_year}/${HOSTNAME}.csv
 ```
+
+
+## Similar and related tools
+
+- Reference implementation which serves as inspiration:
+  <https://github.com/UNINETTSigma2/appusage>
+- [TACC Stats](https://github.com/TACC/tacc_stats)
+- [Ganglia Monitoring System](http://ganglia.info/)
