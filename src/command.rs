@@ -7,7 +7,7 @@ pub fn safe_command(command: &str, args: Vec<&str>, timeout_seconds: u64) -> Opt
         .args(&args)
         .stdout(Stdio::piped())
         .spawn()
-        .unwrap();
+        .expect("failed to execute child");
 
     let duration = Duration::from_secs(timeout_seconds);
     match child.wait_timeout(duration).unwrap() {

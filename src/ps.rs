@@ -94,18 +94,21 @@ pub fn create_snapshot(
     let timeout_seconds = 2;
 
     let output = command::safe_command(command, args, timeout_seconds);
-    let processes = extract_processes(&output.unwrap());
 
-    for ((user, command), (cpu_percentage, mem_percentage, mem_size)) in processes {
-        if (cpu_percentage >= cpu_cutoff_percent && mem_percentage >= mem_cutoff_percent)
-            || mem_percentage >= mem_cutoff_percent_idle
-        {
-            // round cpu_percentage to 3 decimal places
-            let cpu_percentage = (cpu_percentage * 1000.0).round() / 1000.0;
+    if let Some(out) = output {
+        let processes = extract_processes(&out);
 
-            println!(
-                "{timestamp},{hostname},{num_cores},{user},{command},{cpu_percentage},{mem_size}"
-            );
+        for ((user, command), (cpu_percentage, mem_percentage, mem_size)) in processes {
+            if (cpu_percentage >= cpu_cutoff_percent && mem_percentage >= mem_cutoff_percent)
+                || mem_percentage >= mem_cutoff_percent_idle
+            {
+                // round cpu_percentage to 3 decimal places
+                let cpu_percentage = (cpu_percentage * 1000.0).round() / 1000.0;
+
+                println!(
+                  "{timestamp},{hostname},{num_cores},{user},{command},{cpu_percentage},{mem_size}"
+              );
+            }
         }
-    }
+    };
 }
