@@ -77,6 +77,12 @@ Options:
   -h, --help                                               Print help
 ```
 
+The code will ignore all processes that are below `--cpu-cutoff-percent` and
+`--mem-cutoff-percent`.  However, it will include idle processes (which are
+below `--cpu-cutoff-percent`) if they are above `--mem-cutoff-percent-idle`.
+This is to catch processes that just occupy memory and do nothing.
+
+
 Here is an example output:
 ```console
 $ sonar ps
