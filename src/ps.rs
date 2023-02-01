@@ -89,11 +89,12 @@ pub fn create_snapshot(
     let hostname = hostname::get().unwrap().into_string().unwrap();
     let num_cores = num_cpus::get();
 
-    let command = "ps";
-    let args = vec!["-e", "--no-header", "-o", "pid,user:22,pcpu,pmem,size,comm"];
+    // the pipe is here as a workaround for https://github.com/rust-lang/rust/issues/45572
+    // see also https://doc.rust-lang.org/std/process/index.html
+    let command = "ps -e --no-header -o pid,user:22,pcpu,pmem,size,comm | grep -v ' 0.0  0.0 '";
     let timeout_seconds = 2;
 
-    let output = command::safe_command(command, args, timeout_seconds);
+    let output = command::safe_command(command, timeout_seconds);
 
     if let Some(out) = output {
         let processes = extract_processes(&out);
