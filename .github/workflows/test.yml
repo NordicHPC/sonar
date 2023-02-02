@@ -9,23 +9,12 @@ on:
 jobs:
   build:
 
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        python-version: [3.7, 3.8, 3.9, "3.10"]
-        os: [ubuntu-latest, macOS-latest]
+    runs-on: ubuntu-latest
 
     steps:
     - name: Checkout
       uses: actions/checkout@v2
-    - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v1
-      with:
-        python-version: ${{ matrix.python-version }}
-    - name: Install Python dependencies
-      run: |
-        pip install -r requirements.txt
-        flit install --symlink
-    - name: Run tests
-      run: |
-        pytest -vv -s sonar/*py
+    - name: Build
+      run: cargo build --verbose
+    - name: Test
+      run: cargo test --verbose
