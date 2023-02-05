@@ -1,0 +1,9 @@
+^vasp.+             VASP
+^l[0-9]+\.exe[l]?   Gaussian
+^python[0-9\.]*     "Python script"
+^blast.*            Blast
+^xpatmos.*          Patmos
+^cp2k.*             cp2k
+.*ReSpect.*         ReSpect
+^KMCART.*           KMCART
+^orca_.*            Orca
