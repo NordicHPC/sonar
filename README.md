@@ -171,11 +171,15 @@ set -euf -o pipefail
 
 sonar_directory=/cluster/shared/sonar/data
 
-current_year=$(date +'%Y')
+year=$(date +'%Y')
+month=$(date +'%m')
+day=$(date +'%d')
 
-mkdir -p ${sonar_directory}/${current_year}
+output_directory=${sonar_directory}/${year}/${month}/${day}
 
-/cluster/bin/sonar ps >> ${sonar_directory}/${current_year}/${HOSTNAME}.csv
+mkdir -p ${output_directory}
+
+/cluster/bin/sonar ps >> ${output_directory}/${HOSTNAME}.csv
 ```
 
 
