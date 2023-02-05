@@ -12,6 +12,10 @@ All it really does is to run
 under the hood, and then filters and groups
 the output and prints it to stdout, comma-separated.
 
+![image of a fish swarm](img/sonar-small.png)
+
+Image: [Midjourney](https://midjourney.com/), [CC BY-NC 4.0](https://creativecommons.org/licenses/by-nc/4.0/legalcode)
+
 
 ## Changes since v0.5.0
 
