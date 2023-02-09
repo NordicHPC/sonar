@@ -183,6 +183,8 @@ mkdir -p ${output_directory}
 /cluster/bin/sonar ps >> ${output_directory}/${HOSTNAME}.csv
 ```
 
+This produces ca. 10 MB data per day.
+
 
 ## Similar and related tools
 
