@@ -1,4 +1,6 @@
 use clap::{Parser, Subcommand};
+use std::collections::HashSet;
+use std::fs;
 
 mod command;
 mod ps;
@@ -20,7 +22,10 @@ enum Commands {
         mem_cutoff_percent: f64,
     },
     /// Not yet implemented
-    Analyze {},
+    Analyze {
+        #[arg(long)]
+        file_name: String,
+    },
 }
 
 fn main() {
@@ -33,8 +38,26 @@ fn main() {
         } => {
             ps::create_snapshot(*cpu_cutoff_percent, *mem_cutoff_percent);
         }
-        Commands::Analyze {} => {
-            println!("sonar analyze not yet completed");
+        Commands::Analyze { file_name } => {
+            let users = read_users(file_name);
+            dbg!(users);
         }
     }
+}
+
+// later we will move this function to own file
+fn read_users(file_name: &str) -> HashSet<String> {
+    let error_message = format!("something went wrong reading file {}", file_name);
+    let contents = fs::read_to_string(file_name).expect(&error_message);
+    let lines = contents.lines();
+
+    let mut users = HashSet::new();
+
+    for line in lines {
+        let words: Vec<&str> = line.split(',').collect();
+        let user = words[3].parse().unwrap();
+        users.insert(user);
+    }
+
+    users
 }
