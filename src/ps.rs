@@ -10,19 +10,22 @@ fn time_iso8601() -> String {
     format!("{}", dt.format("%+"))
 }
 
-fn extract_processes(raw_text: &str) -> HashMap<(String, String), (f64, f64, usize)> {
+fn extract_processes(raw_text: &str) -> HashMap<(String, String, String), (f64, f64, usize)> {
     let result = raw_text
         .lines()
         .map(|line| {
             let mut parts = line.split_whitespace();
-            let _pid = parts.next().unwrap();
+            let pid = parts.next().unwrap();
             let user = parts.next().unwrap();
             let cpu = parts.next().unwrap().parse::<f64>().unwrap();
             let mem = parts.next().unwrap().parse::<f64>().unwrap();
             let size = parts.next().unwrap().parse::<usize>().unwrap();
             let command = parts.next().unwrap();
 
-            ((user.to_string(), command.to_string()), (cpu, mem, size))
+            (
+                (user.to_string(), pid.to_string(), command.to_string()),
+                (cpu, mem, size),
+            )
         })
         .fold(HashMap::new(), |mut acc, (key, value)| {
             if let Some((cpu, mem, size)) = acc.get_mut(&key) {
@@ -59,22 +62,22 @@ mod test {
     fn test_extract_processes() {
         let text = "   2022 bob                            10.0 20.0 553348 slack
   42178 bob                            10.0 15.0 353348 chromium
-  42188 bob                            10.0 15.0  5536 chromium
+  42178 bob                            10.0 15.0  5536 chromium
   42189 alice                          10.0  5.0  5528 slack
   42191 bob                            10.0  5.0  5552 someapp
   42213 alice                          10.0  5.0 348904 someapp
-  42214 alice                          10.0  5.0 135364 someapp";
+  42213 alice                          10.0  5.0 135364 someapp";
 
         let processes = extract_processes(text);
 
         assert!(
             processes
                 == map! {
-                    ("bob".to_string(), "slack".to_string()) => (10.0, 20.0, 553348),
-                    ("bob".to_string(), "chromium".to_string()) => (20.0, 30.0, 358884),
-                    ("alice".to_string(), "slack".to_string()) => (10.0, 5.0, 5528),
-                    ("bob".to_string(), "someapp".to_string()) => (10.0, 5.0, 5552),
-                    ("alice".to_string(), "someapp".to_string()) => (20.0, 10.0, 484268)
+                    ("bob".to_string(), "2022".to_string(), "slack".to_string()) => (10.0, 20.0, 553348),
+                    ("bob".to_string(), "42178".to_string(), "chromium".to_string()) => (20.0, 30.0, 358884),
+                    ("alice".to_string(), "42189".to_string(), "slack".to_string()) => (10.0, 5.0, 5528),
+                    ("bob".to_string(), "42191".to_string(), "someapp".to_string()) => (10.0, 5.0, 5552),
+                    ("alice".to_string(), "42213".to_string(), "someapp".to_string()) => (20.0, 10.0, 484268)
                 }
         );
     }
@@ -96,20 +99,53 @@ pub fn create_snapshot(
 
     let output = command::safe_command(command, timeout_seconds);
 
+    let mut processes_by_slurm_job_id: HashMap<(String, usize, String), (f64, usize)> =
+        HashMap::new();
+
     if let Some(out) = output {
         let processes = extract_processes(&out);
 
-        for ((user, command), (cpu_percentage, mem_percentage, mem_size)) in processes {
+        for ((user, pid, command), (cpu_percentage, mem_percentage, mem_size)) in processes {
             if (cpu_percentage >= cpu_cutoff_percent && mem_percentage >= mem_cutoff_percent)
                 || mem_percentage >= mem_cutoff_percent_idle
             {
-                // round cpu_percentage to 3 decimal places
-                let cpu_percentage = (cpu_percentage * 1000.0).round() / 1000.0;
+                let slurm_job_id = get_slurm_job_id(pid).unwrap_or_default();
+                let slurm_job_id_usize = slurm_job_id.trim().parse::<usize>().unwrap();
 
-                println!(
-                  "{timestamp},{hostname},{num_cores},{user},{command},{cpu_percentage},{mem_size}"
-              );
+                processes_by_slurm_job_id
+                    .entry((user, slurm_job_id_usize, command))
+                    .and_modify(|e| {
+                        e.0 += cpu_percentage;
+                        e.1 += mem_size;
+                    })
+                    .or_insert((cpu_percentage, mem_size));
             }
         }
+
+        for ((user, slurm_job_id, command), (cpu_percentage, mem_size)) in processes_by_slurm_job_id
+        {
+            // round cpu_percentage to 3 decimal places
+            let cpu_percentage = (cpu_percentage * 1000.0).round() / 1000.0;
+
+            println!(
+                  "{timestamp},{hostname},{num_cores},{user},{slurm_job_id},{command},{cpu_percentage},{mem_size}"
+              );
+        }
     };
+}
+
+fn get_slurm_job_id(pid: String) -> Option<String> {
+    let path = format!("/proc/{}/cgroup", pid);
+
+    if !std::path::Path::new(&path).exists() {
+        return None;
+    }
+
+    let command = format!(
+        "cat /proc/{}/cgroup | grep -oP '(?<=job_).*?(?=/)' | head -n 1",
+        pid
+    );
+    let timeout_seconds = 2;
+
+    command::safe_command(&command, timeout_seconds)
 }

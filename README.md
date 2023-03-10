@@ -19,15 +19,9 @@ Image: [Midjourney](https://midjourney.com/), [CC BY-NC 4.0](https://creativecom
 
 ## Changes since v0.5.0
 
-You can find the old code on the
-[with-slurm-data](https://github.com/NordicHPC/sonar/tree/with-slurm-data)
-branch.  Since then, the code has been simplified and the part that queried
-Slurm information has been removed. The reason for the removal was that as we
-went to more and more nodes, this could overload Slurm.
-
 **This tool focuses on how resources are used**. What is actually running.  Its
 focus is not (anymore) whether and how resources are under-used compared to
-Slurm allocations. This is an important question but for another tool.
+Slurm allocations. But this functionality can be re-inserted.
 
 **We have rewritten it from Python to Rust**. The motivation was to have one
 self-contained binary, without any other dependencies or environments to load,
@@ -36,6 +30,10 @@ on the resources on a large computing cluster. You can find the Python version
 on the [python](https://github.com/NordicHPC/sonar/tree/python) branch.
 
 Versions until 0.5.0 are available on [PyPI](https://pypi.org/project/sonar/).
+
+You can find the old code on the
+[with-slurm-data](https://github.com/NordicHPC/sonar/tree/with-slurm-data)
+branch.
 
 
 ## Installation
@@ -91,11 +89,11 @@ Here is an example output:
 ```console
 $ sonar ps
 
-2023-01-31T13:34:47.683582663+00:00,somehost,8,user,alacritty,3.7,214932
-2023-01-31T13:34:47.683582663+00:00,somehost,8,user,slack,2.4,1328412
-2023-01-31T13:34:47.683582663+00:00,somehost,8,user,X,0.8,173148
-2023-01-31T13:34:47.683582663+00:00,somehost,8,user,brave,15.5,7085968
-2023-01-31T13:34:47.683582663+00:00,somehost,8,user,.zoom,37.8,1722564
+2023-01-31T13:34:47.683582663+00:00,somehost,8,user,,alacritty,3.7,214932
+2023-01-31T13:34:47.683582663+00:00,somehost,8,user,,slack,2.4,1328412
+2023-01-31T13:34:47.683582663+00:00,somehost,8,user,,X,0.8,173148
+2023-01-31T13:34:47.683582663+00:00,somehost,8,user,,brave,15.5,7085968
+2023-01-31T13:34:47.683582663+00:00,somehost,8,user,,.zoom,37.8,1722564
 ```
 
 The columns are:
@@ -103,6 +101,7 @@ The columns are:
 - hostname
 - number of cores on this node
 - user
+- Slurm job ID (empty if not applicable)
 - process
 - CPU percentage (as they come out of `ps`)
 - memory used in KiB
@@ -136,13 +135,11 @@ locales. `ps` always uses decimal points. In addition, `ps` is (arguably) more
 versatile/configurable and does not print the header that `top` prints. All
 these properties make the `ps` output easier to parse than the `top` output.
 
-**Do not interact with Slurm at all**:
+**Do not interact with the Slurm database at all**:
 The initial version correlated information we gathered from `ps` (what is
 actually running) with information from Slurm (what was requested). This was
 useful and nice to have but became complicated to maintain since Slurm could
-become unresponsive and then processes were piling up. In later versions this
-got removed.  Job efficiency based on Slurm data (e.g. `seff`) should be
-collected with a separate tool.  "Do one thing only and do it well".
+become unresponsive and then processes were piling up.
 
 **Why not also recording the `pid`**?:
 Because we sum over processes of the same name that may be running over many
