@@ -104,7 +104,7 @@ pub fn create_snapshot(cpu_cutoff_percent: f64, mem_cutoff_percent: f64) {
         for ((user, pid, command), (cpu_percentage, mem_percentage, mem_size)) in processes {
             if (cpu_percentage >= cpu_cutoff_percent) || (mem_percentage >= mem_cutoff_percent) {
                 let slurm_job_id = get_slurm_job_id(pid).unwrap_or_default();
-                let slurm_job_id_usize = slurm_job_id.trim().parse::<usize>().unwrap();
+                let slurm_job_id_usize = slurm_job_id.trim().parse::<usize>().unwrap_or_default();
 
                 processes_by_slurm_job_id
                     .entry((user, slurm_job_id_usize, command))
