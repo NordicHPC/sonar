@@ -73,16 +73,13 @@ Take a snapshot of the currently running processes
 Usage: sonar ps [OPTIONS]
 
 Options:
-      --cpu-cutoff-percent <CPU_CUTOFF_PERCENT>            [default: 0.5]
-      --mem-cutoff-percent <MEM_CUTOFF_PERCENT>            [default: 0.5]
-      --mem-cutoff-percent-idle <MEM_CUTOFF_PERCENT_IDLE>  [default: 50]
-  -h, --help                                               Print help
+      --cpu-cutoff-percent <CPU_CUTOFF_PERCENT>  [default: 0.5]
+      --mem-cutoff-percent <MEM_CUTOFF_PERCENT>  [default: 5]
+  -h, --help                                     Print help
 ```
 
-The code will ignore all processes that are below `--cpu-cutoff-percent` and
-`--mem-cutoff-percent`.  However, it will include idle processes (which are
-below `--cpu-cutoff-percent`) if they are above `--mem-cutoff-percent-idle`.
-This is to catch processes that just occupy memory and do nothing.
+The code will list all processes that are above `--cpu-cutoff-percent` or
+`--mem-cutoff-percent`.
 
 
 Here is an example output:

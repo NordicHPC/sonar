@@ -83,11 +83,7 @@ mod test {
     }
 }
 
-pub fn create_snapshot(
-    cpu_cutoff_percent: f64,
-    mem_cutoff_percent: f64,
-    mem_cutoff_percent_idle: f64,
-) {
+pub fn create_snapshot(cpu_cutoff_percent: f64, mem_cutoff_percent: f64) {
     let timestamp = time_iso8601();
     let hostname = hostname::get().unwrap().into_string().unwrap();
     let num_cores = num_cpus::get();
@@ -106,9 +102,7 @@ pub fn create_snapshot(
         let processes = extract_processes(&out);
 
         for ((user, pid, command), (cpu_percentage, mem_percentage, mem_size)) in processes {
-            if (cpu_percentage >= cpu_cutoff_percent && mem_percentage >= mem_cutoff_percent)
-                || mem_percentage >= mem_cutoff_percent_idle
-            {
+            if (cpu_percentage >= cpu_cutoff_percent) || (mem_percentage >= mem_cutoff_percent) {
                 let slurm_job_id = get_slurm_job_id(pid).unwrap_or_default();
                 let slurm_job_id_usize = slurm_job_id.trim().parse::<usize>().unwrap();
 
