@@ -12,20 +12,46 @@ fn time_iso8601() -> String {
     format!("{}", dt.format("%+"))
 }
 
+fn chunks(input: &str) -> (Vec<usize>, Vec<&str>) {
+    let mut start_indices: Vec<usize> = Vec::new();
+    let mut parts: Vec<&str> = Vec::new();
+
+    let mut last_index = 0;
+    for (index, c) in input.char_indices() {
+        if c.is_whitespace() {
+            if last_index != index {
+                start_indices.push(last_index);
+                parts.push(&input[last_index..index]);
+            }
+            last_index = index + 1;
+        }
+    }
+
+    if last_index < input.len() {
+        start_indices.push(last_index);
+        parts.push(&input[last_index..]);
+    }
+
+    (start_indices, parts)
+}
+
 fn extract_processes(raw_text: &str) -> HashMap<(String, String, String), (f64, f64, usize)> {
     let result = raw_text
         .lines()
         .map(|line| {
-            let mut parts = line.split_whitespace();
-            let pid = parts.next().unwrap();
-            let user = parts.next().unwrap();
-            let cpu = parts.next().unwrap().parse::<f64>().unwrap();
-            let mem = parts.next().unwrap().parse::<f64>().unwrap();
-            let size = parts.next().unwrap().parse::<usize>().unwrap();
-            let command = parts.next().unwrap();
+            let (start_indices, parts) = chunks(line);
+
+            let pid = parts[0];
+            let user = parts[1];
+            let cpu = parts[2].parse::<f64>().unwrap();
+            let mem = parts[3].parse::<f64>().unwrap();
+            let size = parts[4].parse::<usize>().unwrap();
+
+            // this is done because command can have spaces
+            let command = line[start_indices[5]..].to_string();
 
             (
-                (user.to_string(), pid.to_string(), command.to_string()),
+                (user.to_string(), pid.to_string(), command),
                 (cpu, mem, size),
             )
         })
@@ -67,8 +93,8 @@ mod test {
   42178 bob                            10.0 15.0  5536 chromium
   42189 alice                          10.0  5.0  5528 slack
   42191 bob                            10.0  5.0  5552 someapp
-  42213 alice                          10.0  5.0 348904 someapp
-  42213 alice                          10.0  5.0 135364 someapp";
+  42213 alice                          10.0  5.0 348904 some app
+  42213 alice                          10.0  5.0 135364 some app";
 
         let processes = extract_processes(text);
 
@@ -79,7 +105,7 @@ mod test {
                     ("bob".to_string(), "42178".to_string(), "chromium".to_string()) => (20.0, 30.0, 358884),
                     ("alice".to_string(), "42189".to_string(), "slack".to_string()) => (10.0, 5.0, 5528),
                     ("bob".to_string(), "42191".to_string(), "someapp".to_string()) => (10.0, 5.0, 5552),
-                    ("alice".to_string(), "42213".to_string(), "someapp".to_string()) => (20.0, 10.0, 484268)
+                    ("alice".to_string(), "42213".to_string(), "some app".to_string()) => (20.0, 10.0, 484268)
                 }
         );
     }
