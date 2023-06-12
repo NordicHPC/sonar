@@ -4,6 +4,8 @@ use crate::command;
 use chrono::prelude::{DateTime, Utc};
 use std::collections::HashMap;
 extern crate num_cpus;
+use csv::Writer;
+use std::io;
 
 fn time_iso8601() -> String {
     let dt: DateTime<Utc> = std::time::SystemTime::now().into();
@@ -116,15 +118,28 @@ pub fn create_snapshot(cpu_cutoff_percent: f64, mem_cutoff_percent: f64) {
             }
         }
 
+        let mut writer = Writer::from_writer(io::stdout());
+
         for ((user, slurm_job_id, command), (cpu_percentage, mem_size)) in processes_by_slurm_job_id
         {
             // round cpu_percentage to 3 decimal places
             let cpu_percentage = (cpu_percentage * 1000.0).round() / 1000.0;
 
-            println!(
-                  "{timestamp},{hostname},{num_cores},{user},{slurm_job_id},{command},{cpu_percentage},{mem_size}"
-              );
+            writer
+                .write_record([
+                    &timestamp,
+                    &hostname,
+                    &num_cores.to_string(),
+                    &user,
+                    &slurm_job_id.to_string(),
+                    &command,
+                    &cpu_percentage.to_string(),
+                    &mem_size.to_string(),
+                ])
+                .unwrap();
         }
+
+        writer.flush().unwrap();
     };
 }
 
