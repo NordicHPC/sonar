@@ -85,7 +85,7 @@ macro_rules! map(
 );
 
 #[cfg(test)]
-mod test {
+mod test_ps {
     use super::*;
 
     #[test]
@@ -119,25 +119,6 @@ mod test {
 // manual page.
 
 const NVIDIA_SMI_COMMAND : &str = "nvidia-smi pmon -c 1 -s mu";
-
-/* 
-
-$ nvidia-smi pmon -c 1 -s mu
-# gpu        pid  type    sm   mem   enc   dec   command
-# Idx          #   C/G     %     %     %     %   name
-# gpu        pid  type    fb    sm   mem   enc   dec   command
-# Idx          #   C/G    MB     %     %     %     %   name
-    0     447153     C  7669     -     -     -     -   python3.9      
-    0     447160     C 11057     -     -     -     -   python3.9      
-    0     506826     C 11057     -     -     -     -   python3.9      
-    0    1864615     C  1635    40     0     -     -   python         
-    1    1864615     C   535     -     -     -     -   python         
-    1    2233095     C 24395    84    23     -     -   python3        
-    2    1864615     C   535     -     -     -     -   python         
-    2    1448150     C  9383     -     -     -     -   python3        
-    3    1864615     C   535     -     -     -     -   python         
-    3    2233469     C 15771    90    23     -     -   python3        
-*/
 
 // Returns (user-name, pid, command-name) -> (device-mask, gpu-util-pct, gpu-mem-pct, gpu-mem-size-in-kib)
 // where the values are summed across all devices and the device-mask is a bitmask for the
@@ -182,7 +163,7 @@ fn extract_nvidia_processes(raw_text: &str, user_by_pid: HashMap<String, String>
 	        *device |= value.0;
                 *gpu_pct += value.1;
                 *mem_pct += value.2;
-                *mem_size += value.3 * 1024;
+                *mem_size += value.3;
             } else {
                 acc.insert(key, value);
             }
@@ -191,10 +172,56 @@ fn extract_nvidia_processes(raw_text: &str, user_by_pid: HashMap<String, String>
     result
 }
 
+#[cfg(test)]
+mod test_nvidia_smi {
+    use super::*;
+
+    // $ nvidia-smi pmon -c 1 -s mu
+    #[test]
+    fn test_extract_nvidia_processes() {
+        let text = "# gpu        pid  type    sm   mem   enc   dec   command
+# Idx          #   C/G     %     %     %     %   name
+# gpu        pid  type    fb    sm   mem   enc   dec   command
+# Idx          #   C/G    MB     %     %     %     %   name
+    0     447153     C  7669     -     -     -     -   python3.9      
+    0     447160     C 11057     -     -     -     -   python3.9      
+    0     506826     C 11057     -     -     -     -   python3.9      
+    0    1864615     C  1635    40     0     -     -   python         
+    1    1864615     C   535     -     -     -     -   python         
+    1    2233095     C 24395    84    23     -     -   python3        
+    2    1864615     C   535     -     -     -     -   python         
+    2    1448150     C  9383     -     -     -     -   python3        
+    3    1864615     C   535     -     -     -     -   python         
+    3    2233469     C 15771    90    23     -     -   python3        
+";
+	let users = map! {
+	    "447153".to_string() => "bob".to_string(),
+	    "447160".to_string() => "bob".to_string(),
+	    "1864615".to_string() => "alice".to_string(),
+            "2233095".to_string() => "charlie".to_string(),
+            "2233469".to_string() => "charlie".to_string() };
+
+        let processes = extract_nvidia_processes(text, users);
+	println!("{:?}", processes);
+        assert!(
+            processes
+                == map! {
+                    ("bob".to_string(), "447153".to_string(), "python3.9".to_string()) =>      (0b1, 0.0, 0.0, 7669*1024),
+                    ("bob".to_string(), "447160".to_string(), "python3.9".to_string()) =>      (0b1, 0.0, 0.0, 11057*1024),
+		    ("_zombie_".to_string(), "506826".to_string(), "python3.9".to_string()) => (0b1, 0.0, 0.0, 11057*1024),
+                    ("alice".to_string(), "1864615".to_string(), "python".to_string()) =>      (0b1111, 40.0, 0.0, (1635+535+535+535)*1024),
+                    ("charlie".to_string(), "2233095".to_string(), "python3".to_string()) =>   (0b10, 84.0, 23.0, 24395*1024),
+		    ("_zombie_".to_string(), "1448150".to_string(), "python3".to_string()) =>  (0b100, 0.0, 0.0, 9383*1024),
+                    ("charlie".to_string(), "2233469".to_string(), "python3".to_string()) =>   (0b1000, 90.0, 23.0, 15771*1024)
+                }
+        );
+    }
+}
+
 struct JobInfo {
     cpu_percentage: f64,
     mem_size: usize,
-    gpu_mask: u32,
+    gpu_mask: u32,            // Up to 32 GPUs, good enough for now?
     gpu_percentage: f64,
     gpu_mem_percentage: f64,
     gpu_mem_size: usize,
