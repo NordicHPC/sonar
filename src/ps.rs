@@ -113,12 +113,13 @@ mod test {
     }
 }
 
+// For prototyping purposes, parse the output of nvidia-smi.  This output
+// is not necessarily stable; we should consider using the underlying C
+// library instead, but this adds a fair amount of complexity.  See nvidia-smi
+// manual page.
+
 const NVIDIA_SMI_COMMAND : &str = "nvidia-smi pmon -c 1";
 
-// The key for the ht is (user, pid, command) and it would be nice if
-// we could get that, though we don't have a user name here.  It would
-// need to be looked up.
-//
 // The value is likely gpu utilization, memory utilization, and memory
 // size.  For that we'd want total memory, which means basically
 // looking it up separately using --query.
@@ -142,13 +143,8 @@ const NVIDIA_SMI_COMMAND : &str = "nvidia-smi pmon -c 1";
     3    3322026     C     -     -     -     -   python         
 */
 
-// Probably want gpu utilization, memory utilization?  For this
-// we may have to get the user from the pid, if we can.
-
-fn extract_nvidia_processes(raw_text: &str) -> HashMap<(String, String, String), (f64, f64, usize)> {
-    // This should deal with nvidia-smi not being present and should
-    // just return an empty map if so.  We could have a similar
-    // function for rocm-smi.
+fn extract_nvidia_processes(raw_text: &str, user_by_pid: HashMap<String, String>) -> HashMap<(String, String, String), (f64, f64, usize)> {
+    // println!("{}", raw_text);
     let result = raw_text
         .lines()
 	.filter(|line| !line.starts_with("#"))
@@ -156,15 +152,17 @@ fn extract_nvidia_processes(raw_text: &str) -> HashMap<(String, String, String),
 	.filter(|(_, parts)| parts[1] != "-")
         .map(|(start_indices, parts)| {
             let device = parts[0].parse::<usize>().unwrap();
-            let pid = parts[1].parse::<usize>().unwrap();
+            let pid = parts[1];
             let maybe_gpu_pct = parts[3].parse::<f64>();
             let maybe_mem_pct = parts[4].parse::<f64>();
 
             // this is done because command can have spaces
             let command = parts[7];  // FIXME
 
-	    // FIXME: Map PID to user
-	    let user = "somebody";
+	    let user = match user_by_pid.get(pid) {
+	        Some(name) => name.clone(),
+		None => "_zombie_".to_string()
+	    };
             (
                 (user.to_string(), pid.to_string(), command.to_string()),
                 (maybe_gpu_pct.unwrap_or(0.0),
@@ -210,10 +208,14 @@ pub fn create_snapshot(cpu_cutoff_percent: f64, mem_cutoff_percent: f64) {
     let mut processes_by_slurm_job_id: HashMap<(String, usize, String), JobInfo> =
         HashMap::new();
 
+    let mut user_by_pid: HashMap<String, String> = HashMap::new();
+
     if let Some(out) = command::safe_command(PS_COMMAND, timeout_seconds) {
         for ((user, pid, command), (cpu_percentage, mem_percentage, mem_size)) in
 	    extract_ps_processes(&out)
 	{
+            user_by_pid.insert(pid.clone(), user.clone());
+
             if (cpu_percentage >= cpu_cutoff_percent) || (mem_percentage >= mem_cutoff_percent) {
                 let slurm_job_id = get_slurm_job_id(pid).unwrap_or_default();
                 let slurm_job_id_usize = slurm_job_id.trim().parse::<usize>().unwrap_or_default();
@@ -235,7 +237,7 @@ pub fn create_snapshot(cpu_cutoff_percent: f64, mem_cutoff_percent: f64) {
 
     if let Some(out) = command::safe_command(NVIDIA_SMI_COMMAND, timeout_seconds) {
 	for ((user, pid, command), (gpu_percentage, gpu_mem_percentage, gpu_mem_size)) in
-	    extract_nvidia_processes(&out)
+	    extract_nvidia_processes(&out, user_by_pid)
 	{
 	    // I think generally we want to not filter processes here?
             let slurm_job_id = get_slurm_job_id(pid).unwrap_or_default();
