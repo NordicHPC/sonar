@@ -194,50 +194,6 @@ fn extract_nvidia_pmon_processes(
     result
 }
 
-#[cfg(test)]
-mod test_nvidia_pmon {
-    use super::*;
-
-    // $ nvidia-smi pmon -c 1 -s mu
-    #[test]
-    fn test_extract_nvidia_pmon_processes() {
-        let text = "# gpu        pid  type    sm   mem   enc   dec   command
-# Idx          #   C/G     %     %     %     %   name
-# gpu        pid  type    fb    sm   mem   enc   dec   command
-# Idx          #   C/G    MB     %     %     %     %   name
-    0     447153     C  7669     -     -     -     -   python3.9      
-    0     447160     C 11057     -     -     -     -   python3.9      
-    0     506826     C 11057     -     -     -     -   python3.9      
-    0    1864615     C  1635    40     0     -     -   python         
-    1    1864615     C   535     -     -     -     -   python         
-    1    2233095     C 24395    84    23     -     -   python3        
-    2    1864615     C   535     -     -     -     -   python         
-    2    1448150     C  9383     -     -     -     -   python3        
-    3    1864615     C   535     -     -     -     -   python         
-    3    2233469     C 15771    90    23     -     -   python3        
-";
-        let users = map! {
-            "447153".to_string() => "bob".to_string(),
-            "447160".to_string() => "bob".to_string(),
-            "1864615".to_string() => "alice".to_string(),
-            "2233095".to_string() => "charlie".to_string(),
-            "2233469".to_string() => "charlie".to_string() };
-        let processes = extract_nvidia_pmon_processes(text, &users);
-        assert!(
-            processes
-                == map! {
-                    ("bob".to_string(), "447153".to_string(), "python3.9".to_string()) =>      (0b1, 0.0, 0.0, 7669*1024),
-                    ("bob".to_string(), "447160".to_string(), "python3.9".to_string()) =>      (0b1, 0.0, 0.0, 11057*1024),
-                    ("_zombie_506826".to_string(), "506826".to_string(), "python3.9".to_string()) => (0b1, 0.0, 0.0, 11057*1024),
-                    ("alice".to_string(), "1864615".to_string(), "python".to_string()) =>      (0b1111, 40.0, 0.0, (1635+535+535+535)*1024),
-                    ("charlie".to_string(), "2233095".to_string(), "python3".to_string()) =>   (0b10, 84.0, 23.0, 24395*1024),
-                    ("_zombie_1448150".to_string(), "1448150".to_string(), "python3".to_string()) =>  (0b100, 0.0, 0.0, 9383*1024),
-                    ("charlie".to_string(), "2233469".to_string(), "python3".to_string()) =>   (0b1000, 90.0, 23.0, 15771*1024)
-                }
-        );
-    }
-}
-
 // We use this to get information about processes that are not captured by pmon.  It's hacky
 // but it works.
 
@@ -276,6 +232,71 @@ fn extract_nvidia_query_processes(
     result
 }
 
+// Shared test cases for the NVIDIA stuff
+
+#[cfg(test)]
+mod test_nvidia {
+    use super::*;
+
+    fn mkusers() -> HashMap<String,String> {
+        map! {
+            "447153".to_string() => "bob".to_string(),
+            "447160".to_string() => "bob".to_string(),
+            "1864615".to_string() => "alice".to_string(),
+            "2233095".to_string() => "charlie".to_string(),
+            "2233469".to_string() => "charlie".to_string()
+        }
+    }
+
+    // $ nvidia-smi pmon -c 1 -s mu
+    #[test]
+    fn test_extract_nvidia_pmon_processes() {
+        let text = "# gpu        pid  type    sm   mem   enc   dec   command
+# Idx          #   C/G     %     %     %     %   name
+# gpu        pid  type    fb    sm   mem   enc   dec   command
+# Idx          #   C/G    MB     %     %     %     %   name
+    0     447153     C  7669     -     -     -     -   python3.9      
+    0     447160     C 11057     -     -     -     -   python3.9      
+    0     506826     C 11057     -     -     -     -   python3.9      
+    0    1864615     C  1635    40     0     -     -   python         
+    1    1864615     C   535     -     -     -     -   python         
+    1    2233095     C 24395    84    23     -     -   python3        
+    2    1864615     C   535     -     -     -     -   python         
+    2    1448150     C  9383     -     -     -     -   python3        
+    3    1864615     C   535     -     -     -     -   python         
+    3    2233469     C 15771    90    23     -     -   python3        
+";
+        let processes = extract_nvidia_pmon_processes(text, &mkusers());
+        assert!(
+            processes
+                == map! {
+                    ("bob".to_string(), "447153".to_string(), "python3.9".to_string()) =>      (0b1, 0.0, 0.0, 7669*1024),
+                    ("bob".to_string(), "447160".to_string(), "python3.9".to_string()) =>      (0b1, 0.0, 0.0, 11057*1024),
+                    ("_zombie_506826".to_string(), "506826".to_string(), "python3.9".to_string()) => (0b1, 0.0, 0.0, 11057*1024),
+                    ("alice".to_string(), "1864615".to_string(), "python".to_string()) =>      (0b1111, 40.0, 0.0, (1635+535+535+535)*1024),
+                    ("charlie".to_string(), "2233095".to_string(), "python3".to_string()) =>   (0b10, 84.0, 23.0, 24395*1024),
+                    ("_zombie_1448150".to_string(), "1448150".to_string(), "python3".to_string()) =>  (0b100, 0.0, 0.0, 9383*1024),
+                    ("charlie".to_string(), "2233469".to_string(), "python3".to_string()) =>   (0b1000, 90.0, 23.0, 15771*1024)
+                }
+        );
+    }
+
+    // $ nvidia-smi --query-compute-apps=pid,used_memory --format=csv,noheader,nounits
+    #[test]
+    fn test_extract_nvidia_query_processes() {
+        let text = "2233095, 1190
+3079002, 2350
+1864615, 1426";
+        let processes = extract_nvidia_query_processes(text, &mkusers());
+        assert!(
+	    processes
+	        == map! {
+		    ("_zombie_3079002".to_string(), "3079002".to_string(), "_unknown_".to_string()) => (!0, 0.0, 0.0, 2350*1024)
+		}
+	);
+    }
+}
+
 struct JobInfo {
     cpu_percentage: f64,
     mem_size: usize,
@@ -310,11 +331,6 @@ fn add_job_info(processes_by_slurm_job_id: &mut HashMap<(String, usize, String),
                         gpu_mem_percentage,
                         gpu_mem_size,
                     });
-}
-
-// round to 3 decimal places
-fn three_places(n: f64) -> f64 {
-    (n * 1000.0).round() / 1000.0
 }
 
 pub fn create_snapshot(cpu_cutoff_percent: f64, mem_cutoff_percent: f64) {
@@ -398,6 +414,11 @@ pub fn create_snapshot(cpu_cutoff_percent: f64, mem_cutoff_percent: f64) {
     }
 
     writer.flush().unwrap();
+}
+
+// round to 3 decimal places
+fn three_places(n: f64) -> f64 {
+    (n * 1000.0).round() / 1000.0
 }
 
 fn get_slurm_job_id(pid: String) -> Option<String> {
