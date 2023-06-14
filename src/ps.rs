@@ -35,7 +35,8 @@ fn chunks(input: &str) -> (Vec<usize>, Vec<&str>) {
     (start_indices, parts)
 }
 
-const PS_COMMAND : &str = "ps -e --no-header -o pid,user:22,pcpu,pmem,size,comm | grep -v ' 0.0  0.0 '";
+const PS_COMMAND: &str =
+    "ps -e --no-header -o pid,user:22,pcpu,pmem,size,comm | grep -v ' 0.0  0.0 '";
 
 fn extract_ps_processes(raw_text: &str) -> HashMap<(String, String, String), (f64, f64, usize)> {
     let result = raw_text
@@ -118,49 +119,62 @@ mod test_ps {
 // library instead, but this adds a fair amount of complexity.  See nvidia-smi
 // manual page.
 
-const NVIDIA_SMI_COMMAND : &str = "nvidia-smi pmon -c 1 -s mu";
+const NVIDIA_SMI_COMMAND: &str = "nvidia-smi pmon -c 1 -s mu";
 
 // Returns (user-name, pid, command-name) -> (device-mask, gpu-util-pct, gpu-mem-pct, gpu-mem-size-in-kib)
 // where the values are summed across all devices and the device-mask is a bitmask for the
 // GPU devices used by that process.  For a system with 8 cards, utilization
 // can reach 800% and the memory size can reach the sum of the memories on the cards.
 
-fn extract_nvidia_processes(raw_text: &str, user_by_pid: HashMap<String, String>) ->
-    HashMap<(String, String, String), (u32, f64, f64, usize)>
-{
+fn extract_nvidia_processes(
+    raw_text: &str,
+    user_by_pid: HashMap<String, String>,
+) -> HashMap<(String, String, String), (u32, f64, f64, usize)> {
     // println!("{}", raw_text);
     let result = raw_text
         .lines()
-	.filter(|line| !line.starts_with("#"))
+        .filter(|line| !line.starts_with("#"))
         .map(|line| {
-	    let (_start_indices, parts) = chunks(line);
+            let (_start_indices, parts) = chunks(line);
             let device = parts[0].parse::<usize>().unwrap();
             let pid = parts[1];
-	    let maybe_mem_usage = parts[3].parse::<usize>();
+            let maybe_mem_usage = parts[3].parse::<usize>();
             let maybe_gpu_pct = parts[4].parse::<f64>();
             let maybe_mem_pct = parts[5].parse::<f64>();
-	    // For nvidia-smi, we use the first word because the command produces
-	    // blank-padded output.  We can maybe do better by considering non-empty words.
+            // For nvidia-smi, we use the first word because the command produces
+            // blank-padded output.  We can maybe do better by considering non-empty words.
             let command = parts[8].to_string();
-	    let user = match user_by_pid.get(pid) {
-	        Some(name) => name.clone(),
-		None => "_zombie_".to_string()
-	    };
-	    (pid, device, user, maybe_mem_usage, maybe_gpu_pct, maybe_mem_pct, command)
-	    })
-	.filter(|(pid, ..)| *pid != "-")
-        .map(|(pid, device, user, maybe_mem_usage, maybe_gpu_pct, maybe_mem_pct, command)| {
+            let user = match user_by_pid.get(pid) {
+                Some(name) => name.clone(),
+                None => "_zombie_".to_string(),
+            };
             (
-                (user.to_string(), pid.to_string(), command.to_string()),
-                (1 << device,
-		 maybe_gpu_pct.unwrap_or(0.0),
-		 maybe_mem_pct.unwrap_or(0.0),
-		 maybe_mem_usage.unwrap_or(0usize) * 1024),
+                pid,
+                device,
+                user,
+                maybe_mem_usage,
+                maybe_gpu_pct,
+                maybe_mem_pct,
+                command,
             )
         })
+        .filter(|(pid, ..)| *pid != "-")
+        .map(
+            |(pid, device, user, maybe_mem_usage, maybe_gpu_pct, maybe_mem_pct, command)| {
+                (
+                    (user.to_string(), pid.to_string(), command.to_string()),
+                    (
+                        1 << device,
+                        maybe_gpu_pct.unwrap_or(0.0),
+                        maybe_mem_pct.unwrap_or(0.0),
+                        maybe_mem_usage.unwrap_or(0usize) * 1024,
+                    ),
+                )
+            },
+        )
         .fold(HashMap::new(), |mut acc, (key, value)| {
             if let Some((device, gpu_pct, mem_pct, mem_size)) = acc.get_mut(&key) {
-	        *device |= value.0;
+                *device |= value.0;
                 *gpu_pct += value.1;
                 *mem_pct += value.2;
                 *mem_size += value.3;
@@ -194,24 +208,22 @@ mod test_nvidia_smi {
     3    1864615     C   535     -     -     -     -   python         
     3    2233469     C 15771    90    23     -     -   python3        
 ";
-	let users = map! {
-	    "447153".to_string() => "bob".to_string(),
-	    "447160".to_string() => "bob".to_string(),
-	    "1864615".to_string() => "alice".to_string(),
+        let users = map! {
+            "447153".to_string() => "bob".to_string(),
+            "447160".to_string() => "bob".to_string(),
+            "1864615".to_string() => "alice".to_string(),
             "2233095".to_string() => "charlie".to_string(),
             "2233469".to_string() => "charlie".to_string() };
-
         let processes = extract_nvidia_processes(text, users);
-	println!("{:?}", processes);
         assert!(
             processes
                 == map! {
                     ("bob".to_string(), "447153".to_string(), "python3.9".to_string()) =>      (0b1, 0.0, 0.0, 7669*1024),
                     ("bob".to_string(), "447160".to_string(), "python3.9".to_string()) =>      (0b1, 0.0, 0.0, 11057*1024),
-		    ("_zombie_".to_string(), "506826".to_string(), "python3.9".to_string()) => (0b1, 0.0, 0.0, 11057*1024),
+                    ("_zombie_".to_string(), "506826".to_string(), "python3.9".to_string()) => (0b1, 0.0, 0.0, 11057*1024),
                     ("alice".to_string(), "1864615".to_string(), "python".to_string()) =>      (0b1111, 40.0, 0.0, (1635+535+535+535)*1024),
                     ("charlie".to_string(), "2233095".to_string(), "python3".to_string()) =>   (0b10, 84.0, 23.0, 24395*1024),
-		    ("_zombie_".to_string(), "1448150".to_string(), "python3".to_string()) =>  (0b100, 0.0, 0.0, 9383*1024),
+                    ("_zombie_".to_string(), "1448150".to_string(), "python3".to_string()) =>  (0b100, 0.0, 0.0, 9383*1024),
                     ("charlie".to_string(), "2233469".to_string(), "python3".to_string()) =>   (0b1000, 90.0, 23.0, 15771*1024)
                 }
         );
@@ -221,14 +233,14 @@ mod test_nvidia_smi {
 struct JobInfo {
     cpu_percentage: f64,
     mem_size: usize,
-    gpu_mask: u32,            // Up to 32 GPUs, good enough for now?
+    gpu_mask: u32, // Up to 32 GPUs, good enough for now?
     gpu_percentage: f64,
     gpu_mem_percentage: f64,
     gpu_mem_size: usize,
 }
 
 // round to 3 decimal places
-fn three_places(n : f64) -> f64 {
+fn three_places(n: f64) -> f64 {
     (n * 1000.0).round() / 1000.0
 }
 
@@ -241,15 +253,14 @@ pub fn create_snapshot(cpu_cutoff_percent: f64, mem_cutoff_percent: f64) {
     // see also https://doc.rust-lang.org/std/process/index.html
     let timeout_seconds = 2;
 
-    let mut processes_by_slurm_job_id: HashMap<(String, usize, String), JobInfo> =
-        HashMap::new();
+    let mut processes_by_slurm_job_id: HashMap<(String, usize, String), JobInfo> = HashMap::new();
 
     let mut user_by_pid: HashMap<String, String> = HashMap::new();
 
     if let Some(out) = command::safe_command(PS_COMMAND, timeout_seconds) {
         for ((user, pid, command), (cpu_percentage, mem_percentage, mem_size)) in
-	    extract_ps_processes(&out)
-	{
+            extract_ps_processes(&out)
+        {
             user_by_pid.insert(pid.clone(), user.clone());
 
             if (cpu_percentage >= cpu_cutoff_percent) || (mem_percentage >= mem_cutoff_percent) {
@@ -262,21 +273,23 @@ pub fn create_snapshot(cpu_cutoff_percent: f64, mem_cutoff_percent: f64) {
                         e.cpu_percentage += cpu_percentage;
                         e.mem_size += mem_size;
                     })
-                    .or_insert(JobInfo { cpu_percentage,
-					 mem_size,
-                                         gpu_mask: 0,
-					 gpu_percentage: 0.0,
-					 gpu_mem_percentage: 0.0,
-					 gpu_mem_size: 0 });
+                    .or_insert(JobInfo {
+                        cpu_percentage,
+                        mem_size,
+                        gpu_mask: 0,
+                        gpu_percentage: 0.0,
+                        gpu_mem_percentage: 0.0,
+                        gpu_mem_size: 0,
+                    });
             }
         }
     }
 
     if let Some(out) = command::safe_command(NVIDIA_SMI_COMMAND, timeout_seconds) {
-	for ((user, pid, command), (gpu_mask, gpu_percentage, gpu_mem_percentage, gpu_mem_size)) in
-	    extract_nvidia_processes(&out, user_by_pid)
-	{
-	    // I think generally we want to not filter processes here?
+        for ((user, pid, command), (gpu_mask, gpu_percentage, gpu_mem_percentage, gpu_mem_size)) in
+            extract_nvidia_processes(&out, user_by_pid)
+        {
+            // I think generally we want to not filter processes here?
             let slurm_job_id = get_slurm_job_id(pid).unwrap_or_default();
             let slurm_job_id_usize = slurm_job_id.trim().parse::<usize>().unwrap_or_default();
 
@@ -288,19 +301,20 @@ pub fn create_snapshot(cpu_cutoff_percent: f64, mem_cutoff_percent: f64) {
                     e.gpu_mem_percentage += gpu_mem_percentage;
                     e.gpu_mem_size += gpu_mem_size;
                 })
-                .or_insert(JobInfo { cpu_percentage: 0.0,
-				     mem_size: 0,
-                                     gpu_mask,
-				     gpu_percentage,
-				     gpu_mem_percentage,
-				     gpu_mem_size });
-	}
+                .or_insert(JobInfo {
+                    cpu_percentage: 0.0,
+                    mem_size: 0,
+                    gpu_mask,
+                    gpu_percentage,
+                    gpu_mem_percentage,
+                    gpu_mem_size,
+                });
+        }
     }
 
     let mut writer = Writer::from_writer(io::stdout());
 
-    for ((user, slurm_job_id, command), job_info) in processes_by_slurm_job_id
-    {
+    for ((user, slurm_job_id, command), job_info) in processes_by_slurm_job_id {
         writer
             .write_record([
                 &timestamp,
@@ -311,14 +325,14 @@ pub fn create_snapshot(cpu_cutoff_percent: f64, mem_cutoff_percent: f64) {
                 &command,
                 &three_places(job_info.cpu_percentage).to_string(),
                 &job_info.mem_size.to_string(),
-		// TODO: There are other sensible formats for the device mask, notably
-		// non-numeric strings, strings padded on the left out to the number
-		// of devices on the system, and strings of device numbers separated by
-		// some non-comma separator char eg "7:2:1".
+                // TODO: There are other sensible formats for the device mask, notably
+                // non-numeric strings, strings padded on the left out to the number
+                // of devices on the system, and strings of device numbers separated by
+                // some non-comma separator char eg "7:2:1".
                 &format!("{:b}", job_info.gpu_mask),
-		&three_places(job_info.gpu_percentage).to_string(),
-		&three_places(job_info.gpu_mem_percentage).to_string(),
-		&job_info.gpu_mem_size.to_string()
+                &three_places(job_info.gpu_percentage).to_string(),
+                &three_places(job_info.gpu_mem_percentage).to_string(),
+                &job_info.gpu_mem_size.to_string(),
             ])
             .unwrap();
     }
