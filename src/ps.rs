@@ -197,7 +197,8 @@ fn extract_nvidia_pmon_processes(
 // We use this to get information about processes that are not captured by pmon.  It's hacky
 // but it works.
 
-const NVIDIA_QUERY_COMMAND: &str = "nvidia-smi --query-compute-apps=pid,used_memory --format=csv,noheader,nounits";
+const NVIDIA_QUERY_COMMAND: &str =
+    "nvidia-smi --query-compute-apps=pid,used_memory --format=csv,noheader,nounits";
 
 // Same signature as extract_nvidia_pmon_processes(), q.v. but user is always "_zombie_" and command
 // is always "_unknown_".  Only pids not in user_by_pid are returned.
@@ -213,11 +214,11 @@ fn extract_nvidia_query_processes(
             let pid = parts[0].strip_suffix(",").unwrap();
             let mem_usage = parts[1].parse::<usize>().unwrap();
             let user = "_zombie_".to_owned() + pid;
-	    let command = "_unknown_";
-	    (
-                    (user.to_string(), pid.to_string(), command.to_string()),
-                    ( !0, 0.0, 0.0, mem_usage * 1024 ),
-             )
+            let command = "_unknown_";
+            (
+                (user.to_string(), pid.to_string(), command.to_string()),
+                (!0, 0.0, 0.0, mem_usage * 1024),
+            )
         })
         .filter(|((_, pid, _), _)| !user_by_pid.contains_key(pid))
         .fold(HashMap::new(), |mut acc, (key, value)| {
@@ -238,7 +239,7 @@ fn extract_nvidia_query_processes(
 mod test_nvidia {
     use super::*;
 
-    fn mkusers() -> HashMap<String,String> {
+    fn mkusers() -> HashMap<String, String> {
         map! {
             "447153".to_string() => "bob".to_string(),
             "447160".to_string() => "bob".to_string(),
@@ -289,11 +290,11 @@ mod test_nvidia {
 1864615, 1426";
         let processes = extract_nvidia_query_processes(text, &mkusers());
         assert!(
-	    processes
-	        == map! {
-		    ("_zombie_3079002".to_string(), "3079002".to_string(), "_unknown_".to_string()) => (!0, 0.0, 0.0, 2350*1024)
-		}
-	);
+            processes
+                == map! {
+                    ("_zombie_3079002".to_string(), "3079002".to_string(), "_unknown_".to_string()) => (!0, 0.0, 0.0, 2350*1024)
+                }
+        );
     }
 }
 
@@ -306,31 +307,39 @@ struct JobInfo {
     gpu_mem_size: usize,
 }
 
-fn add_job_info(processes_by_slurm_job_id: &mut HashMap<(String, usize, String), JobInfo>,
-                user: String, pid: String, command: String,
-                cpu_percentage: f64, mem_size: usize,
-		gpu_mask: u32, gpu_percentage: f64, gpu_mem_percentage: f64, gpu_mem_size: usize) {
+fn add_job_info(
+    processes_by_slurm_job_id: &mut HashMap<(String, usize, String), JobInfo>,
+    user: String,
+    pid: String,
+    command: String,
+    cpu_percentage: f64,
+    mem_size: usize,
+    gpu_mask: u32,
+    gpu_percentage: f64,
+    gpu_mem_percentage: f64,
+    gpu_mem_size: usize,
+) {
     let slurm_job_id = get_slurm_job_id(pid).unwrap_or_default();
     let slurm_job_id_usize = slurm_job_id.trim().parse::<usize>().unwrap_or_default();
 
     processes_by_slurm_job_id
-                    .entry((user, slurm_job_id_usize, command))
-                    .and_modify(|e| {
-                        e.cpu_percentage += cpu_percentage;
-                        e.mem_size += mem_size;
-			e.gpu_mask |= gpu_mask;
-			e.gpu_percentage += gpu_percentage;
-			e.gpu_mem_percentage += gpu_mem_percentage;
-			e.gpu_mem_size += gpu_mem_size;
-                    })
-                    .or_insert(JobInfo {
-                        cpu_percentage,
-                        mem_size,
-                        gpu_mask,
-                        gpu_percentage,
-                        gpu_mem_percentage,
-                        gpu_mem_size,
-                    });
+        .entry((user, slurm_job_id_usize, command))
+        .and_modify(|e| {
+            e.cpu_percentage += cpu_percentage;
+            e.mem_size += mem_size;
+            e.gpu_mask |= gpu_mask;
+            e.gpu_percentage += gpu_percentage;
+            e.gpu_mem_percentage += gpu_mem_percentage;
+            e.gpu_mem_size += gpu_mem_size;
+        })
+        .or_insert(JobInfo {
+            cpu_percentage,
+            mem_size,
+            gpu_mask,
+            gpu_percentage,
+            gpu_mem_percentage,
+            gpu_mem_size,
+        });
 }
 
 pub fn create_snapshot(cpu_cutoff_percent: f64, mem_cutoff_percent: f64) {
@@ -353,10 +362,18 @@ pub fn create_snapshot(cpu_cutoff_percent: f64, mem_cutoff_percent: f64) {
             user_by_pid.insert(pid.clone(), user.clone());
 
             if (cpu_percentage >= cpu_cutoff_percent) || (mem_percentage >= mem_cutoff_percent) {
-	        add_job_info(&mut processes_by_slurm_job_id,
-		             user, pid, command, 
-			     cpu_percentage, mem_size,
-			     0, 0.0, 0.0, 0);
+                add_job_info(
+                    &mut processes_by_slurm_job_id,
+                    user,
+                    pid,
+                    command,
+                    cpu_percentage,
+                    mem_size,
+                    0,
+                    0.0,
+                    0.0,
+                    0,
+                );
             }
         }
     }
@@ -365,27 +382,43 @@ pub fn create_snapshot(cpu_cutoff_percent: f64, mem_cutoff_percent: f64) {
         for ((user, pid, command), (gpu_mask, gpu_percentage, gpu_mem_percentage, gpu_mem_size)) in
             extract_nvidia_pmon_processes(&out, &user_by_pid)
         {
-	    add_job_info(&mut processes_by_slurm_job_id,
-	                 user, pid, command,
-			 0.0, 0,
-			 gpu_mask, gpu_percentage, gpu_mem_percentage, gpu_mem_size);
+            add_job_info(
+                &mut processes_by_slurm_job_id,
+                user,
+                pid,
+                command,
+                0.0,
+                0,
+                gpu_mask,
+                gpu_percentage,
+                gpu_mem_percentage,
+                gpu_mem_size,
+            );
         }
 
-	// nvidia-smi worked, so look for orphans processes not caught by pmon
-	// For these, "user" will be "_zombie_PID" and command will be "_unknown_", and
-	// even though GPU memory percentage is 0.0 there's a nonzero number for
-	// the memory usage.  All we care about is really the visibility.
+        // nvidia-smi worked, so look for orphans processes not caught by pmon
+        // For these, "user" will be "_zombie_PID" and command will be "_unknown_", and
+        // even though GPU memory percentage is 0.0 there's a nonzero number for
+        // the memory usage.  All we care about is really the visibility.
 
-	if let Some(out) = command::safe_command(NVIDIA_QUERY_COMMAND, timeout_seconds) {
-	   for ((user, pid, command), (gpu_mask, _, _, gpu_mem_size)) in
-	       extract_nvidia_query_processes(&out, &user_by_pid)
-	   {
-	       add_job_info(&mut processes_by_slurm_job_id,
-	                    user, pid, command,
-			    0.0, 0,
-			    gpu_mask, 0.0, 0.0, gpu_mem_size);
-	    }
-	}
+        if let Some(out) = command::safe_command(NVIDIA_QUERY_COMMAND, timeout_seconds) {
+            for ((user, pid, command), (gpu_mask, _, _, gpu_mem_size)) in
+                extract_nvidia_query_processes(&out, &user_by_pid)
+            {
+                add_job_info(
+                    &mut processes_by_slurm_job_id,
+                    user,
+                    pid,
+                    command,
+                    0.0,
+                    0,
+                    gpu_mask,
+                    0.0,
+                    0.0,
+                    gpu_mem_size,
+                );
+            }
+        }
     }
 
     let mut writer = Writer::from_writer(io::stdout());
