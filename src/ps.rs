@@ -1,4 +1,5 @@
 #![allow(clippy::type_complexity)]
+#![allow(clippy::too_many_arguments)]
 
 use crate::command;
 use chrono::prelude::{DateTime, Utc};
@@ -141,7 +142,7 @@ fn extract_nvidia_pmon_processes(
 ) -> HashMap<(String, String, String), (u32, f64, f64, usize)> {
     let result = raw_text
         .lines()
-        .filter(|line| !line.starts_with("#"))
+        .filter(|line| !line.starts_with('#'))
         .map(|line| {
             let (_start_indices, parts) = chunks(line);
             let device = parts[0].parse::<usize>().unwrap();
@@ -170,7 +171,7 @@ fn extract_nvidia_pmon_processes(
         .map(
             |(pid, device, user, maybe_mem_usage, maybe_gpu_pct, maybe_mem_pct, command)| {
                 (
-                    (user.to_string(), pid.to_string(), command.to_string()),
+                    (user, pid.to_string(), command),
                     (
                         1 << device,
                         maybe_gpu_pct.unwrap_or(0.0),
@@ -211,12 +212,12 @@ fn extract_nvidia_query_processes(
         .lines()
         .map(|line| {
             let (_start_indices, parts) = chunks(line);
-            let pid = parts[0].strip_suffix(",").unwrap();
+            let pid = parts[0].strip_suffix(',').unwrap();
             let mem_usage = parts[1].parse::<usize>().unwrap();
             let user = "_zombie_".to_owned() + pid;
             let command = "_unknown_";
             (
-                (user.to_string(), pid.to_string(), command.to_string()),
+                (user, pid.to_string(), command.to_string()),
                 (!0, 0.0, 0.0, mem_usage * 1024),
             )
         })
