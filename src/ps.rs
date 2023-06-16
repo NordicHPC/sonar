@@ -123,6 +123,45 @@ fn extract_nvidia_processes(processes: &Vec<nvidia::Process>) ->
         })
 }
 
+#[test]
+fn test_extract_nvidia_pmon_processes() {
+    let ps_output = nvidia::parsed_pmon_output();
+    let processes = extract_nvidia_processes(&ps_output);
+
+    assert!(
+        processes
+            == map! {
+                ("bob".to_string(), "447153".to_string(), "python3.9".to_string())
+		    => (0b1, 0.0, 0.0, 7669*1024),
+                ("bob".to_string(), "447160".to_string(), "python3.9".to_string())
+		    => (0b1, 0.0, 0.0, 11057*1024),
+                ("_zombie_506826".to_string(), "506826".to_string(), "python3.9".to_string())
+		    => (0b1, 0.0, 0.0, 11057*1024),
+                ("alice".to_string(), "1864615".to_string(), "python".to_string())
+		    => (0b1111, 40.0, 0.0, (1635+535+535+535)*1024),
+                ("charlie".to_string(), "2233095".to_string(), "python3".to_string())
+		    => (0b10, 84.0, 23.0, 24395*1024),
+                ("_zombie_1448150".to_string(), "1448150".to_string(), "python3".to_string())
+		    => (0b100, 0.0, 0.0, 9383*1024),
+                ("charlie".to_string(), "2233469".to_string(), "python3".to_string())
+		    => (0b1000, 90.0, 23.0, 15771*1024)
+            }
+    );
+}
+
+#[test]
+fn test_extract_nvidia_query_processes() {
+    let ps_output = nvidia::parsed_query_output();
+    let processes = extract_nvidia_processes(&ps_output);
+
+    assert!(
+        processes
+            == map! {
+                ("_zombie_3079002".to_string(), "3079002".to_string(), "_unknown_".to_string()) => (!0, 0.0, 0.0, 2350*1024)
+            }
+    );
+}
+
 pub fn create_snapshot(cpu_cutoff_percent: f64, mem_cutoff_percent: f64) {
     let timestamp = time_iso8601();
     let hostname = hostname::get().unwrap().into_string().unwrap();

@@ -69,14 +69,13 @@ fn test_parse_ps_output() {
 
     assert!(
 	parsed_test_output().into_iter().eq(
-	    vec![
-		proc! {  "2022", "bob",   10.0, 20.0, 553348, "slack" },
-		proc! { "42178", "bob",   10.0, 15.0, 353348, "chromium" },
-		proc! { "42178", "bob",   10.0, 15.0,   5536, "chromium" },
-		proc! { "42189", "alice", 10.0,  5.0,   5528, "slack" },
-		proc! { "42191", "bob",   10.0,  5.0,   5552, "someapp" },
-		proc! { "42213", "alice", 10.0,  5.0, 348904, "some app" },
-		proc! { "42213", "alice", 10.0,  5.0, 135364, "some app" }
+	    vec![proc! {  "2022", "bob",   10.0, 20.0, 553348, "slack" },
+		 proc! { "42178", "bob",   10.0, 15.0, 353348, "chromium" },
+		 proc! { "42178", "bob",   10.0, 15.0,   5536, "chromium" },
+		 proc! { "42189", "alice", 10.0,  5.0,   5528, "slack" },
+		 proc! { "42191", "bob",   10.0,  5.0,   5552, "someapp" },
+		 proc! { "42213", "alice", 10.0,  5.0, 348904, "some app" },
+		 proc! { "42213", "alice", 10.0,  5.0, 135364, "some app" }
 	    ])
     )
 }

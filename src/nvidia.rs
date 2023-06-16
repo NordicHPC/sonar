@@ -6,6 +6,7 @@ use std::collections::HashMap;
 #[cfg(test)]
 use crate::util::map;
 
+#[derive(PartialEq)]
 pub struct Process {
     pub device: i32,		// -1 for "unknown", otherwise 0..num_devices-1
     pub pid: String,		// Process ID
@@ -82,7 +83,7 @@ fn parse_pmon_output(raw_text: &str, user_by_pid: &HashMap<String, String>) -> V
 		user,
 		gpu_pct,
 		mem_pct,
-		mem_size_kib: mem_size,
+		mem_size_kib: mem_size * 1024,
 		command }})
 	.collect::<Vec<Process>>()
 }
@@ -120,25 +121,19 @@ fn parse_query_output(raw_text: &str, user_by_pid: &HashMap<String, String>) -> 
 	.collect::<Vec<Process>>()
 }
     
-// Shared test cases for the NVIDIA stuff
-/*
 #[cfg(test)]
-mod test_nvidia {
-    use super::*;
-
-    fn mkusers() -> HashMap<String, String> {
-        map! {
-            "447153".to_string() => "bob".to_string(),
-            "447160".to_string() => "bob".to_string(),
-            "1864615".to_string() => "alice".to_string(),
-            "2233095".to_string() => "charlie".to_string(),
-            "2233469".to_string() => "charlie".to_string()
-        }
+fn mkusers() -> HashMap<String, String> {
+    map! {
+        "447153".to_string() => "bob".to_string(),
+        "447160".to_string() => "bob".to_string(),
+        "1864615".to_string() => "alice".to_string(),
+        "2233095".to_string() => "charlie".to_string(),
+        "2233469".to_string() => "charlie".to_string()
     }
+}
 
-    // $ nvidia-smi pmon -c 1 -s mu
-    #[test]
-    fn test_extract_nvidia_pmon_processes() {
+#[cfg(test)]
+pub fn parsed_pmon_output() -> Vec<Process> {
         let text = "# gpu        pid  type    sm   mem   enc   dec   command
 # Idx          #   C/G     %     %     %     %   name
 # gpu        pid  type    fb    sm   mem   enc   dec   command
@@ -154,34 +149,53 @@ mod test_nvidia {
     3    1864615     C   535     -     -     -     -   python         
     3    2233469     C 15771    90    23     -     -   python3        
 ";
-        let processes = extract_nvidia_pmon_processes(text, &mkusers());
-        assert!(
-            processes
-                == map! {
-                    ("bob".to_string(), "447153".to_string(), "python3.9".to_string()) =>      (0b1, 0.0, 0.0, 7669*1024),
-                    ("bob".to_string(), "447160".to_string(), "python3.9".to_string()) =>      (0b1, 0.0, 0.0, 11057*1024),
-                    ("_zombie_506826".to_string(), "506826".to_string(), "python3.9".to_string()) => (0b1, 0.0, 0.0, 11057*1024),
-                    ("alice".to_string(), "1864615".to_string(), "python".to_string()) =>      (0b1111, 40.0, 0.0, (1635+535+535+535)*1024),
-                    ("charlie".to_string(), "2233095".to_string(), "python3".to_string()) =>   (0b10, 84.0, 23.0, 24395*1024),
-                    ("_zombie_1448150".to_string(), "1448150".to_string(), "python3".to_string()) =>  (0b100, 0.0, 0.0, 9383*1024),
-                    ("charlie".to_string(), "2233469".to_string(), "python3".to_string()) =>   (0b1000, 90.0, 23.0, 15771*1024)
-                }
-        );
-    }
+    parse_pmon_output(text, &mkusers())
+}
 
-    // $ nvidia-smi --query-compute-apps=pid,used_memory --format=csv,noheader,nounits
-    #[test]
-    fn test_extract_nvidia_query_processes() {
-        let text = "2233095, 1190
+#[cfg(test)]
+macro_rules! proc(
+    { $a:expr, $b:expr, $c:expr, $d:expr, $e: expr, $f:expr, $g:expr } => {
+	Process { device: $a,
+		  pid: $b.to_string(),
+		  user: $c.to_string(),
+		  gpu_pct: $d,
+		  mem_pct: $e,
+		  mem_size_kib: $f, 
+		  command: $g.to_string()
+	}
+    });
+
+#[test]
+fn test_parse_pmon_output() {
+    assert!(
+	parsed_pmon_output().into_iter().eq(
+	    vec![proc! { 0,  "447153", "bob",             0.0,  0.0,  7669 * 1024, "python3.9" },
+		 proc! { 0,  "447160", "bob",             0.0,  0.0, 11057 * 1024, "python3.9" },
+		 proc! { 0,  "506826", "_zombie_506826",  0.0,  0.0, 11057 * 1024, "python3.9" },
+		 proc! { 0, "1864615", "alice",          40.0,  0.0,  1635 * 1024, "python" },
+		 proc! { 1, "1864615", "alice",           0.0,  0.0,   535 * 1024, "python" },
+		 proc! { 1, "2233095", "charlie",        84.0, 23.0, 24395 * 1024, "python3" },
+		 proc! { 2, "1864615", "alice",           0.0,  0.0,   535 * 1024, "python" },
+		 proc! { 2, "1448150", "_zombie_1448150", 0.0,  0.0,  9383 * 1024, "python3"},
+		 proc! { 3, "1864615", "alice",           0.0,  0.0,   535 * 1024, "python" },
+		 proc! { 3, "2233469", "charlie",        90.0, 23.0, 15771 * 1024, "python3" }
+	    ])
+    )
+}
+
+#[cfg(test)]
+pub fn parsed_query_output() -> Vec<Process> {
+    let text = "2233095, 1190
 3079002, 2350
 1864615, 1426";
-        let processes = extract_nvidia_query_processes(text, &mkusers());
-        assert!(
-            processes
-                == map! {
-                    ("_zombie_3079002".to_string(), "3079002".to_string(), "_unknown_".to_string()) => (!0, 0.0, 0.0, 2350*1024)
-                }
-        );
-    }
+    parse_query_output(text, &mkusers())
 }
-*/
+
+#[test]
+fn test_parse_query_output() {
+    assert!(
+	parsed_query_output().into_iter().eq(
+	    vec![proc! { !0, "3079002", "_zombie_3079002", 0.0, 0.0, 2350 * 1024, "_unknown_" }]
+	)
+    )
+}
