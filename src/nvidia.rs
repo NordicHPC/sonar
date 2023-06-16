@@ -18,12 +18,11 @@ pub struct Process {
 }
 
 pub fn get_nvidia_information(
-    timeout_seconds: u64,
     user_by_pid: &HashMap<String, String>,
 ) -> Vec<Process> {
-    if let Some(pmon_raw_text) = command::safe_command(NVIDIA_PMON_COMMAND, timeout_seconds) {
+    if let Some(pmon_raw_text) = command::safe_command(NVIDIA_PMON_COMMAND, TIMEOUT_SECONDS) {
         let mut processes = parse_pmon_output(&pmon_raw_text, user_by_pid);
-        if let Some(query_raw_text) = command::safe_command(NVIDIA_QUERY_COMMAND, timeout_seconds) {
+        if let Some(query_raw_text) = command::safe_command(NVIDIA_QUERY_COMMAND, TIMEOUT_SECONDS) {
             processes.append(&mut parse_query_output(&query_raw_text, user_by_pid));
         }
         processes
@@ -31,6 +30,8 @@ pub fn get_nvidia_information(
         vec![]
     }
 }
+
+const TIMEOUT_SECONDS: u64 = 2;	// For `nvidia-smi`
 
 // For prototyping purposes (and maybe it's good enough for production?), parse the output of
 // `nvidia-smi pmon`.  This output has a couple of problems:
