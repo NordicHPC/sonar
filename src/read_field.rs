@@ -1,3 +1,5 @@
+#![allow(clippy::type_complexity)]
+
 use std::collections::HashMap;
 use std::fs;
 
@@ -23,6 +25,10 @@ pub fn read_field(field: &i32, dir_path: &str) -> HashMap<String, i32> {
             let subdir_field_data = read_field(field, file_name.to_str().unwrap());
             field_data.extend(subdir_field_data);
         } else {
+            let error_message = format!(
+                "something went wrong reading file {}",
+                file_name.display()
+            );
             let contents = fs::read_to_string(file_name).expect(&error_message);
             let lines = contents.lines();
 
