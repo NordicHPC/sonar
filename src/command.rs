@@ -1,6 +1,8 @@
 use std::time::Duration;
 use subprocess::{Exec, Redirection};
 
+// the pipe is here as a workaround for https://github.com/rust-lang/rust/issues/45572
+// see also https://doc.rust-lang.org/std/process/index.html
 pub fn safe_command(command: &str, timeout_seconds: u64) -> Option<String> {
     let mut p = Exec::shell(command)
         .stdout(Redirection::Pipe)

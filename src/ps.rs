@@ -183,14 +183,10 @@ pub fn create_snapshot(
     let hostname = hostname::get().unwrap().into_string().unwrap();
     let num_cores = num_cpus::get();
 
-    // the pipe is here as a workaround for https://github.com/rust-lang/rust/issues/45572
-    // see also https://doc.rust-lang.org/std/process/index.html
-    let timeout_seconds = 2;
-
     let mut processes_by_job_id: HashMap<(String, usize, String), JobInfo> = HashMap::new();
     let mut user_by_pid: HashMap<String, String> = HashMap::new();
 
-    let ps_output = process::get_process_information(timeout_seconds);
+    let ps_output = process::get_process_information();
     for ((user, pid, command), (cpu_percentage, mem_percentage, mem_size)) in
         extract_ps_processes(&ps_output)
     {
@@ -212,7 +208,7 @@ pub fn create_snapshot(
         }
     }
 
-    let nvidia_output = nvidia::get_nvidia_information(timeout_seconds, &user_by_pid);
+    let nvidia_output = nvidia::get_nvidia_information(&user_by_pid);
     for ((user, pid, command), (gpu_mask, gpu_percentage, gpu_mem_percentage, gpu_mem_size)) in
         extract_nvidia_processes(&nvidia_output)
     {

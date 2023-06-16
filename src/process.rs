@@ -13,13 +13,15 @@ pub struct Process {
     pub command: String,
 }
 
-pub fn get_process_information(timeout_seconds: u64) -> Vec<Process> {
-    if let Some(out) = command::safe_command(PS_COMMAND, timeout_seconds) {
+pub fn get_process_information() -> Vec<Process> {
+    if let Some(out) = command::safe_command(PS_COMMAND, TIMEOUT_SECONDS) {
         parse_ps_output(&out)
     } else {
         vec![]
     }
 }
+
+const TIMEOUT_SECONDS: u64 = 2;	// for `ps`
 
 const PS_COMMAND: &str =
     "ps -e --no-header -o pid,user:22,pcpu,pmem,size,comm | grep -v ' 0.0  0.0 '";
