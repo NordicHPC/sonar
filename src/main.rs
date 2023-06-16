@@ -1,9 +1,11 @@
 use clap::{Parser, Subcommand};
 
 mod command;
+mod jobs;
 mod nvidia;
 mod process;
 mod ps;
+mod slurm;
 mod util;
 
 #[derive(Parser)]
@@ -34,7 +36,9 @@ fn main() {
             cpu_cutoff_percent,
             mem_cutoff_percent,
         } => {
-            ps::create_snapshot(*cpu_cutoff_percent, *mem_cutoff_percent);
+	    // TODO: Allow for other types of job managers
+	    let mut jm = slurm::SlurmJobManager {};
+            ps::create_snapshot(&mut jm, *cpu_cutoff_percent, *mem_cutoff_percent);
         }
         Commands::Analyze {} => {
             println!("sonar analyze not yet completed");
