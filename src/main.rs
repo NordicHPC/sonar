@@ -2,6 +2,9 @@ use clap::{Parser, Subcommand};
 
 mod command;
 mod ps;
+mod process;
+mod nvidia;
+mod util;
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
