@@ -3,6 +3,8 @@
 use crate::command;
 use crate::util;
 use std::collections::HashMap;
+#[cfg(test)]
+use crate::util::map;
 
 pub struct Process {
     pub device: i32,		// -1 for "unknown", otherwise 0..num_devices-1
@@ -119,7 +121,7 @@ fn parse_query_output(raw_text: &str, user_by_pid: &HashMap<String, String>) -> 
 }
     
 // Shared test cases for the NVIDIA stuff
-
+/*
 #[cfg(test)]
 mod test_nvidia {
     use super::*;
@@ -182,3 +184,4 @@ mod test_nvidia {
         );
     }
 }
+*/

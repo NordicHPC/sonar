@@ -9,6 +9,8 @@ use std::collections::HashMap;
 extern crate num_cpus;
 use csv::Writer;
 use std::io;
+#[cfg(test)]
+use crate::util::map;
 
 struct JobInfo {
     cpu_percentage: f64,
@@ -73,6 +75,23 @@ fn extract_ps_processes(processes: &Vec<process::Process>) -> HashMap<(String, S
             }
             acc
         })
+}
+
+#[test]
+fn test_extract_ps_processes() {
+    let ps_output = process::parsed_test_output();
+    let processes = extract_ps_processes(&ps_output);
+
+    assert!(
+        processes
+            == map! {
+                ("bob".to_string(), "2022".to_string(), "slack".to_string()) => (10.0, 20.0, 553348),
+                ("bob".to_string(), "42178".to_string(), "chromium".to_string()) => (20.0, 30.0, 358884),
+                ("alice".to_string(), "42189".to_string(), "slack".to_string()) => (10.0, 5.0, 5528),
+                ("bob".to_string(), "42191".to_string(), "someapp".to_string()) => (10.0, 5.0, 5552),
+                ("alice".to_string(), "42213".to_string(), "some app".to_string()) => (20.0, 10.0, 484268)
+            }
+    );
 }
 
 fn extract_nvidia_processes(processes: &Vec<nvidia::Process>) -> 

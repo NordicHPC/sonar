@@ -2,9 +2,8 @@
 
 use crate::command;
 use crate::util;
-#[cfg(test)]
-use std::collections::HashMap;
 
+#[derive(PartialEq)]
 pub struct Process {
     pub pid: String,
     pub user: String,
@@ -43,12 +42,8 @@ fn parse_ps_output(raw_text: &str) -> Vec<Process> {
 }
 
 #[cfg(test)]
-mod test_ps {
-    use super::*;
-
-    #[test]
-    fn test_extract_ps_processes() {
-        let text = "   2022 1 bob                            10.0 20.0 553348 slack
+pub fn parsed_test_output() -> Vec<Process> {
+        let text = "   2022 bob                            10.0 20.0 553348 slack
   42178 bob                            10.0 15.0 353348 chromium
   42178 bob                            10.0 15.0  5536 chromium
   42189 alice                          10.0  5.0  5528 slack
@@ -56,18 +51,32 @@ mod test_ps {
   42213 alice                          10.0  5.0 348904 some app
   42213 alice                          10.0  5.0 135364 some app";
 
-	let ps_output = parse_ps_output(text);
-        let processes = extract_ps_processes(ps_output);
+    parse_ps_output(text)
+}
 
-        assert!(
-            processes
-                == map! {
-                    ("bob".to_string(), "2022".to_string(), "slack".to_string()) => (10.0, 20.0, 553348),
-                    ("bob".to_string(), "42178".to_string(), "chromium".to_string()) => (20.0, 30.0, 358884),
-                    ("alice".to_string(), "42189".to_string(), "slack".to_string()) => (10.0, 5.0, 5528),
-                    ("bob".to_string(), "42191".to_string(), "someapp".to_string()) => (10.0, 5.0, 5552),
-                    ("alice".to_string(), "42213".to_string(), "some app".to_string()) => (20.0, 10.0, 484268)
-                }
-        );
-    }
+#[test]
+fn test_parse_ps_output() {
+    macro_rules! proc(
+	{ $a:expr, $b:expr, $c:expr, $d:expr, $e: expr, $f:expr } => {
+	    Process { pid: $a.to_string(),
+		      user: $b.to_string(),
+		      cpu_pct: $c,
+		      mem_pct: $d,
+		      mem_size_kib: $e, 
+		      command: $f.to_string()
+	    }
+	});
+
+    assert!(
+	parsed_test_output().into_iter().eq(
+	    vec![
+		proc! {  "2022", "bob",   10.0, 20.0, 553348, "slack" },
+		proc! { "42178", "bob",   10.0, 15.0, 353348, "chromium" },
+		proc! { "42178", "bob",   10.0, 15.0,   5536, "chromium" },
+		proc! { "42189", "alice", 10.0,  5.0,   5528, "slack" },
+		proc! { "42191", "bob",   10.0,  5.0,   5552, "someapp" },
+		proc! { "42213", "alice", 10.0,  5.0, 348904, "some app" },
+		proc! { "42213", "alice", 10.0,  5.0, 135364, "some app" }
+	    ])
+    )
 }
