@@ -2,8 +2,9 @@
 #![allow(clippy::too_many_arguments)]
 
 use crate::command;
-use crate::util;
-use chrono::prelude::{DateTime, Utc};
+use crate::util::{three_places, time_iso8601};
+use crate::process;
+use crate::nvidia;
 use std::collections::HashMap;
 extern crate num_cpus;
 use csv::Writer;
@@ -53,6 +54,56 @@ fn add_job_info(
         });
 }
 
+fn extract_ps_processes(processes: &Vec<process::Process>) -> HashMap<(String, String, String), (f64, f64, usize)> {
+    processes
+	.into_iter()
+        .map(|process::Process { user, pid, command, cpu_pct, mem_pct, mem_size_kib, ..}| {
+            (
+                (user.clone(), pid.clone(), command.clone()),
+                (*cpu_pct, *mem_pct, *mem_size_kib),
+            )
+        })
+        .fold(HashMap::new(), |mut acc, (key, value)| {
+            if let Some((cpu_pct, mem_pct, mem_size_kib)) = acc.get_mut(&key) {
+                *cpu_pct += value.0;
+                *mem_pct += value.1;
+                *mem_size_kib += value.2;
+            } else {
+                acc.insert(key, value);
+            }
+            acc
+        })
+}
+
+fn extract_nvidia_processes(processes: &Vec<nvidia::Process>) -> 
+    HashMap<(String, String, String), (u32, f64, f64, usize)>
+{
+    processes
+	.into_iter()
+	.map(|nvidia::Process { device, pid, user, gpu_pct, mem_pct, mem_size_kib, command }| {
+	    (
+		(user.clone(), pid.clone(), command.clone()),
+		(
+		    if *device >= 0 { 1 << device } else { !0 },
+		    *gpu_pct,
+		    *mem_pct,
+		    *mem_size_kib,
+		),
+	    )
+	})
+        .fold(HashMap::new(), |mut acc, (key, value)| {
+            if let Some((device, gpu_pct, mem_pct, mem_size)) = acc.get_mut(&key) {
+                *device |= value.0;
+                *gpu_pct += value.1;
+                *mem_pct += value.2;
+                *mem_size += value.3;
+            } else {
+                acc.insert(key, value);
+            }
+            acc
+        })
+}
+
 pub fn create_snapshot(cpu_cutoff_percent: f64, mem_cutoff_percent: f64) {
     let timestamp = time_iso8601();
     let hostname = hostname::get().unwrap().into_string().unwrap();
@@ -63,73 +114,46 @@ pub fn create_snapshot(cpu_cutoff_percent: f64, mem_cutoff_percent: f64) {
     let timeout_seconds = 2;
 
     let mut processes_by_slurm_job_id: HashMap<(String, usize, String), JobInfo> = HashMap::new();
-
     let mut user_by_pid: HashMap<String, String> = HashMap::new();
 
-    if let Some(out) = command::safe_command(PS_COMMAND, timeout_seconds) {
-        for ((user, pid, command), (cpu_percentage, mem_percentage, mem_size)) in
-            extract_ps_processes(&out)
-        {
-            user_by_pid.insert(pid.clone(), user.clone());
+    let ps_output = process::get_process_information(timeout_seconds);
+    for ((user, pid, command), (cpu_percentage, mem_percentage, mem_size)) in
+        extract_ps_processes(&ps_output)
+    {
+        user_by_pid.insert(pid.clone(), user.clone());
 
-            if (cpu_percentage >= cpu_cutoff_percent) || (mem_percentage >= mem_cutoff_percent) {
-                add_job_info(
-                    &mut processes_by_slurm_job_id,
-                    user,
-                    pid,
-                    command,
-                    cpu_percentage,
-                    mem_size,
-                    0,
-                    0.0,
-                    0.0,
-                    0,
-                );
-            }
-        }
-    }
-
-    if let Some(out) = command::safe_command(NVIDIA_PMON_COMMAND, timeout_seconds) {
-        for ((user, pid, command), (gpu_mask, gpu_percentage, gpu_mem_percentage, gpu_mem_size)) in
-            extract_nvidia_pmon_processes(&out, &user_by_pid)
-        {
+        if (cpu_percentage >= cpu_cutoff_percent) || (mem_percentage >= mem_cutoff_percent) {
             add_job_info(
                 &mut processes_by_slurm_job_id,
                 user,
                 pid,
                 command,
+                cpu_percentage,
+                mem_size,
+                0,
+                0.0,
                 0.0,
                 0,
-                gpu_mask,
-                gpu_percentage,
-                gpu_mem_percentage,
-                gpu_mem_size,
             );
         }
+    }
 
-        // nvidia-smi worked, so look for orphans processes not caught by pmon
-        // For these, "user" will be "_zombie_PID" and command will be "_unknown_", and
-        // even though GPU memory percentage is 0.0 there's a nonzero number for
-        // the memory usage.  All we care about is really the visibility.
-
-        if let Some(out) = command::safe_command(NVIDIA_QUERY_COMMAND, timeout_seconds) {
-            for ((user, pid, command), (gpu_mask, _, _, gpu_mem_size)) in
-                extract_nvidia_query_processes(&out, &user_by_pid)
-            {
-                add_job_info(
-                    &mut processes_by_slurm_job_id,
-                    user,
-                    pid,
-                    command,
-                    0.0,
-                    0,
-                    gpu_mask,
-                    0.0,
-                    0.0,
-                    gpu_mem_size,
-                );
-            }
-        }
+    let nvidia_output = nvidia::get_nvidia_information(timeout_seconds, &user_by_pid);
+    for ((user, pid, command), (gpu_mask, gpu_percentage, gpu_mem_percentage, gpu_mem_size)) in
+        extract_nvidia_processes(&nvidia_output)
+    {
+        add_job_info(
+            &mut processes_by_slurm_job_id,
+            user,
+            pid,
+            command,
+            0.0,
+            0,
+            gpu_mask,
+            gpu_percentage,
+            gpu_mem_percentage,
+            gpu_mem_size,
+        );
     }
 
     let mut writer = Writer::from_writer(io::stdout());

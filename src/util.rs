@@ -1,6 +1,7 @@
 use chrono::prelude::{DateTime, Utc};
 
 // Populate a HashMap.
+#[cfg(test)]
 macro_rules! map(
     { $($key:expr => $value:expr),+ } => {
         {
@@ -13,6 +14,7 @@ macro_rules! map(
      };
 );
 
+#[cfg(test)]
 pub(crate) use map;
 
 // Get current time as an ISO time stamp.

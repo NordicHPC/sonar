@@ -1,18 +1,20 @@
+// Run "ps" and return a vector of structures with all the information we need.
+
 use crate::command;
 use crate::util;
+#[cfg(test)]
 use std::collections::HashMap;
-use std::io;
 
-pub struct PsOutput {
-    pid: String,
-    user: String,
-    cpu: f64,
-    mem: f64,
-    size: usize,
-    command: String
+pub struct Process {
+    pub pid: String,
+    pub user: String,
+    pub cpu_pct: f64,
+    pub mem_pct: f64,
+    pub mem_size_kib: usize,
+    pub command: String
 }
 
-pub fn get_process_information(timeout_seconds: u64) -> Vec<PsOutput> {
+pub fn get_process_information(timeout_seconds: u64) -> Vec<Process> {
     if let Some(out) = command::safe_command(PS_COMMAND, timeout_seconds) {
 	parse_ps_output(&out)
     } else {
@@ -23,21 +25,21 @@ pub fn get_process_information(timeout_seconds: u64) -> Vec<PsOutput> {
 const PS_COMMAND: &str =
     "ps -e --no-header -o pid,user:22,pcpu,pmem,size,comm | grep -v ' 0.0  0.0 '";
 
-fn parse_ps_output(raw_text: &str) -> Vec<PsOutput> {
+fn parse_ps_output(raw_text: &str) -> Vec<Process> {
     raw_text
         .lines()
         .map(|line| {
-            let (start_indices, parts) = chunks(line);
-	    PsOutput {
+            let (start_indices, parts) = util::chunks(line);
+	    Process {
 		pid: parts[0].to_string(),
 		user: parts[1].to_string(),
-		cpu: parts[2].parse::<f64>().unwrap(),
-		mem: parts[3].parse::<f64>().unwrap(),
-		size: parts[4].parse::<usize>().unwrap(),
+		cpu_pct: parts[2].parse::<f64>().unwrap(),
+		mem_pct: parts[3].parse::<f64>().unwrap(),
+		mem_size_kib: parts[4].parse::<usize>().unwrap(),
 		// this is done because command can have spaces
 		command: line[start_indices[5]..].to_string()
 	    }})
-	.collect::<Vec<PsOutput>>()
+	.collect::<Vec<Process>>()
 }
 
 #[cfg(test)]
