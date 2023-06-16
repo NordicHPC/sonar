@@ -56,9 +56,9 @@ fn add_job_info(
         });
 }
 
-fn extract_ps_processes(processes: &Vec<process::Process>) -> HashMap<(String, String, String), (f64, f64, usize)> {
+fn extract_ps_processes(processes: &[process::Process]) -> HashMap<(String, String, String), (f64, f64, usize)> {
     processes
-	.into_iter()
+	.iter()
         .map(|process::Process { user, pid, command, cpu_pct, mem_pct, mem_size_kib, ..}| {
             (
                 (user.clone(), pid.clone(), command.clone()),
@@ -94,11 +94,11 @@ fn test_extract_ps_processes() {
     );
 }
 
-fn extract_nvidia_processes(processes: &Vec<nvidia::Process>) -> 
+fn extract_nvidia_processes(processes: &[nvidia::Process]) -> 
     HashMap<(String, String, String), (u32, f64, f64, usize)>
 {
     processes
-	.into_iter()
+	.iter()
 	.map(|nvidia::Process { device, pid, user, gpu_pct, mem_pct, mem_size_kib, command }| {
 	    (
 		(user.clone(), pid.clone(), command.clone()),
