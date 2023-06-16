@@ -1,9 +1,9 @@
 #![allow(clippy::type_complexity)]
 #![allow(clippy::too_many_arguments)]
 
-use crate::command;
 use crate::nvidia;
 use crate::process;
+use crate::jobs;
 use crate::util::{three_places, time_iso8601};
 use std::collections::HashMap;
 extern crate num_cpus;
@@ -22,9 +22,9 @@ struct JobInfo {
 }
 
 fn add_job_info(
-    processes_by_slurm_job_id: &mut HashMap<(String, usize, String), JobInfo>,
+    processes_by_job_id: &mut HashMap<(String, usize, String), JobInfo>,
     user: String,
-    pid: String,
+    job_id: usize,
     command: String,
     cpu_percentage: f64,
     mem_size: usize,
@@ -33,11 +33,8 @@ fn add_job_info(
     gpu_mem_percentage: f64,
     gpu_mem_size: usize,
 ) {
-    let slurm_job_id = get_slurm_job_id(pid).unwrap_or_default();
-    let slurm_job_id_usize = slurm_job_id.trim().parse::<usize>().unwrap_or_default();
-
-    processes_by_slurm_job_id
-        .entry((user, slurm_job_id_usize, command))
+    processes_by_job_id
+        .entry((user, job_id, command))
         .and_modify(|e| {
             e.cpu_percentage += cpu_percentage;
             e.mem_size += mem_size;
@@ -177,7 +174,7 @@ fn test_extract_nvidia_query_processes() {
     );
 }
 
-pub fn create_snapshot(cpu_cutoff_percent: f64, mem_cutoff_percent: f64) {
+pub fn create_snapshot(jobs: &mut dyn jobs::JobManager, cpu_cutoff_percent: f64, mem_cutoff_percent: f64) {
     let timestamp = time_iso8601();
     let hostname = hostname::get().unwrap().into_string().unwrap();
     let num_cores = num_cpus::get();
@@ -186,7 +183,7 @@ pub fn create_snapshot(cpu_cutoff_percent: f64, mem_cutoff_percent: f64) {
     // see also https://doc.rust-lang.org/std/process/index.html
     let timeout_seconds = 2;
 
-    let mut processes_by_slurm_job_id: HashMap<(String, usize, String), JobInfo> = HashMap::new();
+    let mut processes_by_job_id: HashMap<(String, usize, String), JobInfo> = HashMap::new();
     let mut user_by_pid: HashMap<String, String> = HashMap::new();
 
     let ps_output = process::get_process_information(timeout_seconds);
@@ -197,9 +194,9 @@ pub fn create_snapshot(cpu_cutoff_percent: f64, mem_cutoff_percent: f64) {
 
         if (cpu_percentage >= cpu_cutoff_percent) || (mem_percentage >= mem_cutoff_percent) {
             add_job_info(
-                &mut processes_by_slurm_job_id,
+                &mut processes_by_job_id,
                 user,
-                pid,
+                jobs.job_id_from_pid(pid),
                 command,
                 cpu_percentage,
                 mem_size,
@@ -216,9 +213,9 @@ pub fn create_snapshot(cpu_cutoff_percent: f64, mem_cutoff_percent: f64) {
         extract_nvidia_processes(&nvidia_output)
     {
         add_job_info(
-            &mut processes_by_slurm_job_id,
+            &mut processes_by_job_id,
             user,
-            pid,
+            jobs.job_id_from_pid(pid),
             command,
             0.0,
             0,
@@ -231,14 +228,14 @@ pub fn create_snapshot(cpu_cutoff_percent: f64, mem_cutoff_percent: f64) {
 
     let mut writer = Writer::from_writer(io::stdout());
 
-    for ((user, slurm_job_id, command), job_info) in processes_by_slurm_job_id {
+    for ((user, job_id, command), job_info) in processes_by_job_id {
         writer
             .write_record([
                 &timestamp,
                 &hostname,
                 &num_cores.to_string(),
                 &user,
-                &slurm_job_id.to_string(),
+                &job_id.to_string(),
                 &command,
                 &three_places(job_info.cpu_percentage).to_string(),
                 &job_info.mem_size.to_string(),
@@ -255,20 +252,4 @@ pub fn create_snapshot(cpu_cutoff_percent: f64, mem_cutoff_percent: f64) {
     }
 
     writer.flush().unwrap();
-}
-
-fn get_slurm_job_id(pid: String) -> Option<String> {
-    let path = format!("/proc/{}/cgroup", pid);
-
-    if !std::path::Path::new(&path).exists() {
-        return None;
-    }
-
-    let command = format!(
-        "cat /proc/{}/cgroup | grep -oP '(?<=job_).*?(?=/)' | head -n 1",
-        pid
-    );
-    let timeout_seconds = 2;
-
-    command::safe_command(&command, timeout_seconds)
 }
