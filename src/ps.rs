@@ -1,9 +1,9 @@
 #![allow(clippy::type_complexity)]
 #![allow(clippy::too_many_arguments)]
 
+use crate::jobs;
 use crate::nvidia;
 use crate::process;
-use crate::jobs;
 use crate::util::{three_places, time_iso8601};
 use std::collections::HashMap;
 extern crate num_cpus;
@@ -174,7 +174,11 @@ fn test_extract_nvidia_query_processes() {
     );
 }
 
-pub fn create_snapshot(jobs: &mut dyn jobs::JobManager, cpu_cutoff_percent: f64, mem_cutoff_percent: f64) {
+pub fn create_snapshot(
+    jobs: &mut dyn jobs::JobManager,
+    cpu_cutoff_percent: f64,
+    mem_cutoff_percent: f64,
+) {
     let timestamp = time_iso8601();
     let hostname = hostname::get().unwrap().into_string().unwrap();
     let num_cores = num_cpus::get();
