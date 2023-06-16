@@ -36,8 +36,8 @@ fn main() {
             cpu_cutoff_percent,
             mem_cutoff_percent,
         } => {
-	    // TODO: Allow for other types of job managers
-	    let mut jm = slurm::SlurmJobManager {};
+            // TODO: Allow for other types of job managers
+            let mut jm = slurm::SlurmJobManager {};
             ps::create_snapshot(&mut jm, *cpu_cutoff_percent, *mem_cutoff_percent);
         }
         Commands::Analyze {} => {
