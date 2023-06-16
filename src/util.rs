@@ -51,4 +51,3 @@ pub fn chunks(input: &str) -> (Vec<usize>, Vec<&str>) {
 pub fn three_places(n: f64) -> f64 {
     (n * 1000.0).round() / 1000.0
 }
-

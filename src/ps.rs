@@ -2,15 +2,15 @@
 #![allow(clippy::too_many_arguments)]
 
 use crate::command;
-use crate::util::{three_places, time_iso8601};
-use crate::process;
 use crate::nvidia;
+use crate::process;
+use crate::util::{three_places, time_iso8601};
 use std::collections::HashMap;
 extern crate num_cpus;
-use csv::Writer;
-use std::io;
 #[cfg(test)]
 use crate::util::map;
+use csv::Writer;
+use std::io;
 
 struct JobInfo {
     cpu_percentage: f64,
@@ -56,15 +56,27 @@ fn add_job_info(
         });
 }
 
-fn extract_ps_processes(processes: &[process::Process]) -> HashMap<(String, String, String), (f64, f64, usize)> {
+fn extract_ps_processes(
+    processes: &[process::Process],
+) -> HashMap<(String, String, String), (f64, f64, usize)> {
     processes
-	.iter()
-        .map(|process::Process { user, pid, command, cpu_pct, mem_pct, mem_size_kib, ..}| {
-            (
-                (user.clone(), pid.clone(), command.clone()),
-                (*cpu_pct, *mem_pct, *mem_size_kib),
-            )
-        })
+        .iter()
+        .map(
+            |process::Process {
+                 user,
+                 pid,
+                 command,
+                 cpu_pct,
+                 mem_pct,
+                 mem_size_kib,
+                 ..
+             }| {
+                (
+                    (user.clone(), pid.clone(), command.clone()),
+                    (*cpu_pct, *mem_pct, *mem_size_kib),
+                )
+            },
+        )
         .fold(HashMap::new(), |mut acc, (key, value)| {
             if let Some((cpu_pct, mem_pct, mem_size_kib)) = acc.get_mut(&key) {
                 *cpu_pct += value.0;
@@ -94,22 +106,32 @@ fn test_extract_ps_processes() {
     );
 }
 
-fn extract_nvidia_processes(processes: &[nvidia::Process]) -> 
-    HashMap<(String, String, String), (u32, f64, f64, usize)>
-{
+fn extract_nvidia_processes(
+    processes: &[nvidia::Process],
+) -> HashMap<(String, String, String), (u32, f64, f64, usize)> {
     processes
-	.iter()
-	.map(|nvidia::Process { device, pid, user, gpu_pct, mem_pct, mem_size_kib, command }| {
-	    (
-		(user.clone(), pid.clone(), command.clone()),
-		(
-		    if *device >= 0 { 1 << device } else { !0 },
-		    *gpu_pct,
-		    *mem_pct,
-		    *mem_size_kib,
-		),
-	    )
-	})
+        .iter()
+        .map(
+            |nvidia::Process {
+                 device,
+                 pid,
+                 user,
+                 gpu_pct,
+                 mem_pct,
+                 mem_size_kib,
+                 command,
+             }| {
+                (
+                    (user.clone(), pid.clone(), command.clone()),
+                    (
+                        if *device >= 0 { 1 << device } else { !0 },
+                        *gpu_pct,
+                        *mem_pct,
+                        *mem_size_kib,
+                    ),
+                )
+            },
+        )
         .fold(HashMap::new(), |mut acc, (key, value)| {
             if let Some((device, gpu_pct, mem_pct, mem_size)) = acc.get_mut(&key) {
                 *device |= value.0;
@@ -132,19 +154,19 @@ fn test_extract_nvidia_pmon_processes() {
         processes
             == map! {
                 ("bob".to_string(), "447153".to_string(), "python3.9".to_string())
-		    => (0b1, 0.0, 0.0, 7669*1024),
+            => (0b1, 0.0, 0.0, 7669*1024),
                 ("bob".to_string(), "447160".to_string(), "python3.9".to_string())
-		    => (0b1, 0.0, 0.0, 11057*1024),
+            => (0b1, 0.0, 0.0, 11057*1024),
                 ("_zombie_506826".to_string(), "506826".to_string(), "python3.9".to_string())
-		    => (0b1, 0.0, 0.0, 11057*1024),
+            => (0b1, 0.0, 0.0, 11057*1024),
                 ("alice".to_string(), "1864615".to_string(), "python".to_string())
-		    => (0b1111, 40.0, 0.0, (1635+535+535+535)*1024),
+            => (0b1111, 40.0, 0.0, (1635+535+535+535)*1024),
                 ("charlie".to_string(), "2233095".to_string(), "python3".to_string())
-		    => (0b10, 84.0, 23.0, 24395*1024),
+            => (0b10, 84.0, 23.0, 24395*1024),
                 ("_zombie_1448150".to_string(), "1448150".to_string(), "python3".to_string())
-		    => (0b100, 0.0, 0.0, 9383*1024),
+            => (0b100, 0.0, 0.0, 9383*1024),
                 ("charlie".to_string(), "2233469".to_string(), "python3".to_string())
-		    => (0b1000, 90.0, 23.0, 15771*1024)
+            => (0b1000, 90.0, 23.0, 15771*1024)
             }
     );
 }
