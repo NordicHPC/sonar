@@ -41,7 +41,6 @@ fn main() {
             mem_cutoff_percent,
             batchless,
         } => {
-            // TODO: Allow for other types of job managers
             if *batchless {
                 let mut jm = batchless::BatchlessJobManager {};
                 ps::create_snapshot(&mut jm, *cpu_cutoff_percent, *mem_cutoff_percent);
