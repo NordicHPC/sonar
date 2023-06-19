@@ -1,4 +1,6 @@
-// Run nvidia-smi and return a vector of process information.
+// Run nvidia-smi and return a vector of process information.  Note that the information is keyed by
+// (device, pid) so that if a process uses multiple devices, the total utilization for the process
+// must be summed across devices.  (This is the natural mode of output for `nvidia-smi pmon`.)
 
 use crate::command;
 use crate::util;
@@ -14,12 +16,10 @@ pub struct Process {
     pub gpu_pct: f64,        // Percent of GPU, 0.0 for zombies
     pub mem_pct: f64,        // Percent of memory, 0.0 for zombies
     pub mem_size_kib: usize, // Memory use in KiB, _not_ zero for zombies
-    pub command: String,     // The command, _unknown_ for zombies
+    pub command: String,     // The command, _unknown_ for zombies, _noinfo_ if not known
 }
 
-pub fn get_nvidia_information(
-    user_by_pid: &HashMap<usize, String>,
-) -> Vec<Process> {
+pub fn get_nvidia_information(user_by_pid: &HashMap<usize, String>) -> Vec<Process> {
     if let Some(pmon_raw_text) = command::safe_command(NVIDIA_PMON_COMMAND, TIMEOUT_SECONDS) {
         let mut processes = parse_pmon_output(&pmon_raw_text, user_by_pid);
         if let Some(query_raw_text) = command::safe_command(NVIDIA_QUERY_COMMAND, TIMEOUT_SECONDS) {
@@ -31,7 +31,7 @@ pub fn get_nvidia_information(
     }
 }
 
-const TIMEOUT_SECONDS: u64 = 2;	// For `nvidia-smi`
+const TIMEOUT_SECONDS: u64 = 2; // For `nvidia-smi`
 
 // For prototyping purposes (and maybe it's good enough for production?), parse the output of
 // `nvidia-smi pmon`.  This output has a couple of problems:
