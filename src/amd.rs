@@ -38,8 +38,8 @@ pub fn get_amd_information(
 }
 
 fn extract_amd_information(concise_raw_text: &str, showpidgpus_raw_text: &str, user_by_pid: &HashMap<String, String>) -> Vec<nvidia::Process> {
-    let per_device_info = parse_concise_command(&concise_raw_text); // device -> (gpu%, mem%)
-    let per_pid_info = parse_showpidgpus_command(&showpidgpus_raw_text);  // pid -> [device, ...]
+    let per_device_info = parse_concise_command(concise_raw_text); // device -> (gpu%, mem%)
+    let per_pid_info = parse_showpidgpus_command(showpidgpus_raw_text);  // pid -> [device, ...]
     let mut num_processes_per_device = vec![];
     num_processes_per_device.resize(per_device_info.len(), 0);
     per_pid_info.iter().for_each(|(_, devs)| {
@@ -119,7 +119,7 @@ const AMD_CONCISE_COMMAND: &str = "rocm-smi";
 
 // This returns a vector indexed by device number: (gpu%, mem%)
 
-pub fn parse_concise_command<'a>(raw_text: &'a str) -> Vec<(f64, f64)> {
+pub fn parse_concise_command(raw_text: &str) -> Vec<(f64, f64)> {
     let block = find_block(raw_text, "= Concise Info =");
     if block.len() > 1 {
 	let hdr = block[0].split_whitespace().collect::<Vec<&str>>();
@@ -166,7 +166,7 @@ const AMD_SHOWPIDGPUS_COMMAND: &str = "rocm-smi --showpidgpus";
 //
 // The PIDs are unique, ie, the return value is technically a function.
 
-pub fn parse_showpidgpus_command<'a>(raw_text: &'a str) -> Vec<(&'a str, Vec<usize>)> {
+pub fn parse_showpidgpus_command(raw_text: &str) -> Vec<(&str, Vec<usize>)> {
     let block = find_block(raw_text, "= GPUs Indexed by PID =");
     if block.len() == 1 && block[0].starts_with("No KFD PIDs") {
 	// No processes running.
@@ -252,7 +252,7 @@ fn find_block<'a>(raw_text: &'a str, trigger: &str) -> Vec<&'a str> {
 	    i += 1;
 	}
     }
-    return b;
+    b
 }
 
 fn is_terminator(s: &str) -> bool {
