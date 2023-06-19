@@ -23,7 +23,7 @@ use crate::util::map;
 use std::cmp::Ordering;
 use std::collections::HashMap;
 
-pub fn get_amd_information(user_by_pid: &HashMap<String, String>) -> Vec<nvidia::Process> {
+pub fn get_amd_information(user_by_pid: &HashMap<usize, String>) -> Vec<nvidia::Process> {
     if let Some(concise_raw_text) = command::safe_command(AMD_CONCISE_COMMAND, TIMEOUT_SECONDS) {
         if let Some(showpidgpus_raw_text) =
             command::safe_command(AMD_SHOWPIDGPUS_COMMAND, TIMEOUT_SECONDS)
@@ -40,7 +40,7 @@ pub fn get_amd_information(user_by_pid: &HashMap<String, String>) -> Vec<nvidia:
 fn extract_amd_information(
     concise_raw_text: &str,
     showpidgpus_raw_text: &str,
-    user_by_pid: &HashMap<String, String>,
+    user_by_pid: &HashMap<usize, String>,
 ) -> Vec<nvidia::Process> {
     let per_device_info = parse_concise_command(concise_raw_text); // device -> (gpu%, mem%)
     let per_pid_info = parse_showpidgpus_command(showpidgpus_raw_text); // pid -> [device, ...]
@@ -57,11 +57,11 @@ fn extract_amd_information(
         devs.iter().for_each(|dev| {
             processes.push(nvidia::Process {
                 device: *dev as i32,
-                pid: pid.to_string(),
-                user: if let Some(u) = user_by_pid.get(&pid.to_string()) {
+                pid: *pid,
+                user: if let Some(u) = user_by_pid.get(pid) {
                     u.to_string()
                 } else {
-                    "_zombie_".to_owned() + pid
+                    "_zombie_".to_owned() + &pid.to_string()
                 },
                 gpu_pct: per_device_info[*dev].0 / num_processes_per_device[*dev] as f64,
                 mem_pct: per_device_info[*dev].1 / num_processes_per_device[*dev] as f64,
@@ -185,7 +185,7 @@ const AMD_SHOWPIDGPUS_COMMAND: &str = "rocm-smi --showpidgpus";
 //
 // The PIDs are unique, ie, the return value is technically a function.
 
-pub fn parse_showpidgpus_command(raw_text: &str) -> Vec<(&str, Vec<usize>)> {
+pub fn parse_showpidgpus_command(raw_text: &str) -> Vec<(usize, Vec<usize>)> {
     let block = find_block(raw_text, "= GPUs Indexed by PID =");
     if block.len() == 1 && block[0].starts_with("No KFD PIDs") {
         // No processes running.
@@ -196,7 +196,7 @@ pub fn parse_showpidgpus_command(raw_text: &str) -> Vec<(&str, Vec<usize>)> {
         while i < block.len() {
             let xs = block[i].split_whitespace().collect::<Vec<&str>>();
             if xs[0] == "PID" && xs[2] == "is" && xs[3] == "using" && xs[5] == "DRM" {
-                let pid = xs[1];
+                let pid = xs[1].parse::<usize>().unwrap_or_default();
                 let numdev = xs[4].parse::<usize>().unwrap_or_default();
                 let devices = if numdev > 0 {
                     block[i + 1]
