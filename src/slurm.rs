@@ -1,4 +1,4 @@
-// Abstraction of jobs::JobManager for SLURM.
+// Implementation of jobs::JobManager for SLURM.
 
 use crate::command;
 use crate::jobs;
@@ -10,6 +10,10 @@ impl jobs::JobManager for SlurmJobManager {
     fn job_id_from_pid(&mut self, pid: usize, _processes: &[process::Process]) -> usize {
         let slurm_job_id = get_slurm_job_id(pid).unwrap_or_default();
         slurm_job_id.trim().parse::<usize>().unwrap_or_default()
+    }
+
+    fn need_process_tree(&mut self) -> bool {
+        false
     }
 }
 

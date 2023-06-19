@@ -1,6 +1,7 @@
 // Run "ps" and return a vector of structures with all the information we need.
 
 use crate::command;
+use crate::jobs;
 use crate::util;
 
 #[derive(PartialEq)]
@@ -11,11 +12,20 @@ pub struct Process {
     pub mem_pct: f64,
     pub mem_size_kib: usize,
     pub command: String,
+    pub session: String,         // "" if !jobs.need_process_tree()
 }
 
-pub fn get_process_information() -> Vec<Process> {
-    if let Some(out) = command::safe_command(PS_COMMAND, TIMEOUT_SECONDS) {
-        parse_ps_output(&out)
+pub fn get_process_information(jobs: &mut dyn jobs::JobManager) -> Vec<Process> {
+    let need_process_tree = jobs.need_process_tree();
+    if let Some(out) = command::safe_command(
+        if need_process_tree {
+            PS_COMMAND_COMPLETE
+        } else {
+            PS_COMMAND_FILTERED
+        },
+        TIMEOUT_SECONDS,
+    ) {
+        parse_ps_output(&out, need_process_tree)
     } else {
         vec![]
     }
@@ -23,10 +33,12 @@ pub fn get_process_information() -> Vec<Process> {
 
 const TIMEOUT_SECONDS: u64 = 2; // for `ps`
 
-const PS_COMMAND: &str =
+const PS_COMMAND_FILTERED: &str =
     "ps -e --no-header -o pid,user:22,pcpu,pmem,size,comm | grep -v ' 0.0  0.0 '";
 
-fn parse_ps_output(raw_text: &str) -> Vec<Process> {
+const PS_COMMAND_COMPLETE: &str = "ps -e --no-header -o pid,user:22,pcpu,pmem,size,sess,comm";
+
+fn parse_ps_output(raw_text: &str, complete_output: bool) -> Vec<Process> {
     raw_text
         .lines()
         .map(|line| {
@@ -37,15 +49,16 @@ fn parse_ps_output(raw_text: &str) -> Vec<Process> {
                 cpu_pct: parts[2].parse::<f64>().unwrap(),
                 mem_pct: parts[3].parse::<f64>().unwrap(),
                 mem_size_kib: parts[4].parse::<usize>().unwrap(),
+                session: if complete_output { parts[5].to_string() } else { "".to_string() },
                 // this is done because command can have spaces
-                command: line[start_indices[5]..].to_string(),
+                command: line[start_indices[if complete_output { 6 } else { 5 }]..].to_string(),
             }
         })
         .collect::<Vec<Process>>()
 }
 
 #[cfg(test)]
-pub fn parsed_test_output() -> Vec<Process> {
+pub fn parsed_partial_test_output() -> Vec<Process> {
     let text = "   2022 bob                            10.0 20.0 553348 slack
   42178 bob                            10.0 15.0 353348 chromium
   42178 bob                            10.0 15.0  5536 chromium
@@ -54,7 +67,7 @@ pub fn parsed_test_output() -> Vec<Process> {
   42213 alice                          10.0  5.0 348904 some app
   42213 alice                          10.0  5.0 135364 some app";
 
-    parse_ps_output(text)
+    parse_ps_output(text, false)
 }
 
 #[test]
@@ -70,7 +83,7 @@ fn test_parse_ps_output() {
 	    }
 	});
 
-    assert!(parsed_test_output().into_iter().eq(vec![
+    assert!(parsed_partial_test_output().into_iter().eq(vec![
         proc! {  2022, "bob",   10.0, 20.0, 553348, "slack" },
         proc! { 42178, "bob",   10.0, 15.0, 353348, "chromium" },
         proc! { 42178, "bob",   10.0, 15.0,   5536, "chromium" },

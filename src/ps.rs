@@ -88,8 +88,8 @@ fn extract_ps_processes(
 }
 
 #[test]
-fn test_extract_ps_processes() {
-    let ps_output = process::parsed_test_output();
+fn test_extract_partial_ps_processes() {
+    let ps_output = process::parsed_partial_test_output();
     let processes = extract_ps_processes(&ps_output);
 
     assert!(
@@ -211,7 +211,7 @@ pub fn create_snapshot(
     let mut processes_by_job_id: HashMap<(String, usize, String), JobInfo> = HashMap::new();
     let mut user_by_pid: HashMap<usize, String> = HashMap::new();
 
-    let ps_output = process::get_process_information();
+    let ps_output = process::get_process_information(jobs);
     for ((user, pid, command), (cpu_percentage, mem_percentage, mem_size)) in
         extract_ps_processes(&ps_output)
     {
