@@ -1,6 +1,7 @@
 #![allow(clippy::type_complexity)]
 #![allow(clippy::too_many_arguments)]
 
+use crate::amd;
 use crate::jobs;
 use crate::nvidia;
 use crate::process;
@@ -142,6 +143,30 @@ fn extract_nvidia_processes(
         })
 }
 
+fn add_gpu_info(
+    jobs: &mut dyn jobs::JobManager,
+    processes_by_job_id: &mut HashMap<(String, usize, String), JobInfo>,
+    ps_output: &[process::Process],
+    gpu_output: Vec<nvidia::Process>,
+) {
+    for ((user, pid, command), (gpu_mask, gpu_percentage, gpu_mem_percentage, gpu_mem_size)) in
+        extract_nvidia_processes(&gpu_output)
+    {
+        add_job_info(
+            processes_by_job_id,
+            user,
+            jobs.job_id_from_pid(pid, ps_output),
+            command,
+            0.0,
+            0,
+            gpu_mask,
+            gpu_percentage,
+            gpu_mem_percentage,
+            gpu_mem_size,
+        );
+    }
+}
+
 #[test]
 fn test_extract_nvidia_pmon_processes() {
     let ps_output = nvidia::parsed_pmon_output();
@@ -208,23 +233,8 @@ pub fn create_snapshot(
         }
     }
 
-    let nvidia_output = nvidia::get_nvidia_information(&user_by_pid);
-    for ((user, pid, command), (gpu_mask, gpu_percentage, gpu_mem_percentage, gpu_mem_size)) in
-        extract_nvidia_processes(&nvidia_output)
-    {
-        add_job_info(
-            &mut processes_by_job_id,
-            user,
-            jobs.job_id_from_pid(pid, &ps_output),
-            command,
-            0.0,
-            0,
-            gpu_mask,
-            gpu_percentage,
-            gpu_mem_percentage,
-            gpu_mem_size,
-        );
-    }
+    add_gpu_info(jobs, &mut processes_by_job_id, &ps_output, nvidia::get_nvidia_information(&user_by_pid));
+    add_gpu_info(jobs, &mut processes_by_job_id, &ps_output, amd::get_amd_information(&user_by_pid));
 
     let mut writer = Writer::from_writer(io::stdout());
 
