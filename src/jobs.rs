@@ -4,5 +4,5 @@
 use crate::process;
 
 pub trait JobManager {
-    fn job_id_from_pid(&mut self, pid: String, processes: &[process::Process]) -> usize;
+    fn job_id_from_pid(&mut self, pid: usize, processes: &[process::Process]) -> usize;
 }

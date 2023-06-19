@@ -9,7 +9,7 @@ use std::collections::HashMap;
 #[derive(PartialEq)]
 pub struct Process {
     pub device: i32,         // -1 for "unknown", otherwise 0..num_devices-1
-    pub pid: String,         // Process ID
+    pub pid: usize,          // Process ID
     pub user: String,        // User name, _zombie_PID for zombies
     pub gpu_pct: f64,        // Percent of GPU, 0.0 for zombies
     pub mem_pct: f64,        // Percent of memory, 0.0 for zombies
@@ -18,7 +18,7 @@ pub struct Process {
 }
 
 pub fn get_nvidia_information(
-    user_by_pid: &HashMap<String, String>,
+    user_by_pid: &HashMap<usize, String>,
 ) -> Vec<Process> {
     if let Some(pmon_raw_text) = command::safe_command(NVIDIA_PMON_COMMAND, TIMEOUT_SECONDS) {
         let mut processes = parse_pmon_output(&pmon_raw_text, user_by_pid);
@@ -51,7 +51,7 @@ const NVIDIA_PMON_COMMAND: &str = "nvidia-smi pmon -c 1 -s mu";
 // GPU devices used by that process.  For a system with 8 cards, utilization
 // can reach 800% and the memory size can reach the sum of the memories on the cards.
 
-fn parse_pmon_output(raw_text: &str, user_by_pid: &HashMap<String, String>) -> Vec<Process> {
+fn parse_pmon_output(raw_text: &str, user_by_pid: &HashMap<usize, String>) -> Vec<Process> {
     raw_text
         .lines()
         .filter(|line| !line.starts_with('#'))
@@ -65,24 +65,26 @@ fn parse_pmon_output(raw_text: &str, user_by_pid: &HashMap<String, String>) -> V
             // For nvidia-smi, we use the first word because the command produces blank-padded
             // output.  We can maybe do better by considering non-empty words.
             let command = parts[8].to_string();
-            let user = match user_by_pid.get(pid) {
-                Some(name) => name.clone(),
-                None => "_zombie_".to_owned() + pid,
-            };
-            (pid, device, user, mem_size, gpu_pct, mem_pct, command)
+            (pid, device, mem_size, gpu_pct, mem_pct, command)
         })
         .filter(|(pid, ..)| *pid != "-")
         .map(
-            |(pid, device, user, mem_size, gpu_pct, mem_pct, command)| Process {
+            |(pid_str, device, mem_size, gpu_pct, mem_pct, command)| {
+                let pid = pid_str.parse::<usize>().unwrap();
+                let user = match user_by_pid.get(&pid) {
+                    Some(name) => name.clone(),
+                    None => "_zombie_".to_owned() + pid_str,
+                };
+                Process {
                 device,
-                pid: pid.to_string(),
+                pid,
                 user,
                 gpu_pct,
                 mem_pct,
                 mem_size_kib: mem_size * 1024,
                 command,
-            },
-        )
+                }
+            })
         .collect::<Vec<Process>>()
 }
 
@@ -95,16 +97,17 @@ const NVIDIA_QUERY_COMMAND: &str =
 // Same signature as extract_nvidia_pmon_processes(), q.v. but user is always "_zombie_" and command
 // is always "_unknown_".  Only pids not in user_by_pid are returned.
 
-fn parse_query_output(raw_text: &str, user_by_pid: &HashMap<String, String>) -> Vec<Process> {
+fn parse_query_output(raw_text: &str, user_by_pid: &HashMap<usize, String>) -> Vec<Process> {
     raw_text
         .lines()
         .map(|line| {
             let (_start_indices, parts) = util::chunks(line);
-            let pid = parts[0].strip_suffix(',').unwrap();
+            let pid_str = parts[0].strip_suffix(',').unwrap();
+            let pid = pid_str.parse::<usize>().unwrap();
             let mem_usage = parts[1].parse::<usize>().unwrap();
-            let user = "_zombie_".to_owned() + pid;
+            let user = "_zombie_".to_owned() + pid_str;
             let command = "_unknown_";
-            (pid.to_string(), user, command.to_string(), mem_usage * 1024)
+            (pid, user, command.to_string(), mem_usage * 1024)
         })
         .filter(|(pid, ..)| !user_by_pid.contains_key(pid))
         .map(|(pid, user, command, mem_size_kib)| Process {
@@ -120,13 +123,13 @@ fn parse_query_output(raw_text: &str, user_by_pid: &HashMap<String, String>) -> 
 }
 
 #[cfg(test)]
-fn mkusers() -> HashMap<String, String> {
+fn mkusers() -> HashMap<usize, String> {
     map! {
-        "447153".to_string() => "bob".to_string(),
-        "447160".to_string() => "bob".to_string(),
-        "1864615".to_string() => "alice".to_string(),
-        "2233095".to_string() => "charlie".to_string(),
-        "2233469".to_string() => "charlie".to_string()
+        447153 => "bob".to_string(),
+        447160 => "bob".to_string(),
+        1864615 => "alice".to_string(),
+        2233095 => "charlie".to_string(),
+        2233469 => "charlie".to_string()
     }
 }
 
@@ -154,7 +157,7 @@ pub fn parsed_pmon_output() -> Vec<Process> {
 macro_rules! proc(
     { $a:expr, $b:expr, $c:expr, $d:expr, $e: expr, $f:expr, $g:expr } => {
 	Process { device: $a,
-		  pid: $b.to_string(),
+		  pid: $b,
 		  user: $c.to_string(),
 		  gpu_pct: $d,
 		  mem_pct: $e,
@@ -166,16 +169,16 @@ macro_rules! proc(
 #[test]
 fn test_parse_pmon_output() {
     assert!(parsed_pmon_output().into_iter().eq(vec![
-        proc! { 0,  "447153", "bob",             0.0,  0.0,  7669 * 1024, "python3.9" },
-        proc! { 0,  "447160", "bob",             0.0,  0.0, 11057 * 1024, "python3.9" },
-        proc! { 0,  "506826", "_zombie_506826",  0.0,  0.0, 11057 * 1024, "python3.9" },
-        proc! { 0, "1864615", "alice",          40.0,  0.0,  1635 * 1024, "python" },
-        proc! { 1, "1864615", "alice",           0.0,  0.0,   535 * 1024, "python" },
-        proc! { 1, "2233095", "charlie",        84.0, 23.0, 24395 * 1024, "python3" },
-        proc! { 2, "1864615", "alice",           0.0,  0.0,   535 * 1024, "python" },
-        proc! { 2, "1448150", "_zombie_1448150", 0.0,  0.0,  9383 * 1024, "python3"},
-        proc! { 3, "1864615", "alice",           0.0,  0.0,   535 * 1024, "python" },
-        proc! { 3, "2233469", "charlie",        90.0, 23.0, 15771 * 1024, "python3" }
+        proc! { 0,  447153, "bob",             0.0,  0.0,  7669 * 1024, "python3.9" },
+        proc! { 0,  447160, "bob",             0.0,  0.0, 11057 * 1024, "python3.9" },
+        proc! { 0,  506826, "_zombie_506826",  0.0,  0.0, 11057 * 1024, "python3.9" },
+        proc! { 0, 1864615, "alice",          40.0,  0.0,  1635 * 1024, "python" },
+        proc! { 1, 1864615, "alice",           0.0,  0.0,   535 * 1024, "python" },
+        proc! { 1, 2233095, "charlie",        84.0, 23.0, 24395 * 1024, "python3" },
+        proc! { 2, 1864615, "alice",           0.0,  0.0,   535 * 1024, "python" },
+        proc! { 2, 1448150, "_zombie_1448150", 0.0,  0.0,  9383 * 1024, "python3"},
+        proc! { 3, 1864615, "alice",           0.0,  0.0,   535 * 1024, "python" },
+        proc! { 3, 2233469, "charlie",        90.0, 23.0, 15771 * 1024, "python3" }
     ]))
 }
 
@@ -190,6 +193,6 @@ pub fn parsed_query_output() -> Vec<Process> {
 #[test]
 fn test_parse_query_output() {
     assert!(parsed_query_output().into_iter().eq(vec![
-        proc! { !0, "3079002", "_zombie_3079002", 0.0, 0.0, 2350 * 1024, "_unknown_" }
+        proc! { !0, 3079002, "_zombie_3079002", 0.0, 0.0, 2350 * 1024, "_unknown_" }
     ]))
 }
