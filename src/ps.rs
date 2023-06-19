@@ -1,6 +1,7 @@
 #![allow(clippy::type_complexity)]
 #![allow(clippy::too_many_arguments)]
 
+use crate::amd;
 use crate::command;
 use crate::nvidia;
 use crate::process;
@@ -145,6 +146,26 @@ fn extract_nvidia_processes(
         })
 }
 
+fn add_gpu_info(processes_by_slurm_job_id: &mut HashMap<(String, usize, String), JobInfo>,
+		gpu_output: Vec<nvidia::Process>) {
+    for ((user, pid, command), (gpu_mask, gpu_percentage, gpu_mem_percentage, gpu_mem_size)) in
+        extract_nvidia_processes(&gpu_output)
+    {
+        add_job_info(
+            processes_by_slurm_job_id,
+            user,
+            pid,
+            command,
+            0.0,
+            0,
+            gpu_mask,
+            gpu_percentage,
+            gpu_mem_percentage,
+            gpu_mem_size,
+        );
+    }
+}
+
 #[test]
 fn test_extract_nvidia_pmon_processes() {
     let ps_output = nvidia::parsed_pmon_output();
@@ -211,23 +232,8 @@ pub fn create_snapshot(cpu_cutoff_percent: f64, mem_cutoff_percent: f64) {
         }
     }
 
-    let nvidia_output = nvidia::get_nvidia_information(timeout_seconds, &user_by_pid);
-    for ((user, pid, command), (gpu_mask, gpu_percentage, gpu_mem_percentage, gpu_mem_size)) in
-        extract_nvidia_processes(&nvidia_output)
-    {
-        add_job_info(
-            &mut processes_by_slurm_job_id,
-            user,
-            pid,
-            command,
-            0.0,
-            0,
-            gpu_mask,
-            gpu_percentage,
-            gpu_mem_percentage,
-            gpu_mem_size,
-        );
-    }
+    add_gpu_info(&mut processes_by_slurm_job_id, nvidia::get_nvidia_information(timeout_seconds, &user_by_pid));
+    add_gpu_info(&mut processes_by_slurm_job_id, amd::get_amd_information(&user_by_pid));
 
     let mut writer = Writer::from_writer(io::stdout());
 

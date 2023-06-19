@@ -1,4 +1,6 @@
-// Run nvidia-smi and return a vector of process information.
+// Run nvidia-smi and return a vector of process information.  Note that the information is keyed by
+// (device, pid) so that if a process uses multiple devices, the total utilization for the process
+// must be summed across devices.  (This is the natural mode of output for `nvidia-smi pmon`.)
 
 use crate::command;
 use crate::util;
@@ -14,7 +16,7 @@ pub struct Process {
     pub gpu_pct: f64,        // Percent of GPU, 0.0 for zombies
     pub mem_pct: f64,        // Percent of memory, 0.0 for zombies
     pub mem_size_kib: usize, // Memory use in KiB, _not_ zero for zombies
-    pub command: String,     // The command, _unknown_ for zombies
+    pub command: String,     // The command, _unknown_ for zombies, _noinfo_ if not known
 }
 
 pub fn get_nvidia_information(
