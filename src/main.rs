@@ -1,5 +1,7 @@
 use clap::{Parser, Subcommand};
 
+mod amd;
+mod batchless;
 mod command;
 mod jobs;
 mod nvidia;
