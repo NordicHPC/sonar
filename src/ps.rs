@@ -233,8 +233,18 @@ pub fn create_snapshot(
         }
     }
 
-    add_gpu_info(jobs, &mut processes_by_job_id, &ps_output, nvidia::get_nvidia_information(&user_by_pid));
-    add_gpu_info(jobs, &mut processes_by_job_id, &ps_output, amd::get_amd_information(&user_by_pid));
+    add_gpu_info(
+        jobs,
+        &mut processes_by_job_id,
+        &ps_output,
+        nvidia::get_nvidia_information(&user_by_pid),
+    );
+    add_gpu_info(
+        jobs,
+        &mut processes_by_job_id,
+        &ps_output,
+        amd::get_amd_information(&user_by_pid),
+    );
 
     let mut writer = Writer::from_writer(io::stdout());
 

@@ -19,9 +19,7 @@ pub struct Process {
     pub command: String,     // The command, _unknown_ for zombies, _noinfo_ if not known
 }
 
-pub fn get_nvidia_information(
-    user_by_pid: &HashMap<String, String>,
-) -> Vec<Process> {
+pub fn get_nvidia_information(user_by_pid: &HashMap<String, String>) -> Vec<Process> {
     if let Some(pmon_raw_text) = command::safe_command(NVIDIA_PMON_COMMAND, TIMEOUT_SECONDS) {
         let mut processes = parse_pmon_output(&pmon_raw_text, user_by_pid);
         if let Some(query_raw_text) = command::safe_command(NVIDIA_QUERY_COMMAND, TIMEOUT_SECONDS) {
@@ -33,7 +31,7 @@ pub fn get_nvidia_information(
     }
 }
 
-const TIMEOUT_SECONDS: u64 = 2;	// For `nvidia-smi`
+const TIMEOUT_SECONDS: u64 = 2; // For `nvidia-smi`
 
 // For prototyping purposes (and maybe it's good enough for production?), parse the output of
 // `nvidia-smi pmon`.  This output has a couple of problems:
