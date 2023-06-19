@@ -16,51 +16,55 @@ use crate::jobs;
 use crate::process;
 
 pub struct BatchlessJobManager {
-    
 }
 
 impl BatchlessJobManager {
-
-    fn maybe_init(&mut self, processes: &[process::Process]) {
-        
-    }
-
-    fn lookup(&mut self, processes: &[process::Process], pid: &String) -> Option<process::Process> {
-        None
+    fn lookup<'a>(&self, processes: &'a [process::Process], pid: usize) -> Option<&'a process::Process> {
+        // Sequential search may be too slow in practice
+        let mut i = 0;
+        while i < processes.len() {
+            if processes[i].pid == pid {
+                return Some(&processes[i])
+            }
+            i += 1
+        }
+        return None
     }
 }
 
 impl jobs::JobManager for BatchlessJobManager {
     fn job_id_from_pid(&mut self, pid: usize, processes: &[process::Process]) -> usize {
-/*
-        self.maybe_init(processes);
-        if let Some(proc) = lookup(processes, &pid) {
-            if proc.session == "0" {
-                proc.session
-            } else if proc.session == pid {
-                pid
-            } else {
-                loop {
-                    if let Some(parent) = lookup(processes, &proc.session) {
-                        if parent.session == parent.pid {
-                            break pid
-                        } else {
-                            pid = parent.pid;
-                            proc = parent
-                        }
-                    } else {
-                        break pid
-                    }
-                }
-            }
+        let mut probe = self.lookup(processes, pid);
+        if probe.is_none() {
+            // Lost process is job 0
+            0
         } else {
-            "0".to_string()
-        }.parse::<usize>().unwrap()
-*/
-        0
+            loop {
+                let proc = probe.unwrap();
+                if proc.session == 0 {
+                    // System process is its own job
+                    break proc.session
+                }
+                if proc.session == pid {
+                    // Session leader is its own job
+                    break proc.session
+                }
+                let probe_parent = self.lookup(processes, proc.ppid);
+                if probe_parent.is_none() {
+                    // Orphaned subprocess is its own job
+                    break proc.session
+                }
+                let parent = probe_parent.unwrap();
+                if parent.pid == parent.session {
+                    // Parent process is session leader, so this process is the job root
+                    break proc.pid
+                }
+                probe = probe_parent
+            }
+        }
     }
-
-    fn need_process_tree(&mut self) -> bool {
+    
+    fn need_process_tree(&self) -> bool {
         true
     }
 }

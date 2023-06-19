@@ -5,5 +5,5 @@ use crate::process;
 
 pub trait JobManager {
     fn job_id_from_pid(&mut self, pid: usize, processes: &[process::Process]) -> usize;
-    fn need_process_tree(&mut self) -> bool;
+    fn need_process_tree(&self) -> bool;
 }

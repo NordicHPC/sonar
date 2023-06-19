@@ -12,7 +12,8 @@ pub struct Process {
     pub mem_pct: f64,
     pub mem_size_kib: usize,
     pub command: String,
-    pub session: String,         // "" if !jobs.need_process_tree()
+    pub ppid: usize,            // 0 if !jobs.need_process_tree()
+    pub session: usize,         // 0 if !jobs.need_process_tree()
 }
 
 pub fn get_process_information(jobs: &mut dyn jobs::JobManager) -> Vec<Process> {
@@ -36,7 +37,7 @@ const TIMEOUT_SECONDS: u64 = 2; // for `ps`
 const PS_COMMAND_FILTERED: &str =
     "ps -e --no-header -o pid,user:22,pcpu,pmem,size,comm | grep -v ' 0.0  0.0 '";
 
-const PS_COMMAND_COMPLETE: &str = "ps -e --no-header -o pid,user:22,pcpu,pmem,size,sess,comm";
+const PS_COMMAND_COMPLETE: &str = "ps -e --no-header -o pid,user:22,pcpu,pmem,size,ppid,sess,comm";
 
 fn parse_ps_output(raw_text: &str, complete_output: bool) -> Vec<Process> {
     raw_text
@@ -49,9 +50,10 @@ fn parse_ps_output(raw_text: &str, complete_output: bool) -> Vec<Process> {
                 cpu_pct: parts[2].parse::<f64>().unwrap(),
                 mem_pct: parts[3].parse::<f64>().unwrap(),
                 mem_size_kib: parts[4].parse::<usize>().unwrap(),
-                session: if complete_output { parts[5].to_string() } else { "".to_string() },
+                ppid: if complete_output { parts[5].to_string().parse::<usize>().unwrap() } else { 0 },
+                session: if complete_output { parts[6].to_string().parse::<usize>().unwrap() } else { 0 },
                 // this is done because command can have spaces
-                command: line[start_indices[if complete_output { 6 } else { 5 }]..].to_string(),
+                command: line[start_indices[if complete_output { 7 } else { 5 }]..].to_string(),
             }
         })
         .collect::<Vec<Process>>()
@@ -79,7 +81,9 @@ fn test_parse_ps_output() {
 		      cpu_pct: $c,
 		      mem_pct: $d,
 		      mem_size_kib: $e,
-		      command: $f.to_string()
+		      command: $f.to_string(),
+                      ppid: 0,
+                      session: 0,
 	    }
 	});
 

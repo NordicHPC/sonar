@@ -12,7 +12,7 @@ impl jobs::JobManager for SlurmJobManager {
         slurm_job_id.trim().parse::<usize>().unwrap_or_default()
     }
 
-    fn need_process_tree(&mut self) -> bool {
+    fn need_process_tree(&self) -> bool {
         false
     }
 }
