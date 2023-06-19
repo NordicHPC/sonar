@@ -55,7 +55,7 @@ fn add_job_info(
 
 fn extract_ps_processes(
     processes: &[process::Process],
-) -> HashMap<(String, String, String), (f64, f64, usize)> {
+) -> HashMap<(String, usize, String), (f64, f64, usize)> {
     processes
         .iter()
         .map(
@@ -69,7 +69,7 @@ fn extract_ps_processes(
                  ..
              }| {
                 (
-                    (user.clone(), pid.clone(), command.clone()),
+                    (user.clone(), *pid, command.clone()),
                     (*cpu_pct, *mem_pct, *mem_size_kib),
                 )
             },
@@ -94,18 +94,18 @@ fn test_extract_ps_processes() {
     assert!(
         processes
             == map! {
-                ("bob".to_string(), "2022".to_string(), "slack".to_string()) => (10.0, 20.0, 553348),
-                ("bob".to_string(), "42178".to_string(), "chromium".to_string()) => (20.0, 30.0, 358884),
-                ("alice".to_string(), "42189".to_string(), "slack".to_string()) => (10.0, 5.0, 5528),
-                ("bob".to_string(), "42191".to_string(), "someapp".to_string()) => (10.0, 5.0, 5552),
-                ("alice".to_string(), "42213".to_string(), "some app".to_string()) => (20.0, 10.0, 484268)
+                ("bob".to_string(), 2022, "slack".to_string()) => (10.0, 20.0, 553348),
+                ("bob".to_string(), 42178, "chromium".to_string()) => (20.0, 30.0, 358884),
+                ("alice".to_string(), 42189, "slack".to_string()) => (10.0, 5.0, 5528),
+                ("bob".to_string(), 42191, "someapp".to_string()) => (10.0, 5.0, 5552),
+                ("alice".to_string(), 42213, "some app".to_string()) => (20.0, 10.0, 484268)
             }
     );
 }
 
 fn extract_nvidia_processes(
     processes: &[nvidia::Process],
-) -> HashMap<(String, String, String), (u32, f64, f64, usize)> {
+) -> HashMap<(String, usize, String), (u32, f64, f64, usize)> {
     processes
         .iter()
         .map(
@@ -119,7 +119,7 @@ fn extract_nvidia_processes(
                  command,
              }| {
                 (
-                    (user.clone(), pid.clone(), command.clone()),
+                    (user.clone(), *pid, command.clone()),
                     (
                         if *device >= 0 { 1 << device } else { !0 },
                         *gpu_pct,
@@ -150,13 +150,13 @@ fn test_extract_nvidia_pmon_processes() {
     assert!(
         processes
             == map! {
-                ("bob".to_string(), "447153".to_string(), "python3.9".to_string())            => (0b1, 0.0, 0.0, 7669*1024),
-                ("bob".to_string(), "447160".to_string(), "python3.9".to_string())            => (0b1, 0.0, 0.0, 11057*1024),
-                ("_zombie_506826".to_string(), "506826".to_string(), "python3.9".to_string()) => (0b1, 0.0, 0.0, 11057*1024),
-                ("alice".to_string(), "1864615".to_string(), "python".to_string())            => (0b1111, 40.0, 0.0, (1635+535+535+535)*1024),
-                ("charlie".to_string(), "2233095".to_string(), "python3".to_string())         => (0b10, 84.0, 23.0, 24395*1024),
-                ("_zombie_1448150".to_string(), "1448150".to_string(), "python3".to_string()) => (0b100, 0.0, 0.0, 9383*1024),
-                ("charlie".to_string(), "2233469".to_string(), "python3".to_string())         => (0b1000, 90.0, 23.0, 15771*1024)
+                ("bob".to_string(), 447153, "python3.9".to_string())            => (0b1, 0.0, 0.0, 7669*1024),
+                ("bob".to_string(), 447160, "python3.9".to_string())            => (0b1, 0.0, 0.0, 11057*1024),
+                ("_zombie_506826".to_string(), 506826, "python3.9".to_string()) => (0b1, 0.0, 0.0, 11057*1024),
+                ("alice".to_string(), 1864615, "python".to_string())            => (0b1111, 40.0, 0.0, (1635+535+535+535)*1024),
+                ("charlie".to_string(), 2233095, "python3".to_string())         => (0b10, 84.0, 23.0, 24395*1024),
+                ("_zombie_1448150".to_string(), 1448150, "python3".to_string()) => (0b100, 0.0, 0.0, 9383*1024),
+                ("charlie".to_string(), 2233469, "python3".to_string())         => (0b1000, 90.0, 23.0, 15771*1024)
             }
     );
 }
@@ -169,7 +169,7 @@ fn test_extract_nvidia_query_processes() {
     assert!(
         processes
             == map! {
-                ("_zombie_3079002".to_string(), "3079002".to_string(), "_unknown_".to_string()) => (!0, 0.0, 0.0, 2350*1024)
+                ("_zombie_3079002".to_string(), 3079002, "_unknown_".to_string()) => (!0, 0.0, 0.0, 2350*1024)
             }
     );
 }
@@ -184,13 +184,13 @@ pub fn create_snapshot(
     let num_cores = num_cpus::get();
 
     let mut processes_by_job_id: HashMap<(String, usize, String), JobInfo> = HashMap::new();
-    let mut user_by_pid: HashMap<String, String> = HashMap::new();
+    let mut user_by_pid: HashMap<usize, String> = HashMap::new();
 
     let ps_output = process::get_process_information();
     for ((user, pid, command), (cpu_percentage, mem_percentage, mem_size)) in
         extract_ps_processes(&ps_output)
     {
-        user_by_pid.insert(pid.clone(), user.clone());
+        user_by_pid.insert(pid, user.clone());
 
         if (cpu_percentage >= cpu_cutoff_percent) || (mem_percentage >= mem_cutoff_percent) {
             add_job_info(
