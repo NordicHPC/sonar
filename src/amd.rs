@@ -85,7 +85,7 @@ fn extract_amd_information(
 macro_rules! proc(
     { $a:expr, $b:expr, $c:expr, $d:expr, $e: expr } => {
 	nvidia::Process { device: $a,
-			  pid: $b.to_string(),
+			  pid: $b,
 			  user: $c.to_string(),
 			  gpu_pct: $d,
 			  mem_pct: $e,
@@ -112,13 +112,13 @@ PID 28154 is using 1 DRM device(s):
 ================================================================================
 ";
     let users = map! {
-    "28156".to_string() => "bob".to_string()
+    28156 => "bob".to_string()
     };
     let zs = extract_amd_information(concise, pidgpu, &users);
     assert!(zs.eq(&vec![
-        proc! { 0, "28154", "_zombie_28154", 99.0/2.0, 57.0/2.0 },
-        proc! { 0, "28156", "bob", 99.0/2.0, 57.0/2.0 },
-        proc! { 1, "28156", "bob", 63.0, 5.0 },
+        proc! { 0, 28154, "_zombie_28154", 99.0/2.0, 57.0/2.0 },
+        proc! { 0, 28156, "bob", 99.0/2.0, 57.0/2.0 },
+        proc! { 1, 28156, "bob", 63.0, 5.0 },
     ]));
 }
 
@@ -229,7 +229,7 @@ PID 25774 is using 1 DRM device(s):
 ================================================================================
 ",
     );
-    assert!(xs.eq(&vec![("25774", vec![0])]));
+    assert!(xs.eq(&vec![(25774, vec![0])]));
     let xs = parse_showpidgpus_command(
         "
 ============================= GPUs Indexed by PID ==============================
@@ -249,7 +249,7 @@ PID 28154 is using 1 DRM device(s):
 ================================================================================
 ",
     );
-    assert!(xs.eq(&vec![("28156", vec![1]), ("28154", vec![0])]));
+    assert!(xs.eq(&vec![(28156, vec![1]), (28154, vec![0])]));
     let xs = parse_showpidgpus_command(
         "
 ============================= GPUs Indexed by PID ==============================
@@ -258,7 +258,7 @@ PID 29212 is using 2 DRM device(s):
 ================================================================================
 ",
     );
-    assert!(xs.eq(&vec![("29212", vec![0, 1])]));
+    assert!(xs.eq(&vec![(29212, vec![0, 1])]));
 }
 
 // Grab the first block of rocm-smi output we see that contains the trigger string, and return the
