@@ -104,13 +104,13 @@ impl jobs::JobManager for BatchlessJobManager {
 fn test_batchless_jobs() {
     let mut jm = BatchlessJobManager::new();
     let procs = process::parsed_full_test_output();
-    assert!(jm.job_id_from_pid(82554, &procs) == 82329); // firefox subprocess -> firefox, b/c firefox is session leader
+    assert!(jm.job_id_from_pid(82554, &procs) == 82329); // firefox subprocess -> firefox, b/c firefox is below session leader
     assert!(jm.job_id_from_pid(82329, &procs) == 82329); // firefox -> firefox
     assert!(jm.job_id_from_pid(1, &procs) == 1); // init
     assert!(jm.job_id_from_pid(1805, &procs) == 1805); // sd-pam -> sd-pam, b/c 1804 is session leader
     assert!(jm.job_id_from_pid(232, &procs) == 0); // session 0
     assert!(jm.job_id_from_pid(74536, &procs) == 74536); // shell
-    assert!(jm.job_id_from_pid(2305, &procs) == 2225); // ibus-extension- -> ibus-daemon
+    assert!(jm.job_id_from_pid(2305, &procs) == 2225); // ibus-extension- -> ibus-daemon, b/c ibus-daemon is below session leader
     assert!(jm.job_id_from_pid(200, &procs) == 0); // lost process
     assert!(jm.job_id_from_pid(80199, &procs) == 1823); // lost parent process
 }
