@@ -42,7 +42,7 @@ fn main() {
             batchless,
         } => {
             if *batchless {
-                let mut jm = batchless::BatchlessJobManager {};
+                let mut jm = batchless::new();
                 ps::create_snapshot(&mut jm, *cpu_cutoff_percent, *mem_cutoff_percent);
             } else {
                 let mut jm = slurm::SlurmJobManager {};

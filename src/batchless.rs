@@ -23,23 +23,38 @@
 
 use crate::jobs;
 use crate::process;
+use std::collections::HashMap;
 
 pub struct BatchlessJobManager {
+    // Process tables can be large and searching them sequentially for every lookup will be slow, so
+    // add a cache.  Various structures could work.  Here a hashmap maps pid -> (session, ppid).
+    cache: HashMap<usize, (usize, usize)>
+}
+
+pub fn new() -> BatchlessJobManager {
+    BatchlessJobManager {
+        cache: HashMap::new()
+    }
 }
 
 impl BatchlessJobManager {
-    // TODO: Sequential search may be too slow in practice, we're going to be searching the table a
-    // lot.  Sensibly it can be sorted once and binary-searched, or it can be converted to a hash
-    // table, probably lazily.
-    fn lookup<'a>(&self, processes: &'a [process::Process], pid: usize) -> Option<&'a process::Process> {
+    fn lookup(&mut self, processes: &[process::Process], pid: usize) -> Option<(usize, usize)> {
+        let probe = self.cache.get(&pid);
+        if probe.is_some() {
+            return probe.copied();
+        }
+
         let mut i = 0;
         while i < processes.len() {
             if processes[i].pid == pid {
-                return Some(&processes[i])
+                let entry = (processes[i].session, processes[i].ppid);
+                self.cache.insert(pid, entry);
+                return Some(entry);
             }
             i += 1
         }
-        return None
+
+        None
     }
 }
 
@@ -51,24 +66,24 @@ impl jobs::JobManager for BatchlessJobManager {
             0
         } else {
             loop {
-                let proc = probe.unwrap();
-                if proc.session == 0 {
+                let (proc_session, proc_ppid) = probe.unwrap();
+                if proc_session == 0 {
                     // System process is its own job
-                    break proc.session
+                    break proc_session
                 }
-                if proc.session == pid {
+                if proc_session == pid {
                     // Session leader is its own job
-                    break proc.session
+                    break proc_session
                 }
-                let probe_parent = self.lookup(processes, proc.ppid);
+                let probe_parent = self.lookup(processes, proc_ppid);
                 if probe_parent.is_none() {
                     // Orphaned subprocess is its own job
-                    break proc.session
+                    break proc_session
                 }
-                let parent = probe_parent.unwrap();
-                if parent.pid == parent.session {
+                let (parent_session, _parent_ppid) = probe_parent.unwrap();
+                if proc_ppid == parent_session {
                     // Parent process is session leader, so this process is the job root
-                    break proc.pid
+                    break pid
                 }
                 probe = probe_parent
             }
