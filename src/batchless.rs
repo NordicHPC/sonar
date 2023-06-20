@@ -22,18 +22,22 @@
 // (Also this puts some more pressure on the reused-PID problem.)
 
 use crate::jobs;
+#[cfg(test)]
+use crate::jobs::JobManager;
 use crate::process;
 use std::collections::HashMap;
 
 pub struct BatchlessJobManager {
     // Process tables can be large and searching them sequentially for every lookup will be slow, so
     // add a cache.  Various structures could work.  Here a hashmap maps pid -> (session, ppid).
-    cache: HashMap<usize, (usize, usize)>
+    cache: HashMap<usize, (usize, usize)>,
 }
 
-pub fn new() -> BatchlessJobManager {
-    BatchlessJobManager {
-        cache: HashMap::new()
+impl BatchlessJobManager {
+    pub fn new() -> BatchlessJobManager {
+        BatchlessJobManager {
+            cache: HashMap::new(),
+        }
     }
 }
 
@@ -59,39 +63,54 @@ impl BatchlessJobManager {
 }
 
 impl jobs::JobManager for BatchlessJobManager {
-    fn job_id_from_pid(&mut self, pid: usize, processes: &[process::Process]) -> usize {
-        let mut probe = self.lookup(processes, pid);
+    fn job_id_from_pid(&mut self, mut proc_pid: usize, processes: &[process::Process]) -> usize {
+        let mut probe = self.lookup(processes, proc_pid);
         if probe.is_none() {
             // Lost process is job 0
             0
         } else {
             loop {
-                let (proc_session, proc_ppid) = probe.unwrap();
+                let (proc_session, parent_pid) = probe.unwrap();
                 if proc_session == 0 {
                     // System process is its own job
-                    break proc_session
+                    break proc_session;
                 }
-                if proc_session == pid {
+                if proc_session == proc_pid {
                     // Session leader is its own job
-                    break proc_session
+                    break proc_session;
                 }
-                let probe_parent = self.lookup(processes, proc_ppid);
+                let probe_parent = self.lookup(processes, parent_pid);
                 if probe_parent.is_none() {
                     // Orphaned subprocess is its own job
-                    break proc_session
+                    break proc_session;
                 }
-                let (parent_session, _parent_ppid) = probe_parent.unwrap();
-                if proc_ppid == parent_session {
+                let (parent_session, _) = probe_parent.unwrap();
+                if parent_pid == parent_session {
                     // Parent process is session leader, so this process is the job root
-                    break pid
+                    break proc_pid;
                 }
-                probe = probe_parent
+                proc_pid = parent_pid;
+                probe = probe_parent;
             }
         }
     }
-    
+
     fn need_process_tree(&self) -> bool {
         true
     }
 }
 
+#[test]
+fn test_batchless_jobs() {
+    let mut jm = BatchlessJobManager::new();
+    let procs = process::parsed_full_test_output();
+    assert!(jm.job_id_from_pid(82554, &procs) == 82329); // firefox subprocess -> firefox, b/c firefox is session leader
+    assert!(jm.job_id_from_pid(82329, &procs) == 82329); // firefox -> firefox
+    assert!(jm.job_id_from_pid(1, &procs) == 1); // init
+    assert!(jm.job_id_from_pid(1805, &procs) == 1805); // sd-pam -> sd-pam, b/c 1804 is session leader
+    assert!(jm.job_id_from_pid(232, &procs) == 0); // session 0
+    assert!(jm.job_id_from_pid(74536, &procs) == 74536); // shell
+    assert!(jm.job_id_from_pid(2305, &procs) == 2225); // ibus-extension- -> ibus-daemon
+    assert!(jm.job_id_from_pid(200, &procs) == 0); // lost process
+    assert!(jm.job_id_from_pid(80199, &procs) == 1823); // lost parent process
+}

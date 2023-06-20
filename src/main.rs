@@ -26,7 +26,7 @@ enum Commands {
         #[arg(long, default_value_t = 5.0)]
         mem_cutoff_percent: f64,
         #[arg(long, default_value_t = false)]
-        batchless: bool
+        batchless: bool,
     },
     /// Not yet implemented
     Analyze {},
@@ -42,7 +42,7 @@ fn main() {
             batchless,
         } => {
             if *batchless {
-                let mut jm = batchless::new();
+                let mut jm = batchless::BatchlessJobManager::new();
                 ps::create_snapshot(&mut jm, *cpu_cutoff_percent, *mem_cutoff_percent);
             } else {
                 let mut jm = slurm::SlurmJobManager {};

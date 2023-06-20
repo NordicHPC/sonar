@@ -68,14 +68,13 @@ fn parse_pmon_output(raw_text: &str, user_by_pid: &HashMap<usize, String>) -> Ve
             (pid, device, mem_size, gpu_pct, mem_pct, command)
         })
         .filter(|(pid, ..)| *pid != "-")
-        .map(
-            |(pid_str, device, mem_size, gpu_pct, mem_pct, command)| {
-                let pid = pid_str.parse::<usize>().unwrap();
-                let user = match user_by_pid.get(&pid) {
-                    Some(name) => name.clone(),
-                    None => "_zombie_".to_owned() + pid_str,
-                };
-                Process {
+        .map(|(pid_str, device, mem_size, gpu_pct, mem_pct, command)| {
+            let pid = pid_str.parse::<usize>().unwrap();
+            let user = match user_by_pid.get(&pid) {
+                Some(name) => name.clone(),
+                None => "_zombie_".to_owned() + pid_str,
+            };
+            Process {
                 device,
                 pid,
                 user,
@@ -83,8 +82,8 @@ fn parse_pmon_output(raw_text: &str, user_by_pid: &HashMap<usize, String>) -> Ve
                 mem_pct,
                 mem_size_kib: mem_size * 1024,
                 command,
-                }
-            })
+            }
+        })
         .collect::<Vec<Process>>()
 }
 
