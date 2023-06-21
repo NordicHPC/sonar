@@ -1,6 +1,6 @@
 // Run "ps" and return a vector of structures with all the information we need.
 
-use crate::command;
+use crate::command::{self, CmdError};
 use crate::util;
 
 #[derive(PartialEq)]
@@ -13,11 +13,10 @@ pub struct Process {
     pub command: String,
 }
 
-pub fn get_process_information() -> Vec<Process> {
-    if let Some(out) = command::safe_command(PS_COMMAND, TIMEOUT_SECONDS) {
-        parse_ps_output(&out)
-    } else {
-        vec![]
+pub fn get_process_information() -> Result<Vec<Process>, CmdError> {
+    match command::safe_command(PS_COMMAND, TIMEOUT_SECONDS) {
+        Ok(out) => Ok(parse_ps_output(&out)),
+        Err(e) => Err(e),
     }
 }
 

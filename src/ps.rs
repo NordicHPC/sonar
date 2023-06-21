@@ -2,7 +2,9 @@
 #![allow(clippy::too_many_arguments)]
 
 use crate::amd;
+use crate::command::CmdError;
 use crate::jobs;
+use crate::log;
 use crate::nvidia;
 use crate::process;
 use crate::util::{three_places, time_iso8601};
@@ -145,23 +147,32 @@ fn extract_nvidia_processes(
 
 fn add_gpu_info(
     processes_by_slurm_job_id: &mut HashMap<(String, usize, String), JobInfo>,
-    gpu_output: Vec<nvidia::Process>,
+    gpu_output: Result<Vec<nvidia::Process>, CmdError>,
 ) {
-    for ((user, pid, command), (gpu_mask, gpu_percentage, gpu_mem_percentage, gpu_mem_size)) in
-        extract_nvidia_processes(&gpu_output)
-    {
-        add_job_info(
-            processes_by_slurm_job_id,
-            user,
-            pid,
-            command,
-            0.0,
-            0,
-            gpu_mask,
-            gpu_percentage,
-            gpu_mem_percentage,
-            gpu_mem_size,
-        );
+    match gpu_output {
+        Ok(gpu_output) => {
+            for (
+                (user, pid, command),
+                (gpu_mask, gpu_percentage, gpu_mem_percentage, gpu_mem_size),
+            ) in extract_nvidia_processes(&gpu_output)
+            {
+                add_job_info(
+                    processes_by_slurm_job_id,
+                    user,
+                    pid,
+                    command,
+                    0.0,
+                    0,
+                    gpu_mask,
+                    gpu_percentage,
+                    gpu_mem_percentage,
+                    gpu_mem_size,
+                );
+            }
+        }
+        Err(_) => {
+            log("GPU process listing failed");
+        }
     }
 }
 
@@ -209,25 +220,33 @@ pub fn create_snapshot(
     let mut processes_by_job_id: HashMap<(String, usize, String), JobInfo> = HashMap::new();
     let mut user_by_pid: HashMap<usize, String> = HashMap::new();
 
-    let ps_output = process::get_process_information();
-    for ((user, pid, command), (cpu_percentage, mem_percentage, mem_size)) in
-        extract_ps_processes(&ps_output)
-    {
-        user_by_pid.insert(pid, user.clone());
+    match process::get_process_information() {
+        Err(_e) => {
+            log("CPU process listing failed");
+            return;
+        }
+        Ok(ps_output) => {
+            for ((user, pid, command), (cpu_percentage, mem_percentage, mem_size)) in
+                extract_ps_processes(&ps_output)
+            {
+                user_by_pid.insert(pid, user.clone());
 
-        if (cpu_percentage >= cpu_cutoff_percent) || (mem_percentage >= mem_cutoff_percent) {
-            add_job_info(
-                &mut processes_by_job_id,
-                user,
-                jobs.job_id_from_pid(pid, &ps_output),
-                command,
-                cpu_percentage,
-                mem_size,
-                0,
-                0.0,
-                0.0,
-                0,
-            );
+                if (cpu_percentage >= cpu_cutoff_percent) || (mem_percentage >= mem_cutoff_percent)
+                {
+                    add_job_info(
+                        &mut processes_by_job_id,
+                        user,
+                        jobs.job_id_from_pid(pid, &ps_output),
+                        command,
+                        cpu_percentage,
+                        mem_size,
+                        0,
+                        0.0,
+                        0.0,
+                        0,
+                    );
+                }
+            }
         }
     }
 
