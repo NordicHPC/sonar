@@ -26,5 +26,9 @@ fn get_slurm_job_id(pid: usize) -> Option<String> {
     );
     let timeout_seconds = 2;
 
-    command::safe_command(&command, timeout_seconds)
+    // TODO: Maybe propagate an error here?
+    match command::safe_command(&command, timeout_seconds) {
+        Ok(s) => Some(s),
+        Err(_) => None,
+    }
 }

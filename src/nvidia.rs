@@ -2,7 +2,7 @@
 // (device, pid) so that if a process uses multiple devices, the total utilization for the process
 // must be summed across devices.  (This is the natural mode of output for `nvidia-smi pmon`.)
 
-use crate::command;
+use crate::command::{self, CmdError};
 use crate::util;
 #[cfg(test)]
 use crate::util::map;
@@ -19,17 +19,25 @@ pub struct Process {
     pub command: String,     // The command, _unknown_ for zombies, _noinfo_ if not known
 }
 
+// Err(e) really means the command started running but failed, for the reason given.  If the
+// command could not be found, we return Ok(vec![]).
+
 pub fn get_nvidia_information(
     user_by_pid: &HashMap<usize, String>,
-) -> Vec<Process> {
-    if let Some(pmon_raw_text) = command::safe_command(NVIDIA_PMON_COMMAND, TIMEOUT_SECONDS) {
-        let mut processes = parse_pmon_output(&pmon_raw_text, user_by_pid);
-        if let Some(query_raw_text) = command::safe_command(NVIDIA_QUERY_COMMAND, TIMEOUT_SECONDS) {
-            processes.append(&mut parse_query_output(&query_raw_text, user_by_pid));
+) -> Result<Vec<Process>, CmdError> {
+    match command::safe_command(NVIDIA_PMON_COMMAND, TIMEOUT_SECONDS) {
+        Ok(pmon_raw_text) => {
+            let mut processes = parse_pmon_output(&pmon_raw_text, user_by_pid);
+            match command::safe_command(NVIDIA_QUERY_COMMAND, TIMEOUT_SECONDS) {
+                Ok(query_raw_text) => {
+                    processes.append(&mut parse_query_output(&query_raw_text, user_by_pid));
+                    Ok(processes)
+                }
+                Err(e) => Err(e),
+            }
         }
-        processes
-    } else {
-        vec![]
+        Err(CmdError::CouldNotStart) => Ok(vec![]),
+        Err(e) => Err(e),
     }
 }
 
@@ -70,14 +78,13 @@ fn parse_pmon_output(raw_text: &str, user_by_pid: &HashMap<usize, String>) -> Ve
             (pid, device, mem_size, gpu_pct, mem_pct, command)
         })
         .filter(|(pid, ..)| *pid != "-")
-        .map(
-            |(pid_str, device, mem_size, gpu_pct, mem_pct, command)| {
-                let pid = pid_str.parse::<usize>().unwrap();
-                let user = match user_by_pid.get(&pid) {
-                    Some(name) => name.clone(),
-                    None => "_zombie_".to_owned() + pid_str,
-                };
-                Process {
+        .map(|(pid_str, device, mem_size, gpu_pct, mem_pct, command)| {
+            let pid = pid_str.parse::<usize>().unwrap();
+            let user = match user_by_pid.get(&pid) {
+                Some(name) => name.clone(),
+                None => "_zombie_".to_owned() + pid_str,
+            };
+            Process {
                 device,
                 pid,
                 user,
@@ -85,8 +92,8 @@ fn parse_pmon_output(raw_text: &str, user_by_pid: &HashMap<usize, String>) -> Ve
                 mem_pct,
                 mem_size_kib: mem_size * 1024,
                 command,
-                }
-            })
+            }
+        })
         .collect::<Vec<Process>>()
 }
 

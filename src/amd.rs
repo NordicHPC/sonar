@@ -16,26 +16,32 @@
 // about the usage of various processes on the various devices.  We divide the utilization of a
 // device by the number of processes on the device.  This is approximate.
 
-use crate::command;
+use crate::command::{self, CmdError};
 use crate::nvidia;
 #[cfg(test)]
 use crate::util::map;
 use std::cmp::Ordering;
 use std::collections::HashMap;
 
+// Err(e) really means the command started running but failed, for the reason given.  If the command
+// could not be found, we return Ok(vec![]).
+
 pub fn get_amd_information(
-    user_by_pid: &HashMap<usize, String>
-) -> Vec<nvidia::Process> {
-    if let Some(concise_raw_text) = command::safe_command(AMD_CONCISE_COMMAND, TIMEOUT_SECONDS) {
-        if let Some(showpidgpus_raw_text) =
-            command::safe_command(AMD_SHOWPIDGPUS_COMMAND, TIMEOUT_SECONDS)
-        {
-            extract_amd_information(&concise_raw_text, &showpidgpus_raw_text, user_by_pid)
-        } else {
-            vec![]
+    user_by_pid: &HashMap<usize, String>,
+) -> Result<Vec<nvidia::Process>, CmdError> {
+    match command::safe_command(AMD_CONCISE_COMMAND, TIMEOUT_SECONDS) {
+        Ok(concise_raw_text) => {
+            match command::safe_command(AMD_SHOWPIDGPUS_COMMAND, TIMEOUT_SECONDS) {
+                Ok(showpidgpus_raw_text) => Ok(extract_amd_information(
+                    &concise_raw_text,
+                    &showpidgpus_raw_text,
+                    user_by_pid,
+                )),
+                Err(e) => Err(e),
+            }
         }
-    } else {
-        vec![]
+        Err(CmdError::CouldNotStart) => Ok(vec![]),
+        Err(e) => Err(e),
     }
 }
 

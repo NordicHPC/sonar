@@ -46,3 +46,8 @@ fn main() {
         }
     }
 }
+
+fn log(msg: &str) {
+    // TODO: Implement this
+    println!("ERROR: {:?}", msg);
+}
