@@ -7,13 +7,13 @@ use crate::process;
 pub struct SlurmJobManager {}
 
 impl jobs::JobManager for SlurmJobManager {
-    fn job_id_from_pid(&mut self, pid: String, _processes: &[process::Process]) -> usize {
+    fn job_id_from_pid(&mut self, pid: usize, _processes: &[process::Process]) -> usize {
         let slurm_job_id = get_slurm_job_id(pid).unwrap_or_default();
         slurm_job_id.trim().parse::<usize>().unwrap_or_default()
     }
 }
 
-fn get_slurm_job_id(pid: String) -> Option<String> {
+fn get_slurm_job_id(pid: usize) -> Option<String> {
     let path = format!("/proc/{}/cgroup", pid);
 
     if !std::path::Path::new(&path).exists() {

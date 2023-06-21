@@ -5,7 +5,7 @@ use crate::util;
 
 #[derive(PartialEq)]
 pub struct Process {
-    pub pid: String,
+    pub pid: usize,
     pub user: String,
     pub cpu_pct: f64,
     pub mem_pct: f64,
@@ -13,13 +13,15 @@ pub struct Process {
     pub command: String,
 }
 
-pub fn get_process_information(timeout_seconds: u64) -> Vec<Process> {
-    if let Some(out) = command::safe_command(PS_COMMAND, timeout_seconds) {
+pub fn get_process_information() -> Vec<Process> {
+    if let Some(out) = command::safe_command(PS_COMMAND, TIMEOUT_SECONDS) {
         parse_ps_output(&out)
     } else {
         vec![]
     }
 }
+
+const TIMEOUT_SECONDS: u64 = 2;	// for `ps`
 
 const PS_COMMAND: &str =
     "ps -e --no-header -o pid,user:22,pcpu,pmem,size,comm | grep -v ' 0.0  0.0 '";
@@ -30,7 +32,7 @@ fn parse_ps_output(raw_text: &str) -> Vec<Process> {
         .map(|line| {
             let (start_indices, parts) = util::chunks(line);
             Process {
-                pid: parts[0].to_string(),
+                pid: parts[0].parse::<usize>().unwrap(),
                 user: parts[1].to_string(),
                 cpu_pct: parts[2].parse::<f64>().unwrap(),
                 mem_pct: parts[3].parse::<f64>().unwrap(),
@@ -59,7 +61,7 @@ pub fn parsed_test_output() -> Vec<Process> {
 fn test_parse_ps_output() {
     macro_rules! proc(
 	{ $a:expr, $b:expr, $c:expr, $d:expr, $e: expr, $f:expr } => {
-	    Process { pid: $a.to_string(),
+	    Process { pid: $a,
 		      user: $b.to_string(),
 		      cpu_pct: $c,
 		      mem_pct: $d,
@@ -69,12 +71,12 @@ fn test_parse_ps_output() {
 	});
 
     assert!(parsed_test_output().into_iter().eq(vec![
-        proc! {  "2022", "bob",   10.0, 20.0, 553348, "slack" },
-        proc! { "42178", "bob",   10.0, 15.0, 353348, "chromium" },
-        proc! { "42178", "bob",   10.0, 15.0,   5536, "chromium" },
-        proc! { "42189", "alice", 10.0,  5.0,   5528, "slack" },
-        proc! { "42191", "bob",   10.0,  5.0,   5552, "someapp" },
-        proc! { "42213", "alice", 10.0,  5.0, 348904, "some app" },
-        proc! { "42213", "alice", 10.0,  5.0, 135364, "some app" }
+        proc! {  2022, "bob",   10.0, 20.0, 553348, "slack" },
+        proc! { 42178, "bob",   10.0, 15.0, 353348, "chromium" },
+        proc! { 42178, "bob",   10.0, 15.0,   5536, "chromium" },
+        proc! { 42189, "alice", 10.0,  5.0,   5528, "slack" },
+        proc! { 42191, "bob",   10.0,  5.0,   5552, "someapp" },
+        proc! { 42213, "alice", 10.0,  5.0, 348904, "some app" },
+        proc! { 42213, "alice", 10.0,  5.0, 135364, "some app" }
     ]))
 }
