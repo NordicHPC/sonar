@@ -4,10 +4,7 @@ use std::collections::HashMap;
 use std::fs;
 
 pub fn rank_data(entries: &HashMap<String, i32>) -> Vec<(String, i32)> {
-    let mut ranked: Vec<(String, i32)> = entries
-        .iter()
-        .map(|(k, v)| (k.clone(), *v))
-        .collect();
+    let mut ranked: Vec<(String, i32)> = entries.iter().map(|(k, v)| (k.clone(), *v)).collect();
     ranked.sort_by(|a, b| b.1.cmp(&a.1));
 
     ranked
@@ -25,10 +22,8 @@ pub fn read_field(field: &i32, dir_path: &str) -> HashMap<String, i32> {
             let subdir_field_data = read_field(field, file_name.to_str().unwrap());
             field_data.extend(subdir_field_data);
         } else {
-            let error_message = format!(
-                "something went wrong reading file {}",
-                file_name.display()
-            );
+            let error_message =
+                format!("something went wrong reading file {}", file_name.display());
             let contents = fs::read_to_string(file_name).expect(&error_message);
             let lines = contents.lines();
 
