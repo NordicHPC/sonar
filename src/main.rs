@@ -46,3 +46,8 @@ fn main() {
         }
     }
 }
+
+fn log(msg: &str) {
+    // TODO (issue 52): Implement some sensible logging maybe
+    eprintln!("SONAR ERROR: {:?}", msg);
+}
