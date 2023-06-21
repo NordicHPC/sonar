@@ -11,6 +11,10 @@ impl jobs::JobManager for SlurmJobManager {
         let slurm_job_id = get_slurm_job_id(pid).unwrap_or_default();
         slurm_job_id.trim().parse::<usize>().unwrap_or_default()
     }
+
+    fn need_process_tree(&self) -> bool {
+        false
+    }
 }
 
 fn get_slurm_job_id(pid: usize) -> Option<String> {

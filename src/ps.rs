@@ -220,7 +220,7 @@ pub fn create_snapshot(
     let mut processes_by_job_id: HashMap<(String, usize, String), JobInfo> = HashMap::new();
     let mut user_by_pid: HashMap<usize, String> = HashMap::new();
 
-    match process::get_process_information() {
+    match process::get_process_information(jobs) {
         Err(_e) => {
             log("CPU process listing failed");
             return;
