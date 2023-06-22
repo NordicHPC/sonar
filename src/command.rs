@@ -63,8 +63,8 @@ pub fn safe_command(command: &str, timeout_seconds: u64) -> Result<String, CmdEr
 fn test_safe_command() {
     // Should work, because we should be running this in the repo root.
     match safe_command("ls Cargo.toml", 2) {
-	Ok(_) => {},
-	Err(_) => assert!(false)
+        Ok(_) => {}
+        Err(_) => assert!(false),
     }
     // This really needs to be the output
     assert!(safe_command("grep '^name =' Cargo.toml", 2) == Ok("name = \"sonar\"\n".to_string()));
