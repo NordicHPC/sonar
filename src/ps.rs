@@ -91,7 +91,7 @@ fn extract_ps_processes(
 
 #[test]
 fn test_extract_ps_processes() {
-    let ps_output = process::parsed_test_output();
+    let ps_output = process::parsed_partial_test_output();
     let processes = extract_ps_processes(&ps_output);
 
     assert!(

@@ -67,7 +67,7 @@ fn parse_ps_output(raw_text: &str, complete_output: bool) -> Vec<Process> {
 }
 
 #[cfg(test)]
-pub fn parsed_test_output() -> Vec<Process> {
+pub fn parsed_partial_test_output() -> Vec<Process> {
     let text = "   2022 bob                            10.0 20.0 553348 slack
   42178 bob                            10.0 15.0 353348 chromium
   42178 bob                            10.0 15.0  5536 chromium
@@ -80,7 +80,7 @@ pub fn parsed_test_output() -> Vec<Process> {
 }
 
 #[test]
-fn test_parse_ps_output() {
+fn test_parse_partial_ps_output() {
     macro_rules! proc(
 	{ $a:expr, $b:expr, $c:expr, $d:expr, $e: expr, $f:expr } => {
 	    Process { pid: $a,
@@ -94,7 +94,7 @@ fn test_parse_ps_output() {
 	    }
 	});
 
-    assert!(parsed_test_output().into_iter().eq(vec![
+    assert!(parsed_partial_test_output().into_iter().eq(vec![
         proc! {  2022, "bob",   10.0, 20.0, 553348, "slack" },
         proc! { 42178, "bob",   10.0, 15.0, 353348, "chromium" },
         proc! { 42178, "bob",   10.0, 15.0,   5536, "chromium" },
