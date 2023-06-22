@@ -73,7 +73,7 @@ fn test_safe_command() {
     // Wrong permissions, not executable
     assert!(safe_command("/etc/passwd", 2) == Err(CmdError::CouldNotStart));
     // Should take too long
-    assert!(safe_command("traceroute amazon.com", 2) == Err(CmdError::Hung));
+    assert!(safe_command("sleep 7", 2) == Err(CmdError::Hung));
     // Exited with error
     assert!(safe_command("ls /abracadabra", 2) == Err(CmdError::Failed));
 }
