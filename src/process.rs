@@ -21,7 +21,7 @@ pub fn get_process_information() -> Vec<Process> {
     }
 }
 
-const TIMEOUT_SECONDS: u64 = 2;	// for `ps`
+const TIMEOUT_SECONDS: u64 = 2; // for `ps`
 
 const PS_COMMAND: &str =
     "ps -e --no-header -o pid,user:22,pcpu,pmem,size,comm | grep -v ' 0.0  0.0 '";
