@@ -48,6 +48,6 @@ fn main() {
 }
 
 fn log(msg: &str) {
-    // TODO: Implement this
-    println!("ERROR: {:?}", msg);
+    // TODO (issue 52): Implement some sensible logging maybe
+    eprintln!("SONAR ERROR: {:?}", msg);
 }
