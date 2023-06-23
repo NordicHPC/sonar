@@ -76,7 +76,7 @@ pub fn parsed_test_output() -> Vec<Process> {
   42213 alice                          10.0  5.0 348904 some app
   42213 alice                          10.0  5.0 135364 some app";
 
-    parse_ps_output(text)
+    parse_ps_output(text, false)
 }
 
 #[test]
@@ -88,7 +88,9 @@ fn test_parse_ps_output() {
 		      cpu_pct: $c,
 		      mem_pct: $d,
 		      mem_size_kib: $e,
-		      command: $f.to_string()
+		      command: $f.to_string(),
+                      ppid: 0,
+                      session: 0,
 	    }
 	});
 
