@@ -1,6 +1,7 @@
 use clap::{Parser, Subcommand};
 
 mod amd;
+mod batchless;
 mod command;
 mod jobs;
 mod nvidia;
@@ -24,6 +25,8 @@ enum Commands {
         cpu_cutoff_percent: f64,
         #[arg(long, default_value_t = 5.0)]
         mem_cutoff_percent: f64,
+        #[arg(long, default_value_t = false)]
+        batchless: bool,
     },
     /// Not yet implemented
     Analyze {},
@@ -36,13 +39,23 @@ fn main() {
         Commands::PS {
             cpu_cutoff_percent,
             mem_cutoff_percent,
+            batchless,
         } => {
-            // TODO: Allow for other types of job managers
-            let mut jm = slurm::SlurmJobManager {};
-            ps::create_snapshot(&mut jm, *cpu_cutoff_percent, *mem_cutoff_percent);
+            if *batchless {
+                let mut jm = batchless::BatchlessJobManager::new();
+                ps::create_snapshot(&mut jm, *cpu_cutoff_percent, *mem_cutoff_percent);
+            } else {
+                let mut jm = slurm::SlurmJobManager {};
+                ps::create_snapshot(&mut jm, *cpu_cutoff_percent, *mem_cutoff_percent);
+            }
         }
         Commands::Analyze {} => {
             println!("sonar analyze not yet completed");
         }
     }
+}
+
+fn log(msg: &str) {
+    // TODO (issue 52): Implement some sensible logging maybe
+    eprintln!("SONAR ERROR: {:?}", msg);
 }
