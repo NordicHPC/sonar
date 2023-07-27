@@ -4,7 +4,6 @@
 use crate::amd;
 use crate::command::CmdError;
 use crate::jobs;
-use crate::log_cmderror;
 use crate::nvidia;
 use crate::process;
 use crate::util::{three_places, time_iso8601};
@@ -285,4 +284,9 @@ pub fn create_snapshot(
     }
 
     writer.flush().unwrap();
+}
+
+fn log_cmderror(msg: &str) {
+    // TODO (issue 52): Implement some sensible logging maybe
+    eprintln!("SONAR ERROR: {:?}", msg);
 }
