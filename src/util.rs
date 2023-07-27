@@ -1,4 +1,4 @@
-use chrono::prelude::{DateTime, Utc};
+use chrono::prelude::Local;
 
 // Populate a HashMap.
 #[cfg(test)]
@@ -19,8 +19,8 @@ pub(crate) use map;
 
 // Get current time as an ISO time stamp.
 pub fn time_iso8601() -> String {
-    let dt: DateTime<Utc> = std::time::SystemTime::now().into();
-    format!("{}", dt.format("%+"))
+    let local_time = Local::now();
+    format!("{}", local_time.format("%Y-%m-%dT%H:%M:%S%Z"))
 }
 
 // Carve up a line of text into space-separated chunks + the start indices of the chunks.
