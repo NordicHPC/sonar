@@ -113,9 +113,10 @@ folder.
 
 ## Authors
 
-- Henrik Rojas Nagel
-- Mathias Bockwoldt
 - [Radovan Bast](https://bast.fr)
+- Mathias Bockwoldt
+- Lars T. Hansen
+- Henrik Rojas Nagel
 
 
 ## Design goals and design decisions
