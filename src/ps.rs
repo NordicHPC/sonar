@@ -4,7 +4,7 @@
 use crate::amd;
 use crate::command::CmdError;
 use crate::jobs;
-use crate::log;
+use crate::log_cmderror;
 use crate::nvidia;
 use crate::process;
 use crate::util::{three_places, time_iso8601};
@@ -171,7 +171,7 @@ fn add_gpu_info(
             }
         }
         Err(_) => {
-            log("GPU process listing failed");
+            log_cmderror("GPU process listing failed");
         }
     }
 }
@@ -221,8 +221,8 @@ pub fn create_snapshot(
     let mut user_by_pid: HashMap<usize, String> = HashMap::new();
 
     match process::get_process_information(jobs) {
-        Err(_e) => {
-            log("CPU process listing failed");
+        Err(_) => {
+            log_cmderror("CPU process listing failed");
             return;
         }
         Ok(ps_output) => {

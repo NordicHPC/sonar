@@ -55,7 +55,7 @@ fn main() {
     }
 }
 
-fn log(msg: &str) {
+fn log_cmderror(msg: &str) {
     // TODO (issue 52): Implement some sensible logging maybe
     eprintln!("SONAR ERROR: {:?}", msg);
 }

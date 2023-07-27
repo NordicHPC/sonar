@@ -39,13 +39,20 @@ impl BatchlessJobManager {
 }
 
 impl BatchlessJobManager {
-    fn lookup(&mut self, processes: &[process::Process], want_pid: usize) -> Option<(usize, usize)> {
+    fn lookup(
+        &mut self,
+        processes: &[process::Process],
+        want_pid: usize,
+    ) -> Option<(usize, usize)> {
         let probe = self.cache.get(&want_pid);
         if probe.is_some() {
             return probe.copied();
         }
 
-        for process::Process { pid, ppid, session, .. } in processes {
+        for process::Process {
+            pid, ppid, session, ..
+        } in processes
+        {
             if *pid == want_pid {
                 let entry = (*session, *ppid);
                 self.cache.insert(want_pid, entry);
