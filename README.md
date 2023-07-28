@@ -86,11 +86,11 @@ Here is an example output:
 ```console
 $ sonar ps
 
-2023-01-31T13:34:47.683582663+00:00,somehost,8,user,,alacritty,3.7,214932
-2023-01-31T13:34:47.683582663+00:00,somehost,8,user,,slack,2.4,1328412
-2023-01-31T13:34:47.683582663+00:00,somehost,8,user,,X,0.8,173148
-2023-01-31T13:34:47.683582663+00:00,somehost,8,user,,brave,15.5,7085968
-2023-01-31T13:34:47.683582663+00:00,somehost,8,user,,.zoom,37.8,1722564
+2023-07-27T18:29:17+02:00,somehost,8,user,,alacritty,3.7,214932
+2023-07-27T18:29:17+02:00,somehost,8,user,,slack,2.4,1328412
+2023-07-27T18:29:17+02:00,somehost,8,user,,X,0.8,173148
+2023-07-27T18:29:17+02:00,somehost,8,user,,brave,15.5,7085968
+2023-07-27T18:29:17+02:00,somehost,8,user,,.zoom,37.8,1722564
 ```
 
 The columns are:
