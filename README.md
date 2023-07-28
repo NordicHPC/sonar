@@ -107,7 +107,7 @@ The columns are:
 ## Collect results with `sonar analyze` :construction:
 
 This part is work in progress. Currently we only collect the data since we use
-it also in another tool. The mapping files can be found in the [data](data)
+it also in [another tool](https://github.com/NordicHPC/jobgraph). The mapping files can be found in the [data](data)
 folder.
 
 
