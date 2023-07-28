@@ -1,0 +1,28 @@
+# This CITATION.cff file was generated with cffinit.
+# Visit https://bit.ly/cffinit to generate yours today!
+
+cff-version: 1.2.0
+title: "sonar: Tool to profile usage of HPC resources by regularly probing processes using ps."
+message: "If you use this software, please cite it as below."
+type: software
+authors:
+  - given-names: Radovan
+    family-names: Bast
+    email: radovan.bast@uit.no
+    affiliation: UiT The Arctic University of Norway
+    orcid: 'https://orcid.org/0000-0003-4498-3806'
+  - given-names: Mathias
+    family-names: Bockwoldt
+  - given-names: Lars T.
+    family-names: Hansen
+  - given-names: Henrik Rojas
+    family-names: Nagel
+repository-code: 'https://github.com/NordicHPC/sonar'
+url: 'https://github.com/NordicHPC/sonar'
+keywords:
+  - profiling
+  - high-performance computing
+  - processes
+  - resource usage
+license: GPL-3.0
+version: '0.6.2'

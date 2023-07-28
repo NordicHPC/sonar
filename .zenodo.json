@@ -1,0 +1,29 @@
+{
+  "creators": [
+    {
+      "affiliation": "UiT The Arctic University of Norway",
+      "name": "Bast, Radovan",
+      "orcid": "0000-0003-4498-3806"
+    },
+    {
+      "name": "Bockwoldt, Mathias"
+    },
+    {
+      "name": "Hansen, Lars T."
+    },
+    {
+      "name": "Nagel, Henrik Rojas"
+    }
+  ],
+  "keywords": [
+    "profiling",
+    "high-performance computing",
+    "processes",
+    "resource usage"
+  ],
+  "license": {
+    "id": "GPL-3.0"
+  },
+  "title": "sonar: Tool to profile usage of HPC resources by regularly probing processes using ps.",
+  "version": "0.6.2"
+}
