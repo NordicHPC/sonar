@@ -1,6 +1,11 @@
-// Run nvidia-smi and return a vector of process information.  Note that the information is keyed by
-// (device, pid) so that if a process uses multiple devices, the total utilization for the process
-// must be summed across devices.  (This is the natural mode of output for `nvidia-smi pmon`.)
+/// Run nvidia-smi and return a vector of process samples.
+///
+/// The information is keyed by (device, pid) so that if a process uses multiple devices, the total
+/// utilization for the process must be summed across devices.  (This is the natural mode of output
+/// for `nvidia-smi pmon`.)
+///
+/// Crucially, the data are sampling data: they contain no (long) running averages, but are
+/// snapshots of the system at the time the sample is taken.
 
 use crate::command::{self, CmdError};
 use crate::util;
@@ -13,9 +18,9 @@ pub struct Process {
     pub device: i32,         // -1 for "unknown", otherwise 0..num_devices-1
     pub pid: usize,          // Process ID
     pub user: String,        // User name, _zombie_PID for zombies
-    pub gpu_pct: f64,        // Percent of GPU, 0.0 for zombies
-    pub mem_pct: f64,        // Percent of memory, 0.0 for zombies
-    pub mem_size_kib: usize, // Memory use in KiB, _not_ zero for zombies
+    pub gpu_pct: f64,        // Percent of GPU /for this sample/, 0.0 for zombies
+    pub mem_pct: f64,        // Percent of memory /for this sample/, 0.0 for zombies
+    pub mem_size_kib: usize, // Memory use in KiB /for this sample/, _not_ zero for zombies
     pub command: String,     // The command, _unknown_ for zombies, _noinfo_ if not known
 }
 
@@ -50,6 +55,9 @@ const TIMEOUT_SECONDS: u64 = 2; // For `nvidia-smi`
 //  - it does not orphaned processes holding onto GPU memory, the way nvtop can do
 //
 // To fix the latter problem we do something with --query-compute-apps, see later.
+//
+// Note that `-c 1 -s u` gives us more or less instantaneous utilization, not some long-running
+// average.
 //
 // TODO: We could consider using the underlying C library instead, but this adds a fair
 // amount of complexity.  See the nvidia-smi manual page.
