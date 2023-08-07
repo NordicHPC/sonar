@@ -1,20 +1,18 @@
-// Get info about AMD graphics cards by parsing the output of rocm-smi.
-// This is pretty hacky!  Something better than this is likely needed and hopefully possible.
-//
-// Note that the returned information is keyed by (device, pid) so that if a process uses multiple
-// devices, the total utilization for the process must be summed across devices.  We do this
-// to be compatible with the NVIDIA module (nvidia.rs).
-//
-// I've not been able to combine the two invocations of rocm-smi yet; we have to run the command
-// twice.  Not a happy situation.
-//
-// Also, there is no information here about absolute memory usage numbers.  The cards I have don't
-// support getting that information.  Other cards might.  In that case, the --showmemusage switch
-// (can be combined with --showgpupids in a single invocation) might be useful.
-//
-// Even though the output is presented in the same format as for NVIDIA, we only have partial stats
-// about the usage of various processes on the various devices.  We divide the utilization of a
-// device by the number of processes on the device.  This is approximate.
+/// Get info about AMD graphics cards by parsing the output of rocm-smi.
+///
+/// This is pretty hacky!  Something better than this is likely needed and hopefully possible.
+///
+/// The returned information is keyed by (device, pid) so that if a process uses multiple devices,
+/// the total utilization for the process must be summed across devices.  We do this to be
+/// compatible with the NVIDIA module (nvidia.rs).
+///
+/// There is no information here about absolute memory usage numbers.  The cards I have don't
+/// support getting that information.  Other cards might.  In that case, the --showmemusage switch
+/// (can be combined with --showgpupids in a single invocation) might be useful.
+///
+/// Even though the output is presented in the same format as for NVIDIA, we only have partial stats
+/// about the usage of various processes on the various devices.  We divide the utilization of a
+/// device by the number of processes on the device.  This is approximate.
 
 use crate::command::{self, CmdError};
 use crate::nvidia;
@@ -23,12 +21,18 @@ use crate::util::map;
 use std::cmp::Ordering;
 use std::collections::HashMap;
 
-// Err(e) really means the command started running but failed, for the reason given.  If the command
-// could not be found, we return Ok(vec![]).
+/// Get information about AMD cards.
+///
+/// Err(e) really means the command started running but failed, for the reason given.  If the
+/// command could not be found, we return Ok(vec![]).
 
 pub fn get_amd_information(
     user_by_pid: &HashMap<usize, String>,
 ) -> Result<Vec<nvidia::Process>, CmdError> {
+
+    // I've not been able to combine the two invocations of rocm-smi yet; we have to run the command
+    // twice.  Not a happy situation.
+
     match command::safe_command(AMD_CONCISE_COMMAND, TIMEOUT_SECONDS) {
         Ok(concise_raw_text) => {
             match command::safe_command(AMD_SHOWPIDGPUS_COMMAND, TIMEOUT_SECONDS) {
@@ -44,6 +48,8 @@ pub fn get_amd_information(
         Err(e) => Err(e),
     }
 }
+
+// Put it all together from the command output.
 
 fn extract_amd_information(
     concise_raw_text: &str,
@@ -134,9 +140,14 @@ const TIMEOUT_SECONDS: u64 = 2; // For `rocm-smi`
 
 const AMD_CONCISE_COMMAND: &str = "rocm-smi";
 
-// This returns a vector indexed by device number: (gpu%, mem%)
+// Return a vector of AMD GPU utilization indexed by device number: (gpu%, mem%)
+//
+// The gpu% has been verified to be roughly instantaneous utilization, as it would be for
+// `rocm-smi -u`, see the manual page.  That is, this is not some (long) running average.
+//
+// The mem% is instantaneous memory utilization as expected.
 
-pub fn parse_concise_command(raw_text: &str) -> Vec<(f64, f64)> {
+fn parse_concise_command(raw_text: &str) -> Vec<(f64, f64)> {
     let block = find_block(raw_text, "= Concise Info =");
     if block.len() > 1 {
         let hdr = block[0].split_whitespace().collect::<Vec<&str>>();
@@ -187,13 +198,13 @@ GPU  Temp (DieEdge)  AvgPwr  SCLK     MCLK    Fan     Perf  PwrCap  VRAM%  GPU%
 
 const AMD_SHOWPIDGPUS_COMMAND: &str = "rocm-smi --showpidgpus";
 
-// This returns a vector of (PID, DEVICES) where DEVICES is a vector of the devices used
-// by the PID.  The PID is a string, the devices are numbers.  See test cases below for
-// the various forms expected/supported.
+// Return a vector of (PID, DEVICES) where DEVICES is a vector of the devices used by the PID.  The
+// PID is a string, the devices are numbers.  See test cases below for the various forms
+// expected/supported.
 //
 // The PIDs are unique, ie, the return value is technically a function.
 
-pub fn parse_showpidgpus_command(raw_text: &str) -> Vec<(usize, Vec<usize>)> {
+fn parse_showpidgpus_command(raw_text: &str) -> Vec<(usize, Vec<usize>)> {
     let block = find_block(raw_text, "= GPUs Indexed by PID =");
     if block.len() == 1 && block[0].starts_with("No KFD PIDs") {
         // No processes running.
