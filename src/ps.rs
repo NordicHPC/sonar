@@ -219,8 +219,8 @@ pub fn create_snapshot(
     let mut user_by_pid: HashMap<usize, String> = HashMap::new();
 
     match process::get_process_information(jobs) {
-        Err(_) => {
-            log_cmderror("CPU process listing failed");
+        Err(e) => {
+            log_cmderror(&format!("CPU process listing failed: {:?}", e));
             return;
         }
         Ok(ps_output) => {
