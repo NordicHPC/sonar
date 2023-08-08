@@ -4,10 +4,10 @@ use subprocess::{Exec, ExitStatus, Redirection};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum CmdError {
-    CouldNotStart,
-    Failed,
-    Hung,
-    InternalError,
+    CouldNotStart(String),
+    Failed(String),
+    Hung(String),
+    InternalError(String),
 }
 
 // There's a general problem with subprocesses writing to a pipe in that there is a limited capacity
@@ -32,7 +32,7 @@ pub fn safe_command(command: &str, timeout_seconds: u64) -> Result<String, CmdEr
         Err(_) => {
             // TODO: Possibly too coarse-grained but the documentation is not
             // helpful in clarifying what might have happened.
-            return Err(CmdError::CouldNotStart);
+            return Err(CmdError::CouldNotStart(command.to_string()));
         }
     };
 
@@ -51,7 +51,7 @@ pub fn safe_command(command: &str, timeout_seconds: u64) -> Result<String, CmdEr
         match comm.read_string() {
             Ok((Some(stdout), Some(stderr))) => {
                 if !stderr.is_empty() {
-                    break Some(CmdError::Failed);
+                    break Some(CmdError::Failed(command.to_string()));
                 } else if stdout.is_empty() {
                     // This is always EOF because timeouts are signaled as Err()
                     break None;
@@ -59,15 +59,15 @@ pub fn safe_command(command: &str, timeout_seconds: u64) -> Result<String, CmdEr
                     result = result + &stdout
                 }
             }
-            Ok((_, _)) => break Some(CmdError::InternalError),
+            Ok((_, _)) => break Some(CmdError::InternalError(command.to_string())),
             Err(e) => {
                 if e.error.kind() == io::ErrorKind::TimedOut {
                     match p.terminate() {
-                        Ok(_) => break Some(CmdError::Hung),
-                        Err(_) => break Some(CmdError::InternalError),
+                        Ok(_) => break Some(CmdError::Hung(command.to_string())),
+                        Err(_) => break Some(CmdError::InternalError(command.to_string())),
                     }
                 }
-                break Some(CmdError::InternalError);
+                break Some(CmdError::InternalError(command.to_string()));
             }
         }
     };
@@ -82,18 +82,18 @@ pub fn safe_command(command: &str, timeout_seconds: u64) -> Result<String, CmdEr
         }
         Ok(ExitStatus::Exited(126)) => {
             // 126 == "Command cannot execute"
-            Err(CmdError::CouldNotStart)
+            Err(CmdError::CouldNotStart(command.to_string()))
         }
         Ok(ExitStatus::Exited(127)) => {
             // 127 == "Command not found"
-            Err(CmdError::CouldNotStart)
+            Err(CmdError::CouldNotStart(command.to_string()))
         }
         Ok(ExitStatus::Signaled(15)) => {
             // Signal 15 == SIGTERM
-            Err(CmdError::Hung)
+            Err(CmdError::Hung(command.to_string()))
         }
-        Ok(_) => Err(CmdError::Failed),
-        Err(_) => Err(CmdError::InternalError),
+        Ok(_) => Err(CmdError::Failed(command.to_string())),
+        Err(_) => Err(CmdError::InternalError(command.to_string())),
     }
 }
 
@@ -107,16 +107,28 @@ fn test_safe_command() {
     // This really needs to be the output
     assert!(safe_command("grep '^name =' Cargo.toml", 2) == Ok("name = \"sonar\"\n".to_string()));
     // Not found
-    assert!(safe_command("no-such-command-we-hope", 2) == Err(CmdError::CouldNotStart));
+    match safe_command("no-such-command-we-hope", 2) {
+        Err(CmdError::CouldNotStart(_)) => {}
+        _ => { assert!(false) }
+    }
     // Wrong permissions, not executable
-    assert!(safe_command("/etc/passwd", 2) == Err(CmdError::CouldNotStart));
+    match safe_command("/etc/passwd", 2) {
+        Err(CmdError::CouldNotStart(_)) => {}
+        _ => { assert!(false) }
+    }
     // Should take too long
-    assert!(safe_command("sleep 7", 2) == Err(CmdError::Hung));
+    match safe_command("sleep 7", 2) {
+        Err(CmdError::Hung(_)) => {}
+        _ => { assert!(false) }
+    }
     // Exited with error
-    assert!(safe_command("ls /abracadabra", 2) == Err(CmdError::Failed));
+    match safe_command("ls /abracadabra", 2) {
+        Err(CmdError::Failed(_)) => {}
+        _ => { assert!(false) }
+    }
     // Should work even though output is large (the executable is 26MB on my system)
     match safe_command("cat target/debug/sonar", 5) {
         Ok(_) => {}
-        Err(_) => assert!(false),
+        Err(_) => { assert!(false) }
     }
 }

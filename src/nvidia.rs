@@ -43,7 +43,7 @@ pub fn get_nvidia_information(
                 Err(e) => Err(format!("{:?}", e)),
             }
         }
-        Err(CmdError::CouldNotStart) => Ok(vec![]),
+        Err(CmdError::CouldNotStart(_)) => Ok(vec![]),
         Err(e) => Err(format!("{:?}", e)),
     }
 }
