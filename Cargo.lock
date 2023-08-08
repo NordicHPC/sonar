@@ -407,6 +407,7 @@ dependencies = [
  "clap",
  "csv",
  "hostname",
+ "log",
  "num_cpus",
  "subprocess",
  "wait-timeout",
