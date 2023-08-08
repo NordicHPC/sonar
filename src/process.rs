@@ -37,7 +37,8 @@ const TIMEOUT_SECONDS: u64 = 2; // for `ps`
 const PS_COMMAND_FILTERED: &str =
     "ps -e --no-header -o pid,user:22,pcpu,pmem,cputimes,size,comm | grep -v ' 0.0  0.0 '";
 
-const PS_COMMAND_COMPLETE: &str = "ps -e --no-header -o pid,user:22,pcpu,pmem,cputimes,size,ppid,sess,comm";
+const PS_COMMAND_COMPLETE: &str =
+    "ps -e --no-header -o pid,user:22,pcpu,pmem,cputimes,size,ppid,sess,comm";
 
 fn parse_ps_output(raw_text: &str, complete_output: bool) -> Vec<Process> {
     raw_text
@@ -84,18 +85,18 @@ pub fn parsed_test_output() -> Vec<Process> {
 #[test]
 fn test_parse_ps_output() {
     macro_rules! proc(
-	{ $a:expr, $b:expr, $c:expr, $d:expr, $e: expr, $f:expr, $g:expr } => {
-	    Process { pid: $a,
-		      user: $b.to_string(),
-		      cpu_pct: $c,
-		      mem_pct: $d,
+        { $a:expr, $b:expr, $c:expr, $d:expr, $e: expr, $f:expr, $g:expr } => {
+            Process { pid: $a,
+                      user: $b.to_string(),
+                      cpu_pct: $c,
+                      mem_pct: $d,
                       cputime_sec: $e,
-		      mem_size_kib: $f,
-		      command: $g.to_string(),
+                      mem_size_kib: $f,
+                      command: $g.to_string(),
                       ppid: 0,
                       session: 0,
-	    }
-	});
+            }
+        });
 
     assert!(parsed_test_output().into_iter().eq(vec![
         proc! {  2022, "bob",   10.0, 20.0, 128, 553348, "slack" },
