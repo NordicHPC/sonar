@@ -2,7 +2,6 @@
 #![allow(clippy::too_many_arguments)]
 
 use crate::amd;
-use crate::command::CmdError;
 use crate::jobs;
 use crate::nvidia;
 use crate::process;
@@ -146,7 +145,7 @@ fn extract_nvidia_processes(
 
 fn add_gpu_info(
     processes_by_slurm_job_id: &mut HashMap<(String, usize, String), JobInfo>,
-    gpu_output: Result<Vec<nvidia::Process>, CmdError>,
+    gpu_output: Result<Vec<nvidia::Process>, String>,
 ) {
     match gpu_output {
         Ok(gpu_output) => {
@@ -169,8 +168,8 @@ fn add_gpu_info(
                 );
             }
         }
-        Err(_) => {
-            log_cmderror("GPU process listing failed");
+        Err(e) => {
+            log_cmderror(&format!("GPU process listing failed:\n{}", e));
         }
     }
 }

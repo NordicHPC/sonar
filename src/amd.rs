@@ -16,10 +16,12 @@
 
 use crate::command::{self, CmdError};
 use crate::nvidia;
-#[cfg(test)]
-use crate::util::map;
+
 use std::cmp::Ordering;
 use std::collections::HashMap;
+
+#[cfg(test)]
+use crate::util::map;
 
 /// Get information about AMD cards.
 ///
@@ -28,7 +30,7 @@ use std::collections::HashMap;
 
 pub fn get_amd_information(
     user_by_pid: &HashMap<usize, String>,
-) -> Result<Vec<nvidia::Process>, CmdError> {
+) -> Result<Vec<nvidia::Process>, String> {
 
     // I've not been able to combine the two invocations of rocm-smi yet; we have to run the command
     // twice.  Not a happy situation.
@@ -40,12 +42,12 @@ pub fn get_amd_information(
                     &concise_raw_text,
                     &showpidgpus_raw_text,
                     user_by_pid,
-                )),
-                Err(e) => Err(e),
+                )?),
+                Err(e) => Err(format!("{:?}", e)),
             }
         }
         Err(CmdError::CouldNotStart) => Ok(vec![]),
-        Err(e) => Err(e),
+        Err(e) => Err(format!("{:?}", e)),
     }
 }
 
@@ -55,9 +57,9 @@ fn extract_amd_information(
     concise_raw_text: &str,
     showpidgpus_raw_text: &str,
     user_by_pid: &HashMap<usize, String>,
-) -> Vec<nvidia::Process> {
-    let per_device_info = parse_concise_command(concise_raw_text); // device -> (gpu%, mem%)
-    let per_pid_info = parse_showpidgpus_command(showpidgpus_raw_text); // pid -> [device, ...]
+) -> Result<Vec<nvidia::Process>, String> {
+    let per_device_info = parse_concise_command(concise_raw_text)?; // device -> (gpu%, mem%)
+    let per_pid_info = parse_showpidgpus_command(showpidgpus_raw_text)?; // pid -> [device, ...]
     let mut num_processes_per_device = vec![];
     num_processes_per_device.resize(per_device_info.len(), 0);
     per_pid_info.iter().for_each(|(_, devs)| {
@@ -92,7 +94,7 @@ fn extract_amd_information(
             fst
         }
     });
-    processes
+    Ok(processes)
 }
 
 #[cfg(test)]
@@ -147,7 +149,7 @@ const AMD_CONCISE_COMMAND: &str = "rocm-smi";
 //
 // The mem% is instantaneous memory utilization as expected.
 
-fn parse_concise_command(raw_text: &str) -> Vec<(f64, f64)> {
+fn parse_concise_command(raw_text: &str) -> Result<Vec<(f64, f64)>, String> {
     let block = find_block(raw_text, "= Concise Info =");
     if block.len() > 1 {
         let hdr = block[0].split_whitespace().collect::<Vec<&str>>();
@@ -173,12 +175,12 @@ fn parse_concise_command(raw_text: &str) -> Vec<(f64, f64)> {
                 mappings[dev] = (gpu, mem);
                 i += 1;
             }
-            mappings
+            Ok(mappings)
         } else {
-            vec![]
+            Err("Unexpected `Concise Info` header in output for AMD card:\n".to_string() + raw_text)
         }
     } else {
-        vec![]
+        Err("`Concise Info` block not found in output for AMD card:\n".to_string() + raw_text)
     }
 }
 
@@ -204,11 +206,11 @@ const AMD_SHOWPIDGPUS_COMMAND: &str = "rocm-smi --showpidgpus";
 //
 // The PIDs are unique, ie, the return value is technically a function.
 
-fn parse_showpidgpus_command(raw_text: &str) -> Vec<(usize, Vec<usize>)> {
+fn parse_showpidgpus_command(raw_text: &str) -> Result<Vec<(usize, Vec<usize>)>, String> {
     let block = find_block(raw_text, "= GPUs Indexed by PID =");
     if block.len() == 1 && block[0].starts_with("No KFD PIDs") {
         // No processes running.
-        vec![]
+        Ok(vec![])
     } else if block.len() > 1 && block.len() % 2 == 0 {
         let mut mappings = vec![];
         let mut i = 0;
@@ -229,10 +231,9 @@ fn parse_showpidgpus_command(raw_text: &str) -> Vec<(usize, Vec<usize>)> {
             }
             i += 2;
         }
-        mappings
+        Ok(mappings)
     } else {
-        // Weird output
-        vec![]
+        Err("`GPUs Indexed By PID` block not found in output for AMD card\n".to_string() + raw_text)
     }
 }
 
