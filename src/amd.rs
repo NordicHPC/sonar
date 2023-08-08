@@ -130,7 +130,7 @@ PID 28154 is using 1 DRM device(s):
     let users = map! {
     28156 => "bob".to_string()
     };
-    let zs = extract_amd_information(concise, pidgpu, &users);
+    let zs = extract_amd_information(concise, pidgpu, &users).unwrap();
     assert!(zs.eq(&vec![
         proc! { 0, 28154, "_zombie_28154", 99.0/2.0, 57.0/2.0 },
         proc! { 0, 28156, "bob", 99.0/2.0, 57.0/2.0 },
@@ -194,7 +194,7 @@ GPU  Temp (DieEdge)  AvgPwr  SCLK     MCLK    Fan     Perf  PwrCap  VRAM%  GPU%
 1    26.0c           3.0W    852Mhz   167Mhz  9.41%   auto  220.0W    5%   63%    
 ================================================================================
 ",
-    );
+    ).unwrap();
     assert!(xs.eq(&vec![(99.0, 57.0), (63.0, 5.0)]));
 }
 
@@ -248,7 +248,7 @@ PID 25774 is using 1 DRM device(s):
 0 
 ================================================================================
 ",
-    );
+    ).unwrap();
     assert!(xs.eq(&vec![(25774, vec![0])]));
     let xs = parse_showpidgpus_command(
         "
@@ -256,7 +256,7 @@ PID 25774 is using 1 DRM device(s):
 No KFD PIDs currently running
 ================================================================================
 ",
-    );
+    ).unwrap();
     assert!(xs.eq(&vec![]));
 
     let xs = parse_showpidgpus_command(
@@ -268,7 +268,7 @@ PID 28154 is using 1 DRM device(s):
 0 
 ================================================================================
 ",
-    );
+    ).unwrap();
     assert!(xs.eq(&vec![(28156, vec![1]), (28154, vec![0])]));
     let xs = parse_showpidgpus_command(
         "
@@ -277,7 +277,7 @@ PID 29212 is using 2 DRM device(s):
 0 1 
 ================================================================================
 ",
-    );
+    ).unwrap();
     assert!(xs.eq(&vec![(29212, vec![0, 1])]));
 }
 
