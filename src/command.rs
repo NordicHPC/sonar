@@ -92,7 +92,9 @@ pub fn safe_command(command: &str, timeout_seconds: u64) -> Result<String, CmdEr
             // Signal 15 == SIGTERM
             Err(CmdError::Hung(command.to_string()))
         }
-        Ok(_) => Err(CmdError::Failed(command.to_string())),
+        Ok(_) => {
+            Err(CmdError::Failed(command.to_string()))
+        }
         Err(_) => Err(CmdError::InternalError(command.to_string())),
     }
 }
