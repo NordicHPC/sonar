@@ -1,3 +1,5 @@
+extern crate env_logger;
+
 use clap::{Parser, Subcommand};
 
 mod amd;
@@ -33,6 +35,8 @@ enum Commands {
 }
 
 fn main() {
+    env_logger::init();
+
     let cli = Cli::parse();
 
     match &cli.command {

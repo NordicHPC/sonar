@@ -14,3 +14,4 @@ num_cpus = "1.0"
 clap = { version = "4.3", features = ["derive"] }
 csv = "1.2"
 log = "0.4.19"
+env_logger = "0.10.0"
