@@ -2,17 +2,20 @@
 #![allow(clippy::too_many_arguments)]
 
 use crate::amd;
-use crate::command::CmdError;
 use crate::jobs;
 use crate::nvidia;
 use crate::process;
 use crate::util::{three_places, time_iso8601};
-use std::collections::HashMap;
+
 extern crate num_cpus;
+extern crate log;
+
+use csv::Writer;
+use std::collections::HashMap;
+use std::io;
+
 #[cfg(test)]
 use crate::util::map;
-use csv::Writer;
-use std::io;
 
 struct JobInfo {
     cpu_percentage: f64,
@@ -146,7 +149,7 @@ fn extract_nvidia_processes(
 
 fn add_gpu_info(
     processes_by_slurm_job_id: &mut HashMap<(String, usize, String), JobInfo>,
-    gpu_output: Result<Vec<nvidia::Process>, CmdError>,
+    gpu_output: Result<Vec<nvidia::Process>, String>,
 ) {
     match gpu_output {
         Ok(gpu_output) => {
@@ -169,8 +172,8 @@ fn add_gpu_info(
                 );
             }
         }
-        Err(_) => {
-            log_cmderror("GPU process listing failed");
+        Err(e) => {
+            log::error!("GPU process listing failed: {}", e);
         }
     }
 }
@@ -220,8 +223,8 @@ pub fn create_snapshot(
     let mut user_by_pid: HashMap<usize, String> = HashMap::new();
 
     match process::get_process_information(jobs) {
-        Err(_) => {
-            log_cmderror("CPU process listing failed");
+        Err(e) => {
+            log::error!("CPU process listing failed: {:?}", e);
             return;
         }
         Ok(ps_output) => {
@@ -284,9 +287,4 @@ pub fn create_snapshot(
     }
 
     writer.flush().unwrap();
-}
-
-fn log_cmderror(msg: &str) {
-    // TODO (issue 52): Implement some sensible logging maybe
-    eprintln!("SONAR ERROR: {:?}", msg);
 }

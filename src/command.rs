@@ -4,10 +4,10 @@ use subprocess::{Exec, ExitStatus, Redirection};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum CmdError {
-    CouldNotStart,
-    Failed,
-    Hung,
-    InternalError,
+    CouldNotStart(String),
+    Failed(String),
+    Hung(String),
+    InternalError(String),
 }
 
 // There's a general problem with subprocesses writing to a pipe in that there is a limited capacity
@@ -32,7 +32,7 @@ pub fn safe_command(command: &str, timeout_seconds: u64) -> Result<String, CmdEr
         Err(_) => {
             // TODO: Possibly too coarse-grained but the documentation is not
             // helpful in clarifying what might have happened.
-            return Err(CmdError::CouldNotStart);
+            return Err(CmdError::CouldNotStart(command.to_string()));
         }
     };
 
@@ -46,28 +46,30 @@ pub fn safe_command(command: &str, timeout_seconds: u64) -> Result<String, CmdEr
     let mut comm = p
         .communicate_start(None)
         .limit_time(Duration::new(timeout_seconds, 0));
-    let mut result = "".to_string();
+    let mut stdout_result = "".to_string();
+    let mut stderr_result = "".to_string();
     let code = loop {
         match comm.read_string() {
             Ok((Some(stdout), Some(stderr))) => {
                 if !stderr.is_empty() {
-                    break Some(CmdError::Failed);
+		    stderr_result += &stderr;
+                    break Some(CmdError::Failed(format_failure(&command, &stdout_result, &stderr_result)))
                 } else if stdout.is_empty() {
                     // This is always EOF because timeouts are signaled as Err()
                     break None;
                 } else {
-                    result = result + &stdout
+                    stdout_result += &stdout;
                 }
             }
-            Ok((_, _)) => break Some(CmdError::InternalError),
+            Ok((_, _)) => break Some(CmdError::InternalError(format_failure(&command, &stdout_result, &stderr_result))),
             Err(e) => {
                 if e.error.kind() == io::ErrorKind::TimedOut {
                     match p.terminate() {
-                        Ok(_) => break Some(CmdError::Hung),
-                        Err(_) => break Some(CmdError::InternalError),
+                        Ok(_) => break Some(CmdError::Hung(format_failure(&command, &stdout_result, &stderr_result))),
+                        Err(_) => break Some(CmdError::InternalError(format_failure(&command, &stdout_result, &stderr_result)))
                     }
                 }
-                break Some(CmdError::InternalError);
+                break Some(CmdError::InternalError(format_failure(&command, &stdout_result, &stderr_result)))
             }
         }
     };
@@ -77,23 +79,39 @@ pub fn safe_command(command: &str, timeout_seconds: u64) -> Result<String, CmdEr
             if let Some(status) = code {
                 Err(status)
             } else {
-                Ok(result)
+                Ok(stdout_result)
             }
         }
         Ok(ExitStatus::Exited(126)) => {
             // 126 == "Command cannot execute"
-            Err(CmdError::CouldNotStart)
+            Err(CmdError::CouldNotStart(format_failure(&command, &stdout_result, &stderr_result)))
         }
         Ok(ExitStatus::Exited(127)) => {
             // 127 == "Command not found"
-            Err(CmdError::CouldNotStart)
+            Err(CmdError::CouldNotStart(format_failure(&command, &stdout_result, &stderr_result)))
         }
         Ok(ExitStatus::Signaled(15)) => {
             // Signal 15 == SIGTERM
-            Err(CmdError::Hung)
+            Err(CmdError::Hung(format_failure(&command, &stdout_result, &stderr_result)))
         }
-        Ok(_) => Err(CmdError::Failed),
-        Err(_) => Err(CmdError::InternalError),
+        Ok(_) => {
+            Err(CmdError::Failed(format_failure(&command, &stdout_result, &stderr_result)))
+        }
+        Err(_) => Err(CmdError::InternalError(format_failure(&command, &stdout_result, &stderr_result)))
+    }
+}
+
+fn format_failure(command: &str, stdout: &str, stderr: &str) -> String {
+    if !stdout.is_empty() {
+        if !stderr.is_empty() {
+            format!("COMMAND:\n{command}\nSTDOUT:\n{stdout}\nSTDERR:\n{stderr}")
+	} else {
+            format!("COMMAND:\n{command}\nSTDOUT:\n{stdout}")
+	}
+    } else if !stderr.is_empty() {
+        format!("COMMAND:\n{command}\nSTDERR:\n{stderr}")
+    } else {
+        format!("COMMAND:\n{command}")
     }
 }
 
@@ -107,16 +125,28 @@ fn test_safe_command() {
     // This really needs to be the output
     assert!(safe_command("grep '^name =' Cargo.toml", 2) == Ok("name = \"sonar\"\n".to_string()));
     // Not found
-    assert!(safe_command("no-such-command-we-hope", 2) == Err(CmdError::CouldNotStart));
+    match safe_command("no-such-command-we-hope", 2) {
+        Err(CmdError::CouldNotStart(_)) => {}
+        _ => { assert!(false) }
+    }
     // Wrong permissions, not executable
-    assert!(safe_command("/etc/passwd", 2) == Err(CmdError::CouldNotStart));
+    match safe_command("/etc/passwd", 2) {
+        Err(CmdError::CouldNotStart(_)) => {}
+        _ => { assert!(false) }
+    }
     // Should take too long
-    assert!(safe_command("sleep 7", 2) == Err(CmdError::Hung));
+    match safe_command("sleep 7", 2) {
+        Err(CmdError::Hung(_)) => {}
+        _ => { assert!(false) }
+    }
     // Exited with error
-    assert!(safe_command("ls /abracadabra", 2) == Err(CmdError::Failed));
+    match safe_command("ls /abracadabra", 2) {
+        Err(CmdError::Failed(_)) => {}
+        _ => { assert!(false) }
+    }
     // Should work even though output is large (the executable is 26MB on my system)
     match safe_command("cat target/debug/sonar", 5) {
         Ok(_) => {}
-        Err(_) => assert!(false),
+        Err(_) => { assert!(false) }
     }
 }

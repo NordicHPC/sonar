@@ -9,9 +9,11 @@
 
 use crate::command::{self, CmdError};
 use crate::util;
+
+use std::collections::HashMap;
+
 #[cfg(test)]
 use crate::util::map;
-use std::collections::HashMap;
 
 #[derive(PartialEq)]
 pub struct Process {
@@ -29,7 +31,7 @@ pub struct Process {
 
 pub fn get_nvidia_information(
     user_by_pid: &HashMap<usize, String>,
-) -> Result<Vec<Process>, CmdError> {
+) -> Result<Vec<Process>, String> {
     match command::safe_command(NVIDIA_PMON_COMMAND, TIMEOUT_SECONDS) {
         Ok(pmon_raw_text) => {
             let mut processes = parse_pmon_output(&pmon_raw_text, user_by_pid);
@@ -38,11 +40,11 @@ pub fn get_nvidia_information(
                     processes.append(&mut parse_query_output(&query_raw_text, user_by_pid));
                     Ok(processes)
                 }
-                Err(e) => Err(e),
+                Err(e) => Err(format!("{:?}", e)),
             }
         }
-        Err(CmdError::CouldNotStart) => Ok(vec![]),
-        Err(e) => Err(e),
+        Err(CmdError::CouldNotStart(_)) => Ok(vec![]),
+        Err(e) => Err(format!("{:?}", e)),
     }
 }
 
