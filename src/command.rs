@@ -46,28 +46,30 @@ pub fn safe_command(command: &str, timeout_seconds: u64) -> Result<String, CmdEr
     let mut comm = p
         .communicate_start(None)
         .limit_time(Duration::new(timeout_seconds, 0));
-    let mut result = "".to_string();
+    let mut stdout_result = "".to_string();
+    let mut stderr_result = "".to_string();
     let code = loop {
         match comm.read_string() {
             Ok((Some(stdout), Some(stderr))) => {
                 if !stderr.is_empty() {
-                    break Some(CmdError::Failed(command.to_string()));
+		    stderr_result += &stderr;
+                    break Some(CmdError::Failed(format_failure(&command, &stdout_result, &stderr_result)))
                 } else if stdout.is_empty() {
                     // This is always EOF because timeouts are signaled as Err()
                     break None;
                 } else {
-                    result = result + &stdout
+                    stdout_result += &stdout;
                 }
             }
-            Ok((_, _)) => break Some(CmdError::InternalError(command.to_string())),
+            Ok((_, _)) => break Some(CmdError::InternalError(format_failure(&command, &stdout_result, &stderr_result))),
             Err(e) => {
                 if e.error.kind() == io::ErrorKind::TimedOut {
                     match p.terminate() {
-                        Ok(_) => break Some(CmdError::Hung(command.to_string())),
-                        Err(_) => break Some(CmdError::InternalError(command.to_string())),
+                        Ok(_) => break Some(CmdError::Hung(format_failure(&command, &stdout_result, &stderr_result))),
+                        Err(_) => break Some(CmdError::InternalError(format_failure(&command, &stdout_result, &stderr_result)))
                     }
                 }
-                break Some(CmdError::InternalError(command.to_string()));
+                break Some(CmdError::InternalError(format_failure(&command, &stdout_result, &stderr_result)))
             }
         }
     };
@@ -77,25 +79,39 @@ pub fn safe_command(command: &str, timeout_seconds: u64) -> Result<String, CmdEr
             if let Some(status) = code {
                 Err(status)
             } else {
-                Ok(result)
+                Ok(stdout_result)
             }
         }
         Ok(ExitStatus::Exited(126)) => {
             // 126 == "Command cannot execute"
-            Err(CmdError::CouldNotStart(command.to_string()))
+            Err(CmdError::CouldNotStart(format_failure(&command, &stdout_result, &stderr_result)))
         }
         Ok(ExitStatus::Exited(127)) => {
             // 127 == "Command not found"
-            Err(CmdError::CouldNotStart(command.to_string()))
+            Err(CmdError::CouldNotStart(format_failure(&command, &stdout_result, &stderr_result)))
         }
         Ok(ExitStatus::Signaled(15)) => {
             // Signal 15 == SIGTERM
-            Err(CmdError::Hung(command.to_string()))
+            Err(CmdError::Hung(format_failure(&command, &stdout_result, &stderr_result)))
         }
         Ok(_) => {
-            Err(CmdError::Failed(command.to_string()))
+            Err(CmdError::Failed(format_failure(&command, &stdout_result, &stderr_result)))
         }
-        Err(_) => Err(CmdError::InternalError(command.to_string())),
+        Err(_) => Err(CmdError::InternalError(format_failure(&command, &stdout_result, &stderr_result)))
+    }
+}
+
+fn format_failure(command: &str, stdout: &str, stderr: &str) -> String {
+    if !stdout.is_empty() {
+        if !stderr.is_empty() {
+            format!("COMMAND:\n{command}\nSTDOUT:\n{stdout}\nSTDERR:\n{stderr}")
+	} else {
+            format!("COMMAND:\n{command}\nSTDOUT:\n{stdout}")
+	}
+    } else if !stderr.is_empty() {
+        format!("COMMAND:\n{command}\nSTDERR:\n{stderr}")
+    } else {
+        format!("COMMAND:\n{command}")
     }
 }
 

@@ -173,7 +173,7 @@ fn add_gpu_info(
             }
         }
         Err(e) => {
-            log::error!("GPU process listing failed:\n{}", e);
+            log::error!("GPU process listing failed: {}", e);
         }
     }
 }
