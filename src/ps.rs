@@ -102,11 +102,11 @@ fn test_extract_ps_processes() {
     assert!(
         processes
             == map! {
-                ("bob".to_string(), 2022, "slack".to_string()) => (10.0, 128, 20.0, 553348),
-                ("bob".to_string(), 42178, "chromium".to_string()) => (20.0, 129+130, 30.0, 358884),
-                ("alice".to_string(), 42189, "slack".to_string()) => (10.0, 131, 5.0, 5528),
-                ("bob".to_string(), 42191, "someapp".to_string()) => (10.0, 132, 5.0, 5552),
-                ("alice".to_string(), 42213, "some app".to_string()) => (20.0, 133+134, 10.0, 484268)
+                ("bob".to_string(), 2022, "slack".to_string()) => (10.0, 60+28, 20.0, 553348),
+                ("bob".to_string(), 42178, "chromium".to_string()) => (20.0, 60+29+60+30, 30.0, 358884),
+                ("alice".to_string(), 42189, "slack".to_string()) => (10.0, 60+31, 5.0, 5528),
+                ("bob".to_string(), 42191, "someapp".to_string()) => (10.0, 60+32, 5.0, 5552),
+                ("alice".to_string(), 42213, "some app".to_string()) => (20.0, 60+33+60+34, 10.0, 484268)
             }
     );
 }
