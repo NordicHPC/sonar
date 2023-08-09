@@ -34,11 +34,17 @@ pub fn get_process_information(jobs: &mut dyn jobs::JobManager) -> Result<Vec<Pr
 
 const TIMEOUT_SECONDS: u64 = 2; // for `ps`
 
+// `--cumulative` and `bsdtime` are to make sure that the cpu time accounted to exited child
+// processes (the cutime and cstime fields of /proc/pid/status) is used and printed.  Note
+// `cputimes` is unaffected by `--cumulative`.
+//
+// The format of `bsdtime` is `m...m:ss` in minutes and seconds.
+
 const PS_COMMAND_FILTERED: &str =
-    "ps -e --no-header -o pid,user:22,pcpu,pmem,cputimes,size,comm | grep -v ' 0.0  0.0 '";
+    "ps -e --no-header --cumulative -o pid,user:22,pcpu,pmem,bsdtime,size,comm | grep -v ' 0.0  0.0 '";
 
 const PS_COMMAND_COMPLETE: &str =
-    "ps -e --no-header -o pid,user:22,pcpu,pmem,cputimes,size,ppid,sess,comm";
+    "ps -e --no-header --cumulative -o pid,user:22,pcpu,pmem,bsdtime,size,ppid,sess,comm";
 
 fn parse_ps_output(raw_text: &str, complete_output: bool) -> Vec<Process> {
     raw_text
@@ -50,7 +56,7 @@ fn parse_ps_output(raw_text: &str, complete_output: bool) -> Vec<Process> {
                 user: parts[1].to_string(),
                 cpu_pct: parts[2].parse::<f64>().unwrap(),
                 mem_pct: parts[3].parse::<f64>().unwrap(),
-                cputime_sec: parts[4].parse::<usize>().unwrap(),
+                cputime_sec: parse_bsdtime(parts[4]),
                 mem_size_kib: parts[5].parse::<usize>().unwrap(),
                 ppid: if complete_output {
                     parts[6].to_string().parse::<usize>().unwrap()
@@ -67,6 +73,15 @@ fn parse_ps_output(raw_text: &str, complete_output: bool) -> Vec<Process> {
             }
         })
         .collect::<Vec<Process>>()
+}
+
+fn parse_bsdtime<'a>(s: &'a str) -> usize {
+    let ss = s.split(':').collect::<Vec<&'a str>>();
+    if ss.len() != 2 {
+        0
+    } else {
+        ss[0].parse::<usize>().unwrap() * 60 + ss[1].parse::<usize>().unwrap()
+    }
 }
 
 #[cfg(test)]
