@@ -6,22 +6,22 @@ use crate::jobs;
 use crate::nvidia;
 use crate::process;
 use crate::util::{three_places, time_iso8601};
+use std::collections::{HashMap, HashSet};
 
-extern crate num_cpus;
 extern crate log;
+extern crate num_cpus;
 
 use csv::Writer;
-use std::collections::HashMap;
 use std::io;
 
 #[cfg(test)]
-use crate::util::map;
+use crate::util::{map, set};
 
 struct JobInfo {
     cpu_percentage: f64,
     cputime_sec: usize,
     mem_size: usize,
-    gpu_mask: u32, // Up to 32 GPUs, good enough for now?
+    gpu_cards: HashSet<usize>,
     gpu_percentage: f64,
     gpu_mem_percentage: f64,
     gpu_mem_size: usize,
@@ -35,7 +35,7 @@ fn add_job_info(
     cpu_percentage: f64,
     cputime_sec: usize,
     mem_size: usize,
-    gpu_mask: u32,
+    gpu_cards: HashSet<usize>,
     gpu_percentage: f64,
     gpu_mem_percentage: f64,
     gpu_mem_size: usize,
@@ -46,7 +46,7 @@ fn add_job_info(
             e.cpu_percentage += cpu_percentage;
             e.cputime_sec += cputime_sec;
             e.mem_size += mem_size;
-            e.gpu_mask |= gpu_mask;
+            e.gpu_cards.extend(&gpu_cards);
             e.gpu_percentage += gpu_percentage;
             e.gpu_mem_percentage += gpu_mem_percentage;
             e.gpu_mem_size += gpu_mem_size;
@@ -55,7 +55,7 @@ fn add_job_info(
             cpu_percentage,
             cputime_sec,
             mem_size,
-            gpu_mask,
+            gpu_cards,
             gpu_percentage,
             gpu_mem_percentage,
             gpu_mem_size,
@@ -116,7 +116,7 @@ fn test_extract_ps_processes() {
 
 fn extract_nvidia_processes(
     processes: &[nvidia::Process],
-) -> HashMap<(String, usize, String), (u32, f64, f64, usize)> {
+) -> HashMap<(String, usize, String), (HashSet<usize>, f64, f64, usize)> {
     processes
         .iter()
         .map(
@@ -131,23 +131,24 @@ fn extract_nvidia_processes(
              }| {
                 (
                     (user.clone(), *pid, command.clone()),
-                    (
-                        if *device >= 0 { 1 << device } else { !0 },
-                        *gpu_pct,
-                        *mem_pct,
-                        *mem_size_kib,
-                    ),
+                    (*device, *gpu_pct, *mem_pct, *mem_size_kib),
                 )
             },
         )
         .fold(HashMap::new(), |mut acc, (key, value)| {
-            if let Some((device, gpu_pct, mem_pct, mem_size)) = acc.get_mut(&key) {
-                *device |= value.0;
+            if let Some((gpu_cards, gpu_pct, mem_pct, mem_size)) = acc.get_mut(&key) {
+                if value.0.is_some() {
+                    gpu_cards.insert(value.0.unwrap());
+                }
                 *gpu_pct += value.1;
                 *mem_pct += value.2;
                 *mem_size += value.3;
             } else {
-                acc.insert(key, value);
+                let mut gpu_cards = HashSet::new();
+                if value.0.is_some() {
+                    gpu_cards.insert(value.0.unwrap());
+                }
+                acc.insert(key, (gpu_cards, value.1, value.2, value.3));
             }
             acc
         })
@@ -161,7 +162,7 @@ fn add_gpu_info(
         Ok(gpu_output) => {
             for (
                 (user, pid, command),
-                (gpu_mask, gpu_percentage, gpu_mem_percentage, gpu_mem_size),
+                (gpu_cards, gpu_percentage, gpu_mem_percentage, gpu_mem_size),
             ) in extract_nvidia_processes(&gpu_output)
             {
                 add_job_info(
@@ -172,7 +173,7 @@ fn add_gpu_info(
                     0.0,
                     0,
                     0,
-                    gpu_mask,
+                    gpu_cards,
                     gpu_percentage,
                     gpu_mem_percentage,
                     gpu_mem_size,
@@ -193,13 +194,13 @@ fn test_extract_nvidia_pmon_processes() {
     assert!(
         processes
             == map! {
-                ("bob".to_string(), 447153, "python3.9".to_string())            => (0b1, 0.0, 0.0, 7669*1024),
-                ("bob".to_string(), 447160, "python3.9".to_string())            => (0b1, 0.0, 0.0, 11057*1024),
-                ("_zombie_506826".to_string(), 506826, "python3.9".to_string()) => (0b1, 0.0, 0.0, 11057*1024),
-                ("alice".to_string(), 1864615, "python".to_string())            => (0b1111, 40.0, 0.0, (1635+535+535+535)*1024),
-                ("charlie".to_string(), 2233095, "python3".to_string())         => (0b10, 84.0, 23.0, 24395*1024),
-                ("_zombie_1448150".to_string(), 1448150, "python3".to_string()) => (0b100, 0.0, 0.0, 9383*1024),
-                ("charlie".to_string(), 2233469, "python3".to_string())         => (0b1000, 90.0, 23.0, 15771*1024)
+                ("bob".to_string(), 447153, "python3.9".to_string())            => (set!{0}, 0.0, 0.0, 7669*1024),
+                ("bob".to_string(), 447160, "python3.9".to_string())            => (set!{0}, 0.0, 0.0, 11057*1024),
+                ("_zombie_506826".to_string(), 506826, "python3.9".to_string()) => (set!{0}, 0.0, 0.0, 11057*1024),
+                ("alice".to_string(), 1864615, "python".to_string())            => (set!{0, 1, 2, 3}, 40.0, 0.0, (1635+535+535+535)*1024),
+                ("charlie".to_string(), 2233095, "python3".to_string())         => (set!{1}, 84.0, 23.0, 24395*1024),
+                ("_zombie_1448150".to_string(), 1448150, "python3".to_string()) => (set!{2}, 0.0, 0.0, 9383*1024),
+                ("charlie".to_string(), 2233469, "python3".to_string())         => (set!{3}, 90.0, 23.0, 15771*1024)
             }
     );
 }
@@ -212,7 +213,7 @@ fn test_extract_nvidia_query_processes() {
     assert!(
         processes
             == map! {
-                ("_zombie_3079002".to_string(), 3079002, "_unknown_".to_string()) => (!0, 0.0, 0.0, 2350*1024)
+                ("_zombie_3079002".to_string(), 3079002, "_unknown_".to_string()) => (HashSet::new(), 0.0, 0.0, 2350*1024)
             }
     );
 }
@@ -250,7 +251,7 @@ pub fn create_snapshot(
                         cpu_percentage,
                         cputime_sec,
                         mem_size,
-                        0,
+                        HashSet::new(),
                         0.0,
                         0.0,
                         0,
@@ -271,26 +272,25 @@ pub fn create_snapshot(
 
     let mut writer = Writer::from_writer(io::stdout());
 
+    const VERSION: &str = env!("CARGO_PKG_VERSION");
+
     for ((user, job_id, command), job_info) in processes_by_job_id {
         writer
             .write_record([
-                &timestamp,
-                &hostname,
-                &num_cores.to_string(),
-                &user,
-                &job_id.to_string(),
-                &command,
-                &three_places(job_info.cpu_percentage).to_string(),
-                &job_info.mem_size.to_string(),
-                // TODO: There are other sensible formats for the device mask, notably
-                // non-numeric strings, strings padded on the left out to the number
-                // of devices on the system, and strings of device numbers separated by
-                // some non-comma separator char eg "7:2:1".
-                &format!("{:b}", job_info.gpu_mask),
-                &three_places(job_info.gpu_percentage).to_string(),
-                &three_places(job_info.gpu_mem_percentage).to_string(),
-                &job_info.gpu_mem_size.to_string(),
-                &job_info.cputime_sec.to_string(),
+                &format!("v={VERSION}"),
+                &format!("time={timestamp}"),
+                &format!("host={hostname}"),
+                &format!("cores={num_cores}"),
+                &format!("user={user}"),
+                &format!("job={job_id}"),
+                &format!("cmd={command}"),
+                &format!("cpu%={}", three_places(job_info.cpu_percentage)),
+                &format!("cpukib={}", job_info.mem_size),
+                &format!("gpus={:?}", job_info.gpu_cards),
+                &format!("gpu%={}", three_places(job_info.gpu_percentage)),
+                &format!("gpumem%={}", three_places(job_info.gpu_mem_percentage)),
+                &format!("gpukib={}", job_info.gpu_mem_size),
+                &format!("cputime_sec={}", job_info.cputime_sec),
             ])
             .unwrap();
     }

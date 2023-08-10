@@ -1,5 +1,19 @@
 use chrono::prelude::Local;
 
+// Populate a HashSet.
+#[cfg(test)]
+macro_rules! set(
+    { $($key:expr),+ } => {
+        {
+            let mut m = ::std::collections::HashSet::new();
+            $(
+                m.insert($key);
+            )+
+            m
+        }
+     };
+);
+
 // Populate a HashMap.
 #[cfg(test)]
 macro_rules! map(
@@ -16,6 +30,9 @@ macro_rules! map(
 
 #[cfg(test)]
 pub(crate) use map;
+
+#[cfg(test)]
+pub(crate) use set;
 
 // Get current time as an ISO time stamp.
 pub fn time_iso8601() -> String {
