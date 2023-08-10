@@ -54,7 +54,7 @@ pub fn safe_command(command: &str, timeout_seconds: u64) -> Result<String, CmdEr
                 if !stderr.is_empty() {
                     stderr_result += &stderr;
                     break Some(CmdError::Failed(format_failure(
-                        &command,
+                        command,
                         &stdout_result,
                         &stderr_result,
                     )));
@@ -67,7 +67,7 @@ pub fn safe_command(command: &str, timeout_seconds: u64) -> Result<String, CmdEr
             }
             Ok((_, _)) => {
                 break Some(CmdError::InternalError(format_failure(
-                    &command,
+                    command,
                     &stdout_result,
                     &stderr_result,
                 )))
@@ -77,14 +77,14 @@ pub fn safe_command(command: &str, timeout_seconds: u64) -> Result<String, CmdEr
                     match p.terminate() {
                         Ok(_) => {
                             break Some(CmdError::Hung(format_failure(
-                                &command,
+                                command,
                                 &stdout_result,
                                 &stderr_result,
                             )))
                         }
                         Err(_) => {
                             break Some(CmdError::InternalError(format_failure(
-                                &command,
+                                command,
                                 &stdout_result,
                                 &stderr_result,
                             )))
@@ -92,7 +92,7 @@ pub fn safe_command(command: &str, timeout_seconds: u64) -> Result<String, CmdEr
                     }
                 }
                 break Some(CmdError::InternalError(format_failure(
-                    &command,
+                    command,
                     &stdout_result,
                     &stderr_result,
                 )));
@@ -111,7 +111,7 @@ pub fn safe_command(command: &str, timeout_seconds: u64) -> Result<String, CmdEr
         Ok(ExitStatus::Exited(126)) => {
             // 126 == "Command cannot execute"
             Err(CmdError::CouldNotStart(format_failure(
-                &command,
+                command,
                 &stdout_result,
                 &stderr_result,
             )))
@@ -119,7 +119,7 @@ pub fn safe_command(command: &str, timeout_seconds: u64) -> Result<String, CmdEr
         Ok(ExitStatus::Exited(127)) => {
             // 127 == "Command not found"
             Err(CmdError::CouldNotStart(format_failure(
-                &command,
+                command,
                 &stdout_result,
                 &stderr_result,
             )))
@@ -127,18 +127,18 @@ pub fn safe_command(command: &str, timeout_seconds: u64) -> Result<String, CmdEr
         Ok(ExitStatus::Signaled(15)) => {
             // Signal 15 == SIGTERM
             Err(CmdError::Hung(format_failure(
-                &command,
+                command,
                 &stdout_result,
                 &stderr_result,
             )))
         }
         Ok(_) => Err(CmdError::Failed(format_failure(
-            &command,
+            command,
             &stdout_result,
             &stderr_result,
         ))),
         Err(_) => Err(CmdError::InternalError(format_failure(
-            &command,
+            command,
             &stdout_result,
             &stderr_result,
         ))),
