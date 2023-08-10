@@ -86,13 +86,13 @@ Here is an example output:
 ```console
 $ sonar ps
 
-v=0.7.0,time=2023-07-29T17:45:37+02:00,host=somehost,cores=12,user=someone,job=0,cmd=.vim-wrapped,cpu%=1.9,cpukib=7228,gpus={},gpu%=0,gpumem%=0,gpukib=0
-v=0.7.0,time=2023-07-29T17:45:37+02:00,host=somehost,cores=12,user=someone,job=0,cmd=node,cpu%=1.8,cpukib=79332,gpus={},gpu%=0,gpumem%=0,gpukib=0
-v=0.7.0,time=2023-07-29T17:45:37+02:00,host=somehost,cores=12,user=someone,job=0,cmd=slack,cpu%=0.7,cpukib=591720,gpus={},gpu%=0,gpumem%=0,gpukib=0
-v=0.7.0,time=2023-07-29T17:45:37+02:00,host=somehost,cores=12,user=someone,job=0,cmd=X,cpu%=1.5,cpukib=224416,gpus={},gpu%=0,gpumem%=0,gpukib=0
-v=0.7.0,time=2023-07-29T17:45:37+02:00,host=somehost,cores=12,user=someone,job=0,cmd=brave,cpu%=12.1,cpukib=3075300,gpus={},gpu%=0,gpumem%=0,gpukib=0
-v=0.7.0,time=2023-07-29T17:45:37+02:00,host=somehost,cores=12,user=someone,job=0,cmd=alacritty,cpu%=1.2,cpukib=286196,gpus={},gpu%=0,gpumem%=0,gpukib=0
-v=0.7.0,time=2023-07-29T17:45:37+02:00,host=somehost,cores=12,user=someone,job=0,cmd=sonar,cpu%=9,cpukib=372,gpus={},gpu%=0,gpumem%=0,gpukib=0
+v=0.7.0,time=2023-07-29T17:45:37+02:00,host=somehost,cores=12,user=someone,job=0,cmd=.vim-wrapped,cpu%=1.9,cpukib=7228,gpus=none,gpu%=0,gpumem%=0,gpukib=0
+v=0.7.0,time=2023-07-29T17:45:37+02:00,host=somehost,cores=12,user=someone,job=0,cmd=node,cpu%=1.8,cpukib=79332,gpus=none,gpu%=0,gpumem%=0,gpukib=0
+v=0.7.0,time=2023-07-29T17:45:37+02:00,host=somehost,cores=12,user=someone,job=0,cmd=slack,cpu%=0.7,cpukib=591720,gpus=none,gpu%=0,gpumem%=0,gpukib=0
+v=0.7.0,time=2023-07-29T17:45:37+02:00,host=somehost,cores=12,user=someone,job=0,cmd=X,cpu%=1.5,cpukib=224416,gpus=none,gpu%=0,gpumem%=0,gpukib=0
+v=0.7.0,time=2023-07-29T17:45:37+02:00,host=somehost,cores=12,user=someone,job=0,cmd=brave,cpu%=12.1,cpukib=3075300,gpus=none,gpu%=0,gpumem%=0,gpukib=0
+v=0.7.0,time=2023-07-29T17:45:37+02:00,host=somehost,cores=12,user=someone,job=0,cmd=alacritty,cpu%=1.2,cpukib=286196,gpus=none,gpu%=0,gpumem%=0,gpukib=0
+v=0.7.0,time=2023-07-29T17:45:37+02:00,host=somehost,cores=12,user=someone,job=0,cmd=sonar,cpu%=9,cpukib=372,gpus=none,gpu%=0,gpumem%=0,gpukib=0
 ```
 
 The columns are:
@@ -103,12 +103,12 @@ The columns are:
 - `user` : username owning the process/command (it can also be "unknown" and "zombie")
 - `job`: job ID (positive integer; 0 if not applicable)
 - `cmd`: process/command
-- `cpu%`: CPU percentage (in percent of one core; as they come out of `ps`)
-- `cpukib`: CPU memory used in KiB
+- `cpu%`: CPU percentage (in percent of one core; as they come out of `ps`; this is not a sample but a running average)
+- `cpukib`: CPU memory used in KiB (this is a sample)
 - `gpus`: GPU devices (the card indices are 1-based; more about it below)
-- `gpu%`: GPU percentage (sim across cards)
-- `gpumem%`: GPU memory percentage (in percent of memory across all cards)
-- `gpukib`: GPU memory used in KiB (sum across cards)
+- `gpu%`: GPU percentage (sim across cards; this is a sample)
+- `gpumem%`: GPU memory percentage (in percent of memory across all cards; this is a sample)
+- `gpukib`: GPU memory used in KiB (sum across cards; this is a sample)
 
 `gpumem%` vs `gpukib`:
 The difference is that on some cards some of the time it is possible to
@@ -123,8 +123,9 @@ for the time being to report what we can report and let the analyzer sort it
 out.
 
 `gpus` are GPU devices:
-- If a process would use GPUs 1, 3, and 7: `"gpus={1, 3, 7}"`
-- If a process would use no or unknown GPUs: `gpus={}`
+- If a process would use GPUs 1, 3, and 7: `"gpus=1,3,7"`
+- If a process would use no GPUs: `gpus=none`
+- If a process uses unknown GPUs: `gpus=unknown`
 
 
 ## Collect results with `sonar analyze` :construction:
