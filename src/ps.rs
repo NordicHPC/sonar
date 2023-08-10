@@ -19,6 +19,7 @@ use crate::util::map;
 
 struct JobInfo {
     cpu_percentage: f64,
+    cputime_sec: usize,
     mem_size: usize,
     gpu_mask: u32, // Up to 32 GPUs, good enough for now?
     gpu_percentage: f64,
@@ -32,6 +33,7 @@ fn add_job_info(
     job_id: usize,
     command: String,
     cpu_percentage: f64,
+    cputime_sec: usize,
     mem_size: usize,
     gpu_mask: u32,
     gpu_percentage: f64,
@@ -42,6 +44,7 @@ fn add_job_info(
         .entry((user, job_id, command))
         .and_modify(|e| {
             e.cpu_percentage += cpu_percentage;
+            e.cputime_sec += cputime_sec;
             e.mem_size += mem_size;
             e.gpu_mask |= gpu_mask;
             e.gpu_percentage += gpu_percentage;
@@ -50,6 +53,7 @@ fn add_job_info(
         })
         .or_insert(JobInfo {
             cpu_percentage,
+            cputime_sec,
             mem_size,
             gpu_mask,
             gpu_percentage,
@@ -60,7 +64,7 @@ fn add_job_info(
 
 fn extract_ps_processes(
     processes: &[process::Process],
-) -> HashMap<(String, usize, String), (f64, f64, usize)> {
+) -> HashMap<(String, usize, String), (f64, usize, f64, usize)> {
     processes
         .iter()
         .map(
@@ -69,21 +73,23 @@ fn extract_ps_processes(
                  pid,
                  command,
                  cpu_pct,
+                 cputime_sec,
                  mem_pct,
                  mem_size_kib,
                  ..
              }| {
                 (
                     (user.clone(), *pid, command.clone()),
-                    (*cpu_pct, *mem_pct, *mem_size_kib),
+                    (*cpu_pct, *cputime_sec, *mem_pct, *mem_size_kib),
                 )
             },
         )
         .fold(HashMap::new(), |mut acc, (key, value)| {
-            if let Some((cpu_pct, mem_pct, mem_size_kib)) = acc.get_mut(&key) {
+            if let Some((cpu_pct, cputime_sec, mem_pct, mem_size_kib)) = acc.get_mut(&key) {
                 *cpu_pct += value.0;
-                *mem_pct += value.1;
-                *mem_size_kib += value.2;
+                *cputime_sec += value.1;
+                *mem_pct += value.2;
+                *mem_size_kib += value.3;
             } else {
                 acc.insert(key, value);
             }
@@ -99,11 +105,11 @@ fn test_extract_ps_processes() {
     assert!(
         processes
             == map! {
-                ("bob".to_string(), 2022, "slack".to_string()) => (10.0, 20.0, 553348),
-                ("bob".to_string(), 42178, "chromium".to_string()) => (20.0, 30.0, 358884),
-                ("alice".to_string(), 42189, "slack".to_string()) => (10.0, 5.0, 5528),
-                ("bob".to_string(), 42191, "someapp".to_string()) => (10.0, 5.0, 5552),
-                ("alice".to_string(), 42213, "some app".to_string()) => (20.0, 10.0, 484268)
+                ("bob".to_string(), 2022, "slack".to_string()) => (10.0, 60+28, 20.0, 553348),
+                ("bob".to_string(), 42178, "chromium".to_string()) => (20.0, 60+29+60+30, 30.0, 358884),
+                ("alice".to_string(), 42189, "slack".to_string()) => (10.0, 60+31, 5.0, 5528),
+                ("bob".to_string(), 42191, "someapp".to_string()) => (10.0, 60+32, 5.0, 5552),
+                ("alice".to_string(), 42213, "some app".to_string()) => (20.0, 60+33+60+34, 10.0, 484268)
             }
     );
 }
@@ -164,6 +170,7 @@ fn add_gpu_info(
                     pid,
                     command,
                     0.0,
+                    0,
                     0,
                     gpu_mask,
                     gpu_percentage,
@@ -228,7 +235,7 @@ pub fn create_snapshot(
             return;
         }
         Ok(ps_output) => {
-            for ((user, pid, command), (cpu_percentage, mem_percentage, mem_size)) in
+            for ((user, pid, command), (cpu_percentage, cputime_sec, mem_percentage, mem_size)) in
                 extract_ps_processes(&ps_output)
             {
                 user_by_pid.insert(pid, user.clone());
@@ -241,6 +248,7 @@ pub fn create_snapshot(
                         jobs.job_id_from_pid(pid, &ps_output),
                         command,
                         cpu_percentage,
+                        cputime_sec,
                         mem_size,
                         0,
                         0.0,
@@ -282,6 +290,7 @@ pub fn create_snapshot(
                 &three_places(job_info.gpu_percentage).to_string(),
                 &three_places(job_info.gpu_mem_percentage).to_string(),
                 &job_info.gpu_mem_size.to_string(),
+                &job_info.cputime_sec.to_string(),
             ])
             .unwrap();
     }
