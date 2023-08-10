@@ -52,8 +52,12 @@ pub fn safe_command(command: &str, timeout_seconds: u64) -> Result<String, CmdEr
         match comm.read_string() {
             Ok((Some(stdout), Some(stderr))) => {
                 if !stderr.is_empty() {
-		    stderr_result += &stderr;
-                    break Some(CmdError::Failed(format_failure(&command, &stdout_result, &stderr_result)))
+                    stderr_result += &stderr;
+                    break Some(CmdError::Failed(format_failure(
+                        &command,
+                        &stdout_result,
+                        &stderr_result,
+                    )));
                 } else if stdout.is_empty() {
                     // This is always EOF because timeouts are signaled as Err()
                     break None;
@@ -61,15 +65,37 @@ pub fn safe_command(command: &str, timeout_seconds: u64) -> Result<String, CmdEr
                     stdout_result += &stdout;
                 }
             }
-            Ok((_, _)) => break Some(CmdError::InternalError(format_failure(&command, &stdout_result, &stderr_result))),
+            Ok((_, _)) => {
+                break Some(CmdError::InternalError(format_failure(
+                    &command,
+                    &stdout_result,
+                    &stderr_result,
+                )))
+            }
             Err(e) => {
                 if e.error.kind() == io::ErrorKind::TimedOut {
                     match p.terminate() {
-                        Ok(_) => break Some(CmdError::Hung(format_failure(&command, &stdout_result, &stderr_result))),
-                        Err(_) => break Some(CmdError::InternalError(format_failure(&command, &stdout_result, &stderr_result)))
+                        Ok(_) => {
+                            break Some(CmdError::Hung(format_failure(
+                                &command,
+                                &stdout_result,
+                                &stderr_result,
+                            )))
+                        }
+                        Err(_) => {
+                            break Some(CmdError::InternalError(format_failure(
+                                &command,
+                                &stdout_result,
+                                &stderr_result,
+                            )))
+                        }
                     }
                 }
-                break Some(CmdError::InternalError(format_failure(&command, &stdout_result, &stderr_result)))
+                break Some(CmdError::InternalError(format_failure(
+                    &command,
+                    &stdout_result,
+                    &stderr_result,
+                )));
             }
         }
     };
@@ -84,20 +110,38 @@ pub fn safe_command(command: &str, timeout_seconds: u64) -> Result<String, CmdEr
         }
         Ok(ExitStatus::Exited(126)) => {
             // 126 == "Command cannot execute"
-            Err(CmdError::CouldNotStart(format_failure(&command, &stdout_result, &stderr_result)))
+            Err(CmdError::CouldNotStart(format_failure(
+                &command,
+                &stdout_result,
+                &stderr_result,
+            )))
         }
         Ok(ExitStatus::Exited(127)) => {
             // 127 == "Command not found"
-            Err(CmdError::CouldNotStart(format_failure(&command, &stdout_result, &stderr_result)))
+            Err(CmdError::CouldNotStart(format_failure(
+                &command,
+                &stdout_result,
+                &stderr_result,
+            )))
         }
         Ok(ExitStatus::Signaled(15)) => {
             // Signal 15 == SIGTERM
-            Err(CmdError::Hung(format_failure(&command, &stdout_result, &stderr_result)))
+            Err(CmdError::Hung(format_failure(
+                &command,
+                &stdout_result,
+                &stderr_result,
+            )))
         }
-        Ok(_) => {
-            Err(CmdError::Failed(format_failure(&command, &stdout_result, &stderr_result)))
-        }
-        Err(_) => Err(CmdError::InternalError(format_failure(&command, &stdout_result, &stderr_result)))
+        Ok(_) => Err(CmdError::Failed(format_failure(
+            &command,
+            &stdout_result,
+            &stderr_result,
+        ))),
+        Err(_) => Err(CmdError::InternalError(format_failure(
+            &command,
+            &stdout_result,
+            &stderr_result,
+        ))),
     }
 }
 
@@ -105,9 +149,9 @@ fn format_failure(command: &str, stdout: &str, stderr: &str) -> String {
     if !stdout.is_empty() {
         if !stderr.is_empty() {
             format!("COMMAND:\n{command}\nSTDOUT:\n{stdout}\nSTDERR:\n{stderr}")
-	} else {
+        } else {
             format!("COMMAND:\n{command}\nSTDOUT:\n{stdout}")
-	}
+        }
     } else if !stderr.is_empty() {
         format!("COMMAND:\n{command}\nSTDERR:\n{stderr}")
     } else {
@@ -127,26 +171,36 @@ fn test_safe_command() {
     // Not found
     match safe_command("no-such-command-we-hope", 2) {
         Err(CmdError::CouldNotStart(_)) => {}
-        _ => { assert!(false) }
+        _ => {
+            assert!(false)
+        }
     }
     // Wrong permissions, not executable
     match safe_command("/etc/passwd", 2) {
         Err(CmdError::CouldNotStart(_)) => {}
-        _ => { assert!(false) }
+        _ => {
+            assert!(false)
+        }
     }
     // Should take too long
     match safe_command("sleep 7", 2) {
         Err(CmdError::Hung(_)) => {}
-        _ => { assert!(false) }
+        _ => {
+            assert!(false)
+        }
     }
     // Exited with error
     match safe_command("ls /abracadabra", 2) {
         Err(CmdError::Failed(_)) => {}
-        _ => { assert!(false) }
+        _ => {
+            assert!(false)
+        }
     }
     // Should work even though output is large (the executable is 26MB on my system)
     match safe_command("cat target/debug/sonar", 5) {
         Ok(_) => {}
-        Err(_) => { assert!(false) }
+        Err(_) => {
+            assert!(false)
+        }
     }
 }
