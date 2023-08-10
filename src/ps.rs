@@ -62,9 +62,32 @@ fn add_job_info(
         });
 }
 
-fn extract_ps_processes(
-    processes: &[process::Process],
-) -> HashMap<(String, usize, String), (f64, usize, f64, usize)> {
+type Pid = usize;
+
+#[derive(PartialEq)]
+struct PsInfo {
+    user: String,
+    command: String,
+    cpu_pct: f64,
+    cputime_sec: usize,
+    mem_pct: f64,
+    mem_size_kib: usize
+}
+
+impl PsInfo {
+    fn new(user: &str, command: &str, cpu_pct: f64, cputime_sec: usize, mem_pct: f64, mem_size_kib: usize) -> PsInfo {
+        PsInfo {
+            user: user.to_string(),
+            command: command.to_string(),
+            cpu_pct,
+            cputime_sec,
+            mem_pct,
+            mem_size_kib
+        }
+    }
+}
+
+fn extract_ps_info(processes: &[process::Process]) -> HashMap<Pid, PsInfo> {
     processes
         .iter()
         .map(
@@ -77,19 +100,14 @@ fn extract_ps_processes(
                  mem_pct,
                  mem_size_kib,
                  ..
-             }| {
-                (
-                    (user.clone(), *pid, command.clone()),
-                    (*cpu_pct, *cputime_sec, *mem_pct, *mem_size_kib),
-                )
-            },
+             }| (*pid, PsInfo::new(&user, &command, *cpu_pct, *cputime_sec, *mem_pct, *mem_size_kib)),
         )
         .fold(HashMap::new(), |mut acc, (key, value)| {
-            if let Some((cpu_pct, cputime_sec, mem_pct, mem_size_kib)) = acc.get_mut(&key) {
-                *cpu_pct += value.0;
-                *cputime_sec += value.1;
-                *mem_pct += value.2;
-                *mem_size_kib += value.3;
+            if let Some(ps_info) = acc.get_mut(&key) {
+                ps_info.cpu_pct += value.cpu_pct;
+                ps_info.cputime_sec += value.cputime_sec;
+                ps_info.mem_pct += value.mem_pct;
+                ps_info.mem_size_kib += value.mem_size_kib;
             } else {
                 acc.insert(key, value);
             }
@@ -98,25 +116,46 @@ fn extract_ps_processes(
 }
 
 #[test]
-fn test_extract_ps_processes() {
+fn test_extract_ps_info() {
     let ps_output = process::parsed_test_output();
-    let processes = extract_ps_processes(&ps_output);
+    let ps_info = extract_ps_info(&ps_output);
 
     assert!(
-        processes
+        ps_info
             == map! {
-                ("bob".to_string(), 2022, "slack".to_string()) => (10.0, 60+28, 20.0, 553348),
-                ("bob".to_string(), 42178, "chromium".to_string()) => (20.0, 60+29+60+30, 30.0, 358884),
-                ("alice".to_string(), 42189, "slack".to_string()) => (10.0, 60+31, 5.0, 5528),
-                ("bob".to_string(), 42191, "someapp".to_string()) => (10.0, 60+32, 5.0, 5552),
-                ("alice".to_string(), 42213, "some app".to_string()) => (20.0, 60+33+60+34, 10.0, 484268)
+                2022 => PsInfo::new("bob", "slack", 10.0, 60+28, 20.0, 553348),
+                42178 => PsInfo::new("bob", "chromium", 20.0, 60+29+60+30, 30.0, 358884),
+                42189 => PsInfo::new("alice", "slack", 10.0, 60+31, 5.0, 5528),
+                42191 => PsInfo::new("bob", "someapp", 10.0, 60+32, 5.0, 5552),
+                42213 => PsInfo::new("alice", "some app", 20.0, 60+33+60+34, 10.0, 484268)
             }
     );
 }
 
-fn extract_nvidia_processes(
-    processes: &[nvidia::Process],
-) -> HashMap<(String, usize, String), (HashSet<usize>, f64, f64, usize)> {
+#[derive(PartialEq)]
+struct GpuInfo {
+    user: String,
+    command: String,
+    gpus: HashSet<usize>,
+    gpu_pct: f64,
+    gpumem_pct: f64,
+    gpumem_size_kib: usize,
+}
+
+impl GpuInfo {
+    fn new(user: &str, command: &str, gpus: HashSet<usize>, gpu_pct: f64, gpumem_pct: f64, gpumem_size_kib: usize) -> GpuInfo {
+        GpuInfo {
+            user: user.to_string(),
+            command: command.to_string(),
+            gpus,
+            gpu_pct,
+            gpumem_pct,
+            gpumem_size_kib
+        }
+    }
+}
+
+fn extract_gpu_info(processes: &[nvidia::Process]) -> HashMap<Pid, GpuInfo> {
     processes
         .iter()
         .map(
@@ -128,30 +167,26 @@ fn extract_nvidia_processes(
                  mem_pct,
                  mem_size_kib,
                  command,
-             }| {
-                (
-                    (user.clone(), *pid, command.clone()),
-                    (*device, *gpu_pct, *mem_pct, *mem_size_kib),
-                )
-            },
-        )
+             }| (*pid, GpuInfo::new(&user, &command, make_gpuset(*device), *gpu_pct, *mem_pct, *mem_size_kib)))
         .fold(HashMap::new(), |mut acc, (key, value)| {
-            if let Some((gpu_cards, gpu_pct, mem_pct, mem_size)) = acc.get_mut(&key) {
-                if value.0.is_some() {
-                    gpu_cards.insert(value.0.unwrap());
-                }
-                *gpu_pct += value.1;
-                *mem_pct += value.2;
-                *mem_size += value.3;
+            if let Some(gpu_info) = acc.get_mut(&key) {
+                gpu_info.gpus.extend(value.gpus);
+                gpu_info.gpu_pct += value.gpu_pct;
+                gpu_info.gpumem_pct += value.gpumem_pct;
+                gpu_info.gpumem_size_kib += value.gpumem_size_kib;
             } else {
-                let mut gpu_cards = HashSet::new();
-                if value.0.is_some() {
-                    gpu_cards.insert(value.0.unwrap());
-                }
-                acc.insert(key, (gpu_cards, value.1, value.2, value.3));
+                acc.insert(key, value);
             }
             acc
         })
+}
+
+fn make_gpuset(maybe_device: Option<usize>) -> HashSet<usize> {
+    let mut gpus = HashSet::new();
+    if let Some(dev) = maybe_device {
+        gpus.insert(dev);
+    }
+    gpus
 }
 
 fn add_gpu_info(
@@ -160,23 +195,19 @@ fn add_gpu_info(
 ) {
     match gpu_output {
         Ok(gpu_output) => {
-            for (
-                (user, pid, command),
-                (gpu_cards, gpu_percentage, gpu_mem_percentage, gpu_mem_size),
-            ) in extract_nvidia_processes(&gpu_output)
-            {
+            for (pid, gpu_info) in extract_gpu_info(&gpu_output) {
                 add_job_info(
                     processes_by_slurm_job_id,
-                    user,
+                    gpu_info.user,
                     pid,
-                    command,
+                    gpu_info.command,
                     0.0,
                     0,
                     0,
-                    gpu_cards,
-                    gpu_percentage,
-                    gpu_mem_percentage,
-                    gpu_mem_size,
+                    gpu_info.gpus,
+                    gpu_info.gpu_pct,
+                    gpu_info.gpumem_pct,
+                    gpu_info.gpumem_size_kib,
                 );
             }
         }
@@ -189,18 +220,18 @@ fn add_gpu_info(
 #[test]
 fn test_extract_nvidia_pmon_processes() {
     let ps_output = nvidia::parsed_pmon_output();
-    let processes = extract_nvidia_processes(&ps_output);
+    let gpu_info = extract_gpu_info(&ps_output);
 
     assert!(
-        processes
+        gpu_info
             == map! {
-                ("bob".to_string(), 447153, "python3.9".to_string())            => (set!{0}, 0.0, 0.0, 7669*1024),
-                ("bob".to_string(), 447160, "python3.9".to_string())            => (set!{0}, 0.0, 0.0, 11057*1024),
-                ("_zombie_506826".to_string(), 506826, "python3.9".to_string()) => (set!{0}, 0.0, 0.0, 11057*1024),
-                ("alice".to_string(), 1864615, "python".to_string())            => (set!{0, 1, 2, 3}, 40.0, 0.0, (1635+535+535+535)*1024),
-                ("charlie".to_string(), 2233095, "python3".to_string())         => (set!{1}, 84.0, 23.0, 24395*1024),
-                ("_zombie_1448150".to_string(), 1448150, "python3".to_string()) => (set!{2}, 0.0, 0.0, 9383*1024),
-                ("charlie".to_string(), 2233469, "python3".to_string())         => (set!{3}, 90.0, 23.0, 15771*1024)
+                447153 => GpuInfo::new("bob", "python3.9", set!{0}, 0.0, 0.0, 7669*1024),
+                447160 => GpuInfo::new("bob", "python3.9", set!{0}, 0.0, 0.0, 11057*1024),
+                506826 => GpuInfo::new("_zombie_506826", "python3.9", set!{0}, 0.0, 0.0, 11057*1024),
+                1864615 => GpuInfo::new("alice", "python", set!{0, 1, 2, 3}, 40.0, 0.0, (1635+535+535+535)*1024),
+                2233095 => GpuInfo::new("charlie", "python3", set!{1}, 84.0, 23.0, 24395*1024),
+                1448150 => GpuInfo::new("_zombie_1448150", "python3", set!{2}, 0.0, 0.0, 9383*1024),
+                2233469 => GpuInfo::new("charlie", "python3", set!{3}, 90.0, 23.0, 15771*1024)
             }
     );
 }
@@ -208,12 +239,12 @@ fn test_extract_nvidia_pmon_processes() {
 #[test]
 fn test_extract_nvidia_query_processes() {
     let ps_output = nvidia::parsed_query_output();
-    let processes = extract_nvidia_processes(&ps_output);
+    let gpu_info = extract_gpu_info(&ps_output);
 
     assert!(
-        processes
+        gpu_info
             == map! {
-                ("_zombie_3079002".to_string(), 3079002, "_unknown_".to_string()) => (HashSet::new(), 0.0, 0.0, 2350*1024)
+                3079002 => GpuInfo::new("_zombie_3079002", "_unknown_", HashSet::new(), 0.0, 0.0, 2350*1024)
             }
     );
 }
@@ -236,21 +267,20 @@ pub fn create_snapshot(
             return;
         }
         Ok(ps_output) => {
-            for ((user, pid, command), (cpu_percentage, cputime_sec, mem_percentage, mem_size)) in
-                extract_ps_processes(&ps_output)
+            for (pid, ps_info) in extract_ps_info(&ps_output)
             {
-                user_by_pid.insert(pid, user.clone());
+                user_by_pid.insert(pid, ps_info.user.clone());
 
-                if (cpu_percentage >= cpu_cutoff_percent) || (mem_percentage >= mem_cutoff_percent)
+                if (ps_info.cpu_pct >= cpu_cutoff_percent) || (ps_info.mem_pct >= mem_cutoff_percent)
                 {
                     add_job_info(
                         &mut processes_by_job_id,
-                        user,
+                        ps_info.user,
                         jobs.job_id_from_pid(pid, &ps_output),
-                        command,
-                        cpu_percentage,
-                        cputime_sec,
-                        mem_size,
+                        ps_info.command,
+                        ps_info.cpu_pct,
+                        ps_info.cputime_sec,
+                        ps_info.mem_size_kib,
                         HashSet::new(),
                         0.0,
                         0.0,
