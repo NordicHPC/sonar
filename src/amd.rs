@@ -13,7 +13,6 @@
 /// Even though the output is presented in the same format as for NVIDIA, we only have partial stats
 /// about the usage of various processes on the various devices.  We divide the utilization of a
 /// device by the number of processes on the device.  This is approximate.
-
 use crate::command::{self, CmdError};
 use crate::nvidia;
 
@@ -31,7 +30,6 @@ use crate::util::map;
 pub fn get_amd_information(
     user_by_pid: &HashMap<usize, String>,
 ) -> Result<Vec<nvidia::Process>, String> {
-
     // I've not been able to combine the two invocations of rocm-smi yet; we have to run the command
     // twice.  Not a happy situation.
 
@@ -72,7 +70,7 @@ fn extract_amd_information(
     per_pid_info.iter().for_each(|(pid, devs)| {
         devs.iter().for_each(|dev| {
             processes.push(nvidia::Process {
-                device: *dev as i32,
+                device: Some(*dev),
                 pid: *pid,
                 user: if let Some(u) = user_by_pid.get(pid) {
                     u.to_string()
@@ -114,17 +112,17 @@ macro_rules! proc(
 fn test_extract_amd_information() {
     let concise = "
 ================================= Concise Info =================================
-GPU  Temp (DieEdge)  AvgPwr  SCLK     MCLK    Fan     Perf  PwrCap  VRAM%  GPU%  
-0    53.0c           220.0W  1576Mhz  945Mhz  10.98%  auto  220.0W   57%   99%   
-1    26.0c           3.0W    852Mhz   167Mhz  9.41%   auto  220.0W    5%   63%    
+GPU  Temp (DieEdge)  AvgPwr  SCLK     MCLK    Fan     Perf  PwrCap  VRAM%  GPU%
+0    53.0c           220.0W  1576Mhz  945Mhz  10.98%  auto  220.0W   57%   99%
+1    26.0c           3.0W    852Mhz   167Mhz  9.41%   auto  220.0W    5%   63%
 ================================================================================
 ";
     let pidgpu = "
 ============================= GPUs Indexed by PID ==============================
 PID 28156 is using 2 DRM device(s):
-0 1 
+0 1
 PID 28154 is using 1 DRM device(s):
-0 
+0
 ================================================================================
 ";
     let users = map! {
@@ -132,9 +130,9 @@ PID 28154 is using 1 DRM device(s):
     };
     let zs = extract_amd_information(concise, pidgpu, &users).unwrap();
     assert!(zs.eq(&vec![
-        proc! { 0, 28154, "_zombie_28154", 99.0/2.0, 57.0/2.0 },
-        proc! { 0, 28156, "bob", 99.0/2.0, 57.0/2.0 },
-        proc! { 1, 28156, "bob", 63.0, 5.0 },
+        proc! { Some(0), 28154, "_zombie_28154", 99.0/2.0, 57.0/2.0 },
+        proc! { Some(0), 28156, "bob", 99.0/2.0, 57.0/2.0 },
+        proc! { Some(1), 28156, "bob", 63.0, 5.0 },
     ]));
 }
 
@@ -189,12 +187,13 @@ fn test_parse_concise_command() {
     let xs = parse_concise_command(
         "
 ================================= Concise Info =================================
-GPU  Temp (DieEdge)  AvgPwr  SCLK     MCLK    Fan     Perf  PwrCap  VRAM%  GPU%  
-0    53.0c           220.0W  1576Mhz  945Mhz  10.98%  auto  220.0W   57%   99%   
-1    26.0c           3.0W    852Mhz   167Mhz  9.41%   auto  220.0W    5%   63%    
+GPU  Temp (DieEdge)  AvgPwr  SCLK     MCLK    Fan     Perf  PwrCap  VRAM%  GPU%
+0    53.0c           220.0W  1576Mhz  945Mhz  10.98%  auto  220.0W   57%   99%
+1    26.0c           3.0W    852Mhz   167Mhz  9.41%   auto  220.0W    5%   63%
 ================================================================================
 ",
-    ).unwrap();
+    )
+    .unwrap();
     assert!(xs.eq(&vec![(99.0, 57.0), (63.0, 5.0)]));
 }
 
@@ -245,10 +244,11 @@ fn test_parse_showpidgpus_command() {
         "
 ============================= GPUs Indexed by PID ==============================
 PID 25774 is using 1 DRM device(s):
-0 
+0
 ================================================================================
 ",
-    ).unwrap();
+    )
+    .unwrap();
     assert!(xs.eq(&vec![(25774, vec![0])]));
     let xs = parse_showpidgpus_command(
         "
@@ -256,28 +256,31 @@ PID 25774 is using 1 DRM device(s):
 No KFD PIDs currently running
 ================================================================================
 ",
-    ).unwrap();
+    )
+    .unwrap();
     assert!(xs.eq(&vec![]));
 
     let xs = parse_showpidgpus_command(
         "
 ============================= GPUs Indexed by PID ==============================
 PID 28156 is using 1 DRM device(s):
-1 
+1
 PID 28154 is using 1 DRM device(s):
-0 
+0
 ================================================================================
 ",
-    ).unwrap();
+    )
+    .unwrap();
     assert!(xs.eq(&vec![(28156, vec![1]), (28154, vec![0])]));
     let xs = parse_showpidgpus_command(
         "
 ============================= GPUs Indexed by PID ==============================
 PID 29212 is using 2 DRM device(s):
-0 1 
+0 1
 ================================================================================
 ",
-    ).unwrap();
+    )
+    .unwrap();
     assert!(xs.eq(&vec![(29212, vec![0, 1])]));
 }
 
@@ -312,10 +315,10 @@ fn test_find_block() {
 ============================= xGPUs Indexed by PID ==============================
 ============================= GPUs Indexed by PID ==============================
 PID 25774 is using 1 DRM device(s):
-0 
+0
 ================================================================================
 ",
         "= GPUs Indexed by PID ="
     )
-    .eq(&vec!["PID 25774 is using 1 DRM device(s):", "0 "]))
+    .eq(&vec!["PID 25774 is using 1 DRM device(s):", "0"]))
 }

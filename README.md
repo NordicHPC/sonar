@@ -86,22 +86,46 @@ Here is an example output:
 ```console
 $ sonar ps
 
-2023-07-27T18:29:17+02:00,somehost,8,user,,alacritty,3.7,214932
-2023-07-27T18:29:17+02:00,somehost,8,user,,slack,2.4,1328412
-2023-07-27T18:29:17+02:00,somehost,8,user,,X,0.8,173148
-2023-07-27T18:29:17+02:00,somehost,8,user,,brave,15.5,7085968
-2023-07-27T18:29:17+02:00,somehost,8,user,,.zoom,37.8,1722564
+v=0.7.0,time=2023-08-10T11:09:41+02:00,host=somehost,cores=8,user=someone,job=0,cmd=fish,cpu%=2.1,cpukib=64400,gpus=none,gpu%=0,gpumem%=0,gpukib=0,cputime_sec=138
+v=0.7.0,time=2023-08-10T11:09:41+02:00,host=somehost,cores=8,user=someone,job=0,cmd=sonar,cpu%=761,cpukib=372,gpus=none,gpu%=0,gpumem%=0,gpukib=0,cputime_sec=137
+v=0.7.0,time=2023-08-10T11:09:41+02:00,host=somehost,cores=8,user=someone,job=0,cmd=brave,cpu%=14.6,cpukib=2907168,gpus=none,gpu%=0,gpumem%=0,gpukib=0,cputime_sec=3532
+v=0.7.0,time=2023-08-10T11:09:41+02:00,host=somehost,cores=8,user=someone,job=0,cmd=alacritty,cpu%=0.8,cpukib=126700,gpus=none,gpu%=0,gpumem%=0,gpukib=0,cputime_sec=51
+v=0.7.0,time=2023-08-10T11:09:41+02:00,host=somehost,cores=8,user=someone,job=0,cmd=pulseaudio,cpu%=0.7,cpukib=90640,gpus=none,gpu%=0,gpumem%=0,gpukib=0,cputime_sec=399
+v=0.7.0,time=2023-08-10T11:09:41+02:00,host=somehost,cores=8,user=someone,job=0,cmd=slack,cpu%=3.9,cpukib=716924,gpus=none,gpu%=0,gpumem%=0,gpukib=0,cputime_sec=266
 ```
 
 The columns are:
-- time stamp
-- hostname
-- number of cores on this node
-- user
-- Slurm job ID (empty if not applicable)
-- process
-- CPU percentage (as they come out of `ps`)
-- memory used in KiB
+- `v`: version (in the format n.m.o, following semantic versioning)
+- `time`: local time stamp (in ISO time without fractional seconds but with TZO)
+- `host`: host name (FQDN)
+- `cores`: number of cores on this node (positive integer)
+- `user` : username owning the process/command (it can also be "unknown" and "zombie")
+- `job`: job ID (positive integer; 0 if not applicable)
+- `cmd`: process/command
+- `cpu%`: CPU percentage (in percent of one core; as they come out of `ps`; this is not a sample but a running average)
+- `cpukib`: CPU memory used in KiB (this is a sample)
+- `gpus`: GPU devices (the card indices are 1-based; more about it below)
+- `gpu%`: GPU percentage (sim across cards; this is a sample)
+- `gpumem%`: GPU memory percentage (in percent of memory across all cards; this is a sample)
+- `gpukib`: GPU memory used in KiB (sum across cards; this is a sample)
+- `cputime_sec`: Accumulated CPU time that a process has used
+
+`gpumem%` vs `gpukib`:
+The difference is that on some cards some of the time it is possible to
+determine one of these but not the other, and vice versa. For example, on the
+NVIDIA cards we can read both quantities for running processes but only
+`gpukib` for some zombies. Since we can detect the total amount of memory here
+we could translate `gpukib` into `gpumem%`, though. On the other hand, on our
+AMD cards there is no support for detecting the absolute amount of memory used,
+nor the total amount of memory on the cards, only the percentage of gpu memory
+used. Rather than encoding the logic for dealing with this, it seemed better
+for the time being to report what we can report and let the analyzer sort it
+out.
+
+`gpus` are GPU devices:
+- If a process would use GPUs 1, 3, and 7: `"gpus=1,3,7"`
+- If a process would use no GPUs: `gpus=none`
+- If a process uses unknown GPUs: `gpus=unknown`
 
 
 ## Collect results with `sonar analyze` :construction:
