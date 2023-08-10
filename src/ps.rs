@@ -275,6 +275,14 @@ pub fn create_snapshot(
     const VERSION: &str = env!("CARGO_PKG_VERSION");
 
     for ((user, job_id, command), job_info) in processes_by_job_id {
+        // FIXME this does not print "none" or "unknown"
+        let gpus_comma_separated: String = job_info
+            .gpu_cards
+            .iter()
+            .map(|&num| num.to_string())
+            .collect::<Vec<String>>()
+            .join(",");
+
         writer
             .write_record([
                 &format!("v={VERSION}"),
@@ -286,7 +294,7 @@ pub fn create_snapshot(
                 &format!("cmd={command}"),
                 &format!("cpu%={}", three_places(job_info.cpu_percentage)),
                 &format!("cpukib={}", job_info.mem_size),
-                &format!("gpus={:?}", job_info.gpu_cards),
+                &format!("gpus={}", gpus_comma_separated),
                 &format!("gpu%={}", three_places(job_info.gpu_percentage)),
                 &format!("gpumem%={}", three_places(job_info.gpu_mem_percentage)),
                 &format!("gpukib={}", job_info.gpu_mem_size),
