@@ -86,13 +86,12 @@ Here is an example output:
 ```console
 $ sonar ps
 
-v=0.7.0,time=2023-07-29T17:45:37+02:00,host=somehost,cores=12,user=someone,job=0,cmd=.vim-wrapped,cpu%=1.9,cpukib=7228,gpus=none,gpu%=0,gpumem%=0,gpukib=0
-v=0.7.0,time=2023-07-29T17:45:37+02:00,host=somehost,cores=12,user=someone,job=0,cmd=node,cpu%=1.8,cpukib=79332,gpus=none,gpu%=0,gpumem%=0,gpukib=0
-v=0.7.0,time=2023-07-29T17:45:37+02:00,host=somehost,cores=12,user=someone,job=0,cmd=slack,cpu%=0.7,cpukib=591720,gpus=none,gpu%=0,gpumem%=0,gpukib=0
-v=0.7.0,time=2023-07-29T17:45:37+02:00,host=somehost,cores=12,user=someone,job=0,cmd=X,cpu%=1.5,cpukib=224416,gpus=none,gpu%=0,gpumem%=0,gpukib=0
-v=0.7.0,time=2023-07-29T17:45:37+02:00,host=somehost,cores=12,user=someone,job=0,cmd=brave,cpu%=12.1,cpukib=3075300,gpus=none,gpu%=0,gpumem%=0,gpukib=0
-v=0.7.0,time=2023-07-29T17:45:37+02:00,host=somehost,cores=12,user=someone,job=0,cmd=alacritty,cpu%=1.2,cpukib=286196,gpus=none,gpu%=0,gpumem%=0,gpukib=0
-v=0.7.0,time=2023-07-29T17:45:37+02:00,host=somehost,cores=12,user=someone,job=0,cmd=sonar,cpu%=9,cpukib=372,gpus=none,gpu%=0,gpumem%=0,gpukib=0
+v=0.7.0,time=2023-08-10T11:09:41+02:00,host=somehost,cores=8,user=someone,job=0,cmd=fish,cpu%=2.1,cpukib=64400,gpus=none,gpu%=0,gpumem%=0,gpukib=0,cputime_sec=138
+v=0.7.0,time=2023-08-10T11:09:41+02:00,host=somehost,cores=8,user=someone,job=0,cmd=sonar,cpu%=761,cpukib=372,gpus=none,gpu%=0,gpumem%=0,gpukib=0,cputime_sec=137
+v=0.7.0,time=2023-08-10T11:09:41+02:00,host=somehost,cores=8,user=someone,job=0,cmd=brave,cpu%=14.6,cpukib=2907168,gpus=none,gpu%=0,gpumem%=0,gpukib=0,cputime_sec=3532
+v=0.7.0,time=2023-08-10T11:09:41+02:00,host=somehost,cores=8,user=someone,job=0,cmd=alacritty,cpu%=0.8,cpukib=126700,gpus=none,gpu%=0,gpumem%=0,gpukib=0,cputime_sec=51
+v=0.7.0,time=2023-08-10T11:09:41+02:00,host=somehost,cores=8,user=someone,job=0,cmd=pulseaudio,cpu%=0.7,cpukib=90640,gpus=none,gpu%=0,gpumem%=0,gpukib=0,cputime_sec=399
+v=0.7.0,time=2023-08-10T11:09:41+02:00,host=somehost,cores=8,user=someone,job=0,cmd=slack,cpu%=3.9,cpukib=716924,gpus=none,gpu%=0,gpumem%=0,gpukib=0,cputime_sec=266
 ```
 
 The columns are:
@@ -109,6 +108,7 @@ The columns are:
 - `gpu%`: GPU percentage (sim across cards; this is a sample)
 - `gpumem%`: GPU memory percentage (in percent of memory across all cards; this is a sample)
 - `gpukib`: GPU memory used in KiB (sum across cards; this is a sample)
+- `cputime_sec`: Accumulated CPU time that a process has used
 
 `gpumem%` vs `gpukib`:
 The difference is that on some cards some of the time it is possible to

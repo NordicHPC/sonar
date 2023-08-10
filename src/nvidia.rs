@@ -16,7 +16,7 @@ use crate::util::map;
 
 #[derive(PartialEq)]
 pub struct Process {
-    pub device: Option<usize>, // -1 for "unknown", otherwise 0..num_devices-1
+    pub device: Option<usize>, // Device ID
     pub pid: usize,            // Process ID
     pub user: String,          // User name, _zombie_PID for zombies
     pub gpu_pct: f64,          // Percent of GPU /for this sample/, 0.0 for zombies

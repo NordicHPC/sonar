@@ -1,17 +1,17 @@
 #![allow(clippy::type_complexity)]
 #![allow(clippy::too_many_arguments)]
 
+extern crate log;
+extern crate num_cpus;
+
 use crate::amd;
 use crate::jobs;
 use crate::nvidia;
 use crate::process;
 use crate::util::{three_places, time_iso8601};
-use std::collections::{HashMap, HashSet};
-
-extern crate log;
-extern crate num_cpus;
 
 use csv::Writer;
+use std::collections::{HashMap, HashSet};
 use std::io;
 
 #[cfg(test)]
@@ -275,13 +275,17 @@ pub fn create_snapshot(
     const VERSION: &str = env!("CARGO_PKG_VERSION");
 
     for ((user, job_id, command), job_info) in processes_by_job_id {
-        // FIXME this does not print "none" or "unknown"
-        let gpus_comma_separated: String = job_info
+        // "unknown" is not implemented, see https://github.com/NordicHPC/sonar/issues/75
+        let mut gpus_comma_separated: String = job_info
             .gpu_cards
             .iter()
             .map(|&num| num.to_string())
             .collect::<Vec<String>>()
             .join(",");
+
+        if gpus_comma_separated.is_empty() {
+            gpus_comma_separated = "none".to_string();
+        }
 
         writer
             .write_record([
