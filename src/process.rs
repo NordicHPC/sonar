@@ -1,4 +1,4 @@
-// Run "ps" and return a vector of structures with all the information we need.
+/// Collect CPU process information without GPU information.
 
 use crate::command::{self, CmdError};
 use crate::jobs;
@@ -16,6 +16,9 @@ pub struct Process {
     pub ppid: usize,    // 0 if !jobs.need_process_tree()
     pub session: usize, // 0 if !jobs.need_process_tree()
 }
+
+/// Run "ps" and return a vector of structures with all the information we need.
+/// In the returned vector, pids uniquely tag the records.
 
 pub fn get_process_information(jobs: &mut dyn jobs::JobManager) -> Result<Vec<Process>, CmdError> {
     let need_process_tree = jobs.need_process_tree();
