@@ -1,3 +1,6 @@
+#![allow(unused_imports)]
+#![allow(unused_macros)]
+
 use chrono::prelude::Local;
 
 // Populate a HashSet.
