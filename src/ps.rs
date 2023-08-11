@@ -112,7 +112,7 @@ pub fn create_snapshot(
     let no_gpus = make_gpuset(None);
     let mut proc_by_pid = ProcTable::new();
 
-    let ps_probe = process::get_process_information(jobs);
+    let ps_probe = process::get_process_information();
     if let Err(e) = ps_probe {
         // This is a hard error, we need this information for everything.
         log::error!("CPU process listing failed: {:?}", e);
