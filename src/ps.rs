@@ -10,7 +10,7 @@ use crate::nvidia;
 use crate::process;
 use crate::util::{three_places, time_iso8601};
 
-use csv::Writer;
+use csv::{Writer, WriterBuilder};
 use std::collections::{HashMap, HashSet};
 use std::io;
 
@@ -196,7 +196,9 @@ pub fn create_snapshot(
         }
     }
 
-    let mut writer = Writer::from_writer(io::stdout());
+    let mut writer = WriterBuilder::new()
+        .flexible(true)
+        .from_writer(io::stdout());
 
     let timestamp = time_iso8601();
     let hostname = hostname::get().unwrap().into_string().unwrap();
@@ -258,7 +260,6 @@ pub fn create_snapshot(
                 }
             }
         }
-
         for r in rolledup {
             print_record(&mut writer, &print_params, &r); 
         }
@@ -298,23 +299,24 @@ fn print_record<W: io::Write>(writer: &mut Writer<W>, params: &PrintParameters, 
         gpus_comma_separated = "none".to_string();
     }
 
-    writer
-        .write_record([
-            &format!("v={}", params.version),
-            &format!("time={}", params.timestamp),
-            &format!("host={}", params.hostname),
-            &format!("cores={}", params.num_cores),
-            &format!("user={}", proc_info.user),
-            &format!("job={}", proc_info.job_id),
-            &format!("cmd={}", proc_info.command),
-            &format!("cpu%={}", three_places(proc_info.cpu_percentage)),
-            &format!("cpukib={}", proc_info.mem_size_kib),
-            &format!("gpus={}", gpus_comma_separated),
-            &format!("gpu%={}", three_places(proc_info.gpu_percentage)),
-            &format!("gpumem%={}", three_places(proc_info.gpu_mem_percentage)),
-            &format!("gpukib={}", proc_info.gpu_mem_size_kib),
-            &format!("cputime_sec={}", proc_info.cputime_sec),
-            &format!("rolledup={}", proc_info.rolledup),
-        ])
-        .unwrap();
+    let mut fields = vec![
+        format!("v={}", params.version),
+        format!("time={}", params.timestamp),
+        format!("host={}", params.hostname),
+        format!("cores={}", params.num_cores),
+        format!("user={}", proc_info.user),
+        format!("job={}", proc_info.job_id),
+        format!("cmd={}", proc_info.command),
+        format!("cpu%={}", three_places(proc_info.cpu_percentage)),
+        format!("cpukib={}", proc_info.mem_size_kib),
+        format!("gpus={}", gpus_comma_separated),
+        format!("gpu%={}", three_places(proc_info.gpu_percentage)),
+        format!("gpumem%={}", three_places(proc_info.gpu_mem_percentage)),
+        format!("gpukib={}", proc_info.gpu_mem_size_kib),
+        format!("cputime_sec={}", proc_info.cputime_sec),
+    ];
+    if proc_info.rolledup > 0 {
+        fields.push(format!("rolledup={}", proc_info.rolledup));
+    }
+    writer.write_record(fields).unwrap();
 }
