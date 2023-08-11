@@ -23,14 +23,6 @@ struct Cli {
 enum Commands {
     /// Take a snapshot of the currently running processes
     PS {
-        /// Do not print records for jobs that have not on average used more than this percentage of CPU
-        #[arg(long, default_value_t = 0.5)]
-        cpu_cutoff_percent: f64,
-
-        /// Do not print records for jobs that do not presently use more than this percentage of real memory
-        #[arg(long, default_value_t = 5.0)]
-        mem_cutoff_percent: f64,
-
         /// Synthesize a job ID from the process tree in which a process finds itself
         #[arg(long, default_value_t = false)]
         batchless: bool,
@@ -38,6 +30,26 @@ enum Commands {
         /// Merge process records that have the same job ID and command name
         #[arg(long, default_value_t = false)]
         rollup: bool,
+
+        /// Select records for jobs that have on average used at least this percentage of CPU, note this is nonmonotonic [default: none]
+        #[arg(long)]
+        min_cpu_percent: Option<f64>,
+
+        /// Select records for jobs that presently use at least this percentage of real memory, note this is nonmonotonic [default: none]
+        #[arg(long)]
+        min_mem_percent: Option<f64>,
+
+        /// Select records for jobs that have used at least this much CPU time (in seconds) [default: none]
+        #[arg(long)]
+        min_cpu_time: Option<usize>,
+
+        /// Exclude records for system jobs (uid < 1000)
+        #[arg(long, default_value_t = false)]
+        exclude_system_jobs: bool,
+
+        /// Exclude records for these comma-separated user names [default: none]
+        #[arg(long)]
+        exclude_users: Option<String>,
     },
     /// Not yet implemented
     Analyze {},
@@ -50,17 +62,32 @@ fn main() {
 
     match &cli.command {
         Commands::PS {
-            cpu_cutoff_percent,
-            mem_cutoff_percent,
             rollup,
             batchless,
+            min_cpu_percent,
+            min_mem_percent,
+            min_cpu_time,
+            exclude_system_jobs,
+            exclude_users,
         } => {
+            let opts = ps::PsOptions {
+                rollup: *rollup,
+                min_cpu_percent: *min_cpu_percent,
+                min_mem_percent: *min_mem_percent,
+                min_cpu_time: *min_cpu_time,
+                exclude_system_jobs: *exclude_system_jobs,
+                exclude_users: if let Some(s) = exclude_users {
+                    s.split(',').collect::<Vec<&str>>()
+                } else {
+                    vec![]
+                },
+            };
             if *batchless {
                 let mut jm = batchless::BatchlessJobManager::new();
-                ps::create_snapshot(&mut jm, *rollup, *cpu_cutoff_percent, *mem_cutoff_percent);
+                ps::create_snapshot(&mut jm, &opts);
             } else {
                 let mut jm = slurm::SlurmJobManager {};
-                ps::create_snapshot(&mut jm, *rollup, *cpu_cutoff_percent, *mem_cutoff_percent);
+                ps::create_snapshot(&mut jm, &opts);
             }
         }
         Commands::Analyze {} => {

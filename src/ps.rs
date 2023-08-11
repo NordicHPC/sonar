@@ -38,6 +38,7 @@ struct ProcInfo<'a> {
     command: &'a str,
     _pid: Pid,
     rolledup: usize,
+    is_system_job: bool,
     job_id: usize,
     cpu_percentage: f64,
     cputime_sec: usize,
@@ -91,6 +92,7 @@ where
             command,
             _pid: pid,
             rolledup: 0,
+            is_system_job: false,
             job_id: lookup_job_by_pid(pid),
             cpu_percentage,
             cputime_sec,
@@ -103,11 +105,18 @@ where
         });
 }
 
+pub struct PsOptions<'a> {
+    pub rollup: bool,
+    pub min_cpu_percent: Option<f64>,
+    pub min_mem_percent: Option<f64>,
+    pub min_cpu_time: Option<usize>,
+    pub exclude_system_jobs: bool,
+    pub exclude_users: Vec<&'a str>,
+}
+
 pub fn create_snapshot(
     jobs: &mut dyn jobs::JobManager,
-    rollup_by_jobid_and_command: bool,
-    cpu_cutoff_percent: f64,
-    mem_cutoff_percent: f64,
+    opts: &PsOptions
 ) {
     let no_gpus = make_gpuset(None);
     let mut proc_by_pid = ProcTable::new();
@@ -209,11 +218,10 @@ pub fn create_snapshot(
         timestamp: &timestamp,
         num_cores,
         version: VERSION,
-        cpu_cutoff_percent,
-        mem_cutoff_percent
+        opts
     };
 
-    if rollup_by_jobid_and_command {
+    if opts.rollup {
         // This is a little complicated because jobs with job_id 0 cannot be rolled up.
         //
         // - There is an array `rolledup` of ProcInfo nodes that represent rolled-up data
@@ -221,10 +229,11 @@ pub fn create_snapshot(
         // - When the job ID of a job in `proc_by_pid` is zero, the entry in `rolledup` is a copy of
         //   that job; these jobs cannot be rolled up (this is why it's complicated)
         //
-        // - Otherwise, the entry in `rolledup` represent rolled-up information for a (job, command) pair
+        // - Otherwise, the entry in `rolledup` represent rolled-up information for a (job, command)
+        //   pair
         //
-        // - There is a hash table `index` that maps the (job, command) pair to the entry in `rolledup`,
-        //   if any
+        // - There is a hash table `index` that maps the (job, command) pair to the entry in
+        //   `rolledup`, if any
         //
         // - When we're done rolling up, we print the `rolledup` table.
         //
@@ -277,13 +286,54 @@ struct PrintParameters<'a> {
     timestamp: &'a str,
     num_cores: usize,
     version: &'a str,
-    cpu_cutoff_percent: f64,
-    mem_cutoff_percent: f64,
+    opts: &'a PsOptions<'a>
 }
 
 fn print_record<W: io::Write>(writer: &mut Writer<W>, params: &PrintParameters, proc_info: &ProcInfo) {
-    if (proc_info.cpu_percentage < params.cpu_cutoff_percent) &&
-        (proc_info.mem_percentage < params.mem_cutoff_percent) {
+    let mut included = false;
+
+    // The logic here is that if any of the inclusion filters are provided, then the set of those
+    // that are provided constitute the entire inclusion filter, and the record must pass at least
+    // one of those to be included.  Otherwise, when none of the filters are provided then the
+    // record is included by default.
+
+    if params.opts.min_cpu_percent.is_some() || params.opts.min_mem_percent.is_some() || params.opts.min_cpu_time.is_some() {
+        if let Some(cpu_cutoff_percent) = params.opts.min_cpu_percent {
+            if proc_info.cpu_percentage >= cpu_cutoff_percent {
+                included = true;
+            }
+        }
+        if let Some(mem_cutoff_percent) = params.opts.min_mem_percent {
+            if proc_info.mem_percentage >= mem_cutoff_percent {
+                included = true;
+            }
+        }
+        if let Some(cpu_cutoff_time) = params.opts.min_cpu_time {
+            if proc_info.cputime_sec >= cpu_cutoff_time {
+                included = true;
+            }
+        }
+    } else {
+        included = true;
+    }
+
+    if !included {
+        return;
+    }
+
+    // The exclusion filters apply after the inclusion filters and the record must pass all of the
+    // ones that are provided.
+
+    if params.opts.exclude_system_jobs && proc_info.is_system_job {
+        included = false;
+    }
+    if params.opts.exclude_users.len() > 0 {
+        if params.opts.exclude_users.iter().any(|x| *x == proc_info.user) {
+            included = false;
+        }
+    }
+
+    if !included {
         return;
     }
 
