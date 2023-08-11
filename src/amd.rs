@@ -129,7 +129,7 @@ PID 28154 is using 1 DRM device(s):
 ================================================================================
 ";
     let users = map! {
-    28156 => ("bob".to_string(), 1001usize)
+    28156 => ("bob", 1001usize)
     };
     let zs = extract_amd_information(concise, pidgpu, &users).unwrap();
     assert!(zs.eq(&vec![

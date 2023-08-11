@@ -57,7 +57,7 @@ type ProcTable<'a> = HashMap<Pid, ProcInfo<'a>>;
 // about users for the processes on the GPUS.
 
 pub type Uid = usize;
-pub type UserTable = HashMap<Pid, (String, Uid)>;
+pub type UserTable<'a> = HashMap<Pid, (&'a str, Uid)>;
 
 // Add information about the process to the table `proc_by_pid`.  Here, `lookup_job_by_pid`, `user`,
 // `command`, and `pid` must be provided while the subsequent fields are all optional and must be
@@ -141,7 +141,7 @@ pub fn create_snapshot(
     // The table of users is needed to get GPU information, see comments at UserTable.
     let mut user_by_pid = UserTable::new();
     for proc in ps_output {
-        user_by_pid.insert(proc.pid, (proc.user.clone(), proc.uid));
+        user_by_pid.insert(proc.pid, (&proc.user, proc.uid));
     }
 
     let mut lookup_job_by_pid = |pid: Pid| {

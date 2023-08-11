@@ -92,7 +92,7 @@ fn parse_pmon_output(raw_text: &str, user_by_pid: &UserTable) -> Vec<Process> {
         .map(|(pid_str, device, mem_size, gpu_pct, mem_pct, command)| {
             let pid = pid_str.parse::<usize>().unwrap();
             let user = match user_by_pid.get(&pid) {
-                Some((name, uid)) => (name.clone(), *uid),
+                Some((name, uid)) => (name.to_string(), *uid),
                 None => ("_zombie_".to_owned() + pid_str, ZOMBIE_UID)
             };
             Process {
@@ -145,13 +145,13 @@ fn parse_query_output(raw_text: &str, user_by_pid: &UserTable) -> Vec<Process> {
 }
 
 #[cfg(test)]
-fn mkusers() -> UserTable {
+fn mkusers() -> UserTable<'static> {
     map! {
-        447153 => ("bob".to_string(), 1001),
-        447160 => ("bob".to_string(), 1001),
-        1864615 => ("alice".to_string(), 1002),
-        2233095 => ("charlie".to_string(), 1003),
-        2233469 => ("charlie".to_string(), 1003)
+        447153 => ("bob", 1001),
+        447160 => ("bob", 1001),
+        1864615 => ("alice", 1002),
+        2233095 => ("charlie", 1003),
+        2233469 => ("charlie", 1003)
     }
 }
 
