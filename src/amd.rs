@@ -15,9 +15,9 @@
 /// device by the number of processes on the device.  This is approximate.
 use crate::command::{self, CmdError};
 use crate::nvidia;
+use crate::ps::UserTable;
 
 use std::cmp::Ordering;
-use std::collections::HashMap;
 
 #[cfg(test)]
 use crate::util::map;
@@ -28,7 +28,7 @@ use crate::util::map;
 /// command could not be found, we return Ok(vec![]).
 
 pub fn get_amd_information(
-    user_by_pid: &HashMap<usize, String>,
+    user_by_pid: &UserTable,
 ) -> Result<Vec<nvidia::Process>, String> {
     // I've not been able to combine the two invocations of rocm-smi yet; we have to run the command
     // twice.  Not a happy situation.
@@ -54,7 +54,7 @@ pub fn get_amd_information(
 fn extract_amd_information(
     concise_raw_text: &str,
     showpidgpus_raw_text: &str,
-    user_by_pid: &HashMap<usize, String>,
+    user_by_pid: &UserTable,
 ) -> Result<Vec<nvidia::Process>, String> {
     let per_device_info = parse_concise_command(concise_raw_text)?; // device -> (gpu%, mem%)
     let per_pid_info = parse_showpidgpus_command(showpidgpus_raw_text)?; // pid -> [device, ...]
@@ -69,14 +69,16 @@ fn extract_amd_information(
     // divided by the number of processes using the device.
     per_pid_info.iter().for_each(|(pid, devs)| {
         devs.iter().for_each(|dev| {
+            let (user, uid) = if let Some((user, uid)) = user_by_pid.get(pid) {
+                (user.to_string(), *uid)
+            } else {
+                ("_zombie_".to_owned() + &pid.to_string(), nvidia::ZOMBIE_UID)
+            };
             processes.push(nvidia::Process {
                 device: Some(*dev),
                 pid: *pid,
-                user: if let Some(u) = user_by_pid.get(pid) {
-                    u.to_string()
-                } else {
-                    "_zombie_".to_owned() + &pid.to_string()
-                },
+                user,
+                uid,
                 gpu_pct: per_device_info[*dev].0 / num_processes_per_device[*dev] as f64,
                 mem_pct: per_device_info[*dev].1 / num_processes_per_device[*dev] as f64,
                 mem_size_kib: 0,
@@ -97,12 +99,13 @@ fn extract_amd_information(
 
 #[cfg(test)]
 macro_rules! proc(
-    { $a:expr, $b:expr, $c:expr, $d:expr, $e: expr } => {
+    { $a:expr, $b:expr, $c:expr, $d:expr, $e: expr, $f: expr } => {
 	nvidia::Process { device: $a,
 			  pid: $b,
 			  user: $c.to_string(),
-			  gpu_pct: $d,
-			  mem_pct: $e,
+                          uid: $d,
+			  gpu_pct: $e,
+			  mem_pct: $f,
 			  mem_size_kib: 0,
 			  command: "_noinfo_".to_string()
 	}
@@ -126,13 +129,13 @@ PID 28154 is using 1 DRM device(s):
 ================================================================================
 ";
     let users = map! {
-    28156 => "bob".to_string()
+    28156 => ("bob".to_string(), 1001usize)
     };
     let zs = extract_amd_information(concise, pidgpu, &users).unwrap();
     assert!(zs.eq(&vec![
-        proc! { Some(0), 28154, "_zombie_28154", 99.0/2.0, 57.0/2.0 },
-        proc! { Some(0), 28156, "bob", 99.0/2.0, 57.0/2.0 },
-        proc! { Some(1), 28156, "bob", 63.0, 5.0 },
+        proc! { Some(0), 28154, "_zombie_28154", nvidia::ZOMBIE_UID, 99.0/2.0, 57.0/2.0 },
+        proc! { Some(0), 28156, "bob", 1001, 99.0/2.0, 57.0/2.0 },
+        proc! { Some(1), 28156, "bob", 1001, 63.0, 5.0 },
     ]));
 }
 

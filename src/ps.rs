@@ -35,6 +35,7 @@ type JobID = usize;
 #[derive(Clone)]
 struct ProcInfo<'a> {
     user: &'a str,
+    _uid: usize,
     command: &'a str,
     _pid: Pid,
     rolledup: usize,
@@ -52,6 +53,12 @@ struct ProcInfo<'a> {
 
 type ProcTable<'a> = HashMap<Pid, ProcInfo<'a>>;
 
+// The table mapping a Pid to user information is used by the GPU subsystems to provide information
+// about users for the processes on the GPUS.
+
+pub type Uid = usize;
+pub type UserTable = HashMap<Pid, (String, Uid)>;
+
 // Add information about the process to the table `proc_by_pid`.  Here, `lookup_job_by_pid`, `user`,
 // `command`, and `pid` must be provided while the subsequent fields are all optional and must be
 // zero / empty if there's no information.
@@ -60,6 +67,7 @@ fn add_proc_info<'a, F>(
     proc_by_pid: &mut ProcTable<'a>,
     lookup_job_by_pid: &mut F,
     user: &'a str,
+    uid: usize,
     command: &'a str,
     pid: Pid,
     cpu_percentage: f64,
@@ -89,10 +97,11 @@ where
         })
         .or_insert(ProcInfo {
             user,
+            _uid: uid,
             command,
             _pid: pid,
             rolledup: 0,
-            is_system_job: false,
+            is_system_job: uid < 1000,
             job_id: lookup_job_by_pid(pid),
             cpu_percentage,
             cputime_sec,
@@ -129,10 +138,10 @@ pub fn create_snapshot(
     }
     let ps_output = &ps_probe.unwrap();
 
-    // The table of users is needed to get GPU information
-    let mut user_by_pid: HashMap<usize, String> = HashMap::new();
+    // The table of users is needed to get GPU information, see comments at UserTable.
+    let mut user_by_pid = UserTable::new();
     for proc in ps_output {
-        user_by_pid.insert(proc.pid, proc.user.clone());
+        user_by_pid.insert(proc.pid, (proc.user.clone(), proc.uid));
     }
 
     let mut lookup_job_by_pid = |pid: Pid| {
@@ -143,6 +152,7 @@ pub fn create_snapshot(
         add_proc_info(&mut proc_by_pid,
                       &mut lookup_job_by_pid,
                       &proc.user,
+                      proc.uid,
                       &proc.command,
                       proc.pid,
                       proc.cpu_pct,
@@ -166,6 +176,7 @@ pub fn create_snapshot(
                 add_proc_info(&mut proc_by_pid,
                               &mut lookup_job_by_pid,
                               &proc.user,
+                              proc.uid,
                               &proc.command,
                               proc.pid,
                               0.0, // cpu_percentage
@@ -191,6 +202,7 @@ pub fn create_snapshot(
                 add_proc_info(&mut proc_by_pid,
                               &mut lookup_job_by_pid,
                               &proc.user,
+                              proc.uid,
                               &proc.command,
                               proc.pid,
                               0.0, // cpu_percentage
