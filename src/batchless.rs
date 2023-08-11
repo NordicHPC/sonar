@@ -96,10 +96,6 @@ impl jobs::JobManager for BatchlessJobManager {
             }
         }
     }
-
-    fn need_process_tree(&self) -> bool {
-        true
-    }
 }
 
 #[test]
