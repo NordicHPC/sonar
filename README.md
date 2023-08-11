@@ -5,12 +5,10 @@
 # sonar
 
 Tool to profile usage of HPC resources by regularly probing processes using
-`ps`.
+`ps` and other tools.
 
-All it really does is to run
-`ps -e --no-header -o pid,user:22,pcpu,pmem,size,comm`
-under the hood, and then filters and groups
-the output and prints it to stdout, comma-separated.
+All it really does is to run `ps` and other diagnostic programs under the hood,
+and then filters and groups the output and prints it to stdout, comma-separated.
 
 ![image of a fish swarm](img/sonar-small.png)
 
@@ -100,7 +98,7 @@ The columns are:
 - `host`: host name (FQDN)
 - `cores`: number of cores on this node (positive integer)
 - `user` : username owning the process/command (it can also be "unknown" and "zombie")
-- `job`: job ID (positive integer; 0 if not applicable)
+- `job`: job ID (positive integer; 0 if not applicable, see below)
 - `cmd`: process/command
 - `cpu%`: CPU percentage (in percent of one core; as they come out of `ps`; this is not a sample but a running average)
 - `cpukib`: CPU memory used in KiB (this is a sample)
@@ -109,6 +107,14 @@ The columns are:
 - `gpumem%`: GPU memory percentage (in percent of memory across all cards; this is a sample)
 - `gpukib`: GPU memory used in KiB (sum across cards; this is a sample)
 - `cputime_sec`: Accumulated CPU time that a process has used
+
+`job`:
+There may be multiple records for the same job, one for each process in the job
+(subject to filtering).  Processes in the same job are not merged in the output
+even if they have the same command name (this is a change from earlier code).
+NOTE CAREFULLY that if the job ID is 0 then the process record is for a
+unique job with unknown job ID.  Multiple records with the job ID 0 should never
+be merged into a single job by the consumer.
 
 `gpumem%` vs `gpukib`:
 The difference is that on some cards some of the time it is possible to
@@ -139,7 +145,7 @@ folder.
 
 - [Radovan Bast](https://bast.fr)
 - Mathias Bockwoldt
-- Lars T. Hansen
+- [Lars T. Hansen](https://github.com/lars-t-hansen)
 - Henrik Rojas Nagel
 
 
