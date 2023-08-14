@@ -132,6 +132,8 @@ any particular order.  Not all of the fields may be present - they have default 
 below.  Consumers should assume that new fields may appear, and should not treat records with
 unknown field names as errors.  Broadly we would like to guarantee that fields never change meaning.
 
+Integer fields will tend to be truncated toward zero, not rounded or rounded up.
+
 The field names and their meaning are:
 
 `v` (required): The record version number, a semantic version number on the format `n.m.o`.
