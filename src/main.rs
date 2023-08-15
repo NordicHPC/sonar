@@ -47,9 +47,13 @@ enum Commands {
         #[arg(long, default_value_t = false)]
         exclude_system_jobs: bool,
 
-        /// Exclude records for these comma-separated user names [default: none]
+        /// Exclude records whose users match these comma-separated names [default: none]
         #[arg(long)]
         exclude_users: Option<String>,
+
+        /// Exclude records whose commands start with these comma-separated names [default: none]
+        #[arg(long)]
+        exclude_commands: Option<String>,
     },
     /// Not yet implemented
     Analyze {},
@@ -69,6 +73,7 @@ fn main() {
             min_cpu_time,
             exclude_system_jobs,
             exclude_users,
+            exclude_commands,
         } => {
             let opts = ps::PsOptions {
                 rollup: *rollup,
@@ -77,6 +82,11 @@ fn main() {
                 min_cpu_time: *min_cpu_time,
                 exclude_system_jobs: *exclude_system_jobs,
                 exclude_users: if let Some(s) = exclude_users {
+                    s.split(',').collect::<Vec<&str>>()
+                } else {
+                    vec![]
+                },
+                exclude_commands: if let Some(s) = exclude_commands {
                     s.split(',').collect::<Vec<&str>>()
                 } else {
                     vec![]
