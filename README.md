@@ -165,6 +165,10 @@ ID.  Multiple records with the job ID 0 should never be merged into a single job
 alphanumeric string.  This can be `_unknown_` for zombie jobs, or `_noinfo_` for non-zombies when
 the command name can't be found.
 
+`pid` (optional, default "0"): The process ID of the job, a positive integer.  For a rolled-up job
+(see `rolledup` below) this is zero.  Otherwise, this record represents one process and so the field
+holds the process ID.
+
 `cpu%` (optional, default "0"): The running average CPU percentage over the true lifetime of the
 process (ie computed independently of the sonar log), a nonnegative floating-point number.  100.0
 corresponds to "one full core's worth of computation".
@@ -200,7 +204,8 @@ since terminated.
 
 `rolledup` (optional, default "0"): The number of additional processes with the same `job` and `cmd`
 that have been rolled into this one in response to the `--rollup` switch.  That is, if the value is
-`1`, the record represents the sum of the data for two processes.
+`1`, the record represents the sum of the data for two processes.  If a record represents part of a
+rolled-up job then this field must be present.
 
 
 ### Version 0.6.0 file format (and earlier)
