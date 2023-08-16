@@ -14,14 +14,41 @@ use csv::{Writer, WriterBuilder};
 use std::collections::{HashMap, HashSet};
 use std::io;
 
-type GpuSet = HashSet<usize>;
+// The GpuSet has three states:
+//
+//  - the set is known to be empty, this is Some({})
+//  - the set is known to be nonempty and have only known gpus in the set, this is Some({a,b,..})
+//  - the set is known to be nonempty but have (some) unknown members, this is None
+//
+// During processing, the set starts out as Some({}).  If a device reports "unknown" GPUs then the
+// set can transition from Some({}) to None or from Some({a,b,..}) to None.  Once in the None state,
+// the set will stay in that state.  There is no representation for some known + some unknown GPUs,
+// it is not believed to be worthwhile.
 
-fn make_gpuset(maybe_device: Option<usize>) -> GpuSet {
-    let mut gpus = GpuSet::new();
+type GpuSet = Option<HashSet<usize>>;
+
+fn empty_gpuset() -> GpuSet {
+    Some(HashSet::new())
+}
+
+fn singleton_gpuset(maybe_device: Option<usize>) -> GpuSet {
     if let Some(dev) = maybe_device {
+        let mut gpus = HashSet::new();
         gpus.insert(dev);
+        Some(gpus)
+    } else {
+        None
     }
-    gpus
+}
+
+fn union_gpuset(lhs: &mut GpuSet, rhs: &GpuSet) {
+    if lhs.is_none() {
+        // The result is also None
+    } else if rhs.is_none() {
+        *lhs = None;
+    } else {
+        lhs.as_mut().unwrap().extend(rhs.as_ref().unwrap());
+    }
 }
 
 type Pid = usize;
@@ -29,8 +56,8 @@ type JobID = usize;
 
 // ProcInfo holds per-process information gathered from multiple sources and tagged with a job ID.
 // No processes are merged!  The job ID "0" means "unique job with no job ID".  That is, no consumer
-// of this data, internal or external to the program, may treat processes with job ID "0" as part of
-// the same job.
+// of this data, internal or external to the program, may treat separate processes with job ID "0"
+// as part of the same job.
 
 #[derive(Clone)]
 struct ProcInfo<'a> {
@@ -53,7 +80,7 @@ struct ProcInfo<'a> {
 
 type ProcTable<'a> = HashMap<Pid, ProcInfo<'a>>;
 
-// The table mapping a Pid to user information is used by the GPU subsystems to provide information
+// The table mapping a Pid to user name / Uid is used by the GPU subsystems to provide information
 // about users for the processes on the GPUS.
 
 pub type Uid = usize;
@@ -90,7 +117,7 @@ where
             e.cputime_sec += cputime_sec;
             e.mem_percentage += mem_percentage;
             e.mem_size_kib += mem_size_kib;
-            e.gpu_cards.extend(gpu_cards);
+            union_gpuset(&mut e.gpu_cards, gpu_cards);
             e.gpu_percentage += gpu_percentage;
             e.gpu_mem_percentage += gpu_mem_percentage;
             e.gpu_mem_size_kib += gpu_mem_size_kib;
@@ -127,7 +154,7 @@ pub fn create_snapshot(
     jobs: &mut dyn jobs::JobManager,
     opts: &PsOptions
 ) {
-    let no_gpus = make_gpuset(None);
+    let no_gpus = empty_gpuset();
     let mut proc_by_pid = ProcTable::new();
 
     let ps_probe = process::get_process_information();
@@ -183,7 +210,7 @@ pub fn create_snapshot(
                               0,   // cputime_sec
                               0.0, // mem_percentage
                               0,   // mem_size_kib
-                              &make_gpuset(proc.device),
+                              &singleton_gpuset(proc.device),
                               proc.gpu_pct,
                               proc.mem_pct,
                               proc.mem_size_kib);
@@ -209,7 +236,7 @@ pub fn create_snapshot(
                               0,   // cputime_sec
                               0.0, // mem_percentage
                               0,   // mem_size_kib
-                              &make_gpuset(proc.device),
+                              &singleton_gpuset(proc.device),
                               proc.gpu_pct,
                               proc.mem_pct,
                               proc.mem_size_kib);
@@ -266,7 +293,7 @@ pub fn create_snapshot(
                     p.cputime_sec += proc_info.cputime_sec;
                     p.mem_percentage += proc_info.mem_percentage;
                     p.mem_size_kib += proc_info.mem_size_kib;
-                    p.gpu_cards.extend(&proc_info.gpu_cards);
+                    union_gpuset(&mut p.gpu_cards, &proc_info.gpu_cards);
                     p.gpu_percentage += proc_info.cpu_percentage;
                     p.gpu_mem_percentage += proc_info.gpu_mem_percentage;
                     p.gpu_mem_size_kib += proc_info.gpu_mem_size_kib;
@@ -349,17 +376,20 @@ fn print_record<W: io::Write>(writer: &mut Writer<W>, params: &PrintParameters, 
         return;
     }
 
-    // "unknown" is not implemented, see https://github.com/NordicHPC/sonar/issues/75
-    let mut gpus_comma_separated: String = proc_info
-        .gpu_cards
-        .iter()
-        .map(|&num| num.to_string())
-        .collect::<Vec<String>>()
-        .join(",");
-
-    if gpus_comma_separated.is_empty() {
-        gpus_comma_separated = "none".to_string();
-    }
+    let gpus_comma_separated =
+        if let Some(ref cards) = proc_info.gpu_cards {
+            if cards.len() == 0 {
+                "none".to_string()
+            } else {
+                cards
+                    .iter()
+                    .map(|&num| num.to_string())
+                    .collect::<Vec<String>>()
+                    .join(",")
+            }
+        } else {
+            "unknown".to_string()
+        };
 
     let mut fields = vec![
         format!("v={}", params.version),
@@ -371,7 +401,7 @@ fn print_record<W: io::Write>(writer: &mut Writer<W>, params: &PrintParameters, 
         format!("cmd={}", proc_info.command),
         format!("cpu%={}", three_places(proc_info.cpu_percentage)),
         format!("cpukib={}", proc_info.mem_size_kib),
-        format!("gpus={}", gpus_comma_separated),
+        format!("gpus={gpus_comma_separated}"),
         format!("gpu%={}", three_places(proc_info.gpu_percentage)),
         format!("gpumem%={}", three_places(proc_info.gpu_mem_percentage)),
         format!("gpukib={}", proc_info.gpu_mem_size_kib),
