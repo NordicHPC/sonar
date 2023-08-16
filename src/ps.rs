@@ -148,6 +148,7 @@ pub struct PsOptions<'a> {
     pub min_cpu_time: Option<usize>,
     pub exclude_system_jobs: bool,
     pub exclude_users: Vec<&'a str>,
+    pub exclude_commands: Vec<&'a str>,
 }
 
 pub fn create_snapshot(
@@ -368,6 +369,11 @@ fn print_record<W: io::Write>(writer: &mut Writer<W>, params: &PrintParameters, 
     }
     if params.opts.exclude_users.len() > 0 {
         if params.opts.exclude_users.iter().any(|x| *x == proc_info.user) {
+            included = false;
+        }
+    }
+    if params.opts.exclude_commands.len() > 0 {
+        if params.opts.exclude_commands.iter().any(|x| proc_info.command.starts_with(x)) {
             included = false;
         }
     }
