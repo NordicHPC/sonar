@@ -4,16 +4,38 @@
 
 # sonar
 
-Tool to profile usage of HPC resources by regularly probing processes using
-`ps` and other tools.
+Tool to profile usage of HPC resources by regularly probing processes using `ps` and other tools.
 
-All it really does is to run `ps` and other diagnostic programs under the hood,
-and then filters and groups the output and prints it to stdout, comma-separated.
+All it really does is to run `ps` and other diagnostic programs under the hood, and then filters and
+groups the output and prints it to stdout, comma-separated.  The file format is defined in detail
+below.
 
 ![image of a fish swarm](img/sonar-small.png)
 
 Image: [Midjourney](https://midjourney.com/), [CC BY-NC 4.0](https://creativecommons.org/licenses/by-nc/4.0/legalcode)
 
+
+## Changes since v0.6.0
+
+**Improved filtering.** The process filters used in previous versions (minimum CPU and memory usage)
+are nonmonotonic in that job records for a long-running job can come and go in the log over time.
+Those filters are still available but monotonic filters (for non-system jobs and for jobs that have
+been running long enough) are now available and will result in more easily understood jobs.
+
+**Improved merging.** Earlier, sonar would merge some processes unconditionally and somewhat
+opaquely.  All merging is now controlled by command-line switches and more transparent.
+
+**Better data.** Additional data points are gathered, notably for GPUs, and the meaning of the data
+being gathered has been clarified.
+
+**Self-documenting.** The file format has changed to use named fields, which allows the introduction
+of fields and the use of default values.
+
+**Clearer division of labor with a front-end tool.** Front-end tools such as
+[jobgraph](https://github.com/NordicHPC/jobgraph) and
+[sonalyze](https://github.com/NAICNO/Jobanalyzer/tree/main/sonalyze) ingest well-defined and
+simply-created sonar data, process it and present it in specialized ways, removing those burdens
+from sonar.
 
 ## Changes since v0.5.0
 
@@ -65,24 +87,32 @@ We run `sonar ps` every 5 minutes on every compute node.
 
 ```console
 $ sonar ps --help
-
 Take a snapshot of the currently running processes
 
 Usage: sonar ps [OPTIONS]
 
 Options:
-      --cpu-cutoff-percent <CPU_CUTOFF_PERCENT>  [default: 0.5]
-      --mem-cutoff-percent <MEM_CUTOFF_PERCENT>  [default: 5]
-  -h, --help                                     Print help
+      --batchless
+          Synthesize a job ID from the process tree in which a process finds itself
+      --rollup
+          Merge process records that have the same job ID and command name
+      --min-cpu-percent <MIN_CPU_PERCENT>
+          Include records for jobs that have on average used at least this percentage of CPU, note this is nonmonotonic [default: none]
+      --min-mem-percent <MIN_MEM_PERCENT>
+          Include records for jobs that presently use at least this percentage of real memory, note this is nonmonotonic [default: none]
+      --min-cpu-time <MIN_CPU_TIME>
+          Include records for jobs that have used at least this much CPU time (in seconds) [default: none]
+      --exclude-system-jobs
+          Exclude records for system jobs (uid < 1000)
+      --exclude-users <EXCLUDE_USERS>
+          Exclude records for these comma-separated user names [default: none]
+  -h, --help
+          Print help
 ```
-
-The code will list all processes that are above `--cpu-cutoff-percent` or
-`--mem-cutoff-percent`.
-
 
 Here is an example output:
 ```console
-$ sonar ps
+$ sonar ps --exclude-system-jobs --min-cpu-time=10 --rollup
 
 v=0.7.0,time=2023-08-10T11:09:41+02:00,host=somehost,cores=8,user=someone,job=0,cmd=fish,cpu%=2.1,cpukib=64400,gpus=none,gpu%=0,gpumem%=0,gpukib=0,cputime_sec=138
 v=0.7.0,time=2023-08-10T11:09:41+02:00,host=somehost,cores=8,user=someone,job=0,cmd=sonar,cpu%=761,cpukib=372,gpus=none,gpu%=0,gpumem%=0,gpukib=0,cputime_sec=137
@@ -92,46 +122,104 @@ v=0.7.0,time=2023-08-10T11:09:41+02:00,host=somehost,cores=8,user=someone,job=0,
 v=0.7.0,time=2023-08-10T11:09:41+02:00,host=somehost,cores=8,user=someone,job=0,cmd=slack,cpu%=3.9,cpukib=716924,gpus=none,gpu%=0,gpumem%=0,gpukib=0,cputime_sec=266
 ```
 
-The columns are:
-- `v`: version (in the format n.m.o, following semantic versioning)
-- `time`: local time stamp (in ISO time without fractional seconds but with TZO)
-- `host`: host name (FQDN)
-- `cores`: number of cores on this node (positive integer)
-- `user` : username owning the process/command (it can also be "unknown" and "zombie")
-- `job`: job ID (positive integer; 0 if not applicable, see below)
-- `cmd`: process/command
-- `cpu%`: CPU percentage (in percent of one core; as they come out of `ps`; this is not a sample but a running average)
-- `cpukib`: CPU memory used in KiB (this is a sample)
-- `gpus`: GPU devices (the card indices are 1-based; more about it below)
-- `gpu%`: GPU percentage (sim across cards; this is a sample)
-- `gpumem%`: GPU memory percentage (in percent of memory across all cards; this is a sample)
-- `gpukib`: GPU memory used in KiB (sum across cards; this is a sample)
-- `cputime_sec`: Accumulated CPU time that a process has used
+### Version 0.7.0 file format (evolving)
 
-`job`:
-There may be multiple records for the same job, one for each process in the job
-(subject to filtering).  Processes in the same job are not merged in the output
-even if they have the same command name (this is a change from earlier code).
-NOTE CAREFULLY that if the job ID is 0 then the process record is for a
-unique job with unknown job ID.  Multiple records with the job ID 0 should never
-be merged into a single job by the consumer.
+Each field has the syntax `name=value` where the names are defined below.  Fields are separated by
+commas, and each record is terminated by a newline.  The syntax of the file is therefore as for CSV
+(including all rules for quoting).  However the semantics do not adhere to strict CSV: there may be
+a variable number of fields ("columns"), and as the fields are named, they need not be presented in
+any particular order.  Not all of the fields may be present - they have default values as noted
+below.  Consumers should assume that new fields may appear, and should not treat records with
+unknown field names as errors.  Broadly we would like to guarantee that fields never change meaning.
 
-`gpumem%` vs `gpukib`:
-The difference is that on some cards some of the time it is possible to
-determine one of these but not the other, and vice versa. For example, on the
-NVIDIA cards we can read both quantities for running processes but only
-`gpukib` for some zombies. Since we can detect the total amount of memory here
-we could translate `gpukib` into `gpumem%`, though. On the other hand, on our
-AMD cards there is no support for detecting the absolute amount of memory used,
-nor the total amount of memory on the cards, only the percentage of gpu memory
-used. Rather than encoding the logic for dealing with this, it seemed better
-for the time being to report what we can report and let the analyzer sort it
-out.
+Integer fields will tend to be truncated toward zero, not rounded or rounded up.
 
-`gpus` are GPU devices:
-- If a process would use GPUs 1, 3, and 7: `"gpus=1,3,7"`
-- If a process would use no GPUs: `gpus=none`
-- If a process uses unknown GPUs: `gpus=unknown`
+The field names and their meaning are:
+
+`v` (required): The record version number, a semantic version number on the format `n.m.o`.
+
+`time` (required): The time stamp of the sample, an ISO time format string without fractional
+seconds but with TZO.  Every record created from a single invocation of `sonar` has the same
+timestamp (consumers may depend on this).
+
+`host` (required): The fully qualified domain name of the host running the job, an alphanumeric
+string.  There is only a single host.  If the job spans hosts, there will be multiple records for
+the job, one per host; see `job` below.
+
+`cores` (optional, default "0"): The number of cores on this host, a nonnegative integer, with 0
+meaning "unknown".
+
+`user` (required): The local Unix user name of user owning the job, an alphanumeric string.  This
+can also be `_zombie_<pid>` for zombie processes, where `<pid>` is the process ID of the process.
+
+`job` (optional, default "0"): The job ID, a positive integer. This field will be 0 if the job or
+process does not have a meaningful ID.  There may be many records for the same job, one for each
+process in the job (subject to filtering); these records can have different host names too.
+Processes in the same job on the same host are merged if the `--rollup` command line option is used
+and the processes have the same `cmd` value.
+
+NOTE CAREFULLY that if the job ID is 0 then the process record is for a unique job with unknown job
+ID.  Multiple records with the job ID 0 should never be merged into a single job by the consumer.
+
+`cmd` (required): The executable name of the process/command without command line arguments, an
+alphanumeric string.  This can be `_unknown_` for zombie jobs, or `_noinfo_` for non-zombies when
+the command name can't be found.
+
+`cpu%` (optional, default "0"): The running average CPU percentage over the true lifetime of the
+process (ie computed independently of the sonar log), a nonnegative floating-point number.  100.0
+corresponds to "one full core's worth of computation".
+
+`cpukib` (optional, default "0"): The current CPU memory used in KiB, a nonnegative integer.
+
+`gpus` (optional, default "none"): The list of GPUs currently used by the job, a comma-separated
+list of GPU device numbers, all of them nonnegative integers.  The value can instead be `none` when
+the process uses no GPUs, or `unknown` when the process is known to use GPUs but their device
+numbers can't be determined.
+
+`gpu%` (optional, default "0"): The current GPU percentage utilization summed across all cards, a
+nonnegative floating-point number.  100.0 corresponds to "one full card's worth of computation".
+
+`gpukib` (optional, default "0"): The current GPU memory used in KiB, a nonnegative integer.  This
+is summed across all cards.
+
+The difference between `gpukib` and `gpumem%` (below) is that, on some cards some of the time, it is
+possible to determine one of these but not the other, and vice versa.  For example, on the NVIDIA
+cards we can read both quantities for running processes but only `gpukib` for some zombies.  On the
+other hand, on our AMD cards there is no support for detecting the absolute amount of memory used,
+nor the total amount of memory on the cards, only the percentage of gpu memory used.  Sometimes we
+can convert one figure to another, but other times we cannot quite do that.  Rather than encoding
+the logic for dealing with this in sonar, the task is currently offloaded to the front end.
+
+`gpumem%` (optional, default "0"): The current GPU memory usage percentage, a nonnegative
+floating-point number.  This is summed across all cards.  100.0 corresponds to "one full card's
+worth of memory".
+
+`cputime_sec` (optional, default "0"): Accumulated CPU time in seconds that a process has used over
+its lifetime, a nonnegative integer.  The value includes time used by child processes that have
+since terminated.
+
+`rolledup` (optional, default "0"): The number of additional processes with the same `job` and `cmd`
+that have been rolled into this one in response to the `--rollup` switch.  That is, if the value is
+`1`, the record represents the sum of the data for two processes.
+
+
+### Version 0.6.0 file format (and earlier)
+
+The fields in version 0.6.0 are unnamed and the fields are always presented in the same order.  The
+fields have (mostly) the same syntax and semantics as the 0.7.0 fields, with these notable differences:
+
+* The time field has a fractional-second part and is always UTC (the TZO is always +00:00)
+* The `gpus` field is a base-2 binary number representing a bit vector for the cards used; for the `unknown` value, it is a string of `1` of length 32.
+
+The order of fields is:
+
+`time`, `host`, `cores`, `user`, `job`, `cmd`, `cpu%`, `cpukib`, `gpus`, `gpu%`, `gpumem%`, `gpukib`
+
+where the fields starting with `gpus` may be absent and should be taken to have the defaults
+presented above.
+
+Earlier versions of `sonar` would always roll up processes with the same `job` and `cmd`, so older
+records may or may not represent multiple processes' worth of data.
 
 
 ## Collect results with `sonar analyze` :construction:
@@ -178,14 +266,13 @@ maintain a database or such.
 
 ## Security and robustness
 
-The tool does **not** need root permissions.  It does not modify anything and
-only writes to stdout.
+The tool does **not** need root permissions.  It does not modify anything and writes output to
+stdout (and errors to stderr).
 
-On CPUs, the only external command called by `sonar ps` is `ps -e --no-header -o
-pid,user:22,pcpu,pmem,size,comm` and the tool gives up and stops if the latter
-subprocess does not return within 2 seconds to avoid a pile-up of processes.
+On CPUs, the only external command called by `sonar ps` is `ps`; the tool gives up and stops if the
+latter subprocess does not return within 2 seconds to avoid a pile-up of processes.
 
-(we need to update this documentation for GPUs)
+On GPUs, `sonar ps` will attempt to use `nvidia-smi` and `rocm-smi` to record GPU utilization.
 
 
 ## How we run sonar on a cluster
