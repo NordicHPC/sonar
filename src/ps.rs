@@ -294,7 +294,7 @@ pub fn create_snapshot(
                     p.mem_percentage += proc_info.mem_percentage;
                     p.mem_size_kib += proc_info.mem_size_kib;
                     union_gpuset(&mut p.gpu_cards, &proc_info.gpu_cards);
-                    p.gpu_percentage += proc_info.cpu_percentage;
+                    p.gpu_percentage += proc_info.gpu_percentage;
                     p.gpu_mem_percentage += proc_info.gpu_mem_percentage;
                     p.gpu_mem_size_kib += proc_info.gpu_mem_size_kib;
                     p.rolledup += 1;
