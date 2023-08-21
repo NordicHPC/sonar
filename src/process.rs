@@ -21,10 +21,62 @@ pub struct Process {
 /// In the returned vector, pids uniquely tag the records.
 
 pub fn get_process_information() -> Result<Vec<Process>, CmdError> {
+/*
     match command::safe_command(PS_COMMAND, TIMEOUT_SECONDS) {
         Ok(out) => Ok(parse_ps_output(&out)),
         Err(e) => Err(e),
-    }
+}
+     */
+    let mut pids = fs::read_dir("/proc")?
+        .filter_map(|x| if let Ok(x) = x.path().to_str().parse::<usize>() {
+            Some(x)
+        } else {
+            None
+        })
+        .collect::Vec<usize>();
+    
+    let mut result = vec![];
+    for let pid in pids {
+        // size we may need to get from .../statm, annoying.  Not clear though - want to look at ps source code.
+        if let Some(f) = fs::open(format!("/proc/{pid}/stat")) {
+            let mut uid = 0;
+            let mut pcpu = 0;
+            let mut pmem = 0;
+            let mut bsdtime = 0;
+            let mut size = 0;
+            let mut ppid = 0;
+            let mut sess = 0;
+            let mut comm = "".to_string();
+            // space-separated fields in this order, I'll omit the formats when I don't care
+            // pid
+            // comm (%s) (the parens are literal) with no info about what happens if the command contains a paren of any sort
+            // state 
+            // ppid %d
+            // pgrp
+            // session %d
+            // tty_nr
+            // tpgid
+            // flags
+            // minflt
+            // cminflt
+            // majflt
+            // cmajflt
+            // utime %lu  in clock ticks
+            // stime %lu  ditto
+            // cutime %ld  ditto (why ld?  that's what the manpage says)
+            // cstime %ld  ditto
+            // (and more)
+            
+        }
+    }        
+    // Basically:
+    // - enumerate /proc with std::fs::read_dir
+    // - anything that looks like a pid, we want
+    // - inside that, we want to open status, mostly
+    // - we grab the stuff we need but might avoid `user` until we need it because
+    //   it is expensive to get it (it can't be read from /proc)
+    // - later, we can grab the user once we've filtered out jobs by other means, or not at all
+    // - we can optimize for known user -> uid mappings such as root (--exclude-users=root)
 }
 
 const TIMEOUT_SECONDS: u64 = 2; // for `ps`
