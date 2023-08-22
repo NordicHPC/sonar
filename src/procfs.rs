@@ -20,21 +20,21 @@ pub fn get_process_information() -> Option<Vec<process::Process>> {
             if l.starts_with("MemTotal: ") {
                 // We expect "MemTotal:\s+(\d)+kB", roughly
                 let fields = l.split_ascii_whitespace().collect::<Vec<&str>>();
-                if fields.len() < 3 || fields[2] != "kB" {
-                    eprintln!("Unexpected MemTotal in /proc/meminfo: {l} {:?}", fields);
+                if fields.len() != 3 || fields[2] != "kB" {
+                    eprintln!("Unexpected MemTotal in /proc/meminfo: {s}");
                     return None;
                 }
                 if let Ok(n) = fields[1].parse::<usize>() {
                     memtotal_kib = n;
                     break;
                 } else {
-                    eprintln!("Failed to parse MemTotal");
+                    eprintln!("Failed to parse MemTotal in /proc/meminfo: {s}");
                     return None;
                 }
             }
         }
         if memtotal_kib == 0 {
-            eprintln!("Could not find MemTotal in /proc/meminfo");
+            eprintln!("Could not find MemTotal in /proc/meminfo: {s}");
             return None;
         }
     } else {
@@ -42,11 +42,14 @@ pub fn get_process_information() -> Option<Vec<process::Process>> {
         return None;
     };
 
-    // Enumerate all pids first, and collect the uid while we're here.
+    // Enumerate all pids, and collect the uids while we're here.
+    //
+    // TODO: We can and should filter by uid here.
 
     let pids = 
         if let Ok(dir) = fs::read_dir("/proc") {
-            // FIXME: get rid of the unwraps
+            // FIXME: get rid of the unwraps, and when we do so, there will be some error
+            // propagation.
             dir
                 .filter_map(|dirent| {
                     if let Ok(x) = dirent.as_ref().unwrap().path().file_name().unwrap().to_string_lossy().parse::<usize>() {
@@ -61,8 +64,6 @@ pub fn get_process_information() -> Option<Vec<process::Process>> {
             return None;
         };
     
-    println!("{:?}", pids);
-
     let mut result = vec![];
     for (pid, uid) in pids {
 
@@ -72,42 +73,43 @@ pub fn get_process_information() -> Option<Vec<process::Process>> {
         let ppid;
         let sess;
         let comm;
-        if let Ok(mut s) = fs::read_to_string(path::Path::new(&format!("/proc/{pid}/stat"))) {
+        if let Ok(line) = fs::read_to_string(path::Path::new(&format!("/proc/{pid}/stat"))) {
             // The comm field is a little tricky, it must be extracted first as the contents between
             // the first '(' and the last ')' in the line.
-            let commstart = s.find('(');
-            let commend = s.rfind(')');
+            let commstart = line.find('(');
+            let commend = line.rfind(')');
             if commstart.is_none() || commend.is_none() {
-                eprintln!("Could not parse command");
+                eprintln!("Could not parse command from /proc/{pid}/stat: {line}");
                 return None;
             }
-            comm = s[commstart.unwrap()..commend.unwrap()].to_string();
-            s = s[commend.unwrap()..].to_string();
+            comm = line[commstart.unwrap()..commend.unwrap()].to_string();
+            let s = line[commend.unwrap()..].to_string();
             let fields = s.split_ascii_whitespace().collect::<Vec<&str>>();
             if fields.len() < 16 {
-                eprintln!("Line from /proc/{pid}/stat too short");
+                eprintln!("Line from /proc/{pid}/stat too short: {line}");
                 return None;
             }
             ppid = if let Ok(x) = fields[2].parse::<usize>() {
                 x
             } else {
-                eprintln!("Could not parse ppid");
+                eprintln!("Could not parse ppid from /proc/{pid}/stat: {line}");
                 return None;
             };
             sess = if let Ok(x) = fields[4].parse::<usize>() {
                 x
             } else {
+                eprintln!("Could not parse sess from /proc/{pid}/stat: {line}");
                 return None;
             };
             bsdtime = if let Ok(cutime) = fields[14].parse::<usize>() {
                 if let Ok(cstime) = fields[15].parse::<usize>() {
                     cutime + cstime
                 } else {
-                    eprintln!("Could not parse cstime");
+                    eprintln!("Could not parse cstime from /proc/{pid}/stat: {line}");
                     return None;
                 }
             } else {
-                eprintln!("Could not parse cutime");
+                eprintln!("Could not parse cutime from /proc/{pid}/stat: {line}");
                 return None;
             };
         } else {
@@ -127,14 +129,14 @@ pub fn get_process_information() -> Option<Vec<process::Process>> {
         if let Ok(s) = fs::read_to_string(path::Path::new(&format!("/proc/{pid}/statm"))) {
             let fields = s.split_ascii_whitespace().collect::<Vec<&str>>();
             if fields.len() < 6 {
-                eprintln!("Line from /proc/{pid}/statm too short");
+                eprintln!("Line from /proc/{pid}/statm too short: {s}");
                 return None;
             }
             size = if let Ok(x) = fields[5].parse::<usize>() {
                 let pagesize = 4096; // FIXME
                 x * pagesize / 1024
             } else {
-                eprintln!("Could not parse data size");
+                eprintln!("Could not parse data size from /proc/{pid}/statm: {s}");
                 return None;
             };
         } else {
