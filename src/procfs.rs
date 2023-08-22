@@ -12,14 +12,44 @@ use std::os::linux::fs::MetadataExt;
 
 pub fn get_process_information() -> Option<Vec<process::Process>> {
 
+    // The total RAM installed is in the `MemTotal` field of /proc/meminfo.
+
+    let mut memtotal_kib = 0;
+    if let Ok(s) = fs::read_to_string(path::Path::new("/proc/meminfo")) {
+        for l in s.split('\n') {
+            if l.starts_with("MemTotal: ") {
+                // We expect "MemTotal:\s+(\d)+kB", roughly
+                let fields = l.split_ascii_whitespace().collect::<Vec<&str>>();
+                if fields.len() < 3 || fields[2] != "kB" {
+                    eprintln!("Unexpected MemTotal in /proc/meminfo: {l} {:?}", fields);
+                    return None;
+                }
+                if let Ok(n) = fields[1].parse::<usize>() {
+                    memtotal_kib = n;
+                    break;
+                } else {
+                    eprintln!("Failed to parse MemTotal");
+                    return None;
+                }
+            }
+        }
+        if memtotal_kib == 0 {
+            eprintln!("Could not find MemTotal in /proc/meminfo");
+            return None;
+        }
+    } else {
+        eprintln!("Could not open or read /proc/meminfo");
+        return None;
+    };
+
     // Enumerate all pids first, and collect the uid while we're here.
 
-    let mut pids = 
+    let pids = 
         if let Ok(dir) = fs::read_dir("/proc") {
             // FIXME: get rid of the unwraps
             dir
                 .filter_map(|dirent| {
-                    if let Ok(x) = dirent.as_ref().unwrap().path().to_str().unwrap().parse::<usize>() {
+                    if let Ok(x) = dirent.as_ref().unwrap().path().file_name().unwrap().to_string_lossy().parse::<usize>() {
                         Some((x, dirent.unwrap().metadata().unwrap().st_uid()))
                     } else {
                         None
@@ -27,37 +57,41 @@ pub fn get_process_information() -> Option<Vec<process::Process>> {
                 })
                 .collect::<Vec<(usize, u32)>>()
         } else {
+            eprintln!("Could not open /proc");
             return None;
         };
     
+    println!("{:?}", pids);
+
     let mut result = vec![];
     for (pid, uid) in pids {
-        let mut pcpu;
-        let mut pmem;
-        let mut bsdtime;
-        let mut ppid;
-        let mut sess;
-        let mut comm;
 
-        // We want the values for the variables above.  These are obtainable from /proc/pid/stat.
+        // Basic system variables.
 
+        let bsdtime;
+        let ppid;
+        let sess;
+        let comm;
         if let Ok(mut s) = fs::read_to_string(path::Path::new(&format!("/proc/{pid}/stat"))) {
             // The comm field is a little tricky, it must be extracted first as the contents between
             // the first '(' and the last ')' in the line.
             let commstart = s.find('(');
             let commend = s.rfind(')');
             if commstart.is_none() || commend.is_none() {
+                eprintln!("Could not parse command");
                 return None;
             }
             comm = s[commstart.unwrap()..commend.unwrap()].to_string();
             s = s[commend.unwrap()..].to_string();
-            let fields = s.split(' ').collect::<Vec<&str>>();
+            let fields = s.split_ascii_whitespace().collect::<Vec<&str>>();
             if fields.len() < 16 {
+                eprintln!("Line from /proc/{pid}/stat too short");
                 return None;
             }
             ppid = if let Ok(x) = fields[2].parse::<usize>() {
                 x
             } else {
+                eprintln!("Could not parse ppid");
                 return None;
             };
             sess = if let Ok(x) = fields[4].parse::<usize>() {
@@ -69,13 +103,15 @@ pub fn get_process_information() -> Option<Vec<process::Process>> {
                 if let Ok(cstime) = fields[15].parse::<usize>() {
                     cutime + cstime
                 } else {
+                    eprintln!("Could not parse cstime");
                     return None;
                 }
             } else {
+                eprintln!("Could not parse cutime");
                 return None;
             };
         } else {
-            eprintln!("Failed to open /proc/{pid}/stat");
+            eprintln!("Failed to open or read /proc/{pid}/stat");
             return None;
         }
 
@@ -87,16 +123,18 @@ pub fn get_process_information() -> Option<Vec<process::Process>> {
         // should instead use /proc/pid/statm.  In statm, we want the "data" field which is
         // documented as "data + stack", this is the sixth space-separated field.
 
-        let mut size = 0;
+        let size;
         if let Ok(s) = fs::read_to_string(path::Path::new(&format!("/proc/{pid}/statm"))) {
-            let fields = s.split(' ').collect::<Vec<&str>>();
+            let fields = s.split_ascii_whitespace().collect::<Vec<&str>>();
             if fields.len() < 6 {
+                eprintln!("Line from /proc/{pid}/statm too short");
                 return None;
             }
             size = if let Ok(x) = fields[5].parse::<usize>() {
                 let pagesize = 4096; // FIXME
                 x * pagesize / 1024
             } else {
+                eprintln!("Could not parse data size");
                 return None;
             };
         } else {
@@ -104,12 +142,17 @@ pub fn get_process_information() -> Option<Vec<process::Process>> {
             return None;
         }
 
+        // Now compute some derived quantities.  pcpu is becoming irrelevant, frankly.
+
+        let pcpu = 0.0; // (now - starttime) / (cutime + cstime);
+        let pmem = (size as f64) / (memtotal_kib as f64);
+
         result.push(process::Process {
             pid,
             uid: uid as usize,
             user: "".to_string(), // User name is obtained later
-            cpu_pct: pcpu as f64,
-            mem_pct: pmem as f64,
+            cpu_pct: pcpu,
+            mem_pct: pmem,
             cputime_sec: bsdtime,
             mem_size_kib: size,
             ppid,
