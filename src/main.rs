@@ -8,6 +8,7 @@ mod command;
 mod jobs;
 mod nvidia;
 mod process;
+mod procfs;
 mod ps;
 mod slurm;
 mod util;
