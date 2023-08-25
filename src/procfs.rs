@@ -1,3 +1,5 @@
+/// Collect CPU process information without GPU information, from files in /proc.
+
 use crate::process;
 
 use std::fs;
@@ -8,7 +10,7 @@ use std::os::linux::fs::MetadataExt;
 /// we need.  In the returned vector, pids uniquely tag the records.
 ///
 /// This returns Some(data) on success, otherwise None, and in the latter case the caller should
-/// fallback to another method.
+/// fallback to running `ps`.
 
 pub fn get_process_information() -> Option<Vec<process::Process>> {
 
@@ -18,7 +20,7 @@ pub fn get_process_information() -> Option<Vec<process::Process>> {
     if let Ok(s) = fs::read_to_string(path::Path::new("/proc/meminfo")) {
         for l in s.split('\n') {
             if l.starts_with("MemTotal: ") {
-                // We expect "MemTotal:\s+(\d)+kB", roughly
+                // We expect "MemTotal:\s+(\d+)\s+kB", roughly
                 let fields = l.split_ascii_whitespace().collect::<Vec<&str>>();
                 if fields.len() != 3 || fields[2] != "kB" {
                     eprintln!("Unexpected MemTotal in /proc/meminfo: {s}");
@@ -46,24 +48,28 @@ pub fn get_process_information() -> Option<Vec<process::Process>> {
     //
     // TODO: We can and should filter by uid here.
 
-    let pids = 
-        if let Ok(dir) = fs::read_dir("/proc") {
-            // FIXME: get rid of the unwraps, and when we do so, there will be some error
-            // propagation.
-            dir
-                .filter_map(|dirent| {
-                    if let Ok(x) = dirent.as_ref().unwrap().path().file_name().unwrap().to_string_lossy().parse::<usize>() {
-                        Some((x, dirent.unwrap().metadata().unwrap().st_uid()))
-                    } else {
-                        None
+    let mut pids = vec![];
+    if let Ok(dir) = fs::read_dir("/proc") {
+        // Just ignore dirents that cause trouble, there wouldn't normally be any in proc, but if
+        // there are we probably don't care.  We assume that sonar has sufficient permissions to
+        // inspect all "interesting" processes.
+        for dirent in dir {
+            if let Ok(dirent) = dirent {
+                if let Ok(meta) = dirent.metadata() {
+                    let uid = meta.st_uid();
+                    if let Some(name) = dirent.path().file_name() {
+                        if let Ok(pid) = name.to_string_lossy().parse::<usize>() {
+                            pids.push((pid, uid));
+                        }
                     }
-                })
-                .collect::<Vec<(usize, u32)>>()
-        } else {
-            eprintln!("Could not open /proc");
-            return None;
-        };
-    
+                }
+            }
+        }
+    } else {
+        eprintln!("Could not open /proc");
+        return None;
+    };
+
     let mut result = vec![];
     for (pid, uid) in pids {
 
@@ -122,7 +128,7 @@ pub fn get_process_information() -> Option<Vec<process::Process>> {
         // in the source as "Ugly old Debian thing" and "SCO"). This prints VM_DATA + VM_STACK,
         // scaled to KiB.  The values for VM_DATA and VM_STACK are obtained from /proc/PID/status
         // [sic].  However the man page for /proc says that those values are inaccurate and that one
-        // should instead use /proc/pid/statm.  In statm, we want the "data" field which is
+        // should instead use /proc/pid/statm.  In that file, we want the "data" field which is
         // documented as "data + stack", this is the sixth space-separated field.
 
         let size;
@@ -152,7 +158,7 @@ pub fn get_process_information() -> Option<Vec<process::Process>> {
         result.push(process::Process {
             pid,
             uid: uid as usize,
-            user: "".to_string(), // User name is obtained later
+            user: "".to_string(), // User name must be obtained later using getpwuid_r (3)
             cpu_pct: pcpu,
             mem_pct: pmem,
             cputime_sec: bsdtime,
@@ -161,7 +167,7 @@ pub fn get_process_information() -> Option<Vec<process::Process>> {
             session: sess,
             command: comm
         });
-    }        
+    }
 
     Some(result)
 }
