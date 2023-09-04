@@ -163,20 +163,24 @@ pub fn create_snapshot(
     // TODO: In the future, we can filter early by uid in the case of not --batchless.  (When
     // running with --batchless, we need the full process tree.)
     let procinfo_probe =
-        if let Some(mut result) = procfs::get_process_information() {
-            // Add user names here, for the time being.
-            //
-            // TODO: in the future we can do this during printing.
-            for p in &mut result {
-                if let Some(u) = users::get_user_by_uid(p.uid as users::uid_t) {
-                    p.user = u.name().to_string_lossy().to_string();
-                } else {
-                    p.user = "_noinfo_".to_string();
+        match procfs::get_process_information() {
+            Ok(mut result) => {
+                // Add user names here, for the time being.
+                //
+                // TODO: in the future we can do this during printing.
+                for p in &mut result {
+                    if let Some(u) = users::get_user_by_uid(p.uid as users::uid_t) {
+                        p.user = u.name().to_string_lossy().to_string();
+                    } else {
+                        p.user = "_noinfo_".to_string();
+                    }
                 }
+                Ok(result)
             }
-            Ok(result)
-        } else {
-            process::get_process_information()
+            Err(msg) => {
+                eprintln!("INFO: procfs failed: {}", msg);
+                process::get_process_information()
+            }
         };
     if let Err(e) = procinfo_probe {
         // This is a hard error, we need this information for everything.

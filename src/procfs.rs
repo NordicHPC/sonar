@@ -2,7 +2,7 @@
 
 // TODO: pcpu
 // TODO: do we need the clock tick for anything?
-// TODO: ability to filter by uid (useful for when running without --batchless)
+// TODO: ability to include/exclude by uid (useful for when running without --batchless)
 
 extern crate page_size;
 
@@ -18,7 +18,7 @@ use std::os::linux::fs::MetadataExt;
 /// This returns Some(data) on success, otherwise None, and in the latter case the caller should
 /// fallback to running `ps`.
 
-pub fn get_process_information() -> Option<Vec<process::Process>> {
+pub fn get_process_information() -> Result<Vec<process::Process>, String> {
 
     // The total RAM installed is in the `MemTotal` field of /proc/meminfo.
 
@@ -29,25 +29,21 @@ pub fn get_process_information() -> Option<Vec<process::Process>> {
                 // We expect "MemTotal:\s+(\d+)\s+kB", roughly
                 let fields = l.split_ascii_whitespace().collect::<Vec<&str>>();
                 if fields.len() != 3 || fields[2] != "kB" {
-                    eprintln!("Unexpected MemTotal in /proc/meminfo: {s}");
-                    return None;
+                    return Err(format!("Unexpected MemTotal in /proc/meminfo: {s}"));
                 }
                 if let Ok(n) = fields[1].parse::<usize>() {
                     memtotal_kib = n;
                     break;
                 } else {
-                    eprintln!("Failed to parse MemTotal in /proc/meminfo: {s}");
-                    return None;
+                    return Err(format!("Failed to parse MemTotal in /proc/meminfo: {s}"));
                 }
             }
         }
         if memtotal_kib == 0 {
-            eprintln!("Could not find MemTotal in /proc/meminfo: {s}");
-            return None;
+            return Err(format!("Could not find MemTotal in /proc/meminfo: {s}"));
         }
     } else {
-        eprintln!("Could not open or read /proc/meminfo");
-        return None;
+        return Err(format!("Could not open or read /proc/meminfo"));
     };
 
     // Enumerate all pids, and collect the uids while we're here.
@@ -70,8 +66,7 @@ pub fn get_process_information() -> Option<Vec<process::Process>> {
             }
         }
     } else {
-        eprintln!("Could not open /proc");
-        return None;
+        return Err(format!("Could not open /proc"));
     };
 
     let pagesize_kib = page_size::get() / 1024;
@@ -90,42 +85,35 @@ pub fn get_process_information() -> Option<Vec<process::Process>> {
             let commstart = line.find('(');
             let commend = line.rfind(')');
             if commstart.is_none() || commend.is_none() {
-                eprintln!("Could not parse command from /proc/{pid}/stat: {line}");
-                return None;
+                return Err(format!("Could not parse command from /proc/{pid}/stat: {line}"));
             }
             comm = line[commstart.unwrap()..commend.unwrap()].to_string();
             let s = line[commend.unwrap()..].to_string();
             let fields = s.split_ascii_whitespace().collect::<Vec<&str>>();
             if fields.len() < 16 {
-                eprintln!("Line from /proc/{pid}/stat too short: {line}");
-                return None;
+                return Err(format!("Line from /proc/{pid}/stat too short: {line}"));
             }
             ppid = if let Ok(x) = fields[2].parse::<usize>() {
                 x
             } else {
-                eprintln!("Could not parse ppid from /proc/{pid}/stat: {line}");
-                return None;
+                return Err(format!("Could not parse ppid from /proc/{pid}/stat: {line}"));
             };
             sess = if let Ok(x) = fields[4].parse::<usize>() {
                 x
             } else {
-                eprintln!("Could not parse sess from /proc/{pid}/stat: {line}");
-                return None;
+                return Err(format!("Could not parse sess from /proc/{pid}/stat: {line}"));
             };
             bsdtime = if let Ok(cutime) = fields[14].parse::<usize>() {
                 if let Ok(cstime) = fields[15].parse::<usize>() {
                     cutime + cstime
                 } else {
-                    eprintln!("Could not parse cstime from /proc/{pid}/stat: {line}");
-                    return None;
+                    return Err(format!("Could not parse cstime from /proc/{pid}/stat: {line}"));
                 }
             } else {
-                eprintln!("Could not parse cutime from /proc/{pid}/stat: {line}");
-                return None;
+                return Err(format!("Could not parse cutime from /proc/{pid}/stat: {line}"));
             };
         } else {
-            eprintln!("Failed to open or read /proc/{pid}/stat");
-            return None;
+            return Err(format!("Failed to open or read /proc/{pid}/stat"));
         }
 
         // We want the value corresponding to the "size" field printed by ps.  This is a saga.  When
@@ -140,18 +128,15 @@ pub fn get_process_information() -> Option<Vec<process::Process>> {
         if let Ok(s) = fs::read_to_string(path::Path::new(&format!("/proc/{pid}/statm"))) {
             let fields = s.split_ascii_whitespace().collect::<Vec<&str>>();
             if fields.len() < 6 {
-                eprintln!("Line from /proc/{pid}/statm too short: {s}");
-                return None;
+                return Err(format!("Line from /proc/{pid}/statm too short: {s}"));
             }
             size = if let Ok(x) = fields[5].parse::<usize>() {
                 x * pagesize_kib
             } else {
-                eprintln!("Could not parse data size from /proc/{pid}/statm: {s}");
-                return None;
+                return Err(format!("Could not parse data size from /proc/{pid}/statm: {s}"));
             };
         } else {
-            eprintln!("Failed to open /proc/{pid}/statm");
-            return None;
+            return Err(format!("Failed to open /proc/{pid}/statm"));
         }
 
         // Now compute some derived quantities.
@@ -162,7 +147,7 @@ pub fn get_process_information() -> Option<Vec<process::Process>> {
         result.push(process::Process {
             pid,
             uid: uid as usize,
-            user: "".to_string(), // User name must be obtained later using getpwuid_r (3)
+            user: "".to_string(), // User name must be obtained by caller when it's needed
             cpu_pct: pcpu,
             mem_pct: pmem,
             cputime_sec: bsdtime,
@@ -173,5 +158,5 @@ pub fn get_process_information() -> Option<Vec<process::Process>> {
         });
     }
 
-    Some(result)
+    Ok(result)
 }
