@@ -3,11 +3,13 @@
 
 extern crate log;
 extern crate num_cpus;
+extern crate users;
 
 use crate::amd;
 use crate::jobs;
 use crate::nvidia;
 use crate::process;
+use crate::procfs;
 use crate::util::{three_places, time_iso8601};
 
 use csv::{Writer, WriterBuilder};
@@ -158,25 +160,42 @@ pub fn create_snapshot(
     let no_gpus = empty_gpuset();
     let mut proc_by_pid = ProcTable::new();
 
-    let ps_probe = process::get_process_information();
-    if let Err(e) = ps_probe {
+    // TODO: In the future, we can filter early by uid in the case of not --batchless.  (When
+    // running with --batchless, we need the full process tree.)
+    let procinfo_probe =
+        if let Some(mut result) = procfs::get_process_information() {
+            // Add user names here, for the time being.
+            //
+            // TODO: in the future we can do this during printing.
+            for p in &mut result {
+                if let Some(u) = users::get_user_by_uid(p.uid as users::uid_t) {
+                    p.user = u.name().to_string_lossy().to_string();
+                } else {
+                    p.user = "_noinfo_".to_string();
+                }
+            }
+            Ok(result)
+        } else {
+            process::get_process_information()
+        };
+    if let Err(e) = procinfo_probe {
         // This is a hard error, we need this information for everything.
         log::error!("CPU process listing failed: {:?}", e);
         return;
     }
-    let ps_output = &ps_probe.unwrap();
+    let procinfo_output = &procinfo_probe.unwrap();
 
     // The table of users is needed to get GPU information, see comments at UserTable.
     let mut user_by_pid = UserTable::new();
-    for proc in ps_output {
+    for proc in procinfo_output {
         user_by_pid.insert(proc.pid, (&proc.user, proc.uid));
     }
 
     let mut lookup_job_by_pid = |pid: Pid| {
-        jobs.job_id_from_pid(pid, ps_output)
+        jobs.job_id_from_pid(pid, procinfo_output)
     };
 
-    for proc in ps_output {
+    for proc in procinfo_output {
         add_proc_info(&mut proc_by_pid,
                       &mut lookup_job_by_pid,
                       &proc.user,

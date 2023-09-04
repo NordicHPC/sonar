@@ -1,7 +1,6 @@
-/// Collect CPU process information without GPU information.
+/// Collect CPU process information without GPU information, by running `ps`.
 
 use crate::command::{self, CmdError};
-use crate::procfs;
 use crate::util;
 
 #[derive(PartialEq)]
@@ -18,20 +17,13 @@ pub struct Process {
     pub session: usize,
 }
 
-/// Obtain process information and return a vector of structures with all the information we need.
+/// Run "ps" and return a vector of structures with all the information we need.
 /// In the returned vector, pids uniquely tag the records.
-///
-/// This will attempt to get the values from /proc/PID/{stat,comm,statm} first, and if that
-/// fails, it will run ps.
 
 pub fn get_process_information() -> Result<Vec<Process>, CmdError> {
-    if let Some(result) = procfs::get_process_information() {
-        Ok(result)
-    } else {
-        match command::safe_command(PS_COMMAND, TIMEOUT_SECONDS) {
-            Ok(out) => Ok(parse_ps_output(&out)),
-            Err(e) => Err(e),
-        }
+    match command::safe_command(PS_COMMAND, TIMEOUT_SECONDS) {
+        Ok(out) => Ok(parse_ps_output(&out)),
+        Err(e) => Err(e),
     }
 }
 

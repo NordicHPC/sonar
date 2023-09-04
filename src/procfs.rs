@@ -1,5 +1,11 @@
 /// Collect CPU process information without GPU information, from files in /proc.
 
+// TODO: pcpu
+// TODO: do we need the clock tick for anything?
+// TODO: ability to filter by uid (useful for when running without --batchless)
+
+extern crate page_size;
+
 use crate::process;
 
 use std::fs;
@@ -45,8 +51,6 @@ pub fn get_process_information() -> Option<Vec<process::Process>> {
     };
 
     // Enumerate all pids, and collect the uids while we're here.
-    //
-    // TODO: We can and should filter by uid here.
 
     let mut pids = vec![];
     if let Ok(dir) = fs::read_dir("/proc") {
@@ -70,6 +74,7 @@ pub fn get_process_information() -> Option<Vec<process::Process>> {
         return None;
     };
 
+    let pagesize_kib = page_size::get() / 1024;
     let mut result = vec![];
     for (pid, uid) in pids {
 
@@ -139,8 +144,7 @@ pub fn get_process_information() -> Option<Vec<process::Process>> {
                 return None;
             }
             size = if let Ok(x) = fields[5].parse::<usize>() {
-                let pagesize = 4096; // FIXME
-                x * pagesize / 1024
+                x * pagesize_kib
             } else {
                 eprintln!("Could not parse data size from /proc/{pid}/statm: {s}");
                 return None;
@@ -150,9 +154,9 @@ pub fn get_process_information() -> Option<Vec<process::Process>> {
             return None;
         }
 
-        // Now compute some derived quantities.  pcpu is becoming irrelevant, frankly.
+        // Now compute some derived quantities.
 
-        let pcpu = 0.0; // (now - starttime) / (cutime + cstime);
+        let pcpu = 0.0;         // TODO: (now - starttime) / (cutime + cstime);
         let pmem = (size as f64) / (memtotal_kib as f64);
 
         result.push(process::Process {
