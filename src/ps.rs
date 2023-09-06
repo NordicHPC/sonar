@@ -168,12 +168,9 @@ pub fn create_snapshot(
                 // Add user names here, for the time being.
                 //
                 // TODO: in the future we can do this during printing.
+                let mut user_table = UserNameTable::new();
                 for p in &mut result {
-                    if let Some(u) = users::get_user_by_uid(p.uid as users::uid_t) {
-                        p.user = u.name().to_string_lossy().to_string();
-                    } else {
-                        p.user = "_noinfo_".to_string();
-                    }
+                    p.user = user_table.lookup(p.uid as users::uid_t);
                 }
                 Ok(result)
             }
@@ -343,6 +340,31 @@ pub fn create_snapshot(
 
     writer.flush().unwrap();
 }
+
+struct UserNameTable {
+    ht: HashMap<users::uid_t, String>,
+}
+
+impl UserNameTable {
+    fn new() -> UserNameTable {
+        UserNameTable {
+            ht: HashMap::new()
+        }
+    }
+
+    fn lookup(&mut self, uid: users::uid_t) -> String {
+        if let Some(name) = self.ht.get(&uid) {
+            name.clone()
+        } else if let Some(u) = users::get_user_by_uid(uid) {
+            let name = u.name().to_string_lossy().to_string();
+            self.ht.insert(uid, name.clone());
+            name
+        } else {
+            "_noinfo_".to_string()
+        }
+    }
+}
+
 
 struct PrintParameters<'a> {
     hostname: &'a str,
