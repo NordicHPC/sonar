@@ -69,7 +69,7 @@ pub fn get_process_information() -> Result<Vec<process::Process>, String> {
     } else {
         return Err(format!("Could not open or read /proc/meminfo"));
     };
-    
+
     // Enumerate all pids, and collect the uids while we're here.
     //
     // Just ignore dirents that cause trouble, there wouldn't normally be any in proc, but if there
@@ -96,7 +96,7 @@ pub fn get_process_information() -> Result<Vec<process::Process>, String> {
 
     // Collect remaining system data from /proc/{pid}/stat for the enumerated pids.
 
-    let pagesize_kib = page_size::get() / 1024;
+    let kib_per_page = page_size::get() / 1024;
     let mut result = vec![];
     let mut user_table = UserTable::new();
     let clock_ticks_per_sec: usize = unsafe { libc::sysconf(libc::_SC_CLK_TCK) as usize };
@@ -147,20 +147,27 @@ pub fn get_process_information() -> Result<Vec<process::Process>, String> {
         // "data" field which is documented as "data + stack", this is the sixth space-separated
         // field.
 
-        let size;
+        let size_kib;
+        let rss_kib;
         if let Ok(s) = fs::read_to_string(path::Path::new(&format!("/proc/{pid}/statm"))) {
             let fields = s.split_ascii_whitespace().collect::<Vec<&str>>();
-            size = parse_usize_field(&fields, 5, &s, "statm", pid, "data size")? * pagesize_kib;
+            rss_kib = parse_usize_field(&fields, 1, &s, "statm", pid, "resident set size")? * kib_per_page;
+            size_kib = parse_usize_field(&fields, 5, &s, "statm", pid, "data size")? * kib_per_page;
         } else {
             return Err(format!("Failed to open /proc/{pid}/statm"));
         }
 
         // Now compute some derived quantities.
 
-        // pcpu is rounded to ##.#
-        let pcpu = (((utime + stime) as f64 / realtime as f64) * 1000.0).round() / 10.0;
-        // pmem is not documented but appears rounded the same way as pcpu
-        let pmem = (((size as f64) / (memtotal_kib as f64)) * 1000.0).round() / 10.0;
+        // pcpu and pmem are rounded to ##.#.  We're going to get slightly different answers here
+        // than ps because we use float arithmetic; frequently this code will produce values that
+        // are one-tenth of a percent higher than ps.
+        //
+        // Note ps uses rss not size here.  Also, ps doesn't trust rss to be <= 100% of memory, so
+        // let's not trust it either.
+
+        let pcpu = (((utime + stime) as f64 * 1000.0 / realtime as f64)).ceil() / 10.0;
+        let pmem = f64::min(((rss_kib as f64) * 1000.0 / (memtotal_kib as f64)).ceil() / 10.0, 99.9);
         let user = user_table.lookup(uid);
         
         result.push(process::Process {
@@ -170,7 +177,7 @@ pub fn get_process_information() -> Result<Vec<process::Process>, String> {
             cpu_pct: pcpu,
             mem_pct: pmem,
             cputime_sec: bsdtime,
-            mem_size_kib: size,
+            mem_size_kib: size_kib,
             ppid,
             session: sess,
             command: comm
