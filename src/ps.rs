@@ -3,7 +3,6 @@
 
 extern crate log;
 extern crate num_cpus;
-extern crate users;
 
 use crate::amd;
 use crate::jobs;
@@ -160,18 +159,29 @@ pub fn create_snapshot(
     let no_gpus = empty_gpuset();
     let mut proc_by_pid = ProcTable::new();
 
-    // TODO: In the future, we can filter early by uid in the case of not --batchless.  (When
-    // running with --batchless, we need the full process tree.)
+    let mut ps1 = procfs::get_process_information().expect("ps1");
+    let mut ps2 = process::get_process_information().expect("ps2");
+
+    ps1.sort_by_key(|a| a.pid);
+    ps2.sort_by_key(|b| b.pid);
+
+    {
+        use std::fs::File;
+        use io::Write;
+        let mut ps1file = File::create("ps1.txt").unwrap();
+        for process::Process { pid, uid, user, cpu_pct, mem_pct, cputime_sec, mem_size_kib, command, ppid, session }  in ps1 {
+            writeln!(&mut ps1file, "pid {pid} ppid {ppid} uid {uid} user {user} cpu_pct {cpu_pct} mem_pct {mem_pct} mem_size_kib {mem_size_kib} cputime_sec {cputime_sec} session {session} comm {command}").unwrap();
+        }
+    
+        let mut ps2file = std::fs::File::create("ps2.txt").unwrap();
+        for process::Process { pid, uid, user, cpu_pct, mem_pct, cputime_sec, mem_size_kib, command, ppid, session }  in ps2 {
+            writeln!(&mut ps2file, "pid {pid} ppid {ppid} uid {uid} user {user} cpu_pct {cpu_pct} mem_pct {mem_pct} mem_size_kib {mem_size_kib} cputime_sec {cputime_sec} session {session} comm {command}").unwrap();
+        }
+    }
+
     let procinfo_probe =
         match procfs::get_process_information() {
-            Ok(mut result) => {
-                // Add user names here, for the time being.
-                //
-                // TODO: in the future we can do this during printing.
-                let mut user_table = UserNameTable::new();
-                for p in &mut result {
-                    p.user = user_table.lookup(p.uid as users::uid_t);
-                }
+            Ok(result) => {
                 Ok(result)
             }
             Err(msg) => {
@@ -340,31 +350,6 @@ pub fn create_snapshot(
 
     writer.flush().unwrap();
 }
-
-struct UserNameTable {
-    ht: HashMap<users::uid_t, String>,
-}
-
-impl UserNameTable {
-    fn new() -> UserNameTable {
-        UserNameTable {
-            ht: HashMap::new()
-        }
-    }
-
-    fn lookup(&mut self, uid: users::uid_t) -> String {
-        if let Some(name) = self.ht.get(&uid) {
-            name.clone()
-        } else if let Some(u) = users::get_user_by_uid(uid) {
-            let name = u.name().to_string_lossy().to_string();
-            self.ht.insert(uid, name.clone());
-            name
-        } else {
-            "_noinfo_".to_string()
-        }
-    }
-}
-
 
 struct PrintParameters<'a> {
     hostname: &'a str,
