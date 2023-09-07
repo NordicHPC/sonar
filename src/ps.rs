@@ -174,14 +174,14 @@ pub fn create_snapshot(
         for process::Process { pid, uid, user, cpu_pct, mem_pct, cputime_sec, mem_size_kib, command, ppid, session }  in ps1 {
             writeln!(&mut ps1file, "pid {pid} ppid {ppid} uid {uid} user {user} cpu_pct {cpu_pct} mem_pct {mem_pct} mem_size_kib {mem_size_kib} cputime_sec {cputime_sec} session {session} comm {command}").unwrap();
         }
-    
+
         let mut ps2file = std::fs::File::create("ps-out.txt").unwrap();
         for process::Process { pid, uid, user, cpu_pct, mem_pct, cputime_sec, mem_size_kib, command, ppid, session }  in ps2 {
             writeln!(&mut ps2file, "pid {pid} ppid {ppid} uid {uid} user {user} cpu_pct {cpu_pct} mem_pct {mem_pct} mem_size_kib {mem_size_kib} cputime_sec {cputime_sec} session {session} comm {command}").unwrap();
         }
     }
     */
-    
+
     let procinfo_probe =
         match procfs::get_process_information() {
             Ok(result) => {

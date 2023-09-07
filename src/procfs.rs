@@ -1,8 +1,5 @@
 /// Collect CPU process information without GPU information, from files in /proc.
 
-// TODO: pcpu
-// TODO: do we need the clock tick for anything?
-
 extern crate libc;
 extern crate page_size;
 extern crate users;
@@ -38,7 +35,7 @@ pub fn get_process_information() -> Result<Vec<process::Process>, String> {
                 let fields = l.split_ascii_whitespace().collect::<Vec<&str>>();
                 boot_time = parse_usize_field(&fields, 1, &l, "stat", 0, "btime")? as u64;
                 break;
-            }                
+            }
         }
         if boot_time == 0 {
             return Err(format!("Could not find btime in /proc/stat: {s}"));
@@ -169,7 +166,7 @@ pub fn get_process_information() -> Result<Vec<process::Process>, String> {
         let pcpu = (((utime + stime) as f64 * 1000.0 / realtime as f64)).ceil() / 10.0;
         let pmem = f64::min(((rss_kib as f64) * 1000.0 / (memtotal_kib as f64)).ceil() / 10.0, 99.9);
         let user = user_table.lookup(uid);
-        
+
         result.push(process::Process {
             pid,
             uid: uid as usize,
