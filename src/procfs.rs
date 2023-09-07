@@ -119,7 +119,7 @@ pub fn get_process_information() -> Result<Vec<process::Process>, String> {
             comm = line[commstart.unwrap()+1..commend.unwrap()].to_string();
             let s = line[commend.unwrap()+1..].trim().to_string();
             let fields = s.split_ascii_whitespace().collect::<Vec<&str>>();
-            // NOTE relative to the `ps` documentation: All field offsets here are relative to the
+            // NOTE relative to the `proc` documentation: All field offsets here are relative to the
             // command, so ppid is 2, not 4, and then they are zero-based, not 1-based.
             ppid = parse_usize_field(&fields, 1, &line, "stat", pid, "ppid")?;
             sess = parse_usize_field(&fields, 3, &line, "stat", pid, "sess")?;
