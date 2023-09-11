@@ -1,4 +1,4 @@
-/// Collect CPU process information without GPU information.
+/// Collect CPU process information without GPU information, by running `ps`.
 
 use crate::command::{self, CmdError};
 use crate::util;

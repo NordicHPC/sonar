@@ -8,6 +8,7 @@ mod command;
 mod jobs;
 mod nvidia;
 mod process;
+mod procfs;
 mod ps;
 mod slurm;
 mod util;
@@ -31,15 +32,18 @@ enum Commands {
         #[arg(long, default_value_t = false)]
         rollup: bool,
 
-        /// Include records for jobs that have on average used at least this percentage of CPU, note this is nonmonotonic [default: none]
+        /// Include records for jobs that have on average used at least this percentage of CPU,
+        /// note this is nonmonotonic [default: none]
         #[arg(long)]
         min_cpu_percent: Option<f64>,
 
-        /// Include records for jobs that presently use at least this percentage of real memory, note this is nonmonotonic [default: none]
+        /// Include records for jobs that presently use at least this percentage of real memory,
+        /// note this is nonmonotonic [default: none]
         #[arg(long)]
         min_mem_percent: Option<f64>,
 
-        /// Include records for jobs that have used at least this much CPU time (in seconds) [default: none]
+        /// Include records for jobs that have used at least this much CPU time (in seconds)
+        /// [default: none]
         #[arg(long)]
         min_cpu_time: Option<usize>,
 
