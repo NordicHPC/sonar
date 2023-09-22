@@ -290,9 +290,7 @@ set -euf -o pipefail
 
 sonar_directory=/cluster/shared/sonar/data
 
-year=$(date +'%Y')
-month=$(date +'%m')
-day=$(date +'%d')
+read -r year month day <<< $(date +"%Y %m %d")
 
 output_directory=${sonar_directory}/${year}/${month}/${day}
 
