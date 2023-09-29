@@ -154,6 +154,7 @@ where
 
 pub struct PsOptions<'a> {
     pub rollup: bool,
+    pub always_print_something: bool,
     pub min_cpu_percent: Option<f64>,
     pub min_mem_percent: Option<f64>,
     pub min_cpu_time: Option<usize>,
@@ -323,6 +324,8 @@ pub fn create_snapshot(
         opts
     };
 
+    let mut did_print = false;
+    let must_print = opts.always_print_something;
     if opts.rollup {
         // This is a little complicated because jobs with job_id 0 cannot be rolled up.
         //
@@ -372,12 +375,35 @@ pub fn create_snapshot(
             }
         }
         for r in rolledup {
-            print_record(&mut writer, &print_params, &r); 
+            did_print = print_record(&mut writer, &print_params, &r, false) || did_print;
         }
     } else {
         for (_, proc_info) in proc_by_pid {
-            print_record(&mut writer, &print_params, &proc_info);
+            did_print = print_record(&mut writer, &print_params, &proc_info, false) || did_print;
         }
+    }
+
+    if !did_print && must_print {
+        // Print a synthetic record
+        let synth = ProcInfo {
+            user: "_sonar_",
+            _uid: 0,
+            command: "_heartbeat_",
+            pid: 0,
+            rolledup: 0,
+            is_system_job: true,
+            job_id: 0,
+            cpu_percentage: 0.0,
+            cputime_sec: 0,
+            mem_percentage: 0.0,
+            mem_size_kib: 0,
+            gpu_cards: empty_gpuset(),
+            gpu_percentage: 0.0,
+            gpu_mem_percentage: 0.0,
+            gpu_mem_size_kib: 0,
+            gpu_status: GpuStatus::Ok,
+        };
+        print_record(&mut writer, &print_params, &synth, true);
     }
 
     writer.flush().unwrap();
@@ -391,7 +417,7 @@ struct PrintParameters<'a> {
     opts: &'a PsOptions<'a>
 }
 
-fn print_record<W: io::Write>(writer: &mut Writer<W>, params: &PrintParameters, proc_info: &ProcInfo) {
+fn print_record<W: io::Write>(writer: &mut Writer<W>, params: &PrintParameters, proc_info: &ProcInfo, must_print: bool) -> bool {
     let mut included = false;
 
     // The logic here is that if any of the inclusion filters are provided, then the set of those
@@ -419,8 +445,8 @@ fn print_record<W: io::Write>(writer: &mut Writer<W>, params: &PrintParameters, 
         included = true;
     }
 
-    if !included {
-        return;
+    if !included && !must_print {
+        return false;
     }
 
     // The exclusion filters apply after the inclusion filters and the record must pass all of the
@@ -440,8 +466,8 @@ fn print_record<W: io::Write>(writer: &mut Writer<W>, params: &PrintParameters, 
         }
     }
 
-    if !included {
-        return;
+    if !included && !must_print {
+        return false;
     }
 
     let gpus_comma_separated =
@@ -483,4 +509,5 @@ fn print_record<W: io::Write>(writer: &mut Writer<W>, params: &PrintParameters, 
         fields.push(format!("rolledup={}", proc_info.rolledup));
     }
     writer.write_record(fields).unwrap();
+    return true;
 }

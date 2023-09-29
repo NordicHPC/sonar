@@ -83,6 +83,7 @@ fn main() {
         } => {
             let opts = ps::PsOptions {
                 rollup: *rollup,
+                always_print_something: true,
                 min_cpu_percent: *min_cpu_percent,
                 min_mem_percent: *min_mem_percent,
                 min_cpu_time: *min_cpu_time,
