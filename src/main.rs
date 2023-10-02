@@ -13,6 +13,8 @@ mod ps;
 mod slurm;
 mod util;
 
+const TIMEOUT_SECONDS: u64 = 5; // For subprocesses
+
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
 struct Cli {
