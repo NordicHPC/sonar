@@ -9,6 +9,7 @@
 use crate::command::{self, CmdError};
 use crate::util;
 use crate::ps::UserTable;
+use crate::TIMEOUT_SECONDS;
 
 #[cfg(test)]
 use crate::util::map;
@@ -48,8 +49,6 @@ pub fn get_nvidia_information(
         Err(e) => Err(format!("{:?}", e)),
     }
 }
-
-const TIMEOUT_SECONDS: u64 = 2; // For `nvidia-smi`
 
 // For prototyping purposes (and maybe it's good enough for production?), parse the output of
 // `nvidia-smi pmon`.  This output has a couple of problems:

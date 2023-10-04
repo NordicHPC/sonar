@@ -1,6 +1,7 @@
 /// Collect CPU process information without GPU information, by running `ps`.
 
 use crate::command::{self, CmdError};
+use crate::TIMEOUT_SECONDS;
 use crate::util;
 
 #[derive(PartialEq)]
@@ -26,8 +27,6 @@ pub fn get_process_information() -> Result<Vec<Process>, CmdError> {
         Err(e) => Err(e),
     }
 }
-
-const TIMEOUT_SECONDS: u64 = 2; // for `ps`
 
 // `--cumulative` and `bsdtime` are to make sure that the cpu time accounted to exited child
 // processes (the cutime and cstime fields of /proc/pid/status) is used and printed.  Note

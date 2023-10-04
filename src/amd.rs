@@ -16,6 +16,7 @@
 use crate::command::{self, CmdError};
 use crate::nvidia;
 use crate::ps::UserTable;
+use crate::TIMEOUT_SECONDS;
 
 use std::cmp::Ordering;
 
@@ -138,8 +139,6 @@ PID 28154 is using 1 DRM device(s):
         proc! { Some(1), 28156, "bob", 1001, 63.0, 5.0 },
     ]));
 }
-
-const TIMEOUT_SECONDS: u64 = 2; // For `rocm-smi`
 
 const AMD_CONCISE_COMMAND: &str = "rocm-smi";
 
