@@ -77,6 +77,15 @@ struct ProcInfo<'a> {
     gpu_percentage: f64,
     gpu_mem_percentage: f64,
     gpu_mem_size_kib: usize,
+    gpu_status: GpuStatus,
+}
+
+#[derive(Copy, Clone, PartialEq, Eq)]
+enum GpuStatus {
+    Ok = 0,
+    UnknownFailure = 1,
+    // More here, by and by: it's possible to parse the output of the error and
+    // be specific
 }
 
 type ProcTable<'a> = HashMap<Pid, ProcInfo<'a>>;
@@ -139,6 +148,7 @@ where
             gpu_percentage,
             gpu_mem_percentage,
             gpu_mem_size_kib,
+            gpu_status: GpuStatus::Ok,
         });
 }
 
@@ -226,11 +236,18 @@ pub fn create_snapshot(
                       0);       // gpu_mem_size_kib
     }
 
+    // When a GPU fails it may be a transient error or a permanent error, but either
+    // way sonar does not know.  We just record the failure.
+
+    let mut gpu_status = GpuStatus::Ok;
+
     let nvidia_probe = nvidia::get_nvidia_information(&user_by_pid);
     match nvidia_probe {
-        Err(e) => {
-            // This is a soft error.
-            log::error!("GPU (Nvidia) process listing failed: {:?}", e);
+        Err(_e) => {
+            gpu_status = GpuStatus::UnknownFailure;
+            // This is a soft failure, surfaced through dashboards; we do not want mail about it
+            // under normal circumstances.
+            //log::error!("GPU (Nvidia) process listing failed: {:?}", e);
         }
         Ok(ref nvidia_output) => {
             for proc in nvidia_output {
@@ -254,9 +271,11 @@ pub fn create_snapshot(
 
     let amd_probe = amd::get_amd_information(&user_by_pid);
     match amd_probe {
-        Err(e) => {
-            // This is a soft error.
-            log::error!("GPU (Nvidia) process listing failed: {:?}", e);
+        Err(_e) => {
+            gpu_status = GpuStatus::UnknownFailure;
+            // This is a soft failure, surfaced through dashboards; we do not want mail about it
+            // under normal circumstances.
+            //log::error!("GPU (AMD) process listing failed: {:?}", e);
         }
         Ok(ref amd_output) => {
             for proc in amd_output {
@@ -275,6 +294,16 @@ pub fn create_snapshot(
                               proc.mem_pct,
                               proc.mem_size_kib);
             }
+        }
+    }
+
+    // If there was a gpu failure, signal it in all the process structures.  This is pretty
+    // conservative and increases data volume, but it means that the information is not lost so long
+    // as not all records from this sonar run are filtered out by the front end.
+
+    if gpu_status != GpuStatus::Ok {
+        for (_, proc_info) in &mut proc_by_pid {
+            proc_info.gpu_status = gpu_status;
         }
     }
 
@@ -447,6 +476,9 @@ fn print_record<W: io::Write>(writer: &mut Writer<W>, params: &PrintParameters, 
         format!("gpukib={}", proc_info.gpu_mem_size_kib),
         format!("cputime_sec={}", proc_info.cputime_sec),
     ];
+    if proc_info.gpu_status != GpuStatus::Ok {
+        fields.push(format!("gpufail={}", proc_info.gpu_status as i32));
+    }
     if proc_info.rolledup > 0 {
         fields.push(format!("rolledup={}", proc_info.rolledup));
     }
