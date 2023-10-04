@@ -72,6 +72,9 @@ pub fn get_process_information() -> Result<Vec<process::Process>, String> {
     // Just ignore dirents that cause trouble, there wouldn't normally be any in proc, but if there
     // are we probably don't care.  We assume that sonar has sufficient permissions to inspect all
     // "interesting" processes.
+    //
+    // Note that a pid may disappear between the time we see it here and the time we get around to
+    // reading it, later, and that new pids may appear meanwhile.  We should ignore both issues.
 
     let mut pids = vec![];
     if let Ok(dir) = fs::read_dir("/proc") {
@@ -132,7 +135,10 @@ pub fn get_process_information() -> Result<Vec<process::Process>, String> {
             let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
             realtime = now - (boot_time + start_time);
         } else {
-            return Err(format!("Failed to open or read /proc/{pid}/stat"));
+	    // This is *usually* benign - the process may have gone away since we enumerated the
+	    // /proc directory.  It is *possibly* indicative of a permission problem, but that
+	    // problem would be so pervasive that diagnosing it here is not right.
+	    continue;
         }
 
         // We want the value corresponding to the "size" field printed by ps.  This is a saga.  When
@@ -151,7 +157,8 @@ pub fn get_process_information() -> Result<Vec<process::Process>, String> {
             rss_kib = parse_usize_field(&fields, 1, &s, "statm", pid, "resident set size")? * kib_per_page;
             size_kib = parse_usize_field(&fields, 5, &s, "statm", pid, "data size")? * kib_per_page;
         } else {
-            return Err(format!("Failed to open /proc/{pid}/statm"));
+	    // This is *usually* benign - see above.
+	    continue;
         }
 
         // Now compute some derived quantities.
