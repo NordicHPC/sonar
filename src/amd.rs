@@ -28,9 +28,7 @@ use crate::util::map;
 /// Err(e) really means the command started running but failed, for the reason given.  If the
 /// command could not be found, we return Ok(vec![]).
 
-pub fn get_amd_information(
-    user_by_pid: &UserTable,
-) -> Result<Vec<nvidia::Process>, String> {
+pub fn get_amd_information(user_by_pid: &UserTable) -> Result<Vec<nvidia::Process>, String> {
     // I've not been able to combine the two invocations of rocm-smi yet; we have to run the command
     // twice.  Not a happy situation.
 

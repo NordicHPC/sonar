@@ -1,8 +1,7 @@
 /// Collect CPU process information without GPU information, by running `ps`.
-
 use crate::command::{self, CmdError};
-use crate::TIMEOUT_SECONDS;
 use crate::util;
+use crate::TIMEOUT_SECONDS;
 
 #[derive(PartialEq)]
 pub struct Process {

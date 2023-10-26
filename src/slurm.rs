@@ -4,7 +4,7 @@ use crate::jobs;
 use crate::process;
 
 use std::fs::File;
-use std::io::{BufRead,BufReader};
+use std::io::{BufRead, BufReader};
 
 pub struct SlurmJobManager {}
 
@@ -18,7 +18,6 @@ impl jobs::JobManager for SlurmJobManager {
 fn get_slurm_job_id(pid: usize) -> Option<String> {
     match File::open(format!("/proc/{pid}/cgroup")) {
         Ok(f) => {
-
             // We want \1 of the first line that matches "/job_(.*?)/"
             //
             // The reason is that there are several lines in that file that look roughly like this,
@@ -29,8 +28,8 @@ fn get_slurm_job_id(pid: usize) -> Option<String> {
             for l in BufReader::new(f).lines() {
                 if let Ok(l) = l {
                     if let Some(x) = l.find("/job_") {
-                        if let Some(y) = l[x+5..].find('/') {
-                            return Some(l[x+5..x+5+y].to_string())
+                        if let Some(y) = l[x + 5..].find('/') {
+                            return Some(l[x + 5..x + 5 + y].to_string());
                         }
                     }
                 } else {
