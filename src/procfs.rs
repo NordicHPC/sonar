@@ -108,7 +108,7 @@ pub fn get_process_information() -> Result<Vec<process::Process>, String> {
         let realtime;
         let ppid;
         let sess;
-        let comm;
+        let mut comm;
         let utime;
         let stime;
         if let Ok(line) = fs::read_to_string(path::Path::new(&format!("/proc/{pid}/stat"))) {
@@ -124,6 +124,39 @@ pub fn get_process_information() -> Result<Vec<process::Process>, String> {
             let fields = s.split_ascii_whitespace().collect::<Vec<&str>>();
             // NOTE relative to the `proc` documentation: All field offsets here are relative to the
             // command, so ppid is 2, not 4, and then they are zero-based, not 1-based.
+
+            // Fields[0] is the state.  These characters are relevant for modern kernels:
+            //  R running
+            //  S sleeping in interruptible wait
+            //  D sleeping in uninterruptible disk wait
+            //  Z zombie
+            //  T stopped on a signal
+            //  t stopped for tracing
+            //  X dead
+            //
+            // For some of these, the fields may take on different values, in particular, for X and
+            // Z it is known that some of the values we want are represented as -1 and parsing them
+            // as unsigned will fail.  For Z it also looks like some of the fields could have
+            // surprising zero values; one has to be careful when dividing.
+            //
+            // In particular for Z, field 5 "tpgid" has been observed to be -1.
+
+            // Zombie jobs cannot be ignored, because they are indicative of system health and the
+            // information about their presence is used in consumers.
+
+            let dead = fields[0] == "X";
+            let zombie = fields[0] == "Z";
+
+            if dead {
+                // Just drop dead jobs
+                continue;
+            }
+
+            if zombie {
+                // This tag is used by consumers but it's an artifact of `ps`, not the kernel
+                comm = comm + " <defunct>";
+            }
+
             ppid = parse_usize_field(&fields, 1, &line, "stat", pid, "ppid")?;
             sess = parse_usize_field(&fields, 3, &line, "stat", pid, "sess")?;
             utime = parse_usize_field(&fields, 11, &line, "stat", pid, "utime")? / clock_ticks_per_sec;
