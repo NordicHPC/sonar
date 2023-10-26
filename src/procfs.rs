@@ -1,5 +1,4 @@
 /// Collect CPU process information without GPU information, from files in /proc.
-
 extern crate libc;
 extern crate page_size;
 extern crate users;
@@ -8,10 +7,10 @@ use crate::process;
 
 use std::collections::HashMap;
 use std::fs;
-use std::path;
 use std::os::linux::fs::MetadataExt;
+use std::path;
 use std::time::{SystemTime, UNIX_EPOCH};
-use users::{uid_t, get_user_by_uid};
+use users::{get_user_by_uid, uid_t};
 
 /// Obtain process information via /proc and return a vector of structures with all the information
 /// we need.  In the returned vector, pids uniquely tag the records.
@@ -23,7 +22,6 @@ use users::{uid_t, get_user_by_uid};
 /// provide the same information.
 
 pub fn get_process_information() -> Result<Vec<process::Process>, String> {
-
     // The boot time is the `btime` field of /proc/stat.  It is measured in seconds since epoch.  We
     // need this to compute the process's real time, which we need to compute ps-compatible cpu
     // utilization.
@@ -110,7 +108,6 @@ pub fn get_process_information() -> Result<Vec<process::Process>, String> {
     }
 
     for (pid, uid) in pids {
-
         // Basic system variables.  Intermediate time values are represented in ticks to prevent
         // various roundoff artifacts resulting in NaN or Infinity.
 
@@ -118,7 +115,7 @@ pub fn get_process_information() -> Result<Vec<process::Process>, String> {
         let mut realtime_ticks;
         let ppid;
         let sess;
-        let comm;
+        let mut comm;
         let utime_ticks;
         let stime_ticks;
         if let Ok(line) = fs::read_to_string(path::Path::new(&format!("/proc/{pid}/stat"))) {
@@ -127,13 +124,48 @@ pub fn get_process_information() -> Result<Vec<process::Process>, String> {
             let commstart = line.find('(');
             let commend = line.rfind(')');
             if commstart.is_none() || commend.is_none() {
-                return Err(format!("Could not parse command from /proc/{pid}/stat: {line}"));
+                return Err(format!(
+                    "Could not parse command from /proc/{pid}/stat: {line}"
+                ));
             }
-            comm = line[commstart.unwrap()+1..commend.unwrap()].to_string();
-            let s = line[commend.unwrap()+1..].trim().to_string();
+            comm = line[commstart.unwrap() + 1..commend.unwrap()].to_string();
+            let s = line[commend.unwrap() + 1..].trim().to_string();
             let fields = s.split_ascii_whitespace().collect::<Vec<&str>>();
             // NOTE relative to the `proc` documentation: All field offsets here are relative to the
             // command, so ppid is 2, not 4, and then they are zero-based, not 1-based.
+
+            // Fields[0] is the state.  These characters are relevant for modern kernels:
+            //  R running
+            //  S sleeping in interruptible wait
+            //  D sleeping in uninterruptible disk wait
+            //  Z zombie
+            //  T stopped on a signal
+            //  t stopped for tracing
+            //  X dead
+            //
+            // For some of these, the fields may take on different values, in particular, for X and
+            // Z it is known that some of the values we want are represented as -1 and parsing them
+            // as unsigned will fail.  For Z it also looks like some of the fields could have
+            // surprising zero values; one has to be careful when dividing.
+            //
+            // In particular for Z, field 5 "tpgid" has been observed to be -1.
+
+            // Zombie jobs cannot be ignored, because they are indicative of system health and the
+            // information about their presence is used in consumers.
+
+            let dead = fields[0] == "X";
+            let zombie = fields[0] == "Z";
+
+            if dead {
+                // Just drop dead jobs
+                continue;
+            }
+
+            if zombie {
+                // This tag is used by consumers but it's an artifact of `ps`, not the kernel
+                comm = comm + " <defunct>";
+            }
+
             ppid = parse_usize_field(&fields, 1, &line, "stat", pid, "ppid")?;
             sess = parse_usize_field(&fields, 3, &line, "stat", pid, "sess")?;
             utime_ticks = parse_usize_field(&fields, 11, &line, "stat", pid, "utime")? as f64;
@@ -141,12 +173,17 @@ pub fn get_process_information() -> Result<Vec<process::Process>, String> {
             let cutime_ticks = parse_usize_field(&fields, 13, &line, "stat", pid, "cutime")? as f64;
             let cstime_ticks = parse_usize_field(&fields, 14, &line, "stat", pid, "cstime")? as f64;
             bsdtime_ticks = utime_ticks + stime_ticks + cutime_ticks + cstime_ticks;
-            let start_time_ticks = parse_usize_field(&fields, 19, &line, "stat", pid, "starttime")? as f64;
+            let start_time_ticks =
+                parse_usize_field(&fields, 19, &line, "stat", pid, "starttime")? as f64;
 
             // boot_time and the current time are both time_t, ie, a 31-bit quantity in 2023 and a
             // 32-bit quantity before 2038.  clock_ticks_per_sec is on the order of 100.  Ergo
             // boot_ticks and now_ticks can be represented in about 32+7=39 bits, fine for an f64.
-            let now_ticks = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs() as f64 * clock_ticks_per_sec;
+            let now_ticks = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_secs() as f64
+                * clock_ticks_per_sec;
             let boot_ticks = boot_time as f64 * clock_ticks_per_sec;
 
             // start_time_ticks should be on the order of a few years, there is no risk of overflow
@@ -159,10 +196,10 @@ pub fn get_process_information() -> Result<Vec<process::Process>, String> {
                 realtime_ticks = 1.0;
             }
         } else {
-	    // This is *usually* benign - the process may have gone away since we enumerated the
-	    // /proc directory.  It is *possibly* indicative of a permission problem, but that
-	    // problem would be so pervasive that diagnosing it here is not right.
-	    continue;
+            // This is *usually* benign - the process may have gone away since we enumerated the
+            // /proc directory.  It is *possibly* indicative of a permission problem, but that
+            // problem would be so pervasive that diagnosing it here is not right.
+            continue;
         }
 
         // We want the value corresponding to the "size" field printed by ps.  This is a saga.  When
@@ -178,11 +215,12 @@ pub fn get_process_information() -> Result<Vec<process::Process>, String> {
         let rss_kib;
         if let Ok(s) = fs::read_to_string(path::Path::new(&format!("/proc/{pid}/statm"))) {
             let fields = s.split_ascii_whitespace().collect::<Vec<&str>>();
-            rss_kib = parse_usize_field(&fields, 1, &s, "statm", pid, "resident set size")? * kib_per_page;
+            rss_kib = parse_usize_field(&fields, 1, &s, "statm", pid, "resident set size")?
+                * kib_per_page;
             size_kib = parse_usize_field(&fields, 5, &s, "statm", pid, "data size")? * kib_per_page;
         } else {
-	    // This is *usually* benign - see above.
-	    continue;
+            // This is *usually* benign - see above.
+            continue;
         }
 
         // Now compute some derived quantities.
@@ -201,7 +239,10 @@ pub fn get_process_information() -> Result<Vec<process::Process>, String> {
 
         // Note ps uses rss not size here.  Also, ps doesn't trust rss to be <= 100% of memory, so
         // let's not trust it either.
-        let pmem = f64::min(((rss_kib as f64) * 1000.0 / (memtotal_kib as f64)).round() / 10.0, 99.9);
+        let pmem = f64::min(
+            ((rss_kib as f64) * 1000.0 / (memtotal_kib as f64)).round() / 10.0,
+            99.9,
+        );
 
         let user = user_table.lookup(uid);
 
@@ -215,28 +256,41 @@ pub fn get_process_information() -> Result<Vec<process::Process>, String> {
             mem_size_kib: size_kib,
             ppid,
             session: sess,
-            command: comm
+            command: comm,
         });
     }
 
     Ok(result)
 }
 
-fn parse_usize_field(fields: &[&str], ix: usize, line: &str, file: &str, pid: usize, fieldname: &str) -> Result<usize, String> {
+fn parse_usize_field(
+    fields: &[&str],
+    ix: usize,
+    line: &str,
+    file: &str,
+    pid: usize,
+    fieldname: &str,
+) -> Result<usize, String> {
     if ix >= fields.len() {
         if pid == 0 {
             return Err(format!("Index out of range for /proc/{file}: {ix}: {line}"));
         } else {
-            return Err(format!("Index out of range for /proc/{pid}/{file}: {ix}: {line}"));
+            return Err(format!(
+                "Index out of range for /proc/{pid}/{file}: {ix}: {line}"
+            ));
         }
     }
     if let Ok(n) = fields[ix].parse::<usize>() {
         return Ok(n);
     }
     if pid == 0 {
-        Err(format!("Could not parse {fieldname} in /proc/{file}: {line}"))
+        Err(format!(
+            "Could not parse {fieldname} in /proc/{file}: {line}"
+        ))
     } else {
-        Err(format!("Could not parse {fieldname} from /proc/{pid}/{file}: {line}"))
+        Err(format!(
+            "Could not parse {fieldname} from /proc/{pid}/{file}: {line}"
+        ))
     }
 }
 
@@ -248,9 +302,7 @@ struct UserTable {
 
 impl UserTable {
     fn new() -> UserTable {
-        UserTable {
-            ht: HashMap::new()
-        }
+        UserTable { ht: HashMap::new() }
     }
 
     fn lookup(&mut self, uid: uid_t) -> String {
