@@ -3,7 +3,7 @@ use crate::command::{self, CmdError};
 use crate::util;
 use crate::TIMEOUT_SECONDS;
 
-#[derive(PartialEq)]
+#[derive(PartialEq, Debug)]
 pub struct Process {
     pub pid: usize,
     pub uid: usize,

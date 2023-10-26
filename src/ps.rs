@@ -9,6 +9,7 @@ use crate::jobs;
 use crate::nvidia;
 use crate::process;
 use crate::procfs;
+use crate::procfsapi;
 use crate::util::{three_places, time_iso8601};
 
 use csv::{Writer, WriterBuilder};
@@ -189,11 +190,14 @@ pub fn create_snapshot(jobs: &mut dyn jobs::JobManager, opts: &PsOptions) {
     }
     */
 
-    let procinfo_probe = match procfs::get_process_information() {
-        Ok(result) => Ok(result),
-        Err(msg) => {
-            eprintln!("INFO: procfs failed: {}", msg);
-            process::get_process_information()
+    let procinfo_probe = {
+        let fs = procfsapi::RealFS::new();
+        match procfs::get_process_information(&fs) {
+            Ok(result) => Ok(result),
+            Err(msg) => {
+                eprintln!("INFO: procfs failed: {}", msg);
+                process::get_process_information()
+            }
         }
     };
     if let Err(e) = procinfo_probe {
