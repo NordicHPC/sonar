@@ -300,7 +300,7 @@ pub fn create_snapshot(jobs: &mut dyn jobs::JobManager, opts: &PsOptions) {
     // as not all records from this sonar run are filtered out by the front end.
 
     if gpu_status != GpuStatus::Ok {
-        for (_, proc_info) in &mut proc_by_pid {
+        for proc_info in proc_by_pid.values_mut() {
             proc_info.gpu_status = gpu_status;
         }
     }
@@ -345,7 +345,7 @@ pub fn create_snapshot(jobs: &mut dyn jobs::JobManager, opts: &PsOptions) {
 
         let mut rolledup = vec![];
         let mut index = HashMap::<(JobID, &str), usize>::new();
-        for (_, proc_info) in &proc_by_pid {
+        for proc_info in proc_by_pid.values() {
             if proc_info.job_id == 0 {
                 rolledup.push(proc_info.clone());
             } else {
@@ -460,25 +460,23 @@ fn print_record<W: io::Write>(
     if params.opts.exclude_system_jobs && proc_info.is_system_job {
         included = false;
     }
-    if params.opts.exclude_users.len() > 0 {
-        if params
+    if !params.opts.exclude_users.is_empty()
+        && params
             .opts
             .exclude_users
             .iter()
             .any(|x| *x == proc_info.user)
-        {
-            included = false;
-        }
+    {
+        included = false;
     }
-    if params.opts.exclude_commands.len() > 0 {
-        if params
+    if !params.opts.exclude_commands.is_empty()
+        && params
             .opts
             .exclude_commands
             .iter()
             .any(|x| proc_info.command.starts_with(x))
-        {
-            included = false;
-        }
+    {
+        included = false;
     }
 
     if !included && !must_print {
@@ -486,7 +484,7 @@ fn print_record<W: io::Write>(
     }
 
     let gpus_comma_separated = if let Some(ref cards) = proc_info.gpu_cards {
-        if cards.len() == 0 {
+        if cards.is_empty() {
             "none".to_string()
         } else {
             cards
@@ -530,5 +528,6 @@ fn print_record<W: io::Write>(
         fields.push(format!("rolledup={}", proc_info.rolledup));
     }
     writer.write_record(fields).unwrap();
-    return true;
+
+    true
 }

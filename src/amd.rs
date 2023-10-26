@@ -57,8 +57,7 @@ fn extract_amd_information(
 ) -> Result<Vec<nvidia::Process>, String> {
     let per_device_info = parse_concise_command(concise_raw_text)?; // device -> (gpu%, mem%)
     let per_pid_info = parse_showpidgpus_command(showpidgpus_raw_text)?; // pid -> [device, ...]
-    let mut num_processes_per_device = vec![];
-    num_processes_per_device.resize(per_device_info.len(), 0);
+    let mut num_processes_per_device = vec![0; per_device_info.len()];
     per_pid_info.iter().for_each(|(_, devs)| {
         devs.iter()
             .for_each(|dev| num_processes_per_device[*dev] += 1)

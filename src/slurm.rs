@@ -36,10 +36,8 @@ fn get_slurm_job_id(pid: usize) -> Option<String> {
                     return None;
                 }
             }
-            return None;
+            None
         }
-        Err(_) => {
-            return None;
-        }
+        Err(_) => None,
     }
 }
