@@ -28,9 +28,7 @@ use crate::util::map;
 /// Err(e) really means the command started running but failed, for the reason given.  If the
 /// command could not be found, we return Ok(vec![]).
 
-pub fn get_amd_information(
-    user_by_pid: &UserTable,
-) -> Result<Vec<nvidia::Process>, String> {
+pub fn get_amd_information(user_by_pid: &UserTable) -> Result<Vec<nvidia::Process>, String> {
     // I've not been able to combine the two invocations of rocm-smi yet; we have to run the command
     // twice.  Not a happy situation.
 
@@ -59,8 +57,7 @@ fn extract_amd_information(
 ) -> Result<Vec<nvidia::Process>, String> {
     let per_device_info = parse_concise_command(concise_raw_text)?; // device -> (gpu%, mem%)
     let per_pid_info = parse_showpidgpus_command(showpidgpus_raw_text)?; // pid -> [device, ...]
-    let mut num_processes_per_device = vec![];
-    num_processes_per_device.resize(per_device_info.len(), 0);
+    let mut num_processes_per_device = vec![0; per_device_info.len()];
     per_pid_info.iter().for_each(|(_, devs)| {
         devs.iter()
             .for_each(|dev| num_processes_per_device[*dev] += 1)

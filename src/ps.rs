@@ -115,9 +115,8 @@ fn add_proc_info<'a, F>(
     gpu_percentage: f64,
     gpu_mem_percentage: f64,
     gpu_mem_size_kib: usize,
-)
-where
-    F: FnMut(Pid) -> JobID
+) where
+    F: FnMut(Pid) -> JobID,
 {
     proc_by_pid
         .entry(pid)
@@ -163,10 +162,7 @@ pub struct PsOptions<'a> {
     pub exclude_commands: Vec<&'a str>,
 }
 
-pub fn create_snapshot(
-    jobs: &mut dyn jobs::JobManager,
-    opts: &PsOptions
-) {
+pub fn create_snapshot(jobs: &mut dyn jobs::JobManager, opts: &PsOptions) {
     let no_gpus = empty_gpuset();
     let mut proc_by_pid = ProcTable::new();
 
@@ -193,16 +189,13 @@ pub fn create_snapshot(
     }
     */
 
-    let procinfo_probe =
-        match procfs::get_process_information() {
-            Ok(result) => {
-                Ok(result)
-            }
-            Err(msg) => {
-                eprintln!("INFO: procfs failed: {}", msg);
-                process::get_process_information()
-            }
-        };
+    let procinfo_probe = match procfs::get_process_information() {
+        Ok(result) => Ok(result),
+        Err(msg) => {
+            eprintln!("INFO: procfs failed: {}", msg);
+            process::get_process_information()
+        }
+    };
     if let Err(e) = procinfo_probe {
         // This is a hard error, we need this information for everything.
         log::error!("CPU process listing failed: {:?}", e);
@@ -216,25 +209,25 @@ pub fn create_snapshot(
         user_by_pid.insert(proc.pid, (&proc.user, proc.uid));
     }
 
-    let mut lookup_job_by_pid = |pid: Pid| {
-        jobs.job_id_from_pid(pid, procinfo_output)
-    };
+    let mut lookup_job_by_pid = |pid: Pid| jobs.job_id_from_pid(pid, procinfo_output);
 
     for proc in procinfo_output {
-        add_proc_info(&mut proc_by_pid,
-                      &mut lookup_job_by_pid,
-                      &proc.user,
-                      proc.uid,
-                      &proc.command,
-                      proc.pid,
-                      proc.cpu_pct,
-                      proc.cputime_sec,
-                      proc.mem_pct,
-                      proc.mem_size_kib,
-                      &no_gpus, // gpu_cards
-                      0.0,      // gpu_percentage
-                      0.0,      // gpu_mem_percentage
-                      0);       // gpu_mem_size_kib
+        add_proc_info(
+            &mut proc_by_pid,
+            &mut lookup_job_by_pid,
+            &proc.user,
+            proc.uid,
+            &proc.command,
+            proc.pid,
+            proc.cpu_pct,
+            proc.cputime_sec,
+            proc.mem_pct,
+            proc.mem_size_kib,
+            &no_gpus, // gpu_cards
+            0.0,      // gpu_percentage
+            0.0,      // gpu_mem_percentage
+            0,
+        ); // gpu_mem_size_kib
     }
 
     // When a GPU fails it may be a transient error or a permanent error, but either
@@ -252,20 +245,22 @@ pub fn create_snapshot(
         }
         Ok(ref nvidia_output) => {
             for proc in nvidia_output {
-                add_proc_info(&mut proc_by_pid,
-                              &mut lookup_job_by_pid,
-                              &proc.user,
-                              proc.uid,
-                              &proc.command,
-                              proc.pid,
-                              0.0, // cpu_percentage
-                              0,   // cputime_sec
-                              0.0, // mem_percentage
-                              0,   // mem_size_kib
-                              &singleton_gpuset(proc.device),
-                              proc.gpu_pct,
-                              proc.mem_pct,
-                              proc.mem_size_kib);
+                add_proc_info(
+                    &mut proc_by_pid,
+                    &mut lookup_job_by_pid,
+                    &proc.user,
+                    proc.uid,
+                    &proc.command,
+                    proc.pid,
+                    0.0, // cpu_percentage
+                    0,   // cputime_sec
+                    0.0, // mem_percentage
+                    0,   // mem_size_kib
+                    &singleton_gpuset(proc.device),
+                    proc.gpu_pct,
+                    proc.mem_pct,
+                    proc.mem_size_kib,
+                );
             }
         }
     }
@@ -280,20 +275,22 @@ pub fn create_snapshot(
         }
         Ok(ref amd_output) => {
             for proc in amd_output {
-                add_proc_info(&mut proc_by_pid,
-                              &mut lookup_job_by_pid,
-                              &proc.user,
-                              proc.uid,
-                              &proc.command,
-                              proc.pid,
-                              0.0, // cpu_percentage
-                              0,   // cputime_sec
-                              0.0, // mem_percentage
-                              0,   // mem_size_kib
-                              &singleton_gpuset(proc.device),
-                              proc.gpu_pct,
-                              proc.mem_pct,
-                              proc.mem_size_kib);
+                add_proc_info(
+                    &mut proc_by_pid,
+                    &mut lookup_job_by_pid,
+                    &proc.user,
+                    proc.uid,
+                    &proc.command,
+                    proc.pid,
+                    0.0, // cpu_percentage
+                    0,   // cputime_sec
+                    0.0, // mem_percentage
+                    0,   // mem_size_kib
+                    &singleton_gpuset(proc.device),
+                    proc.gpu_pct,
+                    proc.mem_pct,
+                    proc.mem_size_kib,
+                );
             }
         }
     }
@@ -303,7 +300,7 @@ pub fn create_snapshot(
     // as not all records from this sonar run are filtered out by the front end.
 
     if gpu_status != GpuStatus::Ok {
-        for (_, proc_info) in &mut proc_by_pid {
+        for proc_info in proc_by_pid.values_mut() {
             proc_info.gpu_status = gpu_status;
         }
     }
@@ -321,7 +318,7 @@ pub fn create_snapshot(
         timestamp: &timestamp,
         num_cores,
         version: VERSION,
-        opts
+        opts,
     };
 
     let mut did_print = false;
@@ -348,7 +345,7 @@ pub fn create_snapshot(
 
         let mut rolledup = vec![];
         let mut index = HashMap::<(JobID, &str), usize>::new();
-        for (_, proc_info) in &proc_by_pid {
+        for proc_info in proc_by_pid.values() {
             if proc_info.job_id == 0 {
                 rolledup.push(proc_info.clone());
             } else {
@@ -414,10 +411,15 @@ struct PrintParameters<'a> {
     timestamp: &'a str,
     num_cores: usize,
     version: &'a str,
-    opts: &'a PsOptions<'a>
+    opts: &'a PsOptions<'a>,
 }
 
-fn print_record<W: io::Write>(writer: &mut Writer<W>, params: &PrintParameters, proc_info: &ProcInfo, must_print: bool) -> bool {
+fn print_record<W: io::Write>(
+    writer: &mut Writer<W>,
+    params: &PrintParameters,
+    proc_info: &ProcInfo,
+    must_print: bool,
+) -> bool {
     let mut included = false;
 
     // The logic here is that if any of the inclusion filters are provided, then the set of those
@@ -425,7 +427,10 @@ fn print_record<W: io::Write>(writer: &mut Writer<W>, params: &PrintParameters, 
     // one of those to be included.  Otherwise, when none of the filters are provided then the
     // record is included by default.
 
-    if params.opts.min_cpu_percent.is_some() || params.opts.min_mem_percent.is_some() || params.opts.min_cpu_time.is_some() {
+    if params.opts.min_cpu_percent.is_some()
+        || params.opts.min_mem_percent.is_some()
+        || params.opts.min_cpu_time.is_some()
+    {
         if let Some(cpu_cutoff_percent) = params.opts.min_cpu_percent {
             if proc_info.cpu_percentage >= cpu_cutoff_percent {
                 included = true;
@@ -455,35 +460,42 @@ fn print_record<W: io::Write>(writer: &mut Writer<W>, params: &PrintParameters, 
     if params.opts.exclude_system_jobs && proc_info.is_system_job {
         included = false;
     }
-    if params.opts.exclude_users.len() > 0 {
-        if params.opts.exclude_users.iter().any(|x| *x == proc_info.user) {
-            included = false;
-        }
+    if !params.opts.exclude_users.is_empty()
+        && params
+            .opts
+            .exclude_users
+            .iter()
+            .any(|x| *x == proc_info.user)
+    {
+        included = false;
     }
-    if params.opts.exclude_commands.len() > 0 {
-        if params.opts.exclude_commands.iter().any(|x| proc_info.command.starts_with(x)) {
-            included = false;
-        }
+    if !params.opts.exclude_commands.is_empty()
+        && params
+            .opts
+            .exclude_commands
+            .iter()
+            .any(|x| proc_info.command.starts_with(x))
+    {
+        included = false;
     }
 
     if !included && !must_print {
         return false;
     }
 
-    let gpus_comma_separated =
-        if let Some(ref cards) = proc_info.gpu_cards {
-            if cards.len() == 0 {
-                "none".to_string()
-            } else {
-                cards
-                    .iter()
-                    .map(|&num| num.to_string())
-                    .collect::<Vec<String>>()
-                    .join(",")
-            }
+    let gpus_comma_separated = if let Some(ref cards) = proc_info.gpu_cards {
+        if cards.is_empty() {
+            "none".to_string()
         } else {
-            "unknown".to_string()
-        };
+            cards
+                .iter()
+                .map(|&num| num.to_string())
+                .collect::<Vec<String>>()
+                .join(",")
+        }
+    } else {
+        "unknown".to_string()
+    };
 
     let mut fields = vec![
         format!("v={}", params.version),
@@ -492,7 +504,14 @@ fn print_record<W: io::Write>(writer: &mut Writer<W>, params: &PrintParameters, 
         format!("cores={}", params.num_cores),
         format!("user={}", proc_info.user),
         format!("job={}", proc_info.job_id),
-        format!("pid={}", if proc_info.rolledup > 0 { 0 } else { proc_info.pid }),
+        format!(
+            "pid={}",
+            if proc_info.rolledup > 0 {
+                0
+            } else {
+                proc_info.pid
+            }
+        ),
         format!("cmd={}", proc_info.command),
         format!("cpu%={}", three_places(proc_info.cpu_percentage)),
         format!("cpukib={}", proc_info.mem_size_kib),
@@ -509,5 +528,6 @@ fn print_record<W: io::Write>(writer: &mut Writer<W>, params: &PrintParameters, 
         fields.push(format!("rolledup={}", proc_info.rolledup));
     }
     writer.write_record(fields).unwrap();
-    return true;
+
+    true
 }

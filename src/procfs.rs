@@ -31,7 +31,7 @@ pub fn get_process_information() -> Result<Vec<process::Process>, String> {
         for l in s.split('\n') {
             if l.starts_with("btime ") {
                 let fields = l.split_ascii_whitespace().collect::<Vec<&str>>();
-                boot_time = parse_usize_field(&fields, 1, &l, "stat", 0, "btime")? as u64;
+                boot_time = parse_usize_field(&fields, 1, l, "stat", 0, "btime")? as u64;
                 break;
             }
         }
@@ -39,7 +39,7 @@ pub fn get_process_information() -> Result<Vec<process::Process>, String> {
             return Err(format!("Could not find btime in /proc/stat: {s}"));
         }
     } else {
-        return Err(format!("Could not open or read /proc/stat"));
+        return Err("Could not open or read /proc/stat".to_string());
     };
 
     // The total RAM installed is in the `MemTotal` field of /proc/meminfo.  We need this to compute
@@ -54,7 +54,7 @@ pub fn get_process_information() -> Result<Vec<process::Process>, String> {
                 if fields.len() != 3 || fields[2] != "kB" {
                     return Err(format!("Unexpected MemTotal in /proc/meminfo: {l}"));
                 }
-                memtotal_kib = parse_usize_field(&fields, 1, &l, "meminfo", 0, "MemTotal")?;
+                memtotal_kib = parse_usize_field(&fields, 1, l, "meminfo", 0, "MemTotal")?;
                 break;
             }
         }
@@ -62,7 +62,7 @@ pub fn get_process_information() -> Result<Vec<process::Process>, String> {
             return Err(format!("Could not find MemTotal in /proc/meminfo: {s}"));
         }
     } else {
-        return Err(format!("Could not open or read /proc/meminfo"));
+        return Err("Could not open or read /proc/meminfo".to_string());
     };
 
     // Enumerate all pids, and collect the uids while we're here.
@@ -89,7 +89,7 @@ pub fn get_process_information() -> Result<Vec<process::Process>, String> {
             }
         }
     } else {
-        return Err(format!("Could not open /proc"));
+        return Err("Could not open /proc".to_string());
     };
 
     // Collect remaining system data from /proc/{pid}/stat for the enumerated pids.
@@ -104,7 +104,7 @@ pub fn get_process_information() -> Result<Vec<process::Process>, String> {
     let mut user_table = UserTable::new();
     let clock_ticks_per_sec = unsafe { libc::sysconf(libc::_SC_CLK_TCK) as f64 };
     if clock_ticks_per_sec == 0.0 {
-        return Err(format!("Could not get a sensible CLK_TCK"));
+        return Err("Could not get a sensible CLK_TCK".to_string());
     }
 
     for (pid, uid) in pids {
@@ -163,7 +163,7 @@ pub fn get_process_information() -> Result<Vec<process::Process>, String> {
 
             if zombie {
                 // This tag is used by consumers but it's an artifact of `ps`, not the kernel
-                comm = comm + " <defunct>";
+                comm += " <defunct>";
             }
 
             ppid = parse_usize_field(&fields, 1, &line, "stat", pid, "ppid")?;

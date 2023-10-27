@@ -7,8 +7,8 @@
 /// Crucially, the data are sampling data: they contain no (long) running averages, but are
 /// snapshots of the system at the time the sample is taken.
 use crate::command::{self, CmdError};
-use crate::util;
 use crate::ps::UserTable;
+use crate::util;
 use crate::TIMEOUT_SECONDS;
 
 #[cfg(test)]
@@ -26,14 +26,12 @@ pub struct Process {
     pub command: String,       // The command, _unknown_ for zombies, _noinfo_ if not known
 }
 
-pub const ZOMBIE_UID : usize = 666666;
+pub const ZOMBIE_UID: usize = 666666;
 
 // Err(e) really means the command started running but failed, for the reason given.  If the
 // command could not be found, we return Ok(vec![]).
 
-pub fn get_nvidia_information(
-    user_by_pid: &UserTable,
-) -> Result<Vec<Process>, String> {
+pub fn get_nvidia_information(user_by_pid: &UserTable) -> Result<Vec<Process>, String> {
     match command::safe_command(NVIDIA_PMON_COMMAND, TIMEOUT_SECONDS) {
         Ok(pmon_raw_text) => {
             let mut processes = parse_pmon_output(&pmon_raw_text, user_by_pid);
@@ -92,7 +90,7 @@ fn parse_pmon_output(raw_text: &str, user_by_pid: &UserTable) -> Vec<Process> {
             let pid = pid_str.parse::<usize>().unwrap();
             let user = match user_by_pid.get(&pid) {
                 Some((name, uid)) => (name.to_string(), *uid),
-                None => ("_zombie_".to_owned() + pid_str, ZOMBIE_UID)
+                None => ("_zombie_".to_owned() + pid_str, ZOMBIE_UID),
             };
             Process {
                 device: Some(device),
