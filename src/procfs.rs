@@ -286,16 +286,16 @@ impl UserTable {
     }
 }
 
+// For the parse test we use the full text of stat and meminfo, but for stat we only want the
+// 'btime' line and for meminfo we only want the 'MemTotal:' line.  Other tests can economize on the
+// input.
+
 #[test]
 pub fn procfs_parse_test() {
     let pids = vec![(4018, 1000)];
 
     let mut users = HashMap::new();
     users.insert(1000, "zappa".to_string());
-
-    // For this test we use the full text of stat and meminfo, but for stat we only want the 'btime'
-    // line and for meminfo we only want the 'MemTotal:' line, so in general tests can economize on
-    // the input.
 
     let mut files = HashMap::new();
     files.insert(
@@ -418,4 +418,49 @@ DirectMap1G:    11534336 kB
     assert!(p.mem_pct == mem_pct);
 
     assert!(p.mem_size_kib == size);
+}
+
+#[test]
+pub fn procfs_dead_and_undead_test() {
+    let pids = vec![(4018, 1000), (4019, 1000), (4020, 1000)];
+
+    let mut users = HashMap::new();
+    users.insert(1000, "zappa".to_string());
+
+    let mut files = HashMap::new();
+    files.insert("stat".to_string(), "btime 1698303295".to_string());
+    files.insert("meminfo".to_string(), "MemTotal:       16093776 kB".to_string());
+    files.insert(
+        "4018/stat".to_string(),
+        "4018 (firefox) S 2190 2189 2189 0 -1 4194560 19293188 3117638 1823 557 51361 15728 5390 2925 20 0 187 0 16400 5144358912 184775 18446744073709551615 94466859782144 94466860597976 140720852341888 0 0 0 0 4096 17663 0 0 0 17 4 0 0 0 0 0 94466860605280 94466860610840 94466863497216 140720852350777 140720852350820 140720852350820 140720852357069 0".to_string());
+    files.insert(
+        "4019/stat".to_string(),
+        "4019 (firefox) Z 2190 2189 2189 0 -1 4194560 19293188 3117638 1823 557 51361 15728 5390 2925 20 0 187 0 16400 5144358912 184775 18446744073709551615 94466859782144 94466860597976 140720852341888 0 0 0 0 4096 17663 0 0 0 17 4 0 0 0 0 0 94466860605280 94466860610840 94466863497216 140720852350777 140720852350820 140720852350820 140720852357069 0".to_string());
+    files.insert(
+        "4020/stat".to_string(),
+        "4020 (python3) X 0 -1 -1 0 -1 4243524 0 0 0 0 0 0 0 0 20 0 0 0 10643829 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 17 3 0 0 0 0 0 0 0 0 0 0 0 0 0".to_string());
+
+    files.insert(
+        "4018/statm".to_string(),
+        "1255967 185959 54972 200 0 316078 0".to_string(),
+    );
+    files.insert(
+        "4019/statm".to_string(),
+        "1255967 185959 54972 200 0 316078 0".to_string(),
+    );
+    files.insert(
+        "4020/statm".to_string(),
+        "1255967 185959 54972 200 0 316078 0".to_string(),
+    );
+
+    let fs = procfsapi::MockFS::new(files, pids, users, procfsapi::unix_now());
+    let info = get_process_information(&fs).unwrap();
+
+    // 4020 should be dropped - it's dead
+    assert!(info.len() == 2);
+
+    assert!(info[0].pid == 4018);
+    assert!(info[0].command == "firefox");
+    assert!(info[1].pid == 4019);
+    assert!(info[1].command == "firefox <defunct>");
 }
