@@ -9,8 +9,8 @@ use crate::jobs;
 use crate::nvidia;
 use crate::process;
 use crate::procfs;
+use crate::util::three_places;
 use crate::procfsapi;
-use crate::util::{three_places, time_iso8601};
 
 use csv::{Writer, WriterBuilder};
 use std::collections::{HashMap, HashSet};
@@ -163,7 +163,7 @@ pub struct PsOptions<'a> {
     pub exclude_commands: Vec<&'a str>,
 }
 
-pub fn create_snapshot(jobs: &mut dyn jobs::JobManager, opts: &PsOptions) {
+pub fn create_snapshot(jobs: &mut dyn jobs::JobManager, opts: &PsOptions, timestamp: &str) {
     let no_gpus = empty_gpuset();
     let mut proc_by_pid = ProcTable::new();
 
@@ -313,13 +313,12 @@ pub fn create_snapshot(jobs: &mut dyn jobs::JobManager, opts: &PsOptions) {
         .flexible(true)
         .from_writer(io::stdout());
 
-    let timestamp = time_iso8601();
     let hostname = hostname::get().unwrap().into_string().unwrap();
     let num_cores = num_cpus::get();
     const VERSION: &str = env!("CARGO_PKG_VERSION");
     let print_params = PrintParameters {
         hostname: &hostname,
-        timestamp: &timestamp,
+        timestamp: timestamp,
         num_cores,
         version: VERSION,
         opts,
