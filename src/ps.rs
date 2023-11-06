@@ -14,7 +14,11 @@ use crate::procfsapi;
 
 use csv::{Writer, WriterBuilder};
 use std::collections::{HashMap, HashSet};
-use std::io;
+use std::env;
+use std::io::{self, Write};
+use std::path::PathBuf;
+use std::thread;
+use std::time;
 
 // The GpuSet has three states:
 //
@@ -161,9 +165,69 @@ pub struct PsOptions<'a> {
     pub exclude_system_jobs: bool,
     pub exclude_users: Vec<&'a str>,
     pub exclude_commands: Vec<&'a str>,
+    pub lockdir: Option<String>,
 }
 
 pub fn create_snapshot(jobs: &mut dyn jobs::JobManager, opts: &PsOptions, timestamp: &str) {
+    if let Some(ref dirname) = opts.lockdir {
+        let mut created = false;
+        let mut failed = false;
+        let mut skip = false;
+        let hostname = hostname::get().unwrap().into_string().unwrap();
+
+        let mut p = PathBuf::new();
+        p.push(dirname);
+        p.push("sonar-lock.".to_string() + &hostname);
+
+        // create_new() requests atomic creation, if the file exists we'll error out.
+        match std::fs::File::options().write(true).create_new(true).open(&p) {
+            Ok(mut f) => {
+                created = true;
+                let pid = std::process::id();
+                match f.write(format!("{}", pid).as_bytes()) {
+                    Ok(_) => {}
+                    Err(_) => { failed = true; }
+                }
+            }
+            Err(e) if e.kind() == io::ErrorKind::AlreadyExists => {
+                skip = true;
+            }
+            Err(_) => {
+                failed = true;
+            }
+        }
+
+        if !failed && !skip {
+            do_create_snapshot(jobs, opts, timestamp);
+
+            // Testing code: If we got the lockfile and produced a report, wait 10s after producing
+            // it while holding onto the lockfile.  It is then possible to run sonar in that window
+            // while the lockfile is being held, to ensure the second process exits immediately.
+            match std::env::var("SONARTEST_WAIT_LOCKFILE") {
+                Ok(_) => { thread::sleep(time::Duration::new(10, 0)); }
+                Err(_) => {}
+            }
+        }
+
+        if created {
+            match std::fs::remove_file(p) {
+                Ok(_) => {}
+                Err(_) => { failed = true; }
+            }
+        }
+
+        if skip {
+            log::info!("Lockfile present, exiting");
+        }
+        if failed {
+            log::error!("Unable to properly manage or delete lockfile");
+        }
+    } else {
+        do_create_snapshot(jobs, opts, timestamp);
+    }
+}
+
+fn do_create_snapshot(jobs: &mut dyn jobs::JobManager, opts: &PsOptions, timestamp: &str) {
     let no_gpus = empty_gpuset();
     let mut proc_by_pid = ProcTable::new();
 
