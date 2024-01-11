@@ -196,8 +196,9 @@ fn test_safe_command() {
             assert!(false)
         }
     }
-    // Should work even though output is large (the executable is 26MB on my system)
-    match safe_command("cat target/debug/sonar", 5) {
+    // Should work even though output is large, but we want a file that is always present.  The file
+    // img/sonar.png is 1.2MB, which is probably good enough.
+    match safe_command("cat img/sonar.png", 5) {
         Ok(_) => {}
         Err(_) => {
             assert!(false)
