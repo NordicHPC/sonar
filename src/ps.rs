@@ -17,6 +17,8 @@ use std::collections::{HashMap, HashSet};
 use std::env;
 use std::io::{self, Write};
 use std::path::PathBuf;
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::thread;
 use std::time;
 
@@ -169,6 +171,32 @@ pub struct PsOptions<'a> {
 }
 
 pub fn create_snapshot(jobs: &mut dyn jobs::JobManager, opts: &PsOptions, timestamp: &str) {
+    // If a lock file was requested, create one before the operation, exit early if it already
+    // exists, and if we performed the operation, remove the file afterwards.  Otherwise, just
+    // perform the operation.
+    //
+    // However if a signal arrives in the middle of the operation and terminates the program the
+    // lock file may be left on disk.  Assuming no bugs, the interesting signals are SIGHUP,
+    // SIGTERM, SIGINT, and SIGQUIT.  Of these, only SIGHUP and SIGTERM are really interesting
+    // because they are sent by the OS or by job control (and will often be followed by SIGKILL if
+    // not honored within some reasonable time); INT/QUIT are sent by a user in response to keyboard
+    // action and more typical during development/debugging.
+    //
+    // So THE MAIN REASON TO HANDLE SIGNALS is to make sure we're not killed while we hold the lock
+    // file, during normal operation.  To do that, we just need to ignore the signal.
+    //
+    // But if a handled signal is received, it would be sensible to exit as quickly as possible and
+    // with minimal risk of hanging.  And to do that, we record the signal and then check the flag
+    // often, and we avoid starting things if the flag is set, and we produce no output (if
+    // possible) once the flag becomes set, yet produce complete output if any output at all.
+    //
+    // There's no reason to limit the signal handler to the case when we have a lock file, the same
+    // logic can apply to both paths.
+
+    let interrupted = Arc::new(AtomicBool::new(false));
+    signal_hook::flag::register(signal_hook::consts::SIGTERM, Arc::clone(&interrupted)).unwrap();
+    signal_hook::flag::register(signal_hook::consts::SIGHUP, Arc::clone(&interrupted)).unwrap();
+
     if let Some(ref dirname) = opts.lockdir {
         let mut created = false;
         let mut failed = false;
@@ -178,6 +206,10 @@ pub fn create_snapshot(jobs: &mut dyn jobs::JobManager, opts: &PsOptions, timest
         let mut p = PathBuf::new();
         p.push(dirname);
         p.push("sonar-lock.".to_string() + &hostname);
+
+        if interrupted.load(Ordering::Relaxed) {
+            return
+        }
 
         // create_new() requests atomic creation, if the file exists we'll error out.
         match std::fs::File::options().write(true).create_new(true).open(&p) {
@@ -198,7 +230,7 @@ pub fn create_snapshot(jobs: &mut dyn jobs::JobManager, opts: &PsOptions, timest
         }
 
         if !failed && !skip {
-            do_create_snapshot(jobs, opts, timestamp);
+            do_create_snapshot(jobs, opts, timestamp, &interrupted);
 
             // Testing code: If we got the lockfile and produced a report, wait 10s after producing
             // it while holding onto the lockfile.  It is then possible to run sonar in that window
@@ -223,11 +255,11 @@ pub fn create_snapshot(jobs: &mut dyn jobs::JobManager, opts: &PsOptions, timest
             log::error!("Unable to properly manage or delete lockfile");
         }
     } else {
-        do_create_snapshot(jobs, opts, timestamp);
+        do_create_snapshot(jobs, opts, timestamp, &interrupted);
     }
 }
 
-fn do_create_snapshot(jobs: &mut dyn jobs::JobManager, opts: &PsOptions, timestamp: &str) {
+fn do_create_snapshot(jobs: &mut dyn jobs::JobManager, opts: &PsOptions, timestamp: &str, interrupted: &Arc<AtomicBool>) {
     let no_gpus = empty_gpuset();
     let mut proc_by_pid = ProcTable::new();
 
@@ -253,6 +285,10 @@ fn do_create_snapshot(jobs: &mut dyn jobs::JobManager, opts: &PsOptions, timesta
         }
     }
     */
+
+    if interrupted.load(Ordering::Relaxed) {
+        return
+    }
 
     let procinfo_probe = {
         let fs = procfsapi::RealFS::new();
@@ -298,6 +334,10 @@ fn do_create_snapshot(jobs: &mut dyn jobs::JobManager, opts: &PsOptions, timesta
         ); // gpu_mem_size_kib
     }
 
+    if interrupted.load(Ordering::Relaxed) {
+        return
+    }
+
     // When a GPU fails it may be a transient error or a permanent error, but either
     // way sonar does not know.  We just record the failure.
 
@@ -331,6 +371,10 @@ fn do_create_snapshot(jobs: &mut dyn jobs::JobManager, opts: &PsOptions, timesta
                 );
             }
         }
+    }
+
+    if interrupted.load(Ordering::Relaxed) {
+        return
     }
 
     let amd_probe = amd::get_amd_information(&user_by_pid);
@@ -372,6 +416,12 @@ fn do_create_snapshot(jobs: &mut dyn jobs::JobManager, opts: &PsOptions, timesta
             proc_info.gpu_status = gpu_status;
         }
     }
+
+    if interrupted.load(Ordering::Relaxed) {
+        return
+    }
+
+    // Once we start printing we'll print everything and not check the interrupted flag any more.
 
     let mut writer = WriterBuilder::new()
         .flexible(true)
