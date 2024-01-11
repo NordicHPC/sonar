@@ -106,9 +106,17 @@ Options:
           Exclude records for system jobs (uid < 1000)
       --exclude-users <EXCLUDE_USERS>
           Exclude records for these comma-separated user names [default: none]
+      --exclude-commands <EXCLUDE_COMMANDS>
+          Exclude records whose commands start with these comma-separated names [default: none]
+      --lockdir <LOCKDIR>
+          Create a per-host lockfile in this directory and exit early if the file exists on startup [default: none]
   -h, --help
           Print help
 ```
+
+**NOTE** that if you use `--lockdir`, it should name a directory that is cleaned on reboot, such as
+`/var/run`, `/run`, or a tmpfs, and ideally it is a directory on a disk local to the node, not a
+shared disk.
 
 Here is an example output:
 ```console
@@ -229,10 +237,13 @@ records may or may not represent multiple processes' worth of data.
 
 ## Collect results with `sonar analyze` :construction:
 
-This part is work in progress. Currently we only collect the data since we use
-it also in [another tool](https://github.com/NordicHPC/jobgraph). The mapping files can be found in the [data](data)
-folder.
+The `analyze` command is work in progress.  Sonar data are used by two other tools:
 
+* [JobGraph](https://github.com/NordicHPC/jobgraph) provides high-level plots of system activity. Mapping
+  files for JobGraph can be found in the [data](data) folder.
+* [JobAnalyzer](https://github.com/NAICNO/Jobanalyzer) allows sonar logs to be queried and analyzed, and
+  provides dashboards, interactive and batch queries, and reporting of system activity, policy violations,
+  hung jobs, and more.
 
 ## Authors
 
