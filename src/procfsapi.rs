@@ -102,6 +102,37 @@ pub fn unix_now() -> u64 {
         .as_secs()
 }
 
+pub fn parse_usize_field(
+    fields: &[&str],
+    ix: usize,
+    line: &str,
+    file: &str,
+    pid: usize,
+    fieldname: &str,
+) -> Result<usize, String> {
+    if ix >= fields.len() {
+        if pid == 0 {
+            return Err(format!("Index out of range for /proc/{file}: {ix}: {line}"));
+        } else {
+            return Err(format!(
+                "Index out of range for /proc/{pid}/{file}: {ix}: {line}"
+            ));
+        }
+    }
+    if let Ok(n) = fields[ix].parse::<usize>() {
+        return Ok(n);
+    }
+    if pid == 0 {
+        Err(format!(
+            "Could not parse {fieldname} in /proc/{file}: {line}"
+        ))
+    } else {
+        Err(format!(
+            "Could not parse {fieldname} from /proc/{pid}/{file}: {line}"
+        ))
+    }
+}
+
 // MockFS is used for testing, it is instantiated with the values we want it to return.
 
 #[cfg(test)]

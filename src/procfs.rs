@@ -1,44 +1,12 @@
 /// Collect CPU process information without GPU information, from files in /proc.
 use crate::process;
-use crate::procfsapi;
+use crate::procfsapi::{self, parse_usize_field};
 
 use std::collections::HashMap;
 
-/// Obtain process information via /proc and return a vector of structures with all the information
-/// we need.  In the returned vector, pids uniquely tag the records.
-///
-/// This returns Ok(data) on success, otherwise Err(msg), and in the latter case the caller should
-/// fallback to running `ps` and consider logging msg.
-///
-/// This function uniformly uses /proc, even though in some cases there are system calls that
-/// provide the same information.
-///
-/// The underlying computing system -- /proc, system tables, and clock -- is virtualized through the
-/// ProcfsAPI instance.
+/// Read the /proc/meminfo file from the fs and return the value for total installed memory.
 
-pub fn get_process_information(
-    fs: &dyn procfsapi::ProcfsAPI,
-) -> Result<Vec<process::Process>, String> {
-    // The boot time is the `btime` field of /proc/stat.  It is measured in seconds since epoch.  We
-    // need this to compute the process's real time, which we need to compute ps-compatible cpu
-    // utilization.
-
-    let mut boot_time = 0;
-    let stat_s = fs.read_to_string("stat")?;
-    for l in stat_s.split('\n') {
-        if l.starts_with("btime ") {
-            let fields = l.split_ascii_whitespace().collect::<Vec<&str>>();
-            boot_time = parse_usize_field(&fields, 1, l, "stat", 0, "btime")? as u64;
-            break;
-        }
-    }
-    if boot_time == 0 {
-        return Err(format!("Could not find btime in /proc/stat: {stat_s}"));
-    }
-
-    // The total RAM installed is in the `MemTotal` field of /proc/meminfo.  We need this to compute
-    // ps-compatible relative memory use.
-
+pub fn get_memtotal(fs: &dyn procfsapi::ProcfsAPI) -> Result<usize, String> {
     let mut memtotal_kib = 0;
     let meminfo_s = fs.read_to_string("meminfo")?;
     for l in meminfo_s.split('\n') {
@@ -56,6 +24,41 @@ pub fn get_process_information(
         return Err(format!(
             "Could not find MemTotal in /proc/meminfo: {meminfo_s}"
         ));
+    }
+    Ok(memtotal_kib)
+}
+
+/// Obtain process information via /proc and return a vector of structures with all the information
+/// we need.  In the returned vector, pids uniquely tag the records.
+///
+/// This returns Ok(data) on success, otherwise Err(msg), and in the latter case the caller should
+/// fallback to running `ps` and consider logging msg.
+///
+/// This function uniformly uses /proc, even though in some cases there are system calls that
+/// provide the same information.
+///
+/// The underlying computing system -- /proc, system tables, and clock -- is virtualized through the
+/// ProcfsAPI instance.
+
+pub fn get_process_information(
+    fs: &dyn procfsapi::ProcfsAPI,
+    memtotal_kib: usize,
+) -> Result<Vec<process::Process>, String> {
+    // The boot time is the `btime` field of /proc/stat.  It is measured in seconds since epoch.  We
+    // need this to compute the process's real time, which we need to compute ps-compatible cpu
+    // utilization.
+
+    let mut boot_time = 0;
+    let stat_s = fs.read_to_string("stat")?;
+    for l in stat_s.split('\n') {
+        if l.starts_with("btime ") {
+            let fields = l.split_ascii_whitespace().collect::<Vec<&str>>();
+            boot_time = parse_usize_field(&fields, 1, l, "stat", 0, "btime")? as u64;
+            break;
+        }
+    }
+    if boot_time == 0 {
+        return Err(format!("Could not find btime in /proc/stat: {stat_s}"));
     }
 
     // Enumerate all pids, and collect the uids while we're here.
@@ -233,37 +236,6 @@ pub fn get_process_information(
     Ok(result)
 }
 
-fn parse_usize_field(
-    fields: &[&str],
-    ix: usize,
-    line: &str,
-    file: &str,
-    pid: usize,
-    fieldname: &str,
-) -> Result<usize, String> {
-    if ix >= fields.len() {
-        if pid == 0 {
-            return Err(format!("Index out of range for /proc/{file}: {ix}: {line}"));
-        } else {
-            return Err(format!(
-                "Index out of range for /proc/{pid}/{file}: {ix}: {line}"
-            ));
-        }
-    }
-    if let Ok(n) = fields[ix].parse::<usize>() {
-        return Ok(n);
-    }
-    if pid == 0 {
-        Err(format!(
-            "Could not parse {fieldname} in /proc/{file}: {line}"
-        ))
-    } else {
-        Err(format!(
-            "Could not parse {fieldname} from /proc/{pid}/{file}: {line}"
-        ))
-    }
-}
-
 // The UserTable optimizes uid -> name lookup.
 
 struct UserTable {
@@ -401,7 +373,8 @@ DirectMap1G:    11534336 kB
         + 2000.0) as u64;
 
     let fs = procfsapi::MockFS::new(files, pids, users, now);
-    let info = get_process_information(&fs).unwrap();
+    let memtotal_kib = get_memtotal(&fs).unwrap();
+    let info = get_process_information(&fs, memtotal_kib).unwrap();
     assert!(info.len() == 1);
     let p = &info[0];
     assert!(p.pid == 4018); // from enumeration of /proc
@@ -462,7 +435,8 @@ pub fn procfs_dead_and_undead_test() {
     );
 
     let fs = procfsapi::MockFS::new(files, pids, users, procfsapi::unix_now());
-    let info = get_process_information(&fs).unwrap();
+    let memtotal_kib = get_memtotal(&fs).unwrap();
+    let info = get_process_information(&fs, memtotal_kib).unwrap();
 
     // 4020 should be dropped - it's dead
     assert!(info.len() == 2);
