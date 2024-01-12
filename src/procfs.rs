@@ -193,6 +193,31 @@ pub fn get_process_information(fs: &dyn procfsapi::ProcfsAPI, memtotal_kib: usiz
             continue;
         }
 
+        // The best value for resident memory is probably RssAnon of /proc/{pid}/status, which
+        // corresponds to "private data".  It does not include text or file mappings, though these
+        // actually also take up real memory.  But text can be shared, which matters both when we
+        // roll up processes and when the program is executing multiple times on the system, and
+        // file mappings, when they exist, are frequently read-only and evictable.
+        let mut resident_kib = 0;
+        if let Ok(status_info) = fs.read_to_string(&format!("{pid}/status")) {
+            for l in status_info.split('\n') {
+                if l.starts_with("RssAnon: ") {
+                    // We expect "RssAnon:\s+(\d+)\s+kB", roughly
+                    let fields = l.split_ascii_whitespace().collect::<Vec<&str>>();
+                    if fields.len() != 3 || fields[2] != "kB" {
+                        return Err(format!("Unexpected RssAnon in /proc/{pid}/status: {l}"));
+                    }
+                    resident_kib = parse_usize_field(&fields, 1, &l, "status", pid, "private resident set size")?
+                        * kib_per_page;
+                    break;
+                }
+            }
+        }
+        if resident_kib == 0 {
+            // Again, usually benign.
+            continue;
+        }
+
         // Now compute some derived quantities.
 
         // pcpu and pmem are rounded to ##.#.  We're going to get slightly different answers here
@@ -223,6 +248,7 @@ pub fn get_process_information(fs: &dyn procfsapi::ProcfsAPI, memtotal_kib: usiz
             mem_pct: pmem,
             cputime_sec,
             mem_size_kib: size_kib,
+            resident_kib,
             ppid,
             session: sess,
             command: comm,
@@ -351,6 +377,10 @@ DirectMap1G:    11534336 kB
         "4018/statm".to_string(),
         "1255967 185959 54972 200 0 316078 0".to_string(),
     );
+    files.insert(
+        "4018/status".to_string(),
+        "RssAnon: 12345 kB".to_string(),
+    );
 
     let ticks_per_sec = 100.0;     // We define this
     let utime_ticks = 51361.0;     // field(/proc/4018/stat, 14)
@@ -360,6 +390,7 @@ DirectMap1G:    11534336 kB
     let rss: f64 = 185959.0 * 4.0; // pages_to_kib(field(/proc/4018/statm, 1))
     let memtotal = 16093776.0;     // field(/proc/meminfo, "MemTotal:")
     let size = 316078 * 4;         // pages_to_kib(field(/proc/4018/statm, 5))
+    let resident = 12345 * 4;      // pages_to_kib(field(/proc/4018/status, "RssAnon:"))
 
     // now = boot_time + start_time + utime_ticks + stime_ticks + arbitrary idle time
     let now = (boot_time + (start_ticks / ticks_per_sec) + (utime_ticks / ticks_per_sec) + (stime_ticks / ticks_per_sec) + 2000.0) as u64;
@@ -388,6 +419,7 @@ DirectMap1G:    11534336 kB
     assert!(p.mem_pct == mem_pct);
 
     assert!(p.mem_size_kib == size);
+    assert!(p.resident_kib == resident);
 }
 
 #[test]
@@ -421,6 +453,18 @@ pub fn procfs_dead_and_undead_test() {
     files.insert(
         "4020/statm".to_string(),
         "1255967 185959 54972 200 0 316078 0".to_string(),
+    );
+    files.insert(
+        "4018/status".to_string(),
+        "RssAnon: 12345 kB".to_string(),
+    );
+    files.insert(
+        "4019/status".to_string(),
+        "RssAnon: 12345 kB".to_string(),
+    );
+    files.insert(
+        "4020/status".to_string(),
+        "RssAnon: 12345 kB".to_string(),
     );
 
     let fs = procfsapi::MockFS::new(files, pids, users, procfsapi::unix_now());

@@ -80,6 +80,7 @@ struct ProcInfo<'a> {
     cputime_sec: usize,
     mem_percentage: f64,
     mem_size_kib: usize,
+    resident_kib: usize,
     gpu_cards: GpuSet,
     gpu_percentage: f64,
     gpu_mem_percentage: f64,
@@ -118,6 +119,7 @@ fn add_proc_info<'a, F>(
     cputime_sec: usize,
     mem_percentage: f64,
     mem_size_kib: usize,
+    resident_kib: usize,
     gpu_cards: &GpuSet,
     gpu_percentage: f64,
     gpu_mem_percentage: f64,
@@ -133,6 +135,7 @@ fn add_proc_info<'a, F>(
             e.cputime_sec += cputime_sec;
             e.mem_percentage += mem_percentage;
             e.mem_size_kib += mem_size_kib;
+            e.resident_kib += resident_kib;
             union_gpuset(&mut e.gpu_cards, gpu_cards);
             e.gpu_percentage += gpu_percentage;
             e.gpu_mem_percentage += gpu_mem_percentage;
@@ -150,6 +153,7 @@ fn add_proc_info<'a, F>(
             cputime_sec,
             mem_percentage,
             mem_size_kib,
+            resident_kib,
             gpu_cards: gpu_cards.clone(),
             gpu_percentage,
             gpu_mem_percentage,
@@ -340,6 +344,7 @@ fn do_create_snapshot(jobs: &mut dyn jobs::JobManager, opts: &PsOptions, timesta
             proc.cputime_sec,
             proc.mem_pct,
             proc.mem_size_kib,
+            proc.resident_kib,
             &no_gpus, // gpu_cards
             0.0,      // gpu_percentage
             0.0,      // gpu_mem_percentage
@@ -377,6 +382,7 @@ fn do_create_snapshot(jobs: &mut dyn jobs::JobManager, opts: &PsOptions, timesta
                     0,   // cputime_sec
                     0.0, // mem_percentage
                     0,   // mem_size_kib
+                    0,   // resident_kib
                     &singleton_gpuset(proc.device),
                     proc.gpu_pct,
                     proc.mem_pct,
@@ -411,6 +417,7 @@ fn do_create_snapshot(jobs: &mut dyn jobs::JobManager, opts: &PsOptions, timesta
                     0,   // cputime_sec
                     0.0, // mem_percentage
                     0,   // mem_size_kib
+                    0,   // resident_kib
                     &singleton_gpuset(proc.device),
                     proc.gpu_pct,
                     proc.mem_pct,
@@ -487,6 +494,7 @@ fn do_create_snapshot(jobs: &mut dyn jobs::JobManager, opts: &PsOptions, timesta
                     p.cputime_sec += proc_info.cputime_sec;
                     p.mem_percentage += proc_info.mem_percentage;
                     p.mem_size_kib += proc_info.mem_size_kib;
+                    p.resident_kib += proc_info.resident_kib;
                     union_gpuset(&mut p.gpu_cards, &proc_info.gpu_cards);
                     p.gpu_percentage += proc_info.gpu_percentage;
                     p.gpu_mem_percentage += proc_info.gpu_mem_percentage;
@@ -525,6 +533,7 @@ fn do_create_snapshot(jobs: &mut dyn jobs::JobManager, opts: &PsOptions, timesta
             cputime_sec: 0,
             mem_percentage: 0.0,
             mem_size_kib: 0,
+            resident_kib: 0,
             gpu_cards: empty_gpuset(),
             gpu_percentage: 0.0,
             gpu_mem_percentage: 0.0,
@@ -648,6 +657,7 @@ fn print_record<W: io::Write>(
         format!("cmd={}", proc_info.command),
         format!("cpu%={}", three_places(proc_info.cpu_percentage)),
         format!("cpukib={}", proc_info.mem_size_kib),
+        format!("rsskib={}", proc_info.resident_kib),
         format!("gpus={gpus_comma_separated}"),
         format!("gpu%={}", three_places(proc_info.gpu_percentage)),
         format!("gpumem%={}", three_places(proc_info.gpu_mem_percentage)),
