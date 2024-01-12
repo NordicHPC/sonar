@@ -290,9 +290,22 @@ fn do_create_snapshot(jobs: &mut dyn jobs::JobManager, opts: &PsOptions, timesta
         return
     }
 
+    let fs = procfsapi::RealFS::new();
+
+    // The total RAM installed is in the `MemTotal` field of /proc/meminfo.  We need this for
+    // various things.  Not getting it is a hard error.
+
+    let memtotal_kib =
+        match procfs::get_memtotal(&fs) {
+            Ok(n) => n,
+            Err(e) => {
+                log::error!("Could not get installed memory: {}", e);
+                return;
+            }
+        };
+
     let procinfo_probe = {
-        let fs = procfsapi::RealFS::new();
-        match procfs::get_process_information(&fs) {
+        match procfs::get_process_information(&fs, memtotal_kib) {
             Ok(result) => Ok(result),
             Err(msg) => {
                 eprintln!("INFO: procfs failed: {}", msg);
@@ -434,6 +447,7 @@ fn do_create_snapshot(jobs: &mut dyn jobs::JobManager, opts: &PsOptions, timesta
         hostname: &hostname,
         timestamp: timestamp,
         num_cores,
+        memtotal_kib,
         version: VERSION,
         opts,
     };
@@ -527,6 +541,7 @@ struct PrintParameters<'a> {
     hostname: &'a str,
     timestamp: &'a str,
     num_cores: usize,
+    memtotal_kib: usize,
     version: &'a str,
     opts: &'a PsOptions<'a>,
 }
@@ -619,6 +634,7 @@ fn print_record<W: io::Write>(
         format!("time={}", params.timestamp),
         format!("host={}", params.hostname),
         format!("cores={}", params.num_cores),
+        format!("memtotalkib={}", params.memtotal_kib),
         format!("user={}", proc_info.user),
         format!("job={}", proc_info.job_id),
         format!(
