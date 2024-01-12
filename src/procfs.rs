@@ -6,7 +6,7 @@ use std::collections::HashMap;
 
 /// Read the /proc/meminfo file from the fs and return the value for total installed memory.
 
-pub fn get_memtotal(fs: &dyn procfsapi::ProcfsAPI) -> Result<usize, String> {
+pub fn get_memtotal_kib(fs: &dyn procfsapi::ProcfsAPI) -> Result<usize, String> {
     let mut memtotal_kib = 0;
     let meminfo_s = fs.read_to_string("meminfo")?;
     for l in meminfo_s.split('\n') {
@@ -197,6 +197,55 @@ pub fn get_process_information(
             continue;
         }
 
+        // The best value for resident memory is probably the Pss (proportional set size) field of
+        // /proc/{pid}/smaps_rollup, see discussion on bug #126.  But that field is privileged.
+        //
+        // A contender is RssAnon of /proc/{pid}/status, which corresponds to "private data".  It
+        // does not include text or file mappings, though these actually also take up real memory.
+        // But text can be shared, which matters both when we roll up processes and when the program
+        // is executing multiple times on the system, and file mappings, when they exist, are
+        // frequently read-only and evictable.
+        //
+        // RssAnon will tend to be lower than Pss.  For typical scientific codes, discounting text
+        // and read-only file mappings is probably more or less OK since private data will dwarf
+        // these.  The main source of inaccuracy is resident read/write file mappings.
+        //
+        // In order to not confuse the matter we're going to name the fields in our internal data
+        // structures and in the output by the fields that they are taken from, so "rssanon", not
+        // "resident" or "rss" or similar.
+        let mut rssanon_kib = 0;
+        let mut was_found = false;
+        if let Ok(status_info) = fs.read_to_string(&format!("{pid}/status")) {
+            was_found = true;
+            for l in status_info.split('\n') {
+                if l.starts_with("RssAnon:") {
+                    // We expect "RssAnon:\s+(\d+)\s+kB", roughly; there may be tabs.
+                    let fields = l.split_ascii_whitespace().collect::<Vec<&str>>();
+                    if fields.len() != 3 || fields[2] != "kB" {
+                        return Err(format!("Unexpected RssAnon in /proc/{pid}/status: {l}"));
+                    }
+                    rssanon_kib = parse_usize_field(
+                        &fields,
+                        1,
+                        &l,
+                        "status",
+                        pid,
+                        "private resident set size",
+                    )?;
+                    break;
+                }
+            }
+        }
+        if rssanon_kib == 0 {
+            // This is *usually* benign - see above.  But in addition, kernel threads and processes
+            // appear not to have the RssAnon field in /proc/{pid}/status.  In the interest of not
+            // filtering too much too early, we'll just keep going here with a zero value if the
+            // file was found but was missing that field.
+            if !was_found {
+                continue;
+            }
+        }
+
         // Now compute some derived quantities.
 
         // pcpu and pmem are rounded to ##.#.  We're going to get slightly different answers here
@@ -227,6 +276,7 @@ pub fn get_process_information(
             mem_pct: pmem,
             cputime_sec,
             mem_size_kib: size_kib,
+            rssanon_kib,
             ppid,
             session: sess,
             command: comm,
@@ -355,6 +405,7 @@ DirectMap1G:    11534336 kB
         "4018/statm".to_string(),
         "1255967 185959 54972 200 0 316078 0".to_string(),
     );
+    files.insert("4018/status".to_string(), "RssAnon: 12345 kB".to_string());
 
     let ticks_per_sec = 100.0; // We define this
     let utime_ticks = 51361.0; // field(/proc/4018/stat, 14)
@@ -364,6 +415,7 @@ DirectMap1G:    11534336 kB
     let rss: f64 = 185959.0 * 4.0; // pages_to_kib(field(/proc/4018/statm, 1))
     let memtotal = 16093776.0; // field(/proc/meminfo, "MemTotal:")
     let size = 316078 * 4; // pages_to_kib(field(/proc/4018/statm, 5))
+    let rssanon = 12345; // field(/proc/4018/status, "RssAnon:")
 
     // now = boot_time + start_time + utime_ticks + stime_ticks + arbitrary idle time
     let now = (boot_time
@@ -373,7 +425,7 @@ DirectMap1G:    11534336 kB
         + 2000.0) as u64;
 
     let fs = procfsapi::MockFS::new(files, pids, users, now);
-    let memtotal_kib = get_memtotal(&fs).unwrap();
+    let memtotal_kib = get_memtotal_kib(&fs).unwrap();
     let info = get_process_information(&fs, memtotal_kib).unwrap();
     assert!(info.len() == 1);
     let p = &info[0];
@@ -396,6 +448,7 @@ DirectMap1G:    11534336 kB
     assert!(p.mem_pct == mem_pct);
 
     assert!(p.mem_size_kib == size);
+    assert!(p.rssanon_kib == rssanon);
 }
 
 #[test]
@@ -433,9 +486,12 @@ pub fn procfs_dead_and_undead_test() {
         "4020/statm".to_string(),
         "1255967 185959 54972 200 0 316078 0".to_string(),
     );
+    files.insert("4018/status".to_string(), "RssAnon: 12345 kB".to_string());
+    files.insert("4019/status".to_string(), "RssAnon: 12345 kB".to_string());
+    files.insert("4020/status".to_string(), "RssAnon: 12345 kB".to_string());
 
     let fs = procfsapi::MockFS::new(files, pids, users, procfsapi::unix_now());
-    let memtotal_kib = get_memtotal(&fs).unwrap();
+    let memtotal_kib = get_memtotal_kib(&fs).unwrap();
     let info = get_process_information(&fs, memtotal_kib).unwrap();
 
     // 4020 should be dropped - it's dead

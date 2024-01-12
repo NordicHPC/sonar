@@ -80,6 +80,7 @@ struct ProcInfo<'a> {
     cputime_sec: usize,
     mem_percentage: f64,
     mem_size_kib: usize,
+    rssanon_kib: usize,
     gpu_cards: GpuSet,
     gpu_percentage: f64,
     gpu_mem_percentage: f64,
@@ -118,6 +119,7 @@ fn add_proc_info<'a, F>(
     cputime_sec: usize,
     mem_percentage: f64,
     mem_size_kib: usize,
+    rssanon_kib: usize,
     gpu_cards: &GpuSet,
     gpu_percentage: f64,
     gpu_mem_percentage: f64,
@@ -133,6 +135,7 @@ fn add_proc_info<'a, F>(
             e.cputime_sec += cputime_sec;
             e.mem_percentage += mem_percentage;
             e.mem_size_kib += mem_size_kib;
+            e.rssanon_kib += rssanon_kib;
             union_gpuset(&mut e.gpu_cards, gpu_cards);
             e.gpu_percentage += gpu_percentage;
             e.gpu_mem_percentage += gpu_mem_percentage;
@@ -150,6 +153,7 @@ fn add_proc_info<'a, F>(
             cputime_sec,
             mem_percentage,
             mem_size_kib,
+            rssanon_kib,
             gpu_cards: gpu_cards.clone(),
             gpu_percentage,
             gpu_mem_percentage,
@@ -310,7 +314,7 @@ fn do_create_snapshot(
     // The total RAM installed is in the `MemTotal` field of /proc/meminfo.  We need this for
     // various things.  Not getting it is a hard error.
 
-    let memtotal_kib = match procfs::get_memtotal(&fs) {
+    let memtotal_kib = match procfs::get_memtotal_kib(&fs) {
         Ok(n) => n,
         Err(e) => {
             log::error!("Could not get installed memory: {}", e);
@@ -354,6 +358,7 @@ fn do_create_snapshot(
             proc.cputime_sec,
             proc.mem_pct,
             proc.mem_size_kib,
+            proc.rssanon_kib,
             &no_gpus, // gpu_cards
             0.0,      // gpu_percentage
             0.0,      // gpu_mem_percentage
@@ -391,6 +396,7 @@ fn do_create_snapshot(
                     0,   // cputime_sec
                     0.0, // mem_percentage
                     0,   // mem_size_kib
+                    0,   // rssanon_kib
                     &singleton_gpuset(proc.device),
                     proc.gpu_pct,
                     proc.mem_pct,
@@ -425,6 +431,7 @@ fn do_create_snapshot(
                     0,   // cputime_sec
                     0.0, // mem_percentage
                     0,   // mem_size_kib
+                    0,   // rssanon_kib
                     &singleton_gpuset(proc.device),
                     proc.gpu_pct,
                     proc.mem_pct,
@@ -499,6 +506,7 @@ fn do_create_snapshot(
                     p.cputime_sec += proc_info.cputime_sec;
                     p.mem_percentage += proc_info.mem_percentage;
                     p.mem_size_kib += proc_info.mem_size_kib;
+                    p.rssanon_kib += proc_info.rssanon_kib;
                     union_gpuset(&mut p.gpu_cards, &proc_info.gpu_cards);
                     p.gpu_percentage += proc_info.gpu_percentage;
                     p.gpu_mem_percentage += proc_info.gpu_mem_percentage;
@@ -547,6 +555,7 @@ fn do_create_snapshot(
             cputime_sec: 0,
             mem_percentage: 0.0,
             mem_size_kib: 0,
+            rssanon_kib: 0,
             gpu_cards: empty_gpuset(),
             gpu_percentage: 0.0,
             gpu_mem_percentage: 0.0,
@@ -665,6 +674,7 @@ fn print_record<W: io::Write>(
         format!("cmd={}", proc_info.command),
         format!("cpu%={}", three_places(proc_info.cpu_percentage)),
         format!("cpukib={}", proc_info.mem_size_kib),
+        format!("rssanonkib={}", proc_info.rssanon_kib),
         format!("gpus={gpus_comma_separated}"),
         format!("gpu%={}", three_places(proc_info.gpu_percentage)),
         format!("gpumem%={}", three_places(proc_info.gpu_mem_percentage)),

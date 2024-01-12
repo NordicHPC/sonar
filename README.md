@@ -187,6 +187,9 @@ corresponds to "one full core's worth of computation".
 `cpukib` (optional, default "0"): The current CPU data virtual memory used in KiB, a nonnegative
 integer.
 
+`rssanonkib` (optional, default "0"): The current CPU data "RssAnon" (resident private) memory in KiB,
+a nonnegative integer, with 0 meaning "no data available".
+
 `gpus` (optional, default "none"): The list of GPUs currently used by the job, a comma-separated
 list of GPU device numbers, all of them nonnegative integers.  The value can instead be `none` when
 the process uses no GPUs, or `unknown` when the process is known to use GPUs but their device
