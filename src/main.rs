@@ -61,6 +61,10 @@ enum Commands {
         /// Exclude records whose commands start with these comma-separated names [default: none]
         #[arg(long)]
         exclude_commands: Option<String>,
+
+        /// Create a per-host lockfile in this directory and exit early if the file exists on startup [default: none]
+        #[arg(long)]
+        lockdir: Option<String>,
     },
     /// Not yet implemented
     Analyze {},
@@ -87,6 +91,7 @@ fn main() {
             exclude_system_jobs,
             exclude_users,
             exclude_commands,
+            lockdir,
         } => {
             let opts = ps::PsOptions {
                 rollup: *rollup,
@@ -105,6 +110,7 @@ fn main() {
                 } else {
                     vec![]
                 },
+                lockdir: lockdir.clone(),
             };
             if *batchless {
                 let mut jm = batchless::BatchlessJobManager::new();
