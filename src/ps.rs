@@ -300,7 +300,7 @@ fn do_create_snapshot(jobs: &mut dyn jobs::JobManager, opts: &PsOptions, timesta
     // various things.  Not getting it is a hard error.
 
     let memtotal_kib =
-        match procfs::get_memtotal(&fs) {
+        match procfs::get_memtotal_kib(&fs) {
             Ok(n) => n,
             Err(e) => {
                 log::error!("Could not get installed memory: {}", e);

@@ -7,7 +7,7 @@ use std::collections::HashMap;
 
 /// Read the /proc/meminfo file from the fs and return the value for total installed memory.
 
-pub fn get_memtotal(fs: &dyn procfsapi::ProcfsAPI) -> Result<usize, String> {
+pub fn get_memtotal_kib(fs: &dyn procfsapi::ProcfsAPI) -> Result<usize, String> {
     let mut memtotal_kib = 0;
     let meminfo_s = fs.read_to_string("meminfo")?;
     for l in meminfo_s.split('\n') {
@@ -396,7 +396,7 @@ DirectMap1G:    11534336 kB
     let now = (boot_time + (start_ticks / ticks_per_sec) + (utime_ticks / ticks_per_sec) + (stime_ticks / ticks_per_sec) + 2000.0) as u64;
 
     let fs = procfsapi::MockFS::new(files, pids, users, now);
-    let memtotal_kib = get_memtotal(&fs).unwrap();
+    let memtotal_kib = get_memtotal_kib(&fs).unwrap();
     let info = get_process_information(&fs, memtotal_kib).unwrap();
     assert!(info.len() == 1);
     let p = &info[0];
@@ -468,7 +468,7 @@ pub fn procfs_dead_and_undead_test() {
     );
 
     let fs = procfsapi::MockFS::new(files, pids, users, procfsapi::unix_now());
-    let memtotal_kib = get_memtotal(&fs).unwrap();
+    let memtotal_kib = get_memtotal_kib(&fs).unwrap();
     let info = get_process_information(&fs, memtotal_kib).unwrap();
 
     // 4020 should be dropped - it's dead
