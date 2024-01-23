@@ -201,8 +201,8 @@ pub fn get_process_information(fs: &dyn procfsapi::ProcfsAPI, memtotal_kib: usiz
         let mut resident_kib = 0;
         if let Ok(status_info) = fs.read_to_string(&format!("{pid}/status")) {
             for l in status_info.split('\n') {
-                if l.starts_with("RssAnon: ") {
-                    // We expect "RssAnon:\s+(\d+)\s+kB", roughly
+                if l.starts_with("RssAnon:") {
+                    // We expect "RssAnon:\s+(\d+)\s+kB", roughly; there may be tabs.
                     let fields = l.split_ascii_whitespace().collect::<Vec<&str>>();
                     if fields.len() != 3 || fields[2] != "kB" {
                         return Err(format!("Unexpected RssAnon in /proc/{pid}/status: {l}"));
@@ -214,7 +214,7 @@ pub fn get_process_information(fs: &dyn procfsapi::ProcfsAPI, memtotal_kib: usiz
             }
         }
         if resident_kib == 0 {
-            // Again, usually benign.
+            // This is *usually* benign - see above.
             continue;
         }
 

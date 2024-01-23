@@ -657,7 +657,7 @@ fn print_record<W: io::Write>(
         format!("cmd={}", proc_info.command),
         format!("cpu%={}", three_places(proc_info.cpu_percentage)),
         format!("cpukib={}", proc_info.mem_size_kib),
-        format!("rsskib={}", proc_info.resident_kib),
+        format!("residentkib={}", proc_info.resident_kib),
         format!("gpus={gpus_comma_separated}"),
         format!("gpu%={}", three_places(proc_info.gpu_percentage)),
         format!("gpumem%={}", three_places(proc_info.gpu_mem_percentage)),
