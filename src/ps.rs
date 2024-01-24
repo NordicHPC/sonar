@@ -466,9 +466,7 @@ fn do_create_snapshot(
         opts,
     };
 
-    let mut did_print = false;
-    let must_print = opts.always_print_something;
-    if opts.rollup {
+    let mut candidates = if opts.rollup {
         // This is a little complicated because jobs with job_id 0 cannot be rolled up.
         //
         // - There is an array `rolledup` of ProcInfo nodes that represent rolled-up data
@@ -516,13 +514,23 @@ fn do_create_snapshot(
                 }
             }
         }
-        for r in rolledup {
-            did_print = print_record(&mut writer, &print_params, &r, false) || did_print;
-        }
+        rolledup
     } else {
-        for (_, proc_info) in proc_by_pid {
-            did_print = print_record(&mut writer, &print_params, &proc_info, false) || did_print;
-        }
+        proc_by_pid
+            .drain()
+            .map(|(_, v)| v)
+            .collect::<Vec<ProcInfo>>()
+    };
+
+    let must_print = opts.always_print_something;
+    let candidates = candidates
+        .drain(0..)
+        .filter(|proc_info| filter_proc(proc_info, &print_params))
+        .collect::<Vec<ProcInfo>>();
+
+    let mut did_print = false;
+    for c in candidates {
+        did_print = print_record(&mut writer, &print_params, &c) || did_print;
     }
 
     if !did_print && must_print {
@@ -545,27 +553,13 @@ fn do_create_snapshot(
             gpu_mem_size_kib: 0,
             gpu_status: GpuStatus::Ok,
         };
-        print_record(&mut writer, &print_params, &synth, true);
+        print_record(&mut writer, &print_params, &synth);
     }
 
     writer.flush().unwrap();
 }
 
-struct PrintParameters<'a> {
-    hostname: &'a str,
-    timestamp: &'a str,
-    num_cores: usize,
-    memtotal_kib: usize,
-    version: &'a str,
-    opts: &'a PsOptions<'a>,
-}
-
-fn print_record<W: io::Write>(
-    writer: &mut Writer<W>,
-    params: &PrintParameters,
-    proc_info: &ProcInfo,
-    must_print: bool,
-) -> bool {
+fn filter_proc(proc_info: &ProcInfo, params: &PrintParameters) -> bool {
     let mut included = false;
 
     // The logic here is that if any of the inclusion filters are provided, then the set of those
@@ -596,10 +590,6 @@ fn print_record<W: io::Write>(
         included = true;
     }
 
-    if !included && !must_print {
-        return false;
-    }
-
     // The exclusion filters apply after the inclusion filters and the record must pass all of the
     // ones that are provided.
 
@@ -625,10 +615,23 @@ fn print_record<W: io::Write>(
         included = false;
     }
 
-    if !included && !must_print {
-        return false;
-    }
+    return included;
+}
 
+struct PrintParameters<'a> {
+    hostname: &'a str,
+    timestamp: &'a str,
+    num_cores: usize,
+    memtotal_kib: usize,
+    version: &'a str,
+    opts: &'a PsOptions<'a>,
+}
+
+fn print_record<W: io::Write>(
+    writer: &mut Writer<W>,
+    params: &PrintParameters,
+    proc_info: &ProcInfo,
+) -> bool {
     let gpus_comma_separated = if let Some(ref cards) = proc_info.gpu_cards {
         if cards.is_empty() {
             "none".to_string()
