@@ -459,64 +459,70 @@ fn do_create_snapshot(jobs: &mut dyn jobs::JobManager, opts: &PsOptions, timesta
         opts,
     };
 
-    let mut did_print = false;
-    let must_print = opts.always_print_something;
-    if opts.rollup {
-        // This is a little complicated because jobs with job_id 0 cannot be rolled up.
-        //
-        // - There is an array `rolledup` of ProcInfo nodes that represent rolled-up data
-        //
-        // - When the job ID of a job in `proc_by_pid` is zero, the entry in `rolledup` is a copy of
-        //   that job; these jobs cannot be rolled up (this is why it's complicated)
-        //
-        // - Otherwise, the entry in `rolledup` represent rolled-up information for a (job, command)
-        //   pair
-        //
-        // - There is a hash table `index` that maps the (job, command) pair to the entry in
-        //   `rolledup`, if any
-        //
-        // - When we're done rolling up, we print the `rolledup` table.
-        //
-        // Filtering is performed after rolling up, so if a rolled-up job has a bunch of dinky
-        // processes that together push it over the filtering limit then it will be printed.  This
-        // is probably the right thing.
+    let mut candidates =
+        if opts.rollup {
+            // This is a little complicated because jobs with job_id 0 cannot be rolled up.
+            //
+            // - There is an array `rolledup` of ProcInfo nodes that represent rolled-up data
+            //
+            // - When the job ID of a job in `proc_by_pid` is zero, the entry in `rolledup` is a copy of
+            //   that job; these jobs cannot be rolled up (this is why it's complicated)
+            //
+            // - Otherwise, the entry in `rolledup` represent rolled-up information for a (job, command)
+            //   pair
+            //
+            // - There is a hash table `index` that maps the (job, command) pair to the entry in
+            //   `rolledup`, if any
+            //
+            // - When we're done rolling up, we print the `rolledup` table.
+            //
+            // Filtering is performed after rolling up, so if a rolled-up job has a bunch of dinky
+            // processes that together push it over the filtering limit then it will be printed.  This
+            // is probably the right thing.
 
-        let mut rolledup = vec![];
-        let mut index = HashMap::<(JobID, &str), usize>::new();
-        for proc_info in proc_by_pid.values() {
-            if proc_info.job_id == 0 {
-                rolledup.push(proc_info.clone());
-            } else {
-                let key = (proc_info.job_id, proc_info.command);
-                if let Some(x) = index.get(&key) {
-                    let p = &mut rolledup[*x];
-                    p.cpu_percentage += proc_info.cpu_percentage;
-                    p.cputime_sec += proc_info.cputime_sec;
-                    p.mem_percentage += proc_info.mem_percentage;
-                    p.mem_size_kib += proc_info.mem_size_kib;
-                    p.resident_kib += proc_info.resident_kib;
-                    union_gpuset(&mut p.gpu_cards, &proc_info.gpu_cards);
-                    p.gpu_percentage += proc_info.gpu_percentage;
-                    p.gpu_mem_percentage += proc_info.gpu_mem_percentage;
-                    p.gpu_mem_size_kib += proc_info.gpu_mem_size_kib;
-                    p.rolledup += 1;
-                } else {
-                    let x = rolledup.len();
-                    index.insert(key, x);
+            let mut rolledup = vec![];
+            let mut index = HashMap::<(JobID, &str), usize>::new();
+            for proc_info in proc_by_pid.values() {
+                if proc_info.job_id == 0 {
                     rolledup.push(proc_info.clone());
-                    // We do not increment the clone's `rolledup` counter here because that counter
-                    // counts how many *other* records have been rolled into the canonical one, 0
-                    // means "no interesting information" and need not be printed.
+                } else {
+                    let key = (proc_info.job_id, proc_info.command);
+                    if let Some(x) = index.get(&key) {
+                        let p = &mut rolledup[*x];
+                        p.cpu_percentage += proc_info.cpu_percentage;
+                        p.cputime_sec += proc_info.cputime_sec;
+                        p.mem_percentage += proc_info.mem_percentage;
+                        p.mem_size_kib += proc_info.mem_size_kib;
+                        p.resident_kib += proc_info.resident_kib;
+                        union_gpuset(&mut p.gpu_cards, &proc_info.gpu_cards);
+                        p.gpu_percentage += proc_info.gpu_percentage;
+                        p.gpu_mem_percentage += proc_info.gpu_mem_percentage;
+                        p.gpu_mem_size_kib += proc_info.gpu_mem_size_kib;
+                        p.rolledup += 1;
+                    } else {
+                        let x = rolledup.len();
+                        index.insert(key, x);
+                        rolledup.push(proc_info.clone());
+                        // We do not increment the clone's `rolledup` counter here because that counter
+                        // counts how many *other* records have been rolled into the canonical one, 0
+                        // means "no interesting information" and need not be printed.
+                    }
                 }
             }
-        }
-        for r in rolledup {
-            did_print = print_record(&mut writer, &print_params, &r, false) || did_print;
-        }
-    } else {
-        for (_, proc_info) in proc_by_pid {
-            did_print = print_record(&mut writer, &print_params, &proc_info, false) || did_print;
-        }
+            rolledup
+        } else {
+            proc_by_pid.drain().map(|(_,v)| v).collect::<Vec<ProcInfo>>()
+        };
+
+    let must_print = opts.always_print_something;
+    let candidates = candidates.
+        drain(0..).
+        filter(|proc_info| filter_proc(proc_info, &print_params, must_print)).
+        collect::<Vec<ProcInfo>>();
+
+    let mut did_print = false;
+    for c in candidates {
+        did_print = print_record(&mut writer, &print_params, &c) || did_print;
     }
 
     if !did_print && must_print {
@@ -540,27 +546,13 @@ fn do_create_snapshot(jobs: &mut dyn jobs::JobManager, opts: &PsOptions, timesta
             gpu_mem_size_kib: 0,
             gpu_status: GpuStatus::Ok,
         };
-        print_record(&mut writer, &print_params, &synth, true);
+        print_record(&mut writer, &print_params, &synth);
     }
 
     writer.flush().unwrap();
 }
 
-struct PrintParameters<'a> {
-    hostname: &'a str,
-    timestamp: &'a str,
-    num_cores: usize,
-    memtotal_kib: usize,
-    version: &'a str,
-    opts: &'a PsOptions<'a>,
-}
-
-fn print_record<W: io::Write>(
-    writer: &mut Writer<W>,
-    params: &PrintParameters,
-    proc_info: &ProcInfo,
-    must_print: bool,
-) -> bool {
+fn filter_proc(proc_info: &ProcInfo, params: &PrintParameters, must_print: bool) -> bool {
     let mut included = false;
 
     // The logic here is that if any of the inclusion filters are provided, then the set of those
@@ -603,19 +595,19 @@ fn print_record<W: io::Write>(
     }
     if !params.opts.exclude_users.is_empty()
         && params
-            .opts
-            .exclude_users
-            .iter()
-            .any(|x| *x == proc_info.user)
+        .opts
+        .exclude_users
+        .iter()
+        .any(|x| *x == proc_info.user)
     {
         included = false;
     }
     if !params.opts.exclude_commands.is_empty()
         && params
-            .opts
-            .exclude_commands
-            .iter()
-            .any(|x| proc_info.command.starts_with(x))
+        .opts
+        .exclude_commands
+        .iter()
+        .any(|x| proc_info.command.starts_with(x))
     {
         included = false;
     }
@@ -623,6 +615,24 @@ fn print_record<W: io::Write>(
     if !included && !must_print {
         return false;
     }
+
+    return true;
+}
+
+struct PrintParameters<'a> {
+    hostname: &'a str,
+    timestamp: &'a str,
+    num_cores: usize,
+    memtotal_kib: usize,
+    version: &'a str,
+    opts: &'a PsOptions<'a>,
+}
+
+fn print_record<W: io::Write>(
+    writer: &mut Writer<W>,
+    params: &PrintParameters,
+    proc_info: &ProcInfo,
+) -> bool {
 
     let gpus_comma_separated = if let Some(ref cards) = proc_info.gpu_cards {
         if cards.is_empty() {
