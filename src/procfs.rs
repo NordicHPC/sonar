@@ -1,5 +1,4 @@
 /// Collect CPU process information without GPU information, from files in /proc.
-
 use crate::process;
 use crate::procfsapi;
 
@@ -17,7 +16,9 @@ use std::collections::HashMap;
 /// The underlying computing system -- /proc, system tables, and clock -- is virtualized through the
 /// ProcfsAPI instance.
 
-pub fn get_process_information(fs: &dyn procfsapi::ProcfsAPI) -> Result<Vec<process::Process>, String> {
+pub fn get_process_information(
+    fs: &dyn procfsapi::ProcfsAPI,
+) -> Result<Vec<process::Process>, String> {
     // The boot time is the `btime` field of /proc/stat.  It is measured in seconds since epoch.  We
     // need this to compute the process's real time, which we need to compute ps-compatible cpu
     // utilization.
@@ -383,27 +384,31 @@ DirectMap1G:    11534336 kB
         "1255967 185959 54972 200 0 316078 0".to_string(),
     );
 
-    let ticks_per_sec = 100.0;     // We define this
-    let utime_ticks = 51361.0;     // field(/proc/4018/stat, 14)
-    let stime_ticks = 15728.0;     // field(/proc/4018/stat, 15)
-    let boot_time = 1698303295.0;  // field(/proc/stat, "btime")
-    let start_ticks = 16400.0;     // field(/proc/4018/stat, 22)
+    let ticks_per_sec = 100.0; // We define this
+    let utime_ticks = 51361.0; // field(/proc/4018/stat, 14)
+    let stime_ticks = 15728.0; // field(/proc/4018/stat, 15)
+    let boot_time = 1698303295.0; // field(/proc/stat, "btime")
+    let start_ticks = 16400.0; // field(/proc/4018/stat, 22)
     let rss: f64 = 185959.0 * 4.0; // pages_to_kib(field(/proc/4018/statm, 1))
-    let memtotal = 16093776.0;     // field(/proc/meminfo, "MemTotal:")
-    let size = 316078 * 4;         // pages_to_kib(field(/proc/4018/statm, 5))
+    let memtotal = 16093776.0; // field(/proc/meminfo, "MemTotal:")
+    let size = 316078 * 4; // pages_to_kib(field(/proc/4018/statm, 5))
 
     // now = boot_time + start_time + utime_ticks + stime_ticks + arbitrary idle time
-    let now = (boot_time + (start_ticks / ticks_per_sec) + (utime_ticks / ticks_per_sec) + (stime_ticks / ticks_per_sec) + 2000.0) as u64;
+    let now = (boot_time
+        + (start_ticks / ticks_per_sec)
+        + (utime_ticks / ticks_per_sec)
+        + (stime_ticks / ticks_per_sec)
+        + 2000.0) as u64;
 
     let fs = procfsapi::MockFS::new(files, pids, users, now);
     let info = get_process_information(&fs).unwrap();
     assert!(info.len() == 1);
     let p = &info[0];
-    assert!(p.pid == 4018);     // from enumeration of /proc
-    assert!(p.uid == 1000);     // ditto
+    assert!(p.pid == 4018); // from enumeration of /proc
+    assert!(p.uid == 1000); // ditto
     assert!(p.user == "zappa"); // from getent
     assert!(p.command == "firefox"); // field(/proc/4018/stat, 2)
-    assert!(p.ppid == 2190);    // field(/proc/4018/stat, 4)
+    assert!(p.ppid == 2190); // field(/proc/4018/stat, 4)
     assert!(p.session == 2189); // field(/proc/4018/stat, 6)
 
     let now_time = now as f64;
@@ -429,7 +434,10 @@ pub fn procfs_dead_and_undead_test() {
 
     let mut files = HashMap::new();
     files.insert("stat".to_string(), "btime 1698303295".to_string());
-    files.insert("meminfo".to_string(), "MemTotal:       16093776 kB".to_string());
+    files.insert(
+        "meminfo".to_string(),
+        "MemTotal:       16093776 kB".to_string(),
+    );
     files.insert(
         "4018/stat".to_string(),
         "4018 (firefox) S 2190 2189 2189 0 -1 4194560 19293188 3117638 1823 557 51361 15728 5390 2925 20 0 187 0 16400 5144358912 184775 18446744073709551615 94466859782144 94466860597976 140720852341888 0 0 0 0 4096 17663 0 0 0 17 4 0 0 0 0 0 94466860605280 94466860610840 94466863497216 140720852350777 140720852350820 140720852350820 140720852357069 0".to_string());

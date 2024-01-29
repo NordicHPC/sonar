@@ -9,16 +9,16 @@ use crate::jobs;
 use crate::nvidia;
 use crate::process;
 use crate::procfs;
-use crate::util::three_places;
 use crate::procfsapi;
+use crate::util::three_places;
 
 use csv::{Writer, WriterBuilder};
 use std::collections::{HashMap, HashSet};
 use std::env;
 use std::io::{self, Write};
 use std::path::PathBuf;
-use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 use std::thread;
 use std::time;
 
@@ -208,17 +208,23 @@ pub fn create_snapshot(jobs: &mut dyn jobs::JobManager, opts: &PsOptions, timest
         p.push("sonar-lock.".to_string() + &hostname);
 
         if interrupted.load(Ordering::Relaxed) {
-            return
+            return;
         }
 
         // create_new() requests atomic creation, if the file exists we'll error out.
-        match std::fs::File::options().write(true).create_new(true).open(&p) {
+        match std::fs::File::options()
+            .write(true)
+            .create_new(true)
+            .open(&p)
+        {
             Ok(mut f) => {
                 created = true;
                 let pid = std::process::id();
                 match f.write(format!("{}", pid).as_bytes()) {
                     Ok(_) => {}
-                    Err(_) => { failed = true; }
+                    Err(_) => {
+                        failed = true;
+                    }
                 }
             }
             Err(e) if e.kind() == io::ErrorKind::AlreadyExists => {
@@ -236,7 +242,9 @@ pub fn create_snapshot(jobs: &mut dyn jobs::JobManager, opts: &PsOptions, timest
             // it while holding onto the lockfile.  It is then possible to run sonar in that window
             // while the lockfile is being held, to ensure the second process exits immediately.
             match std::env::var("SONARTEST_WAIT_LOCKFILE") {
-                Ok(_) => { thread::sleep(time::Duration::new(10, 0)); }
+                Ok(_) => {
+                    thread::sleep(time::Duration::new(10, 0));
+                }
                 Err(_) => {}
             }
         }
@@ -244,7 +252,9 @@ pub fn create_snapshot(jobs: &mut dyn jobs::JobManager, opts: &PsOptions, timest
         if created {
             match std::fs::remove_file(p) {
                 Ok(_) => {}
-                Err(_) => { failed = true; }
+                Err(_) => {
+                    failed = true;
+                }
             }
         }
 
@@ -259,7 +269,12 @@ pub fn create_snapshot(jobs: &mut dyn jobs::JobManager, opts: &PsOptions, timest
     }
 }
 
-fn do_create_snapshot(jobs: &mut dyn jobs::JobManager, opts: &PsOptions, timestamp: &str, interrupted: &Arc<AtomicBool>) {
+fn do_create_snapshot(
+    jobs: &mut dyn jobs::JobManager,
+    opts: &PsOptions,
+    timestamp: &str,
+    interrupted: &Arc<AtomicBool>,
+) {
     let no_gpus = empty_gpuset();
     let mut proc_by_pid = ProcTable::new();
 
@@ -287,7 +302,7 @@ fn do_create_snapshot(jobs: &mut dyn jobs::JobManager, opts: &PsOptions, timesta
     */
 
     if interrupted.load(Ordering::Relaxed) {
-        return
+        return;
     }
 
     let procinfo_probe = {
@@ -335,7 +350,7 @@ fn do_create_snapshot(jobs: &mut dyn jobs::JobManager, opts: &PsOptions, timesta
     }
 
     if interrupted.load(Ordering::Relaxed) {
-        return
+        return;
     }
 
     // When a GPU fails it may be a transient error or a permanent error, but either
@@ -374,7 +389,7 @@ fn do_create_snapshot(jobs: &mut dyn jobs::JobManager, opts: &PsOptions, timesta
     }
 
     if interrupted.load(Ordering::Relaxed) {
-        return
+        return;
     }
 
     let amd_probe = amd::get_amd_information(&user_by_pid);
@@ -418,7 +433,7 @@ fn do_create_snapshot(jobs: &mut dyn jobs::JobManager, opts: &PsOptions, timesta
     }
 
     if interrupted.load(Ordering::Relaxed) {
-        return
+        return;
     }
 
     // Once we start printing we'll print everything and not check the interrupted flag any more.
