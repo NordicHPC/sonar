@@ -1,43 +1,12 @@
 /// Collect CPU process information without GPU information, from files in /proc.
-
 use crate::process;
-use crate::procfsapi;
+use crate::procfsapi::{self, parse_usize_field};
 
 use std::collections::HashMap;
 
-/// Obtain process information via /proc and return a vector of structures with all the information
-/// we need.  In the returned vector, pids uniquely tag the records.
-///
-/// This returns Ok(data) on success, otherwise Err(msg), and in the latter case the caller should
-/// fallback to running `ps` and consider logging msg.
-///
-/// This function uniformly uses /proc, even though in some cases there are system calls that
-/// provide the same information.
-///
-/// The underlying computing system -- /proc, system tables, and clock -- is virtualized through the
-/// ProcfsAPI instance.
+/// Read the /proc/meminfo file from the fs and return the value for total installed memory.
 
-pub fn get_process_information(fs: &dyn procfsapi::ProcfsAPI) -> Result<Vec<process::Process>, String> {
-    // The boot time is the `btime` field of /proc/stat.  It is measured in seconds since epoch.  We
-    // need this to compute the process's real time, which we need to compute ps-compatible cpu
-    // utilization.
-
-    let mut boot_time = 0;
-    let stat_s = fs.read_to_string("stat")?;
-    for l in stat_s.split('\n') {
-        if l.starts_with("btime ") {
-            let fields = l.split_ascii_whitespace().collect::<Vec<&str>>();
-            boot_time = parse_usize_field(&fields, 1, l, "stat", 0, "btime")? as u64;
-            break;
-        }
-    }
-    if boot_time == 0 {
-        return Err(format!("Could not find btime in /proc/stat: {stat_s}"));
-    }
-
-    // The total RAM installed is in the `MemTotal` field of /proc/meminfo.  We need this to compute
-    // ps-compatible relative memory use.
-
+pub fn get_memtotal_kib(fs: &dyn procfsapi::ProcfsAPI) -> Result<usize, String> {
     let mut memtotal_kib = 0;
     let meminfo_s = fs.read_to_string("meminfo")?;
     for l in meminfo_s.split('\n') {
@@ -55,6 +24,41 @@ pub fn get_process_information(fs: &dyn procfsapi::ProcfsAPI) -> Result<Vec<proc
         return Err(format!(
             "Could not find MemTotal in /proc/meminfo: {meminfo_s}"
         ));
+    }
+    Ok(memtotal_kib)
+}
+
+/// Obtain process information via /proc and return a vector of structures with all the information
+/// we need.  In the returned vector, pids uniquely tag the records.
+///
+/// This returns Ok(data) on success, otherwise Err(msg), and in the latter case the caller should
+/// fallback to running `ps` and consider logging msg.
+///
+/// This function uniformly uses /proc, even though in some cases there are system calls that
+/// provide the same information.
+///
+/// The underlying computing system -- /proc, system tables, and clock -- is virtualized through the
+/// ProcfsAPI instance.
+
+pub fn get_process_information(
+    fs: &dyn procfsapi::ProcfsAPI,
+    memtotal_kib: usize,
+) -> Result<Vec<process::Process>, String> {
+    // The boot time is the `btime` field of /proc/stat.  It is measured in seconds since epoch.  We
+    // need this to compute the process's real time, which we need to compute ps-compatible cpu
+    // utilization.
+
+    let mut boot_time = 0;
+    let stat_s = fs.read_to_string("stat")?;
+    for l in stat_s.split('\n') {
+        if l.starts_with("btime ") {
+            let fields = l.split_ascii_whitespace().collect::<Vec<&str>>();
+            boot_time = parse_usize_field(&fields, 1, l, "stat", 0, "btime")? as u64;
+            break;
+        }
+    }
+    if boot_time == 0 {
+        return Err(format!("Could not find btime in /proc/stat: {stat_s}"));
     }
 
     // Enumerate all pids, and collect the uids while we're here.
@@ -193,6 +197,55 @@ pub fn get_process_information(fs: &dyn procfsapi::ProcfsAPI) -> Result<Vec<proc
             continue;
         }
 
+        // The best value for resident memory is probably the Pss (proportional set size) field of
+        // /proc/{pid}/smaps_rollup, see discussion on bug #126.  But that field is privileged.
+        //
+        // A contender is RssAnon of /proc/{pid}/status, which corresponds to "private data".  It
+        // does not include text or file mappings, though these actually also take up real memory.
+        // But text can be shared, which matters both when we roll up processes and when the program
+        // is executing multiple times on the system, and file mappings, when they exist, are
+        // frequently read-only and evictable.
+        //
+        // RssAnon will tend to be lower than Pss.  For typical scientific codes, discounting text
+        // and read-only file mappings is probably more or less OK since private data will dwarf
+        // these.  The main source of inaccuracy is resident read/write file mappings.
+        //
+        // In order to not confuse the matter we're going to name the fields in our internal data
+        // structures and in the output by the fields that they are taken from, so "rssanon", not
+        // "resident" or "rss" or similar.
+        let mut rssanon_kib = 0;
+        let mut was_found = false;
+        if let Ok(status_info) = fs.read_to_string(&format!("{pid}/status")) {
+            was_found = true;
+            for l in status_info.split('\n') {
+                if l.starts_with("RssAnon:") {
+                    // We expect "RssAnon:\s+(\d+)\s+kB", roughly; there may be tabs.
+                    let fields = l.split_ascii_whitespace().collect::<Vec<&str>>();
+                    if fields.len() != 3 || fields[2] != "kB" {
+                        return Err(format!("Unexpected RssAnon in /proc/{pid}/status: {l}"));
+                    }
+                    rssanon_kib = parse_usize_field(
+                        &fields,
+                        1,
+                        &l,
+                        "status",
+                        pid,
+                        "private resident set size",
+                    )?;
+                    break;
+                }
+            }
+        }
+        if rssanon_kib == 0 {
+            // This is *usually* benign - see above.  But in addition, kernel threads and processes
+            // appear not to have the RssAnon field in /proc/{pid}/status.  In the interest of not
+            // filtering too much too early, we'll just keep going here with a zero value if the
+            // file was found but was missing that field.
+            if !was_found {
+                continue;
+            }
+        }
+
         // Now compute some derived quantities.
 
         // pcpu and pmem are rounded to ##.#.  We're going to get slightly different answers here
@@ -223,6 +276,7 @@ pub fn get_process_information(fs: &dyn procfsapi::ProcfsAPI) -> Result<Vec<proc
             mem_pct: pmem,
             cputime_sec,
             mem_size_kib: size_kib,
+            rssanon_kib,
             ppid,
             session: sess,
             command: comm,
@@ -230,37 +284,6 @@ pub fn get_process_information(fs: &dyn procfsapi::ProcfsAPI) -> Result<Vec<proc
     }
 
     Ok(result)
-}
-
-fn parse_usize_field(
-    fields: &[&str],
-    ix: usize,
-    line: &str,
-    file: &str,
-    pid: usize,
-    fieldname: &str,
-) -> Result<usize, String> {
-    if ix >= fields.len() {
-        if pid == 0 {
-            return Err(format!("Index out of range for /proc/{file}: {ix}: {line}"));
-        } else {
-            return Err(format!(
-                "Index out of range for /proc/{pid}/{file}: {ix}: {line}"
-            ));
-        }
-    }
-    if let Ok(n) = fields[ix].parse::<usize>() {
-        return Ok(n);
-    }
-    if pid == 0 {
-        Err(format!(
-            "Could not parse {fieldname} in /proc/{file}: {line}"
-        ))
-    } else {
-        Err(format!(
-            "Could not parse {fieldname} from /proc/{pid}/{file}: {line}"
-        ))
-    }
 }
 
 // The UserTable optimizes uid -> name lookup.
@@ -382,28 +405,35 @@ DirectMap1G:    11534336 kB
         "4018/statm".to_string(),
         "1255967 185959 54972 200 0 316078 0".to_string(),
     );
+    files.insert("4018/status".to_string(), "RssAnon: 12345 kB".to_string());
 
-    let ticks_per_sec = 100.0;     // We define this
-    let utime_ticks = 51361.0;     // field(/proc/4018/stat, 14)
-    let stime_ticks = 15728.0;     // field(/proc/4018/stat, 15)
-    let boot_time = 1698303295.0;  // field(/proc/stat, "btime")
-    let start_ticks = 16400.0;     // field(/proc/4018/stat, 22)
+    let ticks_per_sec = 100.0; // We define this
+    let utime_ticks = 51361.0; // field(/proc/4018/stat, 14)
+    let stime_ticks = 15728.0; // field(/proc/4018/stat, 15)
+    let boot_time = 1698303295.0; // field(/proc/stat, "btime")
+    let start_ticks = 16400.0; // field(/proc/4018/stat, 22)
     let rss: f64 = 185959.0 * 4.0; // pages_to_kib(field(/proc/4018/statm, 1))
-    let memtotal = 16093776.0;     // field(/proc/meminfo, "MemTotal:")
-    let size = 316078 * 4;         // pages_to_kib(field(/proc/4018/statm, 5))
+    let memtotal = 16093776.0; // field(/proc/meminfo, "MemTotal:")
+    let size = 316078 * 4; // pages_to_kib(field(/proc/4018/statm, 5))
+    let rssanon = 12345; // field(/proc/4018/status, "RssAnon:")
 
     // now = boot_time + start_time + utime_ticks + stime_ticks + arbitrary idle time
-    let now = (boot_time + (start_ticks / ticks_per_sec) + (utime_ticks / ticks_per_sec) + (stime_ticks / ticks_per_sec) + 2000.0) as u64;
+    let now = (boot_time
+        + (start_ticks / ticks_per_sec)
+        + (utime_ticks / ticks_per_sec)
+        + (stime_ticks / ticks_per_sec)
+        + 2000.0) as u64;
 
     let fs = procfsapi::MockFS::new(files, pids, users, now);
-    let info = get_process_information(&fs).unwrap();
+    let memtotal_kib = get_memtotal_kib(&fs).unwrap();
+    let info = get_process_information(&fs, memtotal_kib).unwrap();
     assert!(info.len() == 1);
     let p = &info[0];
-    assert!(p.pid == 4018);     // from enumeration of /proc
-    assert!(p.uid == 1000);     // ditto
+    assert!(p.pid == 4018); // from enumeration of /proc
+    assert!(p.uid == 1000); // ditto
     assert!(p.user == "zappa"); // from getent
     assert!(p.command == "firefox"); // field(/proc/4018/stat, 2)
-    assert!(p.ppid == 2190);    // field(/proc/4018/stat, 4)
+    assert!(p.ppid == 2190); // field(/proc/4018/stat, 4)
     assert!(p.session == 2189); // field(/proc/4018/stat, 6)
 
     let now_time = now as f64;
@@ -418,6 +448,7 @@ DirectMap1G:    11534336 kB
     assert!(p.mem_pct == mem_pct);
 
     assert!(p.mem_size_kib == size);
+    assert!(p.rssanon_kib == rssanon);
 }
 
 #[test]
@@ -429,7 +460,10 @@ pub fn procfs_dead_and_undead_test() {
 
     let mut files = HashMap::new();
     files.insert("stat".to_string(), "btime 1698303295".to_string());
-    files.insert("meminfo".to_string(), "MemTotal:       16093776 kB".to_string());
+    files.insert(
+        "meminfo".to_string(),
+        "MemTotal:       16093776 kB".to_string(),
+    );
     files.insert(
         "4018/stat".to_string(),
         "4018 (firefox) S 2190 2189 2189 0 -1 4194560 19293188 3117638 1823 557 51361 15728 5390 2925 20 0 187 0 16400 5144358912 184775 18446744073709551615 94466859782144 94466860597976 140720852341888 0 0 0 0 4096 17663 0 0 0 17 4 0 0 0 0 0 94466860605280 94466860610840 94466863497216 140720852350777 140720852350820 140720852350820 140720852357069 0".to_string());
@@ -452,9 +486,13 @@ pub fn procfs_dead_and_undead_test() {
         "4020/statm".to_string(),
         "1255967 185959 54972 200 0 316078 0".to_string(),
     );
+    files.insert("4018/status".to_string(), "RssAnon: 12345 kB".to_string());
+    files.insert("4019/status".to_string(), "RssAnon: 12345 kB".to_string());
+    files.insert("4020/status".to_string(), "RssAnon: 12345 kB".to_string());
 
     let fs = procfsapi::MockFS::new(files, pids, users, procfsapi::unix_now());
-    let info = get_process_information(&fs).unwrap();
+    let memtotal_kib = get_memtotal_kib(&fs).unwrap();
+    let info = get_process_information(&fs, memtotal_kib).unwrap();
 
     // 4020 should be dropped - it's dead
     assert!(info.len() == 2);

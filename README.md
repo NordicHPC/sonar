@@ -157,6 +157,9 @@ the job, one per host; see `job` below.
 `cores` (optional, default "0"): The number of cores on this host, a nonnegative integer, with 0
 meaning "unknown".
 
+`memtotalkib` (optional, default "0"): The amount of physical RAM on this host, a nonnegative
+integer, with 0 meaning "unknown".
+
 `user` (required): The local Unix user name of user owning the job, an alphanumeric string.  This
 can also be `_zombie_<pid>` for zombie processes, where `<pid>` is the process ID of the process.
 
@@ -181,7 +184,11 @@ holds the process ID.
 process (ie computed independently of the sonar log), a nonnegative floating-point number.  100.0
 corresponds to "one full core's worth of computation".
 
-`cpukib` (optional, default "0"): The current CPU memory used in KiB, a nonnegative integer.
+`cpukib` (optional, default "0"): The current CPU data virtual memory used in KiB, a nonnegative
+integer.
+
+`rssanonkib` (optional, default "0"): The current CPU data "RssAnon" (resident private) memory in KiB,
+a nonnegative integer, with 0 meaning "no data available".
 
 `gpus` (optional, default "none"): The list of GPUs currently used by the job, a comma-separated
 list of GPU device numbers, all of them nonnegative integers.  The value can instead be `none` when

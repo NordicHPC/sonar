@@ -9,16 +9,16 @@ use crate::jobs;
 use crate::nvidia;
 use crate::process;
 use crate::procfs;
-use crate::util::three_places;
 use crate::procfsapi;
+use crate::util::three_places;
 
 use csv::{Writer, WriterBuilder};
 use std::collections::{HashMap, HashSet};
 use std::env;
 use std::io::{self, Write};
 use std::path::PathBuf;
-use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 use std::thread;
 use std::time;
 
@@ -80,6 +80,7 @@ struct ProcInfo<'a> {
     cputime_sec: usize,
     mem_percentage: f64,
     mem_size_kib: usize,
+    rssanon_kib: usize,
     gpu_cards: GpuSet,
     gpu_percentage: f64,
     gpu_mem_percentage: f64,
@@ -118,6 +119,7 @@ fn add_proc_info<'a, F>(
     cputime_sec: usize,
     mem_percentage: f64,
     mem_size_kib: usize,
+    rssanon_kib: usize,
     gpu_cards: &GpuSet,
     gpu_percentage: f64,
     gpu_mem_percentage: f64,
@@ -133,6 +135,7 @@ fn add_proc_info<'a, F>(
             e.cputime_sec += cputime_sec;
             e.mem_percentage += mem_percentage;
             e.mem_size_kib += mem_size_kib;
+            e.rssanon_kib += rssanon_kib;
             union_gpuset(&mut e.gpu_cards, gpu_cards);
             e.gpu_percentage += gpu_percentage;
             e.gpu_mem_percentage += gpu_mem_percentage;
@@ -150,6 +153,7 @@ fn add_proc_info<'a, F>(
             cputime_sec,
             mem_percentage,
             mem_size_kib,
+            rssanon_kib,
             gpu_cards: gpu_cards.clone(),
             gpu_percentage,
             gpu_mem_percentage,
@@ -208,17 +212,23 @@ pub fn create_snapshot(jobs: &mut dyn jobs::JobManager, opts: &PsOptions, timest
         p.push("sonar-lock.".to_string() + &hostname);
 
         if interrupted.load(Ordering::Relaxed) {
-            return
+            return;
         }
 
         // create_new() requests atomic creation, if the file exists we'll error out.
-        match std::fs::File::options().write(true).create_new(true).open(&p) {
+        match std::fs::File::options()
+            .write(true)
+            .create_new(true)
+            .open(&p)
+        {
             Ok(mut f) => {
                 created = true;
                 let pid = std::process::id();
                 match f.write(format!("{}", pid).as_bytes()) {
                     Ok(_) => {}
-                    Err(_) => { failed = true; }
+                    Err(_) => {
+                        failed = true;
+                    }
                 }
             }
             Err(e) if e.kind() == io::ErrorKind::AlreadyExists => {
@@ -236,7 +246,9 @@ pub fn create_snapshot(jobs: &mut dyn jobs::JobManager, opts: &PsOptions, timest
             // it while holding onto the lockfile.  It is then possible to run sonar in that window
             // while the lockfile is being held, to ensure the second process exits immediately.
             match std::env::var("SONARTEST_WAIT_LOCKFILE") {
-                Ok(_) => { thread::sleep(time::Duration::new(10, 0)); }
+                Ok(_) => {
+                    thread::sleep(time::Duration::new(10, 0));
+                }
                 Err(_) => {}
             }
         }
@@ -244,7 +256,9 @@ pub fn create_snapshot(jobs: &mut dyn jobs::JobManager, opts: &PsOptions, timest
         if created {
             match std::fs::remove_file(p) {
                 Ok(_) => {}
-                Err(_) => { failed = true; }
+                Err(_) => {
+                    failed = true;
+                }
             }
         }
 
@@ -259,7 +273,12 @@ pub fn create_snapshot(jobs: &mut dyn jobs::JobManager, opts: &PsOptions, timest
     }
 }
 
-fn do_create_snapshot(jobs: &mut dyn jobs::JobManager, opts: &PsOptions, timestamp: &str, interrupted: &Arc<AtomicBool>) {
+fn do_create_snapshot(
+    jobs: &mut dyn jobs::JobManager,
+    opts: &PsOptions,
+    timestamp: &str,
+    interrupted: &Arc<AtomicBool>,
+) {
     let no_gpus = empty_gpuset();
     let mut proc_by_pid = ProcTable::new();
 
@@ -287,12 +306,24 @@ fn do_create_snapshot(jobs: &mut dyn jobs::JobManager, opts: &PsOptions, timesta
     */
 
     if interrupted.load(Ordering::Relaxed) {
-        return
+        return;
     }
 
+    let fs = procfsapi::RealFS::new();
+
+    // The total RAM installed is in the `MemTotal` field of /proc/meminfo.  We need this for
+    // various things.  Not getting it is a hard error.
+
+    let memtotal_kib = match procfs::get_memtotal_kib(&fs) {
+        Ok(n) => n,
+        Err(e) => {
+            log::error!("Could not get installed memory: {}", e);
+            return;
+        }
+    };
+
     let procinfo_probe = {
-        let fs = procfsapi::RealFS::new();
-        match procfs::get_process_information(&fs) {
+        match procfs::get_process_information(&fs, memtotal_kib) {
             Ok(result) => Ok(result),
             Err(msg) => {
                 eprintln!("INFO: procfs failed: {}", msg);
@@ -327,6 +358,7 @@ fn do_create_snapshot(jobs: &mut dyn jobs::JobManager, opts: &PsOptions, timesta
             proc.cputime_sec,
             proc.mem_pct,
             proc.mem_size_kib,
+            proc.rssanon_kib,
             &no_gpus, // gpu_cards
             0.0,      // gpu_percentage
             0.0,      // gpu_mem_percentage
@@ -335,7 +367,7 @@ fn do_create_snapshot(jobs: &mut dyn jobs::JobManager, opts: &PsOptions, timesta
     }
 
     if interrupted.load(Ordering::Relaxed) {
-        return
+        return;
     }
 
     // When a GPU fails it may be a transient error or a permanent error, but either
@@ -364,6 +396,7 @@ fn do_create_snapshot(jobs: &mut dyn jobs::JobManager, opts: &PsOptions, timesta
                     0,   // cputime_sec
                     0.0, // mem_percentage
                     0,   // mem_size_kib
+                    0,   // rssanon_kib
                     &singleton_gpuset(proc.device),
                     proc.gpu_pct,
                     proc.mem_pct,
@@ -374,7 +407,7 @@ fn do_create_snapshot(jobs: &mut dyn jobs::JobManager, opts: &PsOptions, timesta
     }
 
     if interrupted.load(Ordering::Relaxed) {
-        return
+        return;
     }
 
     let amd_probe = amd::get_amd_information(&user_by_pid);
@@ -398,6 +431,7 @@ fn do_create_snapshot(jobs: &mut dyn jobs::JobManager, opts: &PsOptions, timesta
                     0,   // cputime_sec
                     0.0, // mem_percentage
                     0,   // mem_size_kib
+                    0,   // rssanon_kib
                     &singleton_gpuset(proc.device),
                     proc.gpu_pct,
                     proc.mem_pct,
@@ -418,7 +452,7 @@ fn do_create_snapshot(jobs: &mut dyn jobs::JobManager, opts: &PsOptions, timesta
     }
 
     if interrupted.load(Ordering::Relaxed) {
-        return
+        return;
     }
 
     // Once we start printing we'll print everything and not check the interrupted flag any more.
@@ -434,13 +468,12 @@ fn do_create_snapshot(jobs: &mut dyn jobs::JobManager, opts: &PsOptions, timesta
         hostname: &hostname,
         timestamp: timestamp,
         num_cores,
+        memtotal_kib,
         version: VERSION,
         opts,
     };
 
-    let mut did_print = false;
-    let must_print = opts.always_print_something;
-    if opts.rollup {
+    let mut candidates = if opts.rollup {
         // This is a little complicated because jobs with job_id 0 cannot be rolled up.
         //
         // - There is an array `rolledup` of ProcInfo nodes that represent rolled-up data
@@ -473,6 +506,7 @@ fn do_create_snapshot(jobs: &mut dyn jobs::JobManager, opts: &PsOptions, timesta
                     p.cputime_sec += proc_info.cputime_sec;
                     p.mem_percentage += proc_info.mem_percentage;
                     p.mem_size_kib += proc_info.mem_size_kib;
+                    p.rssanon_kib += proc_info.rssanon_kib;
                     union_gpuset(&mut p.gpu_cards, &proc_info.gpu_cards);
                     p.gpu_percentage += proc_info.gpu_percentage;
                     p.gpu_mem_percentage += proc_info.gpu_mem_percentage;
@@ -488,13 +522,23 @@ fn do_create_snapshot(jobs: &mut dyn jobs::JobManager, opts: &PsOptions, timesta
                 }
             }
         }
-        for r in rolledup {
-            did_print = print_record(&mut writer, &print_params, &r, false) || did_print;
-        }
+        rolledup
     } else {
-        for (_, proc_info) in proc_by_pid {
-            did_print = print_record(&mut writer, &print_params, &proc_info, false) || did_print;
-        }
+        proc_by_pid
+            .drain()
+            .map(|(_, v)| v)
+            .collect::<Vec<ProcInfo>>()
+    };
+
+    let must_print = opts.always_print_something;
+    let candidates = candidates
+        .drain(0..)
+        .filter(|proc_info| filter_proc(proc_info, &print_params))
+        .collect::<Vec<ProcInfo>>();
+
+    let mut did_print = false;
+    for c in candidates {
+        did_print = print_record(&mut writer, &print_params, &c) || did_print;
     }
 
     if !did_print && must_print {
@@ -511,32 +555,20 @@ fn do_create_snapshot(jobs: &mut dyn jobs::JobManager, opts: &PsOptions, timesta
             cputime_sec: 0,
             mem_percentage: 0.0,
             mem_size_kib: 0,
+            rssanon_kib: 0,
             gpu_cards: empty_gpuset(),
             gpu_percentage: 0.0,
             gpu_mem_percentage: 0.0,
             gpu_mem_size_kib: 0,
             gpu_status: GpuStatus::Ok,
         };
-        print_record(&mut writer, &print_params, &synth, true);
+        print_record(&mut writer, &print_params, &synth);
     }
 
     writer.flush().unwrap();
 }
 
-struct PrintParameters<'a> {
-    hostname: &'a str,
-    timestamp: &'a str,
-    num_cores: usize,
-    version: &'a str,
-    opts: &'a PsOptions<'a>,
-}
-
-fn print_record<W: io::Write>(
-    writer: &mut Writer<W>,
-    params: &PrintParameters,
-    proc_info: &ProcInfo,
-    must_print: bool,
-) -> bool {
+fn filter_proc(proc_info: &ProcInfo, params: &PrintParameters) -> bool {
     let mut included = false;
 
     // The logic here is that if any of the inclusion filters are provided, then the set of those
@@ -567,10 +599,6 @@ fn print_record<W: io::Write>(
         included = true;
     }
 
-    if !included && !must_print {
-        return false;
-    }
-
     // The exclusion filters apply after the inclusion filters and the record must pass all of the
     // ones that are provided.
 
@@ -596,10 +624,23 @@ fn print_record<W: io::Write>(
         included = false;
     }
 
-    if !included && !must_print {
-        return false;
-    }
+    return included;
+}
 
+struct PrintParameters<'a> {
+    hostname: &'a str,
+    timestamp: &'a str,
+    num_cores: usize,
+    memtotal_kib: usize,
+    version: &'a str,
+    opts: &'a PsOptions<'a>,
+}
+
+fn print_record<W: io::Write>(
+    writer: &mut Writer<W>,
+    params: &PrintParameters,
+    proc_info: &ProcInfo,
+) -> bool {
     let gpus_comma_separated = if let Some(ref cards) = proc_info.gpu_cards {
         if cards.is_empty() {
             "none".to_string()
@@ -619,6 +660,7 @@ fn print_record<W: io::Write>(
         format!("time={}", params.timestamp),
         format!("host={}", params.hostname),
         format!("cores={}", params.num_cores),
+        format!("memtotalkib={}", params.memtotal_kib),
         format!("user={}", proc_info.user),
         format!("job={}", proc_info.job_id),
         format!(
@@ -632,6 +674,7 @@ fn print_record<W: io::Write>(
         format!("cmd={}", proc_info.command),
         format!("cpu%={}", three_places(proc_info.cpu_percentage)),
         format!("cpukib={}", proc_info.mem_size_kib),
+        format!("rssanonkib={}", proc_info.rssanon_kib),
         format!("gpus={gpus_comma_separated}"),
         format!("gpu%={}", three_places(proc_info.gpu_percentage)),
         format!("gpumem%={}", three_places(proc_info.gpu_mem_percentage)),
