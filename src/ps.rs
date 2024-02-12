@@ -641,46 +641,66 @@ fn print_record<W: io::Write>(
     params: &PrintParameters,
     proc_info: &ProcInfo,
 ) -> bool {
-    let gpus_comma_separated = if let Some(ref cards) = proc_info.gpu_cards {
-        if cards.is_empty() {
-            "none".to_string()
-        } else {
-            cards
-                .iter()
-                .map(|&num| num.to_string())
-                .collect::<Vec<String>>()
-                .join(",")
-        }
-    } else {
-        "unknown".to_string()
-    };
+    // Mandatory fields.
 
     let mut fields = vec![
         format!("v={}", params.version),
         format!("time={}", params.timestamp),
         format!("host={}", params.hostname),
-        format!("cores={}", params.num_cores),
-        format!("memtotalkib={}", params.memtotal_kib),
         format!("user={}", proc_info.user),
-        format!("job={}", proc_info.job_id),
-        format!(
-            "pid={}",
-            if proc_info.rolledup > 0 {
-                0
-            } else {
-                proc_info.pid
-            }
-        ),
         format!("cmd={}", proc_info.command),
-        format!("cpu%={}", three_places(proc_info.cpu_percentage)),
-        format!("cpukib={}", proc_info.mem_size_kib),
-        format!("rssanonkib={}", proc_info.rssanon_kib),
-        format!("gpus={gpus_comma_separated}"),
-        format!("gpu%={}", three_places(proc_info.gpu_percentage)),
-        format!("gpumem%={}", three_places(proc_info.gpu_mem_percentage)),
-        format!("gpukib={}", proc_info.gpu_mem_size_kib),
-        format!("cputime_sec={}", proc_info.cputime_sec),
     ];
+
+    // Only print optional fields whose values are not their defaults.  The defaults are defined in
+    // README.md.  The values there must agree with those used by Jobanalyzer's parser.
+
+    if params.num_cores != 0 {
+        fields.push(format!("cores={}", params.num_cores));
+    }
+    if params.memtotal_kib != 0 {
+        fields.push(format!("memtotalkib={}", params.memtotal_kib));
+    }
+    if proc_info.job_id != 0 {
+        fields.push(format!("job={}", proc_info.job_id));
+    }
+    if proc_info.rolledup == 0 && proc_info.pid != 0 {
+        fields.push(format!("pid={}", proc_info.pid));
+    }
+    if proc_info.cpu_percentage != 0.0 {
+        fields.push(format!("cpu%={}", three_places(proc_info.cpu_percentage)));
+    }
+    if proc_info.mem_size_kib != 0 {
+        fields.push(format!("cpukib={}", proc_info.mem_size_kib));
+    }
+    if proc_info.rssanon_kib != 0 {
+        fields.push(format!("rssanonkib={}", proc_info.rssanon_kib));
+    }
+    if let Some(ref cards) = proc_info.gpu_cards {
+        if cards.is_empty() {
+            // Nothing
+        } else {
+            fields.push(format!("gpus={}",
+                                cards
+                                .iter()
+                                .map(|&num| num.to_string())
+                                .collect::<Vec<String>>()
+                                .join(",")))
+        }
+    } else {
+        fields.push("gpus=unknown".to_string());
+    }
+    if proc_info.gpu_percentage != 0.0 {
+        fields.push(format!("gpu%={}", three_places(proc_info.gpu_percentage)));
+    }
+    if proc_info.gpu_mem_percentage != 0.0 {
+        fields.push(format!("gpumem%={}", three_places(proc_info.gpu_mem_percentage)));
+    }
+    if proc_info.gpu_mem_size_kib != 0 {
+        fields.push(format!("gpukib={}", proc_info.gpu_mem_size_kib));
+    }
+    if proc_info.cputime_sec != 0 {
+        fields.push(format!("cputime_sec={}", proc_info.cputime_sec));
+    }
     if proc_info.gpu_status != GpuStatus::Ok {
         fields.push(format!("gpufail={}", proc_info.gpu_status as i32));
     }
