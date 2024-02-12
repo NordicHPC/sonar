@@ -7,7 +7,6 @@ mod batchless;
 mod command;
 mod jobs;
 mod nvidia;
-mod process;
 mod procfs;
 mod procfsapi;
 mod ps;

@@ -7,7 +7,6 @@ extern crate num_cpus;
 use crate::amd;
 use crate::jobs;
 use crate::nvidia;
-use crate::process;
 use crate::procfs;
 use crate::procfsapi;
 use crate::util::three_places;
@@ -282,29 +281,6 @@ fn do_create_snapshot(
     let no_gpus = empty_gpuset();
     let mut proc_by_pid = ProcTable::new();
 
-    /* Useful debugging code for ps vs procfs
-    {
-        use std::fs::File;
-        use io::Write;
-
-        let mut ps1 = procfs::get_process_information().expect("procfs");
-        ps1.sort_by_key(|a| a.pid);
-
-        let mut ps2 = process::get_process_information().expect("ps");
-        ps2.sort_by_key(|b| b.pid);
-
-        let mut ps1file = File::create("procfs-out.txt").unwrap();
-        for process::Process { pid, uid, user, cpu_pct, mem_pct, cputime_sec, mem_size_kib, command, ppid, session }  in ps1 {
-            writeln!(&mut ps1file, "pid {pid} ppid {ppid} uid {uid} user {user} cpu_pct {cpu_pct} mem_pct {mem_pct} mem_size_kib {mem_size_kib} cputime_sec {cputime_sec} session {session} comm {command}").unwrap();
-        }
-
-        let mut ps2file = std::fs::File::create("ps-out.txt").unwrap();
-        for process::Process { pid, uid, user, cpu_pct, mem_pct, cputime_sec, mem_size_kib, command, ppid, session }  in ps2 {
-            writeln!(&mut ps2file, "pid {pid} ppid {ppid} uid {uid} user {user} cpu_pct {cpu_pct} mem_pct {mem_pct} mem_size_kib {mem_size_kib} cputime_sec {cputime_sec} session {session} comm {command}").unwrap();
-        }
-    }
-    */
-
     if interrupted.load(Ordering::Relaxed) {
         return;
     }
@@ -322,31 +298,26 @@ fn do_create_snapshot(
         }
     };
 
-    let procinfo_probe = {
-        match procfs::get_process_information(&fs, memtotal_kib) {
-            Ok(result) => Ok(result),
-            Err(msg) => {
-                eprintln!("INFO: procfs failed: {}", msg);
-                process::get_process_information()
-            }
+    let procinfo_output = match procfs::get_process_information(&fs, memtotal_kib) {
+        Ok(result) => result,
+        Err(msg) => {
+            eprintln!("procfs failed: {msg}");
+            log::error!("procfs failed: {msg}");
+            return;
         }
     };
-    if let Err(e) = procinfo_probe {
-        // This is a hard error, we need this information for everything.
-        log::error!("CPU process listing failed: {:?}", e);
-        return;
-    }
-    let procinfo_output = &procinfo_probe.unwrap();
+
+    let pprocinfo_output = &procinfo_output;
 
     // The table of users is needed to get GPU information, see comments at UserTable.
     let mut user_by_pid = UserTable::new();
-    for proc in procinfo_output {
+    for proc in pprocinfo_output {
         user_by_pid.insert(proc.pid, (&proc.user, proc.uid));
     }
 
-    let mut lookup_job_by_pid = |pid: Pid| jobs.job_id_from_pid(pid, procinfo_output);
+    let mut lookup_job_by_pid = |pid: Pid| jobs.job_id_from_pid(pid, pprocinfo_output);
 
-    for proc in procinfo_output {
+    for proc in pprocinfo_output {
         add_proc_info(
             &mut proc_by_pid,
             &mut lookup_job_by_pid,
