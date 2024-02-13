@@ -14,7 +14,7 @@ use crate::util::three_places;
 use csv::{Writer, WriterBuilder};
 use std::collections::{HashMap, HashSet};
 use std::env;
-use std::io::{self, Write};
+use std::io::{self, Result, Write};
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -509,7 +509,18 @@ fn do_create_snapshot(
 
     let mut did_print = false;
     for c in candidates {
-        did_print = print_record(&mut writer, &print_params, &c) || did_print;
+        match print_record(&mut writer, &print_params, &c) {
+            Ok(did_print_one) => {
+                did_print = did_print_one || did_print
+            }
+            Err(_) => {
+                // Discard the error: there's nothing very sensible we can do at this point if the
+                // write failed, and it will fail if we cut off a pipe, for example, see #132.  I
+                // guess one can argue whether we should try the next record, but it seems sensible
+                // to just bail out and hope for the best.
+                break;
+            }
+        }
     }
 
     if !did_print && must_print {
@@ -533,10 +544,12 @@ fn do_create_snapshot(
             gpu_mem_size_kib: 0,
             gpu_status: GpuStatus::Ok,
         };
-        print_record(&mut writer, &print_params, &synth);
+        // Discard the error, see above.
+        let _ = print_record(&mut writer, &print_params, &synth);
     }
 
-    writer.flush().unwrap();
+    // Discard the error code, see above.
+    let _ = writer.flush();
 }
 
 fn filter_proc(proc_info: &ProcInfo, params: &PrintParameters) -> bool {
@@ -611,7 +624,7 @@ fn print_record<W: io::Write>(
     writer: &mut Writer<W>,
     params: &PrintParameters,
     proc_info: &ProcInfo,
-) -> bool {
+) -> Result<bool> {
     // Mandatory fields.
 
     let mut fields = vec![
@@ -678,7 +691,7 @@ fn print_record<W: io::Write>(
     if proc_info.rolledup > 0 {
         fields.push(format!("rolledup={}", proc_info.rolledup));
     }
-    writer.write_record(fields).unwrap();
+    writer.write_record(fields)?;
 
-    true
+    Ok(true)
 }
