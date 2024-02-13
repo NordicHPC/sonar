@@ -510,9 +510,7 @@ fn do_create_snapshot(
     let mut did_print = false;
     for c in candidates {
         match print_record(&mut writer, &print_params, &c) {
-            Ok(did_print_one) => {
-                did_print = did_print_one || did_print
-            }
+            Ok(did_print_one) => did_print = did_print_one || did_print,
             Err(_) => {
                 // Discard the error: there's nothing very sensible we can do at this point if the
                 // write failed, and it will fail if we cut off a pipe, for example, see #132.  I
@@ -663,12 +661,14 @@ fn print_record<W: io::Write>(
         if cards.is_empty() {
             // Nothing
         } else {
-            fields.push(format!("gpus={}",
-                                cards
-                                .iter()
-                                .map(|&num| num.to_string())
-                                .collect::<Vec<String>>()
-                                .join(",")))
+            fields.push(format!(
+                "gpus={}",
+                cards
+                    .iter()
+                    .map(|&num| num.to_string())
+                    .collect::<Vec<String>>()
+                    .join(",")
+            ))
         }
     } else {
         fields.push("gpus=unknown".to_string());
@@ -677,7 +677,10 @@ fn print_record<W: io::Write>(
         fields.push(format!("gpu%={}", three_places(proc_info.gpu_percentage)));
     }
     if proc_info.gpu_mem_percentage != 0.0 {
-        fields.push(format!("gpumem%={}", three_places(proc_info.gpu_mem_percentage)));
+        fields.push(format!(
+            "gpumem%={}",
+            three_places(proc_info.gpu_mem_percentage)
+        ));
     }
     if proc_info.gpu_mem_size_kib != 0 {
         fields.push(format!("gpukib={}", proc_info.gpu_mem_size_kib));
