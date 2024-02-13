@@ -135,7 +135,10 @@ v=0.7.0,time=2023-08-10T11:09:41+02:00,host=somehost,cores=8,user=someone,job=0,
 v=0.7.0,time=2023-08-10T11:09:41+02:00,host=somehost,cores=8,user=someone,job=0,cmd=slack,cpu%=3.9,cpukib=716924,gpus=none,gpu%=0,gpumem%=0,gpukib=0,cputime_sec=266
 ```
 
-### Version 0.8.0 file format
+
+### Version 0.8.0 file format (evolving)
+
+Fields with default values are not printed.
 
 Version 0.8.0 adds two fields:
 
@@ -147,6 +150,7 @@ a nonnegative integer, with 0 meaning "no data available".
 
 Version 0.8.0 also clarifies that the existing `cpukib` field reports virtual data+stack memory, not
 resident memory nor virtual total memory.
+
 
 ### Version 0.7.0 file format
 
@@ -172,11 +176,18 @@ timestamp (consumers may depend on this).
 string.  There is only a single host.  If the job spans hosts, there will be multiple records for
 the job, one per host; see `job` below.
 
+`user` (required): The local Unix user name of user owning the job, an alphanumeric string.  This
+can also be `_zombie_<pid>` for zombie processes, where `<pid>` is the process ID of the process.
+
+`cmd` (required): The executable name of the process/command without command line arguments, an
+alphanumeric string.  This can be `_unknown_` for zombie jobs, or `_noinfo_` for non-zombies when
+the command name can't be found.
+
 `cores` (optional, default "0"): The number of cores on this host, a nonnegative integer, with 0
 meaning "unknown".
 
-`user` (required): The local Unix user name of user owning the job, an alphanumeric string.  This
-can also be `_zombie_<pid>` for zombie processes, where `<pid>` is the process ID of the process.
+`memtotalkib` (optional, default "0"): The amount of physical RAM on this host, a nonnegative
+integer, with 0 meaning "unknown".
 
 `job` (optional, default "0"): The job ID, a positive integer. This field will be 0 if the job or
 process does not have a meaningful ID.  There may be many records for the same job, one for each
@@ -187,13 +198,9 @@ and the processes have the same `cmd` value.
 NOTE CAREFULLY that if the job ID is 0 then the process record is for a unique job with unknown job
 ID.  Multiple records with the job ID 0 should never be merged into a single job by the consumer.
 
-`cmd` (required): The executable name of the process/command without command line arguments, an
-alphanumeric string.  This can be `_unknown_` for zombie jobs, or `_noinfo_` for non-zombies when
-the command name can't be found.
-
 `pid` (optional, default "0"): The process ID of the job, a positive integer.  For a rolled-up job
-(see `rolledup` below) this is zero.  Otherwise, this record represents one process and so the field
-holds the process ID.
+(see `rolledup` below) this has value zero.  Otherwise, this record represents one process and so
+the field holds the process ID.
 
 `cpu%` (optional, default "0"): The running average CPU percentage over the true lifetime of the
 process (ie computed independently of the sonar log), a nonnegative floating-point number.  100.0
