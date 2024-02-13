@@ -4,16 +4,21 @@
 
 # sonar
 
-Tool to profile usage of HPC resources by regularly probing processes using `ps` and other tools.
+Tool to profile usage of HPC resources by regularly probing processes.
 
-All it really does is to run `ps` and other diagnostic programs under the hood, and then filters and
-groups the output and prints it to stdout, comma-separated.  The file format is defined in detail
-below.
+Sonar examines `/proc` and runs some diagnostic programs and filters and groups the output and
+prints it to stdout as CSV text.  The file format is defined in detail below.
 
 ![image of a fish swarm](img/sonar-small.png)
 
 Image: [Midjourney](https://midjourney.com/), [CC BY-NC 4.0](https://creativecommons.org/licenses/by-nc/4.0/legalcode)
 
+
+## Changes since v0.7.0
+
+**Better data**.  More clarifications, more data points.
+
+**Less use of external programs**.  We go directly to `/proc` for data, and no longer run `ps`.
 
 ## Changes since v0.6.0
 
@@ -130,9 +135,22 @@ v=0.7.0,time=2023-08-10T11:09:41+02:00,host=somehost,cores=8,user=someone,job=0,
 v=0.7.0,time=2023-08-10T11:09:41+02:00,host=somehost,cores=8,user=someone,job=0,cmd=slack,cpu%=3.9,cpukib=716924,gpus=none,gpu%=0,gpumem%=0,gpukib=0,cputime_sec=266
 ```
 
+
 ### Version 0.8.0 file format (evolving)
 
 Fields with default values are not printed.
+
+Version 0.8.0 adds two fields:
+
+`memtotalkib` (optional, default "0"): The amount of physical RAM on this host, a nonnegative
+integer, with 0 meaning "unknown".
+
+`rssanonkib` (optional, default "0"): The current CPU data "RssAnon" (resident private) memory in KiB,
+a nonnegative integer, with 0 meaning "no data available".
+
+Version 0.8.0 also clarifies that the existing `cpukib` field reports virtual data+stack memory, not
+resident memory nor virtual total memory.
+
 
 ### Version 0.7.0 file format
 
@@ -188,11 +206,8 @@ the field holds the process ID.
 process (ie computed independently of the sonar log), a nonnegative floating-point number.  100.0
 corresponds to "one full core's worth of computation".
 
-`cpukib` (optional, default "0"): The current CPU data virtual memory used in KiB, a nonnegative
-integer.
-
-`rssanonkib` (optional, default "0"): The current CPU data "RssAnon" (resident private) memory in KiB,
-a nonnegative integer, with 0 meaning "no data available".
+`cpukib` (optional, default "0"): The current CPU data+stack virtual memory used in KiB, a
+nonnegative integer.
 
 `gpus` (optional, default "none"): The list of GPUs currently used by the job, a comma-separated
 list of GPU device numbers, all of them nonnegative integers.  The value can instead be `none` when
@@ -264,7 +279,7 @@ The `analyze` command is work in progress.  Sonar data are used by two other too
 - Henrik Rojas Nagel
 
 
-## Design goals and design decisions
+## Early design goals and design decisions
 
 - Easy installation
 - Minimal overhead for recording
@@ -291,20 +306,34 @@ cores to have less output so that we can keep logs in plain text
 maintain a database or such.
 
 
+## Later design goals and design decisions
+
+The needs of [Jobanalyzer](https://github.com/NAICNO/Jobanalyzer) and some bug fixes have led to
+some feature creep (more data are reported), a bit of redesign (go directly to `/proc`, do not run
+`ps`), and some quirky semantics (`cpu%` is only a good number for the first data point but is still
+always reported, and `cputime/sec` is reported to complement it; and there's a distinction between
+virtual and real memory that is possibly more useful on GPU-full and interactive systems than on HPC
+CPU-only compute nodes).
+
+
 ## Security and robustness
 
 The tool does **not** need root permissions.  It does not modify anything and writes output to
 stdout (and errors to stderr).
 
-On CPUs, the only external command called by `sonar ps` is `ps`; the tool gives up and stops if the
-latter subprocess does not return within 2 seconds to avoid a pile-up of processes.
+On CPUs, no external commands are called by `sonar ps`.
 
-On GPUs, `sonar ps` will attempt to use `nvidia-smi` and `rocm-smi` to record GPU utilization.
+On GPUs, `sonar ps` will attempt to use `nvidia-smi` and `rocm-smi` to record GPU utilization; the
+tool gives up and stops if the latter subprocesses do not return within a few seconds to avoid a pile-up
+of processes.
+
+Optionally, `sonar` will use a lockfile to avoid a pile-up of processes.
 
 
 ## How we run sonar on a cluster
 
 We let cron execute the following script every 5 minutes on every compute node:
+
 ```bash
 #!/usr/bin/env bash
 
@@ -320,7 +349,10 @@ mkdir -p ${output_directory}
 /cluster/bin/sonar ps >> ${output_directory}/${HOSTNAME}.csv
 ```
 
-This produces ca. 10 MB data per day.
+This produces ca. 25-50 MB data per day on Saga (using mostly the old v0.5.0 file format), 5-20 MB
+on Fox (including login and interactive nodes), using the new v0.8.0 file format), and 10-20MB per
+day on the UiO ML nodes (all interactive), with significant variation.  Being text data, it
+compresses extremely well.
 
 
 ## Similar and related tools

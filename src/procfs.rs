@@ -1,8 +1,22 @@
 /// Collect CPU process information without GPU information, from files in /proc.
-use crate::process;
 use crate::procfsapi::{self, parse_usize_field};
 
 use std::collections::HashMap;
+
+#[derive(PartialEq, Debug)]
+pub struct Process {
+    pub pid: usize,
+    pub uid: usize,
+    pub user: String,
+    pub cpu_pct: f64,
+    pub mem_pct: f64,
+    pub cputime_sec: usize,
+    pub mem_size_kib: usize,
+    pub rssanon_kib: usize,
+    pub command: String,
+    pub ppid: usize,
+    pub session: usize,
+}
 
 /// Read the /proc/meminfo file from the fs and return the value for total installed memory.
 
@@ -31,8 +45,7 @@ pub fn get_memtotal_kib(fs: &dyn procfsapi::ProcfsAPI) -> Result<usize, String> 
 /// Obtain process information via /proc and return a vector of structures with all the information
 /// we need.  In the returned vector, pids uniquely tag the records.
 ///
-/// This returns Ok(data) on success, otherwise Err(msg), and in the latter case the caller should
-/// fallback to running `ps` and consider logging msg.
+/// This returns Ok(data) on success, otherwise Err(msg).
 ///
 /// This function uniformly uses /proc, even though in some cases there are system calls that
 /// provide the same information.
@@ -43,7 +56,7 @@ pub fn get_memtotal_kib(fs: &dyn procfsapi::ProcfsAPI) -> Result<usize, String> 
 pub fn get_process_information(
     fs: &dyn procfsapi::ProcfsAPI,
     memtotal_kib: usize,
-) -> Result<Vec<process::Process>, String> {
+) -> Result<Vec<Process>, String> {
     // The boot time is the `btime` field of /proc/stat.  It is measured in seconds since epoch.  We
     // need this to compute the process's real time, which we need to compute ps-compatible cpu
     // utilization.
@@ -268,7 +281,7 @@ pub fn get_process_information(
             99.9,
         );
 
-        result.push(process::Process {
+        result.push(Process {
             pid,
             uid: uid as usize,
             user: user_table.lookup(fs, uid),
