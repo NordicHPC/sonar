@@ -7,33 +7,51 @@
 Tool to profile usage of HPC resources by regularly probing processes.
 
 Sonar examines `/proc` and runs some diagnostic programs and filters and groups the output and
-prints it to stdout as CSV text.  The file format is defined in detail below.
+prints it to stdout as CSV text.  The output format is defined in detail below.
 
 ![image of a fish swarm](img/sonar-small.png)
 
 Image: [Midjourney](https://midjourney.com/), [CC BY-NC 4.0](https://creativecommons.org/licenses/by-nc/4.0/legalcode)
 
+## Versions
 
-## Changes since v0.7.0
+We use semantic versioning.  The major version is expected to remain at zero for the foreseeable
+future, reflecting the experimental nature of Sonar.
+
+The program version is encoded in the output in the `v=` field.
+
+The minor version is updated with changes that alter the output format deliberately: fields are
+added, removed, or are given a new meaning (this has been avoided so far), or the record format
+itself changes.  For example, v0.8.0 both added fields and stopped printing fields that are zero.
+
+The bugfix version is updated for changes that do not alter the output format per se but that might
+affect the output nevertheless, ie, most changes not covered by changes to the minor version number.
+
+These rules are new with v0.8.0.
+
+### Changes in v0.8.0
 
 **Better data**.  More clarifications, more data points.
 
 **Less use of external programs**.  We go directly to `/proc` for data, and no longer run `ps`.
 
-## Changes since v0.6.0
+**Less output**. Fields that hold default values are not printed.
 
-**Improved filtering.** The process filters used in previous versions (minimum CPU and memory usage)
-are nonmonotonic in that job records for a long-running job can come and go in the log over time.
-Those filters are still available but monotonic filters (for non-system jobs and for jobs that have
-been running long enough) are now available and will result in more easily understood jobs.
+### Changes in v0.7.0
+
+**Improved filtering.** The filters used in previous versions (minimum CPU `--min-cpu-percent`, and
+memory usage `--min-mem-percent`) are nonmonotonic in that records for a long-running job can come
+and go in the log over time.  Those filters are still available but monotonic filters (for
+non-system jobs `--exclude-system-jobs`, and for jobs that have been running long enough
+`--min-cpu-time`) are now available and will result in more easily understood data.
 
 **Improved merging.** Earlier, sonar would merge some processes unconditionally and somewhat
-opaquely.  All merging is now controlled by command-line switches and more transparent.
+opaquely.  All merging is now controlled by command-line switches and is more transparent.
 
 **Better data.** Additional data points are gathered, notably for GPUs, and the meaning of the data
 being gathered has been clarified.
 
-**Self-documenting.** The file format has changed to use named fields, which allows the introduction
+**Self-documenting.** The output format has changed to use named fields, which allows the introduction
 of fields and the use of default values.
 
 **Clearer division of labor with a front-end tool.** Front-end tools such as
@@ -42,7 +60,7 @@ of fields and the use of default values.
 simply-created sonar data, process it and present it in specialized ways, removing those burdens
 from sonar.
 
-## Changes since v0.5.0
+### Changes in v0.6.0
 
 **This tool focuses on how resources are used**. What is actually running.  Its
 focus is not (anymore) whether and how resources are under-used compared to
@@ -54,7 +72,7 @@ so that the call can execute in milliseconds and so that it has minimal impact
 on the resources on a large computing cluster. You can find the Python version
 on the [python](https://github.com/NordicHPC/sonar/tree/python) branch.
 
-Versions until 0.5.0 are available on [PyPI](https://pypi.org/project/sonar/).
+Versions through 0.5.0 are available on [PyPI](https://pypi.org/project/sonar/).
 
 You can find the old code on the
 [with-slurm-data](https://github.com/NordicHPC/sonar/tree/with-slurm-data)
@@ -136,9 +154,9 @@ v=0.7.0,time=2023-08-10T11:09:41+02:00,host=somehost,cores=8,user=someone,job=0,
 ```
 
 
-### Version 0.8.0 file format (evolving)
+### Version 0.8.0 output format (evolving)
 
-Fields with default values are not printed.
+Fields with default values (zero in most cases, or the empty set of GPUs) are not printed.
 
 Version 0.8.0 adds two fields:
 
@@ -152,7 +170,7 @@ Version 0.8.0 also clarifies that the existing `cpukib` field reports virtual da
 resident memory nor virtual total memory.
 
 
-### Version 0.7.0 file format
+### Version 0.7.0 output format
 
 Each field has the syntax `name=value` where the names are defined below.  Fields are separated by
 commas, and each record is terminated by a newline.  The syntax of the file is therefore as for CSV
@@ -242,7 +260,7 @@ that have been rolled into this one in response to the `--rollup` switch.  That 
 rolled-up job then this field must be present.
 
 
-### Version 0.6.0 file format (and earlier)
+### Version 0.6.0 output format (and earlier)
 
 The fields in version 0.6.0 are unnamed and the fields are always presented in the same order.  The
 fields have (mostly) the same syntax and semantics as the 0.7.0 fields, with these notable differences:
@@ -349,8 +367,8 @@ mkdir -p ${output_directory}
 /cluster/bin/sonar ps >> ${output_directory}/${HOSTNAME}.csv
 ```
 
-This produces ca. 25-50 MB data per day on Saga (using mostly the old v0.5.0 file format), 5-20 MB
-on Fox (including login and interactive nodes), using the new v0.8.0 file format), and 10-20MB per
+This produces ca. 25-50 MB data per day on Saga (using mostly the old v0.5.0 output format), 5-20 MB
+on Fox (including login and interactive nodes), using the new v0.8.0 output format), and 10-20MB per
 day on the UiO ML nodes (all interactive), with significant variation.  Being text data, it
 compresses extremely well.
 
