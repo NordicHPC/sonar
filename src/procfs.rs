@@ -240,7 +240,7 @@ pub fn get_process_information(
                     rssanon_kib = parse_usize_field(
                         &fields,
                         1,
-                        &l,
+                        l,
                         "status",
                         pid,
                         "private resident set size",

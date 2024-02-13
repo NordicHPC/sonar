@@ -244,11 +244,8 @@ pub fn create_snapshot(jobs: &mut dyn jobs::JobManager, opts: &PsOptions, timest
             // Testing code: If we got the lockfile and produced a report, wait 10s after producing
             // it while holding onto the lockfile.  It is then possible to run sonar in that window
             // while the lockfile is being held, to ensure the second process exits immediately.
-            match std::env::var("SONARTEST_WAIT_LOCKFILE") {
-                Ok(_) => {
-                    thread::sleep(time::Duration::new(10, 0));
-                }
-                Err(_) => {}
+            if std::env::var("SONARTEST_WAIT_LOCKFILE").is_ok() {
+                thread::sleep(time::Duration::new(10, 0));
             }
         }
 
@@ -437,7 +434,7 @@ fn do_create_snapshot(
     const VERSION: &str = env!("CARGO_PKG_VERSION");
     let print_params = PrintParameters {
         hostname: &hostname,
-        timestamp: timestamp,
+        timestamp,
         num_cores,
         memtotal_kib,
         version: VERSION,
@@ -606,7 +603,7 @@ fn filter_proc(proc_info: &ProcInfo, params: &PrintParameters) -> bool {
         included = false;
     }
 
-    return included;
+    included
 }
 
 struct PrintParameters<'a> {
