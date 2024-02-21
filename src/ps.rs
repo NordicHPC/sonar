@@ -244,11 +244,8 @@ pub fn create_snapshot(jobs: &mut dyn jobs::JobManager, opts: &PsOptions, timest
             // Testing code: If we got the lockfile and produced a report, wait 10s after producing
             // it while holding onto the lockfile.  It is then possible to run sonar in that window
             // while the lockfile is being held, to ensure the second process exits immediately.
-            match std::env::var("SONARTEST_WAIT_LOCKFILE") {
-                Ok(_) => {
-                    thread::sleep(time::Duration::new(10, 0));
-                }
-                Err(_) => {}
+            if std::env::var("SONARTEST_WAIT_LOCKFILE").is_ok() {
+                thread::sleep(time::Duration::new(10, 0));
             }
         }
 
@@ -437,7 +434,7 @@ fn do_create_snapshot(
     const VERSION: &str = env!("CARGO_PKG_VERSION");
     let print_params = PrintParameters {
         hostname: &hostname,
-        timestamp: timestamp,
+        timestamp,
         num_cores,
         memtotal_kib,
         version: VERSION,
@@ -510,9 +507,7 @@ fn do_create_snapshot(
     let mut did_print = false;
     for c in candidates {
         match print_record(&mut writer, &print_params, &c) {
-            Ok(did_print_one) => {
-                did_print = did_print_one || did_print
-            }
+            Ok(did_print_one) => did_print = did_print_one || did_print,
             Err(_) => {
                 // Discard the error: there's nothing very sensible we can do at this point if the
                 // write failed, and it will fail if we cut off a pipe, for example, see #132.  I
@@ -608,7 +603,7 @@ fn filter_proc(proc_info: &ProcInfo, params: &PrintParameters) -> bool {
         included = false;
     }
 
-    return included;
+    included
 }
 
 struct PrintParameters<'a> {
@@ -663,12 +658,14 @@ fn print_record<W: io::Write>(
         if cards.is_empty() {
             // Nothing
         } else {
-            fields.push(format!("gpus={}",
-                                cards
-                                .iter()
-                                .map(|&num| num.to_string())
-                                .collect::<Vec<String>>()
-                                .join(",")))
+            fields.push(format!(
+                "gpus={}",
+                cards
+                    .iter()
+                    .map(|&num| num.to_string())
+                    .collect::<Vec<String>>()
+                    .join(",")
+            ))
         }
     } else {
         fields.push("gpus=unknown".to_string());
@@ -677,7 +674,10 @@ fn print_record<W: io::Write>(
         fields.push(format!("gpu%={}", three_places(proc_info.gpu_percentage)));
     }
     if proc_info.gpu_mem_percentage != 0.0 {
-        fields.push(format!("gpumem%={}", three_places(proc_info.gpu_mem_percentage)));
+        fields.push(format!(
+            "gpumem%={}",
+            three_places(proc_info.gpu_mem_percentage)
+        ));
     }
     if proc_info.gpu_mem_size_kib != 0 {
         fields.push(format!("gpukib={}", proc_info.gpu_mem_size_kib));
