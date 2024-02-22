@@ -1,3 +1,5 @@
+extern crate log;
+
 use crate::amd;
 use crate::nvidia;
 use crate::gpu;
@@ -13,7 +15,7 @@ pub fn show_system(timestamp: &str) {
     match do_show_system(&fs, timestamp) {
         Ok(_) => {}
         Err(e) => {
-            println!("FAILED: {e}");
+            log::error!("sysinfo failed: {e}");
         }
     }
 }
@@ -71,7 +73,7 @@ fn do_show_system(fs: &dyn procfsapi::ProcfsAPI, timestamp: &str) -> Result<(), 
                 i += 1;
             }
             let memsize = if cards[first].mem_size_kib > 0 {
-                format!("{}", cards[first].mem_size_kib * 1024 / GIB as i64)
+                (cards[first].mem_size_kib * 1024 / GIB as i64).to_string()
             } else {
                 "unknown ".to_string()
             };

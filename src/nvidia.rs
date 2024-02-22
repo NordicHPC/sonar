@@ -21,7 +21,7 @@ use crate::util::map;
 // "Product Name" names the card.  Following the string "FB Memory Usage", "Total" has the
 // memory of the card.
 //
-// Parsing all the output lines in order yield the information about all the cards.
+// Parsing all the output lines in order yields the information about all the cards.
 
 pub fn get_nvidia_configuration() -> Option<Vec<gpu::Card>> {
     match command::safe_command("nvidia-smi -a", TIMEOUT_SECONDS) {
