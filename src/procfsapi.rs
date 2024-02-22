@@ -3,9 +3,8 @@
 
 extern crate libc;
 extern crate page_size;
-extern crate users;
 
-use users::get_user_by_uid;
+use crate::users::get_user_by_uid;
 
 use std::fs;
 use std::os::linux::fs::MetadataExt;
@@ -79,7 +78,7 @@ impl ProcfsAPI for RealFS {
     }
 
     fn user_by_uid(&self, uid: u32) -> Option<String> {
-        get_user_by_uid(uid).map(|u| u.name().to_string_lossy().to_string())
+        get_user_by_uid(uid).map(|u| u.to_string_lossy().to_string())
     }
 
     fn clock_ticks_per_sec(&self) -> usize {
