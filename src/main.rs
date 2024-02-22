@@ -5,12 +5,14 @@ use clap::{Parser, Subcommand};
 mod amd;
 mod batchless;
 mod command;
+mod gpu;
 mod jobs;
 mod nvidia;
 mod procfs;
 mod procfsapi;
 mod ps;
 mod slurm;
+mod sysinfo;
 mod util;
 
 const TIMEOUT_SECONDS: u64 = 5; // For subprocesses
@@ -65,6 +67,8 @@ enum Commands {
         #[arg(long)]
         lockdir: Option<String>,
     },
+    /// Extract system information
+    Sysinfo {},
     /// Not yet implemented
     Analyze {},
 }
@@ -118,6 +122,9 @@ fn main() {
                 let mut jm = slurm::SlurmJobManager {};
                 ps::create_snapshot(&mut jm, &opts, &timestamp);
             }
+        }
+        Commands::Sysinfo {} => {
+            sysinfo::show_system(&timestamp);
         }
         Commands::Analyze {} => {
             println!("sonar analyze not yet completed");

@@ -14,7 +14,7 @@
 /// about the usage of various processes on the various devices.  We divide the utilization of a
 /// device by the number of processes on the device.  This is approximate.
 use crate::command::{self, CmdError};
-use crate::nvidia;
+use crate::gpu;
 use crate::ps::UserTable;
 use crate::TIMEOUT_SECONDS;
 
@@ -23,12 +23,56 @@ use std::cmp::Ordering;
 #[cfg(test)]
 use crate::util::map;
 
+// We only have one machine with AMD GPUs at UiO and rocm-smi is unable to show eg how much memory
+// is installed on each card on this machine, so this is pretty limited.  But we are at least able
+// to extract gross information about the installed cards.
+//
+// `rocm-smi --showproductname` lists the cards.  The "Card series" line has the card number and
+// model name.  There is no memory information, so record it as zero.
+//
+// TODO: It may be possible to find memory sizes using lspci.  Run `lspci -v` and capture the
+// output.  Now look for the line "Kernel modules: amdgpu".  The lines that are part of that block
+// of info will have a couple of `Memory at ... ` lines that have memory block sizes, and the first
+// line of the info block will have the GPU model.  The largest memory block size is likely the one
+// we want.
+//
+// (It does not appear that the lspci trick works with the nvidia cards - the memory block sizes are
+// too small.  This is presumably all driver dependent.)
+
+pub fn get_amd_configuration() -> Option<Vec<gpu::Card>> {
+    match command::safe_command("rocm-smi --showproductname", TIMEOUT_SECONDS) {
+        Ok(raw_text) => {
+            let mut cards = vec![];
+            for l in raw_text.lines() {
+                // We want to match /^GPU\[(\d+)\].*Card series:\s*(.*)$/ but we really only care
+                // about \2, which is the description.
+                if l.starts_with("GPU[") {
+                    if let Some((_, after)) = l.split_once("Card series:") {
+                        cards.push(gpu::Card{
+                            model: after.trim().to_string(),
+                            mem_size_kib: 0,
+                        });
+                    }
+                }
+            }
+            if cards.len() > 0 {
+                Some(cards)
+            } else {
+                None
+            }
+        }
+        Err(_) => {
+            None
+        }
+    }
+}
+
 /// Get information about AMD cards.
 ///
 /// Err(e) really means the command started running but failed, for the reason given.  If the
 /// command could not be found, we return Ok(vec![]).
 
-pub fn get_amd_information(user_by_pid: &UserTable) -> Result<Vec<nvidia::Process>, String> {
+pub fn get_amd_information(user_by_pid: &UserTable) -> Result<Vec<gpu::Process>, String> {
     // I've not been able to combine the two invocations of rocm-smi yet; we have to run the command
     // twice.  Not a happy situation.
 
@@ -54,7 +98,7 @@ fn extract_amd_information(
     concise_raw_text: &str,
     showpidgpus_raw_text: &str,
     user_by_pid: &UserTable,
-) -> Result<Vec<nvidia::Process>, String> {
+) -> Result<Vec<gpu::Process>, String> {
     let per_device_info = parse_concise_command(concise_raw_text)?; // device -> (gpu%, mem%)
     let per_pid_info = parse_showpidgpus_command(showpidgpus_raw_text)?; // pid -> [device, ...]
     let mut num_processes_per_device = vec![0; per_device_info.len()];
@@ -70,9 +114,9 @@ fn extract_amd_information(
             let (user, uid) = if let Some((user, uid)) = user_by_pid.get(pid) {
                 (user.to_string(), *uid)
             } else {
-                ("_zombie_".to_owned() + &pid.to_string(), nvidia::ZOMBIE_UID)
+                ("_zombie_".to_owned() + &pid.to_string(), gpu::ZOMBIE_UID)
             };
-            processes.push(nvidia::Process {
+            processes.push(gpu::Process {
                 device: Some(*dev),
                 pid: *pid,
                 user,
@@ -98,15 +142,15 @@ fn extract_amd_information(
 #[cfg(test)]
 macro_rules! proc(
     { $a:expr, $b:expr, $c:expr, $d:expr, $e: expr, $f: expr } => {
-	nvidia::Process { device: $a,
-			  pid: $b,
-			  user: $c.to_string(),
-                          uid: $d,
-			  gpu_pct: $e,
-			  mem_pct: $f,
-			  mem_size_kib: 0,
-			  command: "_noinfo_".to_string()
-	}
+        gpu::Process { device: $a,
+                       pid: $b,
+                       user: $c.to_string(),
+                       uid: $d,
+                       gpu_pct: $e,
+                       mem_pct: $f,
+                       mem_size_kib: 0,
+                       command: "_noinfo_".to_string()
+        }
     });
 
 #[test]
@@ -131,7 +175,7 @@ PID 28154 is using 1 DRM device(s):
     };
     let zs = extract_amd_information(concise, pidgpu, &users).unwrap();
     assert!(zs.eq(&vec![
-        proc! { Some(0), 28154, "_zombie_28154", nvidia::ZOMBIE_UID, 99.0/2.0, 57.0/2.0 },
+        proc! { Some(0), 28154, "_zombie_28154", gpu::ZOMBIE_UID, 99.0/2.0, 57.0/2.0 },
         proc! { Some(0), 28156, "bob", 1001, 99.0/2.0, 57.0/2.0 },
         proc! { Some(1), 28156, "bob", 1001, 63.0, 5.0 },
     ]));

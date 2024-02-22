@@ -42,6 +42,52 @@ pub fn get_memtotal_kib(fs: &dyn procfsapi::ProcfsAPI) -> Result<usize, String> 
     Ok(memtotal_kib)
 }
 
+/// Read the /proc/cpuinfo file from the fs and return information about installed CPUs.
+
+pub fn get_cpu_info(fs: &dyn procfsapi::ProcfsAPI) -> Result<(String, i32, i32, i32), String> {
+    let mut physids = HashMap::<i32, bool>::new();
+    let mut cores_per_socket = 0i32;
+    let mut siblings = 0i32;
+    let cpuinfo = fs.read_to_string("cpuinfo")?;
+    let mut model_name = "".to_string();
+    for l in cpuinfo.split('\n') {
+        if l.starts_with("model name") {
+            model_name = text_field(l)?;
+        } else if l.starts_with("physical id") {
+            physids.insert(i32_field(l)?, true);
+        } else if l.starts_with("siblings") {
+            siblings = i32_field(l)?;
+        } else if l.starts_with("cpu cores") {
+            cores_per_socket = i32_field(l)?;
+        }
+    }
+    let sockets = physids.len() as i32;
+    if model_name.is_empty() || sockets == 0 || siblings == 0 || cores_per_socket == 0 {
+        return Err("Incomplete information in /proc/cpuinfo".to_string());
+    }
+    let threads_per_core = siblings / cores_per_socket;
+    Ok((model_name, sockets, cores_per_socket, threads_per_core))
+}
+
+fn text_field(l: &str) -> Result<String, String> {
+    if let Some((_, after)) = l.split_once(':') {
+        Ok(after.trim().to_string())
+    } else {
+        Err(format!("Missing text field in {l}"))
+    }
+}
+
+fn i32_field(l: &str) -> Result<i32, String> {
+    if let Some((_, after)) = l.split_once(':') {
+        match after.trim().parse::<i32>() {
+            Ok(n) => Ok(n),
+            Err(_) => Err(format!("Bad int field {l}")),
+        }
+    } else {
+        Err(format!("Missing or bad int field in {l}"))
+    }
+}
+
 /// Obtain process information via /proc and return a vector of structures with all the information
 /// we need.  In the returned vector, pids uniquely tag the records.
 ///

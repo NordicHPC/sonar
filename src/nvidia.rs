@@ -7,6 +7,7 @@
 /// Crucially, the data are sampling data: they contain no (long) running averages, but are
 /// snapshots of the system at the time the sample is taken.
 use crate::command::{self, CmdError};
+use crate::gpu;
 use crate::ps::UserTable;
 use crate::util;
 use crate::TIMEOUT_SECONDS;
@@ -14,24 +15,68 @@ use crate::TIMEOUT_SECONDS;
 #[cfg(test)]
 use crate::util::map;
 
-#[derive(PartialEq)]
-pub struct Process {
-    pub device: Option<usize>, // Device ID
-    pub pid: usize,            // Process ID
-    pub user: String,          // User name, _zombie_PID for zombies
-    pub uid: usize,            // User ID, 666666 for zombies
-    pub gpu_pct: f64,          // Percent of GPU /for this sample/, 0.0 for zombies
-    pub mem_pct: f64,          // Percent of memory /for this sample/, 0.0 for zombies
-    pub mem_size_kib: usize,   // Memory use in KiB /for this sample/, _not_ zero for zombies
-    pub command: String,       // The command, _unknown_ for zombies, _noinfo_ if not known
-}
+// `nvidia-smi -a` dumps a lot of information about all the cards in a semi-structured form,
+// each line a textual keyword/value pair.
+//
+// "Product Name" names the card.  Following the string "FB Memory Usage", "Total" has the
+// memory of the card.
+//
+// Parsing all the output lines in order yield the information about all the cards.
 
-pub const ZOMBIE_UID: usize = 666666;
+pub fn get_nvidia_configuration() -> Option<Vec<gpu::Card>> {
+    match command::safe_command("nvidia-smi -a", TIMEOUT_SECONDS) {
+        Ok(raw_text) => {
+            let mut cards = vec![];
+            let mut looking_for_total = false;
+            let mut model_name = None;
+            for l in raw_text.lines() {
+                // The regular expressions that trigger state transitions are really these:
+                //
+		//   /^\s*Product Name\s*:\s*(.*)$/
+		//   /^\s*FB Memory Usage\s*$/
+		//   /^\s*Total\s*:\s*(\d+)\s*MiB\s*$/
+                //
+                // but we simplify a bit and use primitive string manipulation.
+                let l = l.trim();
+                if looking_for_total {
+                    if l.starts_with("Total") && l.ends_with("MiB") {
+                        if let Some((_, after)) = l.split_once(':') {
+                            let rest = after.strip_suffix("MiB").unwrap().trim();
+                            if let Ok(n) = rest.parse::<i64>() {
+                                if let Some(m) = model_name {
+                                    cards.push(gpu::Card {
+                                        model: m,
+                                        mem_size_kib: n * 1024 * 1024,
+                                    });
+                                    model_name = None;
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    if l.starts_with("Product Name") {
+                        if let Some((_, rest)) = l.split_once(':') {
+                            model_name = Some(rest.trim().to_string());
+                            continue;
+                        }
+                    }
+                    if l.starts_with("FB Memory Usage") {
+                        looking_for_total = true;
+                        continue;
+                    }
+                }
+                looking_for_total = false;
+            }
+            Some(cards)
+        }
+        Err(_) => None
+    }
+}
 
 // Err(e) really means the command started running but failed, for the reason given.  If the
 // command could not be found, we return Ok(vec![]).
 
-pub fn get_nvidia_information(user_by_pid: &UserTable) -> Result<Vec<Process>, String> {
+pub fn get_nvidia_information(user_by_pid: &UserTable) -> Result<Vec<gpu::Process>, String> {
     match command::safe_command(NVIDIA_PMON_COMMAND, TIMEOUT_SECONDS) {
         Ok(pmon_raw_text) => {
             let mut processes = parse_pmon_output(&pmon_raw_text, user_by_pid);
@@ -69,7 +114,7 @@ const NVIDIA_PMON_COMMAND: &str = "nvidia-smi pmon -c 1 -s mu";
 // GPU devices used by that process.  For a system with 8 cards, utilization
 // can reach 800% and the memory size can reach the sum of the memories on the cards.
 
-fn parse_pmon_output(raw_text: &str, user_by_pid: &UserTable) -> Vec<Process> {
+fn parse_pmon_output(raw_text: &str, user_by_pid: &UserTable) -> Vec<gpu::Process> {
     raw_text
         .lines()
         .filter(|line| !line.starts_with('#'))
@@ -90,9 +135,9 @@ fn parse_pmon_output(raw_text: &str, user_by_pid: &UserTable) -> Vec<Process> {
             let pid = pid_str.parse::<usize>().unwrap();
             let user = match user_by_pid.get(&pid) {
                 Some((name, uid)) => (name.to_string(), *uid),
-                None => ("_zombie_".to_owned() + pid_str, ZOMBIE_UID),
+                None => ("_zombie_".to_owned() + pid_str, gpu::ZOMBIE_UID),
             };
-            Process {
+            gpu::Process {
                 device: Some(device),
                 pid,
                 user: user.0,
@@ -103,7 +148,7 @@ fn parse_pmon_output(raw_text: &str, user_by_pid: &UserTable) -> Vec<Process> {
                 command,
             }
         })
-        .collect::<Vec<Process>>()
+        .collect::<Vec<gpu::Process>>()
 }
 
 // We use this to get information about processes that are not captured by pmon.  It's hacky
@@ -115,7 +160,7 @@ const NVIDIA_QUERY_COMMAND: &str =
 // Same signature as extract_nvidia_pmon_processes(), q.v. but user is always "_zombie_" and command
 // is always "_unknown_".  Only pids not in user_by_pid are returned.
 
-fn parse_query_output(raw_text: &str, user_by_pid: &UserTable) -> Vec<Process> {
+fn parse_query_output(raw_text: &str, user_by_pid: &UserTable) -> Vec<gpu::Process> {
     raw_text
         .lines()
         .map(|line| {
@@ -128,17 +173,17 @@ fn parse_query_output(raw_text: &str, user_by_pid: &UserTable) -> Vec<Process> {
             (pid, user, command.to_string(), mem_usage * 1024)
         })
         .filter(|(pid, ..)| !user_by_pid.contains_key(pid))
-        .map(|(pid, user, command, mem_size_kib)| Process {
+        .map(|(pid, user, command, mem_size_kib)| gpu::Process {
             device: None,
             pid,
             user,
-            uid: ZOMBIE_UID,
+            uid: gpu::ZOMBIE_UID,
             gpu_pct: 0.0,
             mem_pct: 0.0,
             mem_size_kib,
             command,
         })
-        .collect::<Vec<Process>>()
+        .collect::<Vec<gpu::Process>>()
 }
 
 #[cfg(test)]
@@ -153,7 +198,7 @@ fn mkusers() -> UserTable<'static> {
 }
 
 #[cfg(test)]
-pub fn parsed_pmon_output() -> Vec<Process> {
+pub fn parsed_pmon_output() -> Vec<gpu::Process> {
     let text = "# gpu        pid  type    sm   mem   enc   dec   command
 # Idx          #   C/G     %     %     %     %   name
 # gpu        pid  type    fb    sm   mem   enc   dec   command
@@ -175,15 +220,15 @@ pub fn parsed_pmon_output() -> Vec<Process> {
 #[cfg(test)]
 macro_rules! proc(
     { $a:expr, $b:expr, $c:expr, $d:expr, $e: expr, $f:expr, $g:expr, $h:expr } => {
-	Process { device: $a,
-		  pid: $b,
-		  user: $c.to_string(),
-                  uid: $d,
-		  gpu_pct: $e,
-		  mem_pct: $f,
-		  mem_size_kib: $g,
-		  command: $h.to_string()
-	}
+        gpu::Process { device: $a,
+                       pid: $b,
+                       user: $c.to_string(),
+                       uid: $d,
+                       gpu_pct: $e,
+                       mem_pct: $f,
+                       mem_size_kib: $g,
+                       command: $h.to_string()
+        }
     });
 
 #[test]
@@ -191,19 +236,19 @@ fn test_parse_pmon_output() {
     assert!(parsed_pmon_output().into_iter().eq(vec![
         proc! { Some(0),  447153, "bob",            1001, 0.0,  0.0,  7669 * 1024, "python3.9" },
         proc! { Some(0),  447160, "bob",            1001, 0.0,  0.0, 11057 * 1024, "python3.9" },
-        proc! { Some(0),  506826, "_zombie_506826", ZOMBIE_UID, 0.0,  0.0, 11057 * 1024, "python3.9" },
+        proc! { Some(0),  506826, "_zombie_506826", gpu::ZOMBIE_UID, 0.0,  0.0, 11057 * 1024, "python3.9" },
         proc! { Some(0), 1864615, "alice",          1002, 40.0,  0.0,  1635 * 1024, "python" },
         proc! { Some(1), 1864615, "alice",          1002,  0.0,  0.0,   535 * 1024, "python" },
         proc! { Some(1), 2233095, "charlie",        1003, 84.0, 23.0, 24395 * 1024, "python3" },
         proc! { Some(2), 1864615, "alice",          1002, 0.0,  0.0,   535 * 1024, "python" },
-        proc! { Some(2), 1448150, "_zombie_1448150", ZOMBIE_UID, 0.0,  0.0,  9383 * 1024, "python3"},
+        proc! { Some(2), 1448150, "_zombie_1448150", gpu::ZOMBIE_UID, 0.0,  0.0,  9383 * 1024, "python3"},
         proc! { Some(3), 1864615, "alice",          1002,  0.0,  0.0,   535 * 1024, "python" },
         proc! { Some(3), 2233469, "charlie",        1003, 90.0, 23.0, 15771 * 1024, "python3" }
     ]))
 }
 
 #[cfg(test)]
-pub fn parsed_query_output() -> Vec<Process> {
+pub fn parsed_query_output() -> Vec<gpu::Process> {
     let text = "2233095, 1190
 3079002, 2350
 1864615, 1426";
@@ -213,6 +258,6 @@ pub fn parsed_query_output() -> Vec<Process> {
 #[test]
 fn test_parse_query_output() {
     assert!(parsed_query_output().into_iter().eq(vec![
-        proc! { None, 3079002, "_zombie_3079002", ZOMBIE_UID, 0.0, 0.0, 2350 * 1024, "_unknown_" }
+        proc! { None, 3079002, "_zombie_3079002", gpu::ZOMBIE_UID, 0.0, 0.0, 2350 * 1024, "_unknown_" }
     ]))
 }
