@@ -46,7 +46,7 @@ pub fn get_nvidia_configuration() -> Option<Vec<gpu::Card>> {
                                 if let Some(m) = model_name {
                                     cards.push(gpu::Card {
                                         model: m,
-                                        mem_size_kib: n * 1024 * 1024,
+                                        mem_size_kib: n * 1024,
                                     });
                                     model_name = None;
                                 }

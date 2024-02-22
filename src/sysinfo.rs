@@ -18,9 +18,7 @@ pub fn show_system(timestamp: &str) {
     }
 }
 
-// It's possible this is not the right definition, it's possible we want 1000 * 1024 * 1024.
-
-const GIGABYTE: usize = 1024 * 1024 * 1024;
+const GIB: usize = 1024 * 1024 * 1024;
 
 // Note the field names here are used by decoders developed separately and should be considered set
 // in stone.  All fields will be serialized; missing numeric values must be zero; consumers must
@@ -32,15 +30,15 @@ struct NodeConfig {
     hostname: String,
     description: String,
     cpu_cores: i32,
-    mem_gb: i64,
+    mem_gb: i64,                // This is GiB despite the name - the name is frozen
     gpu_cards: i32,
-    gpumem_gb: i64,
+    gpumem_gb: i64,             // Ditto
 }
 
 fn do_show_system(fs: &dyn procfsapi::ProcfsAPI, timestamp: &str) -> Result<(), String> {
     let (model, sockets, cores_per_socket, threads_per_core) = procfs::get_cpu_info(fs)?;
     let mem_by = procfs::get_memtotal_kib(fs)? * 1024;
-    let mem_gb = (mem_by as f64 / GIGABYTE as f64).round() as i64;
+    let mem_gib = (mem_by as f64 / GIB as f64).round() as i64;
     let mut cards = if let Some(cs) = nvidia::get_nvidia_configuration() {
         cs
     } else if let Some(cs) = amd::get_amd_configuration() {
@@ -73,11 +71,11 @@ fn do_show_system(fs: &dyn procfsapi::ProcfsAPI, timestamp: &str) -> Result<(), 
                 i += 1;
             }
             let memsize = if cards[first].mem_size_kib > 0 {
-                format!("{}", cards[first].mem_size_kib * 1024 / GIGABYTE as i64)
+                format!("{}", cards[first].mem_size_kib * 1024 / GIB as i64)
             } else {
                 "unknown ".to_string()
             };
-            gpu_desc += &format!(", {}x {} @ {}GB", (i - first), cards[first].model, memsize);
+            gpu_desc += &format!(", {}x {} @ {}GiB", (i - first), cards[first].model, memsize);
         }
 
         // Compute aggregate data
@@ -86,16 +84,16 @@ fn do_show_system(fs: &dyn procfsapi::ProcfsAPI, timestamp: &str) -> Result<(), 
         for c in &cards {
             total_mem_by += c.mem_size_kib * 1024;
         }
-        (gpu_desc, gpu_cards, total_mem_by / GIGABYTE as i64)
+        (gpu_desc, gpu_cards, total_mem_by / GIB as i64)
     } else {
         ("".to_string(), 0, 0)
     };
     let config = NodeConfig {
         timestamp: timestamp.to_string(),
         hostname,
-        description: format!("{sockets}x{cores_per_socket}{ht} {model}, {mem_gb} GB{gpu_desc}"),
+        description: format!("{sockets}x{cores_per_socket}{ht} {model}, {mem_gib} GiB{gpu_desc}"),
         cpu_cores: sockets * cores_per_socket * threads_per_core,
-        mem_gb,
+        mem_gb: mem_gib,
         gpu_cards,
         gpumem_gb,
     };
