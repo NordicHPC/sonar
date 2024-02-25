@@ -32,9 +32,9 @@ pub fn get_nvidia_configuration() -> Option<Vec<gpu::Card>> {
             for l in raw_text.lines() {
                 // The regular expressions that trigger state transitions are really these:
                 //
-		//   /^\s*Product Name\s*:\s*(.*)$/
-		//   /^\s*FB Memory Usage\s*$/
-		//   /^\s*Total\s*:\s*(\d+)\s*MiB\s*$/
+                //   /^\s*Product Name\s*:\s*(.*)$/
+                //   /^\s*FB Memory Usage\s*$/
+                //   /^\s*Total\s*:\s*(\d+)\s*MiB\s*$/
                 //
                 // but we simplify a bit and use primitive string manipulation.
                 let l = l.trim();
@@ -69,7 +69,7 @@ pub fn get_nvidia_configuration() -> Option<Vec<gpu::Card>> {
             }
             Some(cards)
         }
-        Err(_) => None
+        Err(_) => None,
     }
 }
 

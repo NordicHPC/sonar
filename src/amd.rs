@@ -48,7 +48,7 @@ pub fn get_amd_configuration() -> Option<Vec<gpu::Card>> {
                 // about \2, which is the description.
                 if l.starts_with("GPU[") {
                     if let Some((_, after)) = l.split_once("Card series:") {
-                        cards.push(gpu::Card{
+                        cards.push(gpu::Card {
                             model: after.trim().to_string(),
                             mem_size_kib: 0,
                         });
@@ -61,9 +61,7 @@ pub fn get_amd_configuration() -> Option<Vec<gpu::Card>> {
                 None
             }
         }
-        Err(_) => {
-            None
-        }
+        Err(_) => None,
     }
 }
 

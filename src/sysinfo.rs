@@ -1,8 +1,8 @@
 extern crate log;
 
 use crate::amd;
-use crate::nvidia;
 use crate::gpu;
+use crate::nvidia;
 use crate::procfs;
 use crate::procfsapi;
 
@@ -32,9 +32,9 @@ struct NodeConfig {
     hostname: String,
     description: String,
     cpu_cores: i32,
-    mem_gb: i64,                // This is GiB despite the name - the name is frozen
+    mem_gb: i64, // This is GiB despite the name - the name is frozen
     gpu_cards: i32,
-    gpumem_gb: i64,             // Ditto
+    gpumem_gb: i64, // Ditto
 }
 
 fn do_show_system(fs: &dyn procfsapi::ProcfsAPI, timestamp: &str) -> Result<(), String> {
@@ -56,7 +56,7 @@ fn do_show_system(fs: &dyn procfsapi::ProcfsAPI, timestamp: &str) -> Result<(), 
     };
     let (gpu_desc, gpu_cards, gpumem_gb) = if cards.len() > 0 {
         // Sort cards
-        cards.sort_by(|a:&gpu::Card, b:&gpu::Card| {
+        cards.sort_by(|a: &gpu::Card, b: &gpu::Card| {
             if a.model == b.model {
                 a.mem_size_kib.cmp(&b.mem_size_kib)
             } else {
