@@ -54,7 +54,7 @@ fn do_show_system(fs: &dyn procfsapi::ProcfsAPI, timestamp: &str) -> Result<(), 
     } else {
         ""
     };
-    let (gpu_desc, gpu_cards, gpumem_gb) = if cards.len() > 0 {
+    let (gpu_desc, gpu_cards, gpumem_gb) = if !cards.is_empty() {
         // Sort cards
         cards.sort_by(|a: &gpu::Card, b: &gpu::Card| {
             if a.model == b.model {

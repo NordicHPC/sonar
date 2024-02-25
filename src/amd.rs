@@ -55,7 +55,7 @@ pub fn get_amd_configuration() -> Option<Vec<gpu::Card>> {
                     }
                 }
             }
-            if cards.len() > 0 {
+            if !cards.is_empty() {
                 Some(cards)
             } else {
                 None
