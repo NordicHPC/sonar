@@ -13,6 +13,7 @@ mod procfsapi;
 mod ps;
 mod slurm;
 mod sysinfo;
+mod users;
 mod util;
 
 const TIMEOUT_SECONDS: u64 = 5; // For subprocesses

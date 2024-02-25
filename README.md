@@ -29,15 +29,20 @@ affect the output nevertheless, ie, most changes not covered by changes to the m
 
 These rules are new with v0.8.0.
 
-### Changes in v0.8.0
+### Changes in v0.9.x
 
-**Better data**.  More clarifications, more data points.
+**More help when information is missing**.  The user name field now includes the UID if the user
+name can't be obtained from system databases but the UID is known. (v0.9.0)
+
+### Changes in v0.8.x
+
+**Better data**.  More clarifications, more data points. (v0.8.0)
 
 **Less use of external programs**.  We go directly to `/proc` for data, and no longer run `ps`.
 
-**Less output**. Fields that hold default values are not printed.
+**Less output**. Fields that hold default values are not printed. (v0.8.0)
 
-### Changes in v0.7.0
+### Changes in v0.7.x
 
 **Improved filtering.** The filters used in previous versions (minimum CPU `--min-cpu-percent`, and
 memory usage `--min-mem-percent`) are nonmonotonic in that records for a long-running job can come
@@ -153,8 +158,17 @@ v=0.7.0,time=2023-08-10T11:09:41+02:00,host=somehost,cores=8,user=someone,job=0,
 v=0.7.0,time=2023-08-10T11:09:41+02:00,host=somehost,cores=8,user=someone,job=0,cmd=slack,cpu%=3.9,cpukib=716924,gpus=none,gpu%=0,gpumem%=0,gpukib=0,cputime_sec=266
 ```
 
+### Version 0.9.0 output format
 
-### Version 0.8.0 output format (evolving)
+Version 0.9.0 documents that the `user` field *in previous versions* could have the value
+`_noinfo_`.  This value is sometimes observed in the output from older versions (though no clients
+were looking for it).
+
+Version 0.9.0 extends the encoding of the `user` field: it can now (also) have the value
+`_noinfo_<uid>` where `<uid>` is the user ID, if user information was unobtainable for any reason
+but we have a UID.  Clients could be able to handle both this encoding and the older encoding.
+
+### Version 0.8.0 output format
 
 Fields with default values (zero in most cases, or the empty set of GPUs) are not printed.
 
@@ -168,7 +182,6 @@ a nonnegative integer, with 0 meaning "no data available".
 
 Version 0.8.0 also clarifies that the existing `cpukib` field reports virtual data+stack memory, not
 resident memory nor virtual total memory.
-
 
 ### Version 0.7.0 output format
 
@@ -195,7 +208,9 @@ string.  There is only a single host.  If the job spans hosts, there will be mul
 the job, one per host; see `job` below.
 
 `user` (required): The local Unix user name of user owning the job, an alphanumeric string.  This
-can also be `_zombie_<pid>` for zombie processes, where `<pid>` is the process ID of the process.
+can also be `_zombie_<pid>` for zombie processes, where `<pid>` is the process ID of the process but
+the user ID could not be obtained, or `_noinfo_<uid>`, where `<uid>` is the user ID of the process
+but the user name could not be obtained.
 
 `cmd` (required): The executable name of the process/command without command line arguments, an
 alphanumeric string.  This can be `_unknown_` for zombie jobs, or `_noinfo_` for non-zombies when

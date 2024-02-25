@@ -7,7 +7,7 @@ use std::collections::HashMap;
 pub struct Process {
     pub pid: usize,
     pub uid: usize,
-    pub user: String,
+    pub user: String, // _noinfo_<uid> if name unobtainable
     pub cpu_pct: f64,
     pub mem_pct: f64,
     pub cputime_sec: usize,
@@ -363,7 +363,7 @@ impl UserTable {
             self.ht.insert(uid, name.clone());
             name
         } else {
-            "_noinfo_".to_string()
+            format!("_noinfo_{uid}")
         }
     }
 }
