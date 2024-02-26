@@ -7,18 +7,39 @@
 Tool to profile usage of HPC resources by regularly probing processes.
 
 Sonar examines `/proc` and runs some diagnostic programs and filters and groups the output and
-prints it to stdout as CSV text.  The output format is defined in detail below.
+prints it to stdout as CSV text.  The output format is defined in detail below.  Sonar can also
+probe the system and reports on its overall configuration.
 
 ![image of a fish swarm](img/sonar-small.png)
 
 Image: [Midjourney](https://midjourney.com/), [CC BY-NC 4.0](https://creativecommons.org/licenses/by-nc/4.0/legalcode)
 
+## Subcommands
+
+Sonar has two subcommands, `ps` and `sysinfo`.  Both collect information about the system and print
+it on stdout.  `sonar ps` collects information about running processes.  `sonar sysinfo` collects
+information about the configuration of the system itself - cores, memory, gpus.
+
+```console
+$ sonar
+
+Usage: sonar <COMMAND>
+
+Commands:
+  ps       Take a snapshot of the currently running processes
+  sysinfo  Extract system information
+  analyze  Not yet implemented
+  help     Print this message or the help of the given subcommand(s)
+
+Options:
+  -h, --help     Print help
+  -V, --version  Print version
+```
+
 ## Versions
 
 We use semantic versioning.  The major version is expected to remain at zero for the foreseeable
 future, reflecting the experimental nature of Sonar.
-
-The program version is encoded in the output in the `v=` field.
 
 The minor version is updated with changes that alter the output format deliberately: fields are
 added, removed, or are given a new meaning (this has been avoided so far), or the record format
@@ -31,32 +52,35 @@ These rules are new with v0.8.0.
 
 ### Changes in v0.9.x
 
+**Sysinfo introduced**.  The `sonar sysinfo` subcommand was introduced to extract information about
+the system itself.
+
 **More help when information is missing**.  The user name field now includes the UID if the user
 name can't be obtained from system databases but the UID is known. (v0.9.0)
 
 ### Changes in v0.8.x
 
-**Better data**.  More clarifications, more data points. (v0.8.0)
+**Better `ps` data**.  More clarifications, more data points. (v0.8.0)
 
 **Less use of external programs**.  We go directly to `/proc` for data, and no longer run `ps`.
 
-**Less output**. Fields that hold default values are not printed. (v0.8.0)
+**Less `ps` output**. Fields that hold default values are not printed. (v0.8.0)
 
 ### Changes in v0.7.x
 
-**Improved filtering.** The filters used in previous versions (minimum CPU `--min-cpu-percent`, and
-memory usage `--min-mem-percent`) are nonmonotonic in that records for a long-running job can come
-and go in the log over time.  Those filters are still available but monotonic filters (for
-non-system jobs `--exclude-system-jobs`, and for jobs that have been running long enough
-`--min-cpu-time`) are now available and will result in more easily understood data.
+**Improved `ps` process filtering.** The filters used in previous versions (minimum CPU
+`--min-cpu-percent`, and memory usage `--min-mem-percent`) are nonmonotonic in that records for a
+long-running job can come and go in the log over time.  Those filters are still available but
+monotonic filters (for non-system jobs `--exclude-system-jobs`, and for jobs that have been running
+long enough `--min-cpu-time`) are now available and will result in more easily understood data.
 
-**Improved merging.** Earlier, sonar would merge some processes unconditionally and somewhat
-opaquely.  All merging is now controlled by command-line switches and is more transparent.
+**Improved `ps` process merging.** Earlier, sonar would merge some processes unconditionally and
+somewhat opaquely.  All merging is now controlled by command-line switches and is more transparent.
 
-**Better data.** Additional data points are gathered, notably for GPUs, and the meaning of the data
+**Better `ps` data.** Additional data points are gathered, notably for GPUs, and the meaning of the data
 being gathered has been clarified.
 
-**Self-documenting.** The output format has changed to use named fields, which allows the introduction
+**Self-documenting `ps` data.** The output format has changed to use named fields, which allows the introduction
 of fields and the use of default values.
 
 **Clearer division of labor with a front-end tool.** Front-end tools such as
@@ -95,23 +119,7 @@ branch.
 
 ## Collect processes with `sonar ps`
 
-Available options:
-```console
-$ sonar
-
-Usage: sonar <COMMAND>
-
-Commands:
-  ps       Take a snapshot of the currently running processes
-  analyze  Not yet implemented
-  help     Print this message or the help of the given subcommand(s)
-
-Options:
-  -h, --help     Print help
-  -V, --version  Print version
-```
-
-We run `sonar ps` every 5 minutes on every compute node.
+It's sensible to run `sonar ps` every 5 minutes on every compute node.
 
 ```console
 $ sonar ps --help
@@ -158,7 +166,7 @@ v=0.7.0,time=2023-08-10T11:09:41+02:00,host=somehost,cores=8,user=someone,job=0,
 v=0.7.0,time=2023-08-10T11:09:41+02:00,host=somehost,cores=8,user=someone,job=0,cmd=slack,cpu%=3.9,cpukib=716924,gpus=none,gpu%=0,gpumem%=0,gpukib=0,cputime_sec=266
 ```
 
-### Version 0.9.0 output format
+### Version 0.9.0 `ps` output format
 
 Version 0.9.0 documents that the `user` field *in previous versions* could have the value
 `_noinfo_`.  This value is sometimes observed in the output from older versions (though no clients
@@ -168,7 +176,7 @@ Version 0.9.0 extends the encoding of the `user` field: it can now (also) have t
 `_noinfo_<uid>` where `<uid>` is the user ID, if user information was unobtainable for any reason
 but we have a UID.  Clients could be able to handle both this encoding and the older encoding.
 
-### Version 0.8.0 output format
+### Version 0.8.0 `ps` output format
 
 Fields with default values (zero in most cases, or the empty set of GPUs) are not printed.
 
@@ -183,7 +191,7 @@ a nonnegative integer, with 0 meaning "no data available".
 Version 0.8.0 also clarifies that the existing `cpukib` field reports virtual data+stack memory, not
 resident memory nor virtual total memory.
 
-### Version 0.7.0 output format
+### Version 0.7.0 `ps` output format
 
 Each field has the syntax `name=value` where the names are defined below.  Fields are separated by
 commas, and each record is terminated by a newline.  The syntax of the file is therefore as for CSV
@@ -275,7 +283,7 @@ that have been rolled into this one in response to the `--rollup` switch.  That 
 rolled-up job then this field must be present.
 
 
-### Version 0.6.0 output format (and earlier)
+### Version 0.6.0 `ps` output format (and earlier)
 
 The fields in version 0.6.0 are unnamed and the fields are always presented in the same order.  The
 fields have (mostly) the same syntax and semantics as the 0.7.0 fields, with these notable differences:
@@ -293,6 +301,44 @@ presented above.
 Earlier versions of `sonar` would always roll up processes with the same `job` and `cmd`, so older
 records may or may not represent multiple processes' worth of data.
 
+
+## Collect system information with `sonar sysinfo`
+
+The `sysinfo` subcommand collects information about the system and prints it in JSON form on stdout:
+
+```console
+$ sonar sysinfo
+{
+ "timestamp": "2024-02-26T00:00:02+01:00",
+ "hostname": "ml1.hpc.uio.no",
+ "description": "2x14 (hyperthreaded) Intel(R) Xeon(R) Gold 5120 CPU @ 2.20GHz, 125 GB, 3x NVIDIA GeForce RTX 2080 Ti @ 11GB",
+ "cpu_cores": 56,
+ "mem_gb": 125,
+ "gpu_cards": 3,
+ "gpumem_gb": 33
+}
+```
+
+Typical usage for `sysinfo` is to run the command after reboot and (for hot-swappable systems and
+VMs) once every 24 hours, and to aggregate the information in some database.
+
+The `sysinfo` subcommand currently has no options.
+
+### Version 0.9.0 `sysinfo` format
+
+The JSON structure has these fields:
+
+- `timestamp` - string, an ISO-format timestamp for when the information was collected
+- `hostname` - string, the FQDN of the host
+- `description` - string, a summary of the system configuration with model numbers and so on
+- `cpu_cores` - number, the total number of virtual cores (sockets x cores-per-socket x threads-per-core)
+- `mem_gb` - number, the amount of installed memory in GiB (2^30 bytes)
+- `gpu_cards` - number, the number of installed accelerator cards
+- `gpumem_gb` - number, the total amount of installed accelerator memory across all cards in GiB
+
+Numeric fields that are zero may or may not be omitted by the producer.
+
+Note the v0.9.0 `sysinfo` output does not carry a version number.
 
 ## Collect results with `sonar analyze` :construction:
 
