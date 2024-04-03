@@ -5,14 +5,14 @@ use crate::gpu;
 use crate::nvidia;
 use crate::procfs;
 use crate::procfsapi;
+use crate::util;
 
-use serde::Serialize;
-
-use std::io::{self, Write};
+use std::io;
 
 pub fn show_system(timestamp: &str) {
     let fs = procfsapi::RealFS::new();
-    match do_show_system(&fs, timestamp) {
+    let mut writer = io::stdout();
+    match do_show_system(&mut writer, &fs, timestamp) {
         Ok(_) => {}
         Err(e) => {
             log::error!("sysinfo failed: {e}");
@@ -22,22 +22,7 @@ pub fn show_system(timestamp: &str) {
 
 const GIB: usize = 1024 * 1024 * 1024;
 
-// Note the field names here are used by decoders developed separately and should be considered set
-// in stone.  All fields will be serialized; missing numeric values must be zero; consumers must
-// deal with that.
-
-#[derive(Serialize)]
-struct NodeConfig {
-    timestamp: String,
-    hostname: String,
-    description: String,
-    cpu_cores: i32,
-    mem_gb: i64, // This is GiB despite the name - the name is frozen
-    gpu_cards: i32,
-    gpumem_gb: i64, // Ditto
-}
-
-fn do_show_system(fs: &dyn procfsapi::ProcfsAPI, timestamp: &str) -> Result<(), String> {
+fn do_show_system(writer: &mut dyn io::Write, fs: &dyn procfsapi::ProcfsAPI, timestamp: &str) -> Result<(), String> {
     let (model, sockets, cores_per_socket, threads_per_core) = procfs::get_cpu_info(fs)?;
     let mem_by = procfs::get_memtotal_kib(fs)? * 1024;
     let mem_gib = (mem_by as f64 / GIB as f64).round() as i64;
@@ -90,22 +75,32 @@ fn do_show_system(fs: &dyn procfsapi::ProcfsAPI, timestamp: &str) -> Result<(), 
     } else {
         ("".to_string(), 0, 0)
     };
-    let config = NodeConfig {
-        timestamp: timestamp.to_string(),
-        hostname,
-        description: format!("{sockets}x{cores_per_socket}{ht} {model}, {mem_gib} GiB{gpu_desc}"),
-        cpu_cores: sockets * cores_per_socket * threads_per_core,
-        mem_gb: mem_gib,
-        gpu_cards,
-        gpumem_gb,
-    };
-    match serde_json::to_string_pretty(&config) {
-        Ok(s) => {
-            let _ = io::stdout().write(s.as_bytes());
-            let _ = io::stdout().write(b"\n");
-            let _ = io::stdout().flush();
-            Ok(())
-        }
-        Err(_) => Err("JSON encoding failed".to_string()),
-    }
+    let timestamp = util::json_quote(timestamp);
+    let hostname = util::json_quote(&hostname);
+    let description = util::json_quote(&format!("{sockets}x{cores_per_socket}{ht} {model}, {mem_gib} GiB{gpu_desc}"));
+    let cpu_cores = sockets * cores_per_socket * threads_per_core;
+
+    // Note the field names here are used by decoders that are developed separately, and they should
+    // be considered set in stone.
+
+    let s = format!(r#"{{
+  "timestamp": "{timestamp}",
+  "hostname": "{hostname}",
+  "description": "{description}",
+  "cpu_cores": {cpu_cores},
+  "mem_gb": {mem_gib},
+  "gpu_cards": {gpu_cards},
+  "gpumem_gb": {gpumem_gb}
+}}
+"#);
+
+    // Ignore I/O errors.
+
+    let _ = writer.write(s.as_bytes());
+    let _ = writer.flush();
+    Ok(())
 }
+
+// Currently the test for do_show_system() is black-box, see ../tests.  The reason for this is partly
+// that not all the system interfaces used by that function are virtualized at this time, and partly
+// that we only care that the output syntax looks right.
