@@ -50,6 +50,10 @@ affect the output nevertheless, ie, most changes not covered by changes to the m
 
 These rules are new with v0.8.0.
 
+### Changes in v0.10.x
+
+**Less output**.  Removed the `cores` and `memtotalkib` fields, as they are supplied by `sonar sysinfo`.
+
 ### Changes in v0.9.x
 
 **Sysinfo introduced**.  The `sonar sysinfo` subcommand was introduced to extract information about
@@ -166,6 +170,11 @@ v=0.7.0,time=2023-08-10T11:09:41+02:00,host=somehost,cores=8,user=someone,job=0,
 v=0.7.0,time=2023-08-10T11:09:41+02:00,host=somehost,cores=8,user=someone,job=0,cmd=slack,cpu%=3.9,cpukib=716924,gpus=none,gpu%=0,gpumem%=0,gpukib=0,cputime_sec=266
 ```
 
+### Version 0.10.0 `ps` output format
+
+The fields `cores` and `memtotalkib` were removed, as they were unused by all clients and are
+supplied by `sonar sysinfo` for clients that need that information.
+
 ### Version 0.9.0 `ps` output format
 
 Version 0.9.0 documents that the `user` field *in previous versions* could have the value
@@ -224,11 +233,11 @@ but the user name could not be obtained.
 alphanumeric string.  This can be `_unknown_` for zombie jobs, or `_noinfo_` for non-zombies when
 the command name can't be found.
 
-`cores` (optional, default "0"): The number of cores on this host, a nonnegative integer, with 0
-meaning "unknown".
-
-`memtotalkib` (optional, default "0"): The amount of physical RAM on this host, a nonnegative
+`cores` (optional, default "0", removed in v0.10): The number of cores on this host, a nonnegative
 integer, with 0 meaning "unknown".
+
+`memtotalkib` (optional, default "0", removed in v0.10): The amount of physical RAM on this host, a
+nonnegative integer, with 0 meaning "unknown".
 
 `job` (optional, default "0"): The job ID, a positive integer. This field will be 0 if the job or
 process does not have a meaningful ID.  There may be many records for the same job, one for each

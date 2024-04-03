@@ -2,7 +2,6 @@
 #![allow(clippy::too_many_arguments)]
 
 extern crate log;
-extern crate num_cpus;
 
 use crate::amd;
 use crate::jobs;
@@ -430,13 +429,10 @@ fn do_create_snapshot(
         .from_writer(io::stdout());
 
     let hostname = hostname::get().unwrap().into_string().unwrap();
-    let num_cores = num_cpus::get();
     const VERSION: &str = env!("CARGO_PKG_VERSION");
     let print_params = PrintParameters {
         hostname: &hostname,
         timestamp,
-        num_cores,
-        memtotal_kib,
         version: VERSION,
         opts,
     };
@@ -609,8 +605,6 @@ fn filter_proc(proc_info: &ProcInfo, params: &PrintParameters) -> bool {
 struct PrintParameters<'a> {
     hostname: &'a str,
     timestamp: &'a str,
-    num_cores: usize,
-    memtotal_kib: usize,
     version: &'a str,
     opts: &'a PsOptions<'a>,
 }
@@ -633,12 +627,6 @@ fn print_record<W: io::Write>(
     // Only print optional fields whose values are not their defaults.  The defaults are defined in
     // README.md.  The values there must agree with those used by Jobanalyzer's parser.
 
-    if params.num_cores != 0 {
-        fields.push(format!("cores={}", params.num_cores));
-    }
-    if params.memtotal_kib != 0 {
-        fields.push(format!("memtotalkib={}", params.memtotal_kib));
-    }
     if proc_info.job_id != 0 {
         fields.push(format!("job={}", proc_info.job_id));
     }
