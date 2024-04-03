@@ -1,7 +1,6 @@
-extern crate log;
-
 use crate::amd;
 use crate::gpu;
+use crate::log;
 use crate::nvidia;
 use crate::procfs;
 use crate::procfsapi;
@@ -15,7 +14,7 @@ pub fn show_system(timestamp: &str) {
     match do_show_system(&fs, timestamp) {
         Ok(_) => {}
         Err(e) => {
-            log::error!("sysinfo failed: {e}");
+            log::error(&format!("sysinfo failed: {e}"));
         }
     }
 }
