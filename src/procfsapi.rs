@@ -2,7 +2,6 @@
 // system to be virtualized.  In turn, that allows sensible test cases to be written.
 
 extern crate libc;
-extern crate page_size;
 
 use crate::users::get_user_by_uid;
 
@@ -86,7 +85,7 @@ impl ProcfsAPI for RealFS {
     }
 
     fn page_size_in_kib(&self) -> usize {
-        page_size::get() / 1024
+        (unsafe { libc::sysconf(libc::_SC_PAGESIZE) as usize }) / 1024
     }
 
     fn now_in_secs_since_epoch(&self) -> u64 {
