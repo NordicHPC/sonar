@@ -1,8 +1,7 @@
-extern crate log;
-
 use crate::amd;
 use crate::gpu;
 use crate::hostname;
+use crate::log;
 use crate::nvidia;
 use crate::procfs;
 use crate::procfsapi;
@@ -16,14 +15,18 @@ pub fn show_system(timestamp: &str) {
     match do_show_system(&mut writer, &fs, timestamp) {
         Ok(_) => {}
         Err(e) => {
-            log::error!("sysinfo failed: {e}");
+            log::error(&format!("sysinfo failed: {e}"));
         }
     }
 }
 
 const GIB: usize = 1024 * 1024 * 1024;
 
-fn do_show_system(writer: &mut dyn io::Write, fs: &dyn procfsapi::ProcfsAPI, timestamp: &str) -> Result<(), String> {
+fn do_show_system(
+    writer: &mut dyn io::Write,
+    fs: &dyn procfsapi::ProcfsAPI,
+    timestamp: &str,
+) -> Result<(), String> {
     let (model, sockets, cores_per_socket, threads_per_core) = procfs::get_cpu_info(fs)?;
     let mem_by = procfs::get_memtotal_kib(fs)? * 1024;
     let mem_gib = (mem_by as f64 / GIB as f64).round() as i64;
@@ -78,13 +81,16 @@ fn do_show_system(writer: &mut dyn io::Write, fs: &dyn procfsapi::ProcfsAPI, tim
     };
     let timestamp = util::json_quote(timestamp);
     let hostname = util::json_quote(&hostname);
-    let description = util::json_quote(&format!("{sockets}x{cores_per_socket}{ht} {model}, {mem_gib} GiB{gpu_desc}"));
+    let description = util::json_quote(&format!(
+        "{sockets}x{cores_per_socket}{ht} {model}, {mem_gib} GiB{gpu_desc}"
+    ));
     let cpu_cores = sockets * cores_per_socket * threads_per_core;
 
     // Note the field names here are used by decoders that are developed separately, and they should
     // be considered set in stone.
 
-    let s = format!(r#"{{
+    let s = format!(
+        r#"{{
   "timestamp": "{timestamp}",
   "hostname": "{hostname}",
   "description": "{description}",
@@ -93,7 +99,8 @@ fn do_show_system(writer: &mut dyn io::Write, fs: &dyn procfsapi::ProcfsAPI, tim
   "gpu_cards": {gpu_cards},
   "gpumem_gb": {gpumem_gb}
 }}
-"#);
+"#
+    );
 
     // Ignore I/O errors.
 

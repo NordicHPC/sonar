@@ -1,5 +1,3 @@
-extern crate env_logger;
-
 use clap::{Parser, Subcommand};
 
 mod amd;
@@ -8,6 +6,7 @@ mod command;
 mod gpu;
 mod hostname;
 mod jobs;
+mod log;
 mod nvidia;
 mod procfs;
 mod procfsapi;
@@ -83,7 +82,7 @@ fn main() {
     // improperly reflects the true order in which they were obtained.  See #100.
     let timestamp = time::now_iso8601();
 
-    env_logger::init();
+    log::init();
 
     let cli = Cli::parse();
 
