@@ -4,13 +4,13 @@
 extern crate log;
 
 use crate::amd;
+use crate::hostname;
 use crate::jobs;
 use crate::nvidia;
 use crate::procfs;
 use crate::procfsapi;
-use crate::util::three_places;
+use crate::util::{csv_quote,three_places};
 
-use csv::{Writer, WriterBuilder};
 use std::collections::{HashMap, HashSet};
 use std::env;
 use std::io::{self, Result, Write};
@@ -424,9 +424,7 @@ fn do_create_snapshot(
 
     // Once we start printing we'll print everything and not check the interrupted flag any more.
 
-    let mut writer = WriterBuilder::new()
-        .flexible(true)
-        .from_writer(io::stdout());
+    let mut writer = io::stdout();
 
     let hostname = hostname::get().unwrap().into_string().unwrap();
     const VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -609,8 +607,8 @@ struct PrintParameters<'a> {
     opts: &'a PsOptions<'a>,
 }
 
-fn print_record<W: io::Write>(
-    writer: &mut Writer<W>,
+fn print_record(
+    writer: &mut dyn io::Write,
     params: &PrintParameters,
     proc_info: &ProcInfo,
 ) -> Result<bool> {
@@ -679,7 +677,17 @@ fn print_record<W: io::Write>(
     if proc_info.rolledup > 0 {
         fields.push(format!("rolledup={}", proc_info.rolledup));
     }
-    writer.write_record(fields)?;
+
+    let mut s = "".to_string();
+    for f in fields {
+        if !s.is_empty() {
+            s += ","
+        }
+        s += &csv_quote(&f);
+    }
+    s += "\n";
+
+    writer.write(s.as_bytes())?;
 
     Ok(true)
 }

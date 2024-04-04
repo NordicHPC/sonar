@@ -1,8 +1,6 @@
 #![allow(unused_imports)]
 #![allow(unused_macros)]
 
-use chrono::prelude::Local;
-
 // Populate a HashSet.
 #[cfg(test)]
 macro_rules! set(
@@ -36,12 +34,6 @@ pub(crate) use map;
 
 #[cfg(test)]
 pub(crate) use set;
-
-// Get current time as an ISO time stamp.
-pub fn time_iso8601() -> String {
-    let local_time = Local::now();
-    format!("{}", local_time.format("%Y-%m-%dT%H:%M:%S%Z"))
-}
 
 // Carve up a line of text into space-separated chunks + the start indices of the chunks.
 pub fn chunks(input: &str) -> (Vec<usize>, Vec<&str>) {
@@ -112,4 +104,38 @@ pub fn json_quote_test() {
     assert!(&json_quote("abc\rde") == r#"abc\rde"#);
     assert!(&json_quote("abc	de") == r#"abc\tde"#);
     assert!(&json_quote("abc\u{0008}de") == r#"abc de"#);
+}
+
+// If the value contains a , or " then quote the string, and double every "
+pub fn csv_quote(s: &str) -> String {
+    let mut t = "".to_string();
+    let mut must_quote = false;
+    for c in s.chars() {
+        match c {
+            '"' => {
+                t.push(c);
+                t.push(c);
+                must_quote = true;
+            }
+            ',' => {
+                t.push(c);
+                must_quote = true;
+            }
+            _ => {
+                t.push(c);
+            }
+        }
+    }
+    if must_quote {
+        t = "\"".to_string() + &t + "\""
+    }
+    t
+}
+
+#[test]
+pub fn csv_quote_test() {
+    assert!(&csv_quote("abcde") == "abcde");
+    assert!(&csv_quote(r#"abc,de"#) == r#""abc,de""#);
+    assert!(&csv_quote(r#"abc"de"#) == r#""abc""de""#);
+    assert!(&csv_quote(r#"abc""de"#) == r#""abc""""de""#);
 }

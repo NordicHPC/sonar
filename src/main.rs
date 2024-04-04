@@ -6,6 +6,7 @@ mod amd;
 mod batchless;
 mod command;
 mod gpu;
+mod hostname;
 mod jobs;
 mod nvidia;
 mod procfs;
@@ -13,6 +14,7 @@ mod procfsapi;
 mod ps;
 mod slurm;
 mod sysinfo;
+mod time;
 mod users;
 mod util;
 
@@ -79,7 +81,7 @@ fn main() {
     // obtained, not the time when reporting was allowed to run.  The latter is subject to greater
     // system effects, and using that timestamp increases the risk that the samples' timestamp order
     // improperly reflects the true order in which they were obtained.  See #100.
-    let timestamp = util::time_iso8601();
+    let timestamp = time::now_iso8601();
 
     env_logger::init();
 

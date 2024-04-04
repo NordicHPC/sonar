@@ -2,6 +2,7 @@ extern crate log;
 
 use crate::amd;
 use crate::gpu;
+use crate::hostname;
 use crate::nvidia;
 use crate::procfs;
 use crate::procfsapi;
