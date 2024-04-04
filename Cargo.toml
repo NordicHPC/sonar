@@ -9,7 +9,6 @@ edition = "2021"
 subprocess = "0.2"
 chrono = "0.4"
 hostname = "0.3"
-clap = { version = "4.5", features = ["derive"] }
 csv = "1.3"
 log = "0.4"
 env_logger = "0.11"
