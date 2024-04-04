@@ -71,3 +71,37 @@ pub fn chunks(input: &str) -> (Vec<usize>, Vec<&str>) {
 pub fn three_places(n: f64) -> f64 {
     (n * 1000.0).round() / 1000.0
 }
+
+// If the value contains a , or " then quote the string, and double every "
+pub fn csv_quote(s: &str) -> String {
+    let mut t = "".to_string();
+    let mut must_quote = false;
+    for c in s.chars() {
+        match c {
+            '"' => {
+                t.push(c);
+                t.push(c);
+                must_quote = true;
+            }
+            ',' => {
+                t.push(c);
+                must_quote = true;
+            }
+            _ => {
+                t.push(c);
+            }
+        }
+    }
+    if must_quote {
+        t = "\"".to_string() + &t + "\""
+    }
+    t
+}
+
+#[test]
+pub fn csv_quote_test() {
+    assert!(&csv_quote("abcde") == "abcde");
+    assert!(&csv_quote(r#"abc,de"#) == r#""abc,de""#);
+    assert!(&csv_quote(r#"abc"de"#) == r#""abc""de""#);
+    assert!(&csv_quote(r#"abc""de"#) == r#""abc""""de""#);
+}
