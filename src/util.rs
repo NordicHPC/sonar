@@ -1,8 +1,6 @@
 #![allow(unused_imports)]
 #![allow(unused_macros)]
 
-use chrono::prelude::Local;
-
 // Populate a HashSet.
 #[cfg(test)]
 macro_rules! set(
@@ -36,12 +34,6 @@ pub(crate) use map;
 
 #[cfg(test)]
 pub(crate) use set;
-
-// Get current time as an ISO time stamp.
-pub fn time_iso8601() -> String {
-    let local_time = Local::now();
-    format!("{}", local_time.format("%Y-%m-%dT%H:%M:%S%Z"))
-}
 
 // Carve up a line of text into space-separated chunks + the start indices of the chunks.
 pub fn chunks(input: &str) -> (Vec<usize>, Vec<&str>) {
