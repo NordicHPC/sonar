@@ -6,6 +6,7 @@ mod amd;
 mod batchless;
 mod command;
 mod gpu;
+mod hostname;
 mod jobs;
 mod nvidia;
 mod procfs;
