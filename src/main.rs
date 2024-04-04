@@ -1,16 +1,17 @@
-extern crate env_logger;
-
 mod amd;
 mod batchless;
 mod command;
 mod gpu;
+mod hostname;
 mod jobs;
+mod log;
 mod nvidia;
 mod procfs;
 mod procfsapi;
 mod ps;
 mod slurm;
 mod sysinfo;
+mod time;
 mod users;
 mod util;
 
@@ -58,9 +59,9 @@ fn main() {
     // obtained, not the time when reporting was allowed to run.  The latter is subject to greater
     // system effects, and using that timestamp increases the risk that the samples' timestamp order
     // improperly reflects the true order in which they were obtained.  See #100.
-    let timestamp = util::time_iso8601();
+    let timestamp = time::now_iso8601();
 
-    env_logger::init();
+    log::init();
 
     match &command_line() {
         Commands::PS {
@@ -174,11 +175,9 @@ fn command_line() -> Commands {
                     exclude_users,
                     exclude_commands,
                     lockdir,
-                }
+                };
             }
-            "sysinfo" => {
-                return Commands::Sysinfo {}
-            }
+            "sysinfo" => return Commands::Sysinfo {},
             "help" => {
                 usage(false);
             }
@@ -202,9 +201,7 @@ fn string_value(mut args: std::env::Args) -> (std::env::Args, Option<String>) {
 fn parsed_value<T: std::str::FromStr>(mut args: std::env::Args) -> (std::env::Args, Option<T>) {
     if let Some(val) = args.next() {
         match val.parse::<T>() {
-            Ok(value) => {
-                (args, Some(value))
-            }
+            Ok(value) => (args, Some(value)),
             _ => {
                 usage(true);
             }
@@ -218,7 +215,8 @@ fn usage(is_error: bool) -> ! {
     let mut stdout = std::io::stdout();
     let mut stderr = std::io::stderr();
     let out: &mut dyn std::io::Write = if is_error { &mut stderr } else { &mut stdout };
-    let _ = out.write(b"Usage: sonar <COMMAND>
+    let _ = out.write(
+        b"Usage: sonar <COMMAND>
 
 Commands:
   ps       Take a snapshot of the currently running processes
@@ -248,7 +246,8 @@ Options for `ps`:
   --lockdir directory
       Create a per-host lockfile in this directory and exit early if the file
       exists on startup [default: none]
-");
+",
+    );
     let _ = out.flush();
     std::process::exit(if is_error { 2 } else { 0 });
 }

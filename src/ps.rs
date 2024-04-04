@@ -1,16 +1,15 @@
 #![allow(clippy::type_complexity)]
 #![allow(clippy::too_many_arguments)]
 
-extern crate log;
-
 use crate::amd;
+use crate::hostname;
 use crate::jobs;
+use crate::log;
 use crate::nvidia;
 use crate::procfs;
 use crate::procfsapi;
-use crate::util::three_places;
+use crate::util::{csv_quote,three_places};
 
-use csv::{Writer, WriterBuilder};
 use std::collections::{HashMap, HashSet};
 use std::env;
 use std::io::{self, Result, Write};
@@ -258,10 +257,10 @@ pub fn create_snapshot(jobs: &mut dyn jobs::JobManager, opts: &PsOptions, timest
         }
 
         if skip {
-            log::info!("Lockfile present, exiting");
+            log::info("Lockfile present, exiting");
         }
         if failed {
-            log::error!("Unable to properly manage or delete lockfile");
+            log::error("Unable to properly manage or delete lockfile");
         }
     } else {
         do_create_snapshot(jobs, opts, timestamp, &interrupted);
@@ -289,7 +288,7 @@ fn do_create_snapshot(
     let memtotal_kib = match procfs::get_memtotal_kib(&fs) {
         Ok(n) => n,
         Err(e) => {
-            log::error!("Could not get installed memory: {}", e);
+            log::error(&format!("Could not get installed memory: {e}"));
             return;
         }
     };
@@ -297,8 +296,7 @@ fn do_create_snapshot(
     let procinfo_output = match procfs::get_process_information(&fs, memtotal_kib) {
         Ok(result) => result,
         Err(msg) => {
-            eprintln!("procfs failed: {msg}");
-            log::error!("procfs failed: {msg}");
+            log::error(&format!("procfs failed: {msg}"));
             return;
         }
     };
@@ -348,7 +346,7 @@ fn do_create_snapshot(
             gpu_status = GpuStatus::UnknownFailure;
             // This is a soft failure, surfaced through dashboards; we do not want mail about it
             // under normal circumstances.
-            //log::error!("GPU (Nvidia) process listing failed: {:?}", e);
+            //log::error(&format!("GPU (Nvidia) process listing failed: {:?}", e));
         }
         Ok(ref nvidia_output) => {
             for proc in nvidia_output {
@@ -383,7 +381,7 @@ fn do_create_snapshot(
             gpu_status = GpuStatus::UnknownFailure;
             // This is a soft failure, surfaced through dashboards; we do not want mail about it
             // under normal circumstances.
-            //log::error!("GPU (AMD) process listing failed: {:?}", e);
+            //log::error(&format!("GPU (AMD) process listing failed: {:?}", e));
         }
         Ok(ref amd_output) => {
             for proc in amd_output {
@@ -424,9 +422,7 @@ fn do_create_snapshot(
 
     // Once we start printing we'll print everything and not check the interrupted flag any more.
 
-    let mut writer = WriterBuilder::new()
-        .flexible(true)
-        .from_writer(io::stdout());
+    let mut writer = io::stdout();
 
     let hostname = hostname::get().unwrap().into_string().unwrap();
     const VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -609,8 +605,8 @@ struct PrintParameters<'a> {
     opts: &'a PsOptions<'a>,
 }
 
-fn print_record<W: io::Write>(
-    writer: &mut Writer<W>,
+fn print_record(
+    writer: &mut dyn io::Write,
     params: &PrintParameters,
     proc_info: &ProcInfo,
 ) -> Result<bool> {
@@ -679,7 +675,17 @@ fn print_record<W: io::Write>(
     if proc_info.rolledup > 0 {
         fields.push(format!("rolledup={}", proc_info.rolledup));
     }
-    writer.write_record(fields)?;
+
+    let mut s = "".to_string();
+    for f in fields {
+        if !s.is_empty() {
+            s += ","
+        }
+        s += &csv_quote(&f);
+    }
+    s += "\n";
+
+    writer.write(s.as_bytes())?;
 
     Ok(true)
 }
