@@ -4,6 +4,7 @@
 extern crate log;
 
 use crate::amd;
+use crate::hostname;
 use crate::jobs;
 use crate::nvidia;
 use crate::procfs;
