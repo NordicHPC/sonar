@@ -1,8 +1,6 @@
 // This creates a API by which procfs can access the underlying computing system, allowing the
 // system to be virtualized.  In turn, that allows sensible test cases to be written.
 
-extern crate libc;
-
 use crate::users::get_user_by_uid;
 
 use std::fs;
