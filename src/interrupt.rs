@@ -19,7 +19,7 @@ extern "C" fn sonar_signal_handler(_: libc::c_int) {
 
 pub fn handle_interruptions() {
     unsafe {
-        let nomask : libc::sigset_t = std::mem::zeroed();
+        let nomask: libc::sigset_t = std::mem::zeroed();
         let action = libc::sigaction {
             sa_sigaction: sonar_signal_handler as usize,
             sa_mask: nomask,

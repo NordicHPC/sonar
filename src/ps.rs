@@ -9,7 +9,7 @@ use crate::log;
 use crate::nvidia;
 use crate::procfs;
 use crate::procfsapi;
-use crate::util::{csv_quote,three_places};
+use crate::util::{csv_quote, three_places};
 
 use std::collections::{HashMap, HashSet};
 use std::io::{self, Result, Write};
@@ -263,11 +263,7 @@ pub fn create_snapshot(jobs: &mut dyn jobs::JobManager, opts: &PsOptions, timest
     }
 }
 
-fn do_create_snapshot(
-    jobs: &mut dyn jobs::JobManager,
-    opts: &PsOptions,
-    timestamp: &str,
-) {
+fn do_create_snapshot(jobs: &mut dyn jobs::JobManager, opts: &PsOptions, timestamp: &str) {
     let no_gpus = empty_gpuset();
     let mut proc_by_pid = ProcTable::new();
 
