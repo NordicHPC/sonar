@@ -3,7 +3,6 @@
 
 use crate::amd;
 use crate::hostname;
-use crate::interrupt;
 use crate::jobs;
 use crate::log;
 use crate::nvidia;
@@ -12,8 +11,13 @@ use crate::procfsapi;
 use crate::util::{csv_quote,three_places};
 
 use std::collections::{HashMap, HashSet};
+use std::env;
 use std::io::{self, Result, Write};
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
+use std::thread;
+use std::time;
 
 // The GpuSet has three states:
 //
@@ -173,17 +177,26 @@ pub fn create_snapshot(jobs: &mut dyn jobs::JobManager, opts: &PsOptions, timest
     // perform the operation.
     //
     // However if a signal arrives in the middle of the operation and terminates the program the
-    // lock file may be left on disk.  Therefore some lightweight signal handling is desirable to
-    // trap signals and clean up orderly.
+    // lock file may be left on disk.  Assuming no bugs, the interesting signals are SIGHUP,
+    // SIGTERM, SIGINT, and SIGQUIT.  Of these, only SIGHUP and SIGTERM are really interesting
+    // because they are sent by the OS or by job control (and will often be followed by SIGKILL if
+    // not honored within some reasonable time); INT/QUIT are sent by a user in response to keyboard
+    // action and more typical during development/debugging.
     //
-    // Additionally, if a signal is detected, we do not wish to start new operations, we can just
-    // skip them.  Code therefore calls is_interrupted() at strategic points to check whether a
-    // signal was detected.
+    // So THE MAIN REASON TO HANDLE SIGNALS is to make sure we're not killed while we hold the lock
+    // file, during normal operation.  To do that, we just need to ignore the signal.
     //
-    // Finally, there's no reason to limit the signal handler to the case when we have a lock file,
-    // the same logic can apply to both paths.
+    // But if a handled signal is received, it would be sensible to exit as quickly as possible and
+    // with minimal risk of hanging.  And to do that, we record the signal and then check the flag
+    // often, and we avoid starting things if the flag is set, and we produce no output (if
+    // possible) once the flag becomes set, yet produce complete output if any output at all.
+    //
+    // There's no reason to limit the signal handler to the case when we have a lock file, the same
+    // logic can apply to both paths.
 
-    interrupt::handle_interruptions();
+    let interrupted = Arc::new(AtomicBool::new(false));
+    signal_hook::flag::register(signal_hook::consts::SIGTERM, Arc::clone(&interrupted)).unwrap();
+    signal_hook::flag::register(signal_hook::consts::SIGHUP, Arc::clone(&interrupted)).unwrap();
 
     if let Some(ref dirname) = opts.lockdir {
         let mut created = false;
@@ -195,7 +208,7 @@ pub fn create_snapshot(jobs: &mut dyn jobs::JobManager, opts: &PsOptions, timest
         p.push(dirname);
         p.push("sonar-lock.".to_string() + &hostname);
 
-        if interrupt::is_interrupted() {
+        if interrupted.load(Ordering::Relaxed) {
             return;
         }
 
@@ -224,14 +237,13 @@ pub fn create_snapshot(jobs: &mut dyn jobs::JobManager, opts: &PsOptions, timest
         }
 
         if !failed && !skip {
-            do_create_snapshot(jobs, opts, timestamp);
+            do_create_snapshot(jobs, opts, timestamp, &interrupted);
 
             // Testing code: If we got the lockfile and produced a report, wait 10s after producing
             // it while holding onto the lockfile.  It is then possible to run sonar in that window
             // while the lockfile is being held, to ensure the second process exits immediately.
-            #[cfg(debug_assertions)]
             if std::env::var("SONARTEST_WAIT_LOCKFILE").is_ok() {
-                std::thread::sleep(std::time::Duration::new(10, 0));
+                thread::sleep(time::Duration::new(10, 0));
             }
         }
 
@@ -251,7 +263,7 @@ pub fn create_snapshot(jobs: &mut dyn jobs::JobManager, opts: &PsOptions, timest
             log::error("Unable to properly manage or delete lockfile");
         }
     } else {
-        do_create_snapshot(jobs, opts, timestamp);
+        do_create_snapshot(jobs, opts, timestamp, &interrupted);
     }
 }
 
@@ -259,11 +271,12 @@ fn do_create_snapshot(
     jobs: &mut dyn jobs::JobManager,
     opts: &PsOptions,
     timestamp: &str,
+    interrupted: &Arc<AtomicBool>,
 ) {
     let no_gpus = empty_gpuset();
     let mut proc_by_pid = ProcTable::new();
 
-    if interrupt::is_interrupted() {
+    if interrupted.load(Ordering::Relaxed) {
         return;
     }
 
@@ -318,7 +331,7 @@ fn do_create_snapshot(
         ); // gpu_mem_size_kib
     }
 
-    if interrupt::is_interrupted() {
+    if interrupted.load(Ordering::Relaxed) {
         return;
     }
 
@@ -358,7 +371,7 @@ fn do_create_snapshot(
         }
     }
 
-    if interrupt::is_interrupted() {
+    if interrupted.load(Ordering::Relaxed) {
         return;
     }
 
@@ -403,7 +416,7 @@ fn do_create_snapshot(
         }
     }
 
-    if interrupt::is_interrupted() {
+    if interrupted.load(Ordering::Relaxed) {
         return;
     }
 
