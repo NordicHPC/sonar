@@ -714,7 +714,7 @@ fn print_record(
     }
     s += "\n";
 
-    writer.write(s.as_bytes())?;
+    let _ = writer.write(s.as_bytes())?;
 
     Ok(true)
 }

@@ -20,14 +20,14 @@ extern "C" fn sonar_signal_handler(_: libc::c_int) {
 pub fn handle_interruptions() {
     unsafe {
         let nomask : libc::sigset_t = std::mem::zeroed();
-        let mut action = libc::sigaction {
+        let action = libc::sigaction {
             sa_sigaction: sonar_signal_handler as usize,
             sa_mask: nomask,
             sa_flags: 0,
             sa_restorer: None,
         };
-        libc::sigaction(libc::SIGTERM, &mut action, std::ptr::null_mut());
-        libc::sigaction(libc::SIGHUP, &mut action, std::ptr::null_mut());
+        libc::sigaction(libc::SIGTERM, &action, std::ptr::null_mut());
+        libc::sigaction(libc::SIGHUP, &action, std::ptr::null_mut());
     }
 }
 

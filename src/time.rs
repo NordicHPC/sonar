@@ -28,7 +28,7 @@ pub fn now_iso8601() -> String {
     unsafe {
         let t = libc::time(std::ptr::null_mut());
 
-        if libc::localtime_r(&t, &mut timebuf) == std::ptr::null_mut() {
+        if libc::localtime_r(&t, &mut timebuf).is_null() {
             panic!("localtime_r");
         }
 
