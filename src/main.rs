@@ -3,6 +3,7 @@ mod batchless;
 mod command;
 mod gpu;
 mod hostname;
+mod interrupt;
 mod jobs;
 mod log;
 mod nvidia;
