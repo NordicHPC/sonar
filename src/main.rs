@@ -134,23 +134,37 @@ fn command_line() -> Commands {
                 while next < args.len() {
                     let arg = args[next].as_ref();
                     next += 1;
-                    if let Some(new_next) = bool_arg(&arg, &args, next, "--batchless") {
+                    if let Some(new_next) = bool_arg(arg, &args, next, "--batchless") {
                         (next, batchless) = (new_next, true);
-                    } else if let Some(new_next) = bool_arg(&arg, &args, next, "--rollup") {
+                    } else if let Some(new_next) = bool_arg(arg, &args, next, "--rollup") {
                         (next, rollup) = (new_next, true);
-                    } else if let Some(new_next) = bool_arg(&arg, &args, next, "--exclude-system-jobs") {
+                    } else if let Some(new_next) =
+                        bool_arg(arg, &args, next, "--exclude-system-jobs")
+                    {
                         (next, exclude_system_jobs) = (new_next, true);
-                    } else if let Some((new_next, value)) = string_arg(&arg, &args, next, "--exclude-users") {
+                    } else if let Some((new_next, value)) =
+                        string_arg(arg, &args, next, "--exclude-users")
+                    {
                         (next, exclude_users) = (new_next, Some(value));
-                    } else if let Some((new_next, value)) = string_arg(&arg, &args, next, "--exclude-commands") {
+                    } else if let Some((new_next, value)) =
+                        string_arg(arg, &args, next, "--exclude-commands")
+                    {
                         (next, exclude_commands) = (new_next, Some(value));
-                    } else if let Some((new_next, value)) = string_arg(&arg, &args, next, "--lockdir") {
+                    } else if let Some((new_next, value)) =
+                        string_arg(arg, &args, next, "--lockdir")
+                    {
                         (next, lockdir) = (new_next, Some(value));
-                    } else if let Some((new_next, value)) = numeric_arg::<f64>(&arg, &args, next, "--min-cpu-percent") {
+                    } else if let Some((new_next, value)) =
+                        numeric_arg::<f64>(arg, &args, next, "--min-cpu-percent")
+                    {
                         (next, min_cpu_percent) = (new_next, Some(value));
-                    } else if let Some((new_next, value)) = numeric_arg::<f64>(&arg, &args, next, "--min-mem-percent") {
+                    } else if let Some((new_next, value)) =
+                        numeric_arg::<f64>(arg, &args, next, "--min-mem-percent")
+                    {
                         (next, min_mem_percent) = (new_next, Some(value));
-                    } else if let Some((new_next, value)) = numeric_arg::<usize>(&arg, &args, next, "--min-cpu-time") {
+                    } else if let Some((new_next, value)) =
+                        numeric_arg::<usize>(arg, &args, next, "--min-cpu-time")
+                    {
                         (next, min_cpu_time) = (new_next, Some(value));
                     } else {
                         usage(true);
@@ -204,11 +218,11 @@ fn bool_arg(arg: &str, _args: &[String], next: usize, opt_name: &str) -> Option<
 fn string_arg(arg: &str, args: &[String], next: usize, opt_name: &str) -> Option<(usize, String)> {
     if arg == opt_name {
         if next < args.len() {
-            Some((next+1, args[next].to_string()))
+            Some((next + 1, args[next].to_string()))
         } else {
             None
         }
-    } else if let Some((first, rest)) = arg.split_once("=") {
+    } else if let Some((first, rest)) = arg.split_once('=') {
         if first == opt_name {
             Some((next, rest.to_string()))
         } else {
@@ -219,7 +233,12 @@ fn string_arg(arg: &str, args: &[String], next: usize, opt_name: &str) -> Option
     }
 }
 
-fn numeric_arg<T: std::str::FromStr>(arg: &str, args: &[String], next: usize, opt_name: &str) -> Option<(usize, T)> {
+fn numeric_arg<T: std::str::FromStr>(
+    arg: &str,
+    args: &[String],
+    next: usize,
+    opt_name: &str,
+) -> Option<(usize, T)> {
     if let Some((next, strval)) = string_arg(arg, args, next, opt_name) {
         match strval.parse::<T>() {
             Ok(value) => Some((next, value)),
