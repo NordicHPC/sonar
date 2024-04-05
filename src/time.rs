@@ -1,4 +1,3 @@
-use libc;
 use std::ffi::CStr;
 
 // Get current time as an ISO time stamp: yyyy-mm-ddThh:mm:ss+hhmm
@@ -24,7 +23,7 @@ pub fn now_iso8601() -> String {
         tm_gmtoff: 0,
         tm_zone: std::ptr::null(),
     };
-    const SIZE: usize = 32;     // We need 25 unless something is greatly off
+    const SIZE: usize = 32; // We need 25 unless something is greatly off
     let mut buffer = vec![0i8; SIZE];
     unsafe {
         let t = libc::time(std::ptr::null_mut());
@@ -38,11 +37,16 @@ pub fn now_iso8601() -> String {
             buffer.as_mut_ptr(),
             SIZE,
             CStr::from_bytes_with_nul_unchecked(b"%FT%T%z\0").as_ptr(),
-            &timebuf) == 0 {
+            &timebuf,
+        ) == 0
+        {
             panic!("strftime");
         }
 
-        return CStr::from_ptr(buffer.as_ptr()).to_str().unwrap().to_string();
+        return CStr::from_ptr(buffer.as_ptr())
+            .to_str()
+            .unwrap()
+            .to_string();
     }
 }
 

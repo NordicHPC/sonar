@@ -17,7 +17,7 @@ mod users;
 mod util;
 
 const TIMEOUT_SECONDS: u64 = 5; // For subprocesses
-const USAGE_ERROR: i32 = 2;     // clap, Python, Go
+const USAGE_ERROR: i32 = 2; // clap, Python, Go
 
 enum Commands {
     /// Take a snapshot of the currently running processes
@@ -129,42 +129,38 @@ fn command_line() -> Commands {
                 let mut exclude_users = None;
                 let mut exclude_commands = None;
                 let mut lockdir = None;
-                loop {
-                    if let Some(arg) = args.next() {
-                        match arg.as_str() {
-                            "--batchless" => {
-                                batchless = true;
-                            }
-                            "--rollup" => {
-                                rollup = true;
-                            }
-                            "--exclude-system-jobs" => {
-                                exclude_system_jobs = true;
-                            }
-                            "--exclude-users" => {
-                                (args, exclude_users) = string_value(args);
-                            }
-                            "--exclude-commands" => {
-                                (args, exclude_commands) = string_value(args);
-                            }
-                            "--lockdir" => {
-                                (args, lockdir) = string_value(args);
-                            }
-                            "--min-cpu-percent" => {
-                                (args, min_cpu_percent) = parsed_value::<f64>(args);
-                            }
-                            "--min-mem-percent" => {
-                                (args, min_mem_percent) = parsed_value::<f64>(args);
-                            }
-                            "--min-cpu-time" => {
-                                (args, min_cpu_time) = parsed_value::<usize>(args);
-                            }
-                            _ => {
-                                usage(true);
-                            }
+                while let Some(arg) = args.next() {
+                    match arg.as_str() {
+                        "--batchless" => {
+                            batchless = true;
                         }
-                    } else {
-                        break;
+                        "--rollup" => {
+                            rollup = true;
+                        }
+                        "--exclude-system-jobs" => {
+                            exclude_system_jobs = true;
+                        }
+                        "--exclude-users" => {
+                            (args, exclude_users) = string_value(args);
+                        }
+                        "--exclude-commands" => {
+                            (args, exclude_commands) = string_value(args);
+                        }
+                        "--lockdir" => {
+                            (args, lockdir) = string_value(args);
+                        }
+                        "--min-cpu-percent" => {
+                            (args, min_cpu_percent) = parsed_value::<f64>(args);
+                        }
+                        "--min-mem-percent" => {
+                            (args, min_mem_percent) = parsed_value::<f64>(args);
+                        }
+                        "--min-cpu-time" => {
+                            (args, min_cpu_time) = parsed_value::<usize>(args);
+                        }
+                        _ => {
+                            usage(true);
+                        }
                     }
                 }
 
@@ -178,7 +174,8 @@ fn command_line() -> Commands {
                     eprintln!("--rollup and --batchless are incompatible");
                     std::process::exit(USAGE_ERROR);
                 }
-                return Commands::PS {
+
+                Commands::PS {
                     batchless,
                     rollup,
                     min_cpu_percent,
@@ -188,9 +185,9 @@ fn command_line() -> Commands {
                     exclude_users,
                     exclude_commands,
                     lockdir,
-                };
+                }
             }
-            "sysinfo" => return Commands::Sysinfo {},
+            "sysinfo" => Commands::Sysinfo {},
             "help" => {
                 usage(false);
             }
