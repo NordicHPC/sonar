@@ -38,7 +38,8 @@ pub fn is_interrupted() -> bool {
     }
     let flag = INTERRUPTED.load(Ordering::Relaxed);
     if flag {
-        println!("Interrupt flag was set!")
+        // Test cases depend on this exact output on stderr
+        eprintln!("Interrupt flag was set!")
     }
     flag
 }
