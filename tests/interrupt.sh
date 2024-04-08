@@ -12,7 +12,7 @@ bgpid=$!
 sleep 3
 kill -TERM $bgpid
 sleep 10
-if [[ $(cat interrupt.output.txt) != 'Interrupt flag was set!' ]]; then
+if [[ $(cat interrupt.output.txt) != 'Info: Interrupt flag was set!' ]]; then
     echo "Unexpected output!"
     exit 1
 fi

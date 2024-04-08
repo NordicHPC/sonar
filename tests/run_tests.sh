@@ -4,7 +4,7 @@
 # utility to be installed and will fail if it is not.
 
 set -e
-for test in command-line hostname interrupt sysinfo-syntax user; do
+for test in command-line hostname interrupt lockfile sysinfo-syntax user; do
     echo $test
     ./$test.sh
 done

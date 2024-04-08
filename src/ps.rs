@@ -253,6 +253,7 @@ pub fn create_snapshot(jobs: &mut dyn jobs::JobManager, opts: &PsOptions, timest
         }
 
         if skip {
+            // Test cases depend on this exact message.
             log::info("Lockfile present, exiting");
         }
         if failed {

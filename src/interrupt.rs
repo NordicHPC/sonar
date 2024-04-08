@@ -1,3 +1,5 @@
+use crate::log;
+
 use std::sync::atomic::{AtomicBool, Ordering};
 
 // Signal handling logic.
@@ -38,8 +40,8 @@ pub fn is_interrupted() -> bool {
     }
     let flag = INTERRUPTED.load(Ordering::Relaxed);
     if flag {
-        // Test cases depend on this exact output on stderr
-        eprintln!("Interrupt flag was set!")
+        // Test cases depend on this exact output.
+        log::info("Interrupt flag was set!")
     }
     flag
 }
