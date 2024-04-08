@@ -1,4 +1,6 @@
 #!/bin/bash
+#
+# Test that the --exclude-commands switch works.
 
 set -e
 ( cd .. ; cargo build )

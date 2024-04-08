@@ -1,4 +1,6 @@
 #!/bin/bash
+#
+# Test that the --exclude-users switch works.
 
 set -e
 ( cd .. ; cargo build )
