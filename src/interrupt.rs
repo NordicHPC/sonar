@@ -1,3 +1,4 @@
+#[cfg(debug_assertions)]
 use crate::log;
 
 use std::sync::atomic::{AtomicBool, Ordering};
