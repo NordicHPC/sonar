@@ -8,4 +8,3 @@ if [[ $(../target/debug/sonar ps | head -n 1 | grep ",host=$(hostname)," | wc -l
     echo "Wrong hostname??"
     exit 1
 fi
-

@@ -449,7 +449,7 @@ attack.  There are some rules:
 - Remember that indirect dependencies are dependencies for us, too, and need to be treated the same way
 - If in doubt: copy the parts we need, vet them thoroughly, and maintain them separately
 
-There is a useful discussion about thise matters [here](https://research.swtch.com/deps).
+There is a useful discussion of these matters [here](https://research.swtch.com/deps).
 
 ## How we run sonar on a cluster
 
