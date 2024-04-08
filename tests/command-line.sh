@@ -20,7 +20,7 @@ set -e
                       --exclude-users root \
                       --exclude-commands emacs \
                       --lockdir . \
-                      >> /dev/null
+                      > /dev/null
 
 # Signal error with code 2 for unknown arguments
 set +e
