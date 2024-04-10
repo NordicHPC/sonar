@@ -22,8 +22,9 @@ pub enum CmdError {
 // especially at https://github.com/rust-lang/rust/issues/45572#issuecomment-860134955.  See also
 // https://doc.rust-lang.org/std/process/index.html (second code blob under "Handling I/O").
 
-pub fn safe_command(command: &str, timeout_seconds: u64) -> Result<String, CmdError> {
-    let mut p = match Exec::shell(command)
+pub fn safe_command(command: &str, args: &[&str], timeout_seconds: u64) -> Result<String, CmdError> {
+    let mut p = match Exec::cmd(command)
+        .args(args)
         .stdout(Redirection::Pipe)
         .stderr(Redirection::Pipe)
         .popen()
@@ -162,35 +163,35 @@ fn format_failure(command: &str, stdout: &str, stderr: &str) -> String {
 #[test]
 fn test_safe_command() {
     // Should work, because we should be running this in the repo root.
-    match safe_command("ls Cargo.toml", 2) {
+    match safe_command("ls", &["Cargo.toml"], 2) {
         Ok(_) => {}
         Err(_) => assert!(false),
     }
     // This really needs to be the output
-    assert!(safe_command("grep '^name =' Cargo.toml", 2) == Ok("name = \"sonar\"\n".to_string()));
+    assert!(safe_command("grep", &["^name =", "Cargo.toml"], 2) == Ok("name = \"sonar\"\n".to_string()));
     // Not found
-    match safe_command("no-such-command-we-hope", 2) {
+    match safe_command("no-such-command-we-hope", &[], 2) {
         Err(CmdError::CouldNotStart(_)) => {}
         _ => {
             assert!(false)
         }
     }
     // Wrong permissions, not executable
-    match safe_command("/etc/passwd", 2) {
+    match safe_command("/etc/passwd", &[], 2) {
         Err(CmdError::CouldNotStart(_)) => {}
         _ => {
             assert!(false)
         }
     }
     // Should take too long
-    match safe_command("sleep 7", 2) {
+    match safe_command("sleep", &["7"], 2) {
         Err(CmdError::Hung(_)) => {}
         _ => {
             assert!(false)
         }
     }
     // Exited with error
-    match safe_command("ls /abracadabra", 2) {
+    match safe_command("ls", &["/abracadabra"], 2) {
         Err(CmdError::Failed(_)) => {}
         _ => {
             assert!(false)
@@ -198,7 +199,7 @@ fn test_safe_command() {
     }
     // Should work even though output is large, but we want a file that is always present.  The file
     // img/sonar.png is 1.2MB, which is probably good enough.
-    match safe_command("cat img/sonar.png", 5) {
+    match safe_command("cat", &["img/sonar.png"], 5) {
         Ok(_) => {}
         Err(_) => {
             assert!(false)

@@ -40,7 +40,7 @@ use crate::util::map;
 // too small.  This is presumably all driver dependent.)
 
 pub fn get_amd_configuration() -> Option<Vec<gpu::Card>> {
-    match command::safe_command("rocm-smi --showproductname", TIMEOUT_SECONDS) {
+    match command::safe_command("rocm-smi", &["--showproductname"], TIMEOUT_SECONDS) {
         Ok(raw_text) => {
             let mut cards = vec![];
             for l in raw_text.lines() {
@@ -74,9 +74,9 @@ pub fn get_amd_information(user_by_pid: &UserTable) -> Result<Vec<gpu::Process>,
     // I've not been able to combine the two invocations of rocm-smi yet; we have to run the command
     // twice.  Not a happy situation.
 
-    match command::safe_command(AMD_CONCISE_COMMAND, TIMEOUT_SECONDS) {
+    match command::safe_command(AMD_CONCISE_COMMAND, AMD_CONCISE_ARGS, TIMEOUT_SECONDS) {
         Ok(concise_raw_text) => {
-            match command::safe_command(AMD_SHOWPIDGPUS_COMMAND, TIMEOUT_SECONDS) {
+            match command::safe_command(AMD_SHOWPIDGPUS_COMMAND, AMD_SHOWPIDGPUS_ARGS, TIMEOUT_SECONDS) {
                 Ok(showpidgpus_raw_text) => Ok(extract_amd_information(
                     &concise_raw_text,
                     &showpidgpus_raw_text,
@@ -180,6 +180,7 @@ PID 28154 is using 1 DRM device(s):
 }
 
 const AMD_CONCISE_COMMAND: &str = "rocm-smi";
+const AMD_CONCISE_ARGS: &[&str] = &[];
 
 // Return a vector of AMD GPU utilization indexed by device number: (gpu%, mem%)
 //
@@ -238,7 +239,8 @@ GPU  Temp (DieEdge)  AvgPwr  SCLK     MCLK    Fan     Perf  PwrCap  VRAM%  GPU%
     assert!(xs.eq(&vec![(99.0, 57.0), (63.0, 5.0)]));
 }
 
-const AMD_SHOWPIDGPUS_COMMAND: &str = "rocm-smi --showpidgpus";
+const AMD_SHOWPIDGPUS_COMMAND: &str = "rocm-smi";
+const AMD_SHOWPIDGPUS_ARGS: &[&str] = &["--showpidgpus"];
 
 // Return a vector of (PID, DEVICES) where DEVICES is a vector of the devices used by the PID.  The
 // PID is a string, the devices are numbers.  See test cases below for the various forms

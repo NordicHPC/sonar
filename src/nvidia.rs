@@ -24,7 +24,7 @@ use crate::util::map;
 // Parsing all the output lines in order yields the information about all the cards.
 
 pub fn get_nvidia_configuration() -> Option<Vec<gpu::Card>> {
-    match command::safe_command("nvidia-smi -a", TIMEOUT_SECONDS) {
+    match command::safe_command("nvidia-smi", &["-a"], TIMEOUT_SECONDS) {
         Ok(raw_text) => {
             let mut cards = vec![];
             let mut looking_for_total = false;
@@ -77,10 +77,10 @@ pub fn get_nvidia_configuration() -> Option<Vec<gpu::Card>> {
 // command could not be found, we return Ok(vec![]).
 
 pub fn get_nvidia_information(user_by_pid: &UserTable) -> Result<Vec<gpu::Process>, String> {
-    match command::safe_command(NVIDIA_PMON_COMMAND, TIMEOUT_SECONDS) {
+    match command::safe_command(NVIDIA_PMON_COMMAND, NVIDIA_PMON_ARGS, TIMEOUT_SECONDS) {
         Ok(pmon_raw_text) => {
             let mut processes = parse_pmon_output(&pmon_raw_text, user_by_pid);
-            match command::safe_command(NVIDIA_QUERY_COMMAND, TIMEOUT_SECONDS) {
+            match command::safe_command(NVIDIA_QUERY_COMMAND, NVIDIA_QUERY_ARGS, TIMEOUT_SECONDS) {
                 Ok(query_raw_text) => {
                     processes.append(&mut parse_query_output(&query_raw_text, user_by_pid));
                     Ok(processes)
@@ -107,7 +107,8 @@ pub fn get_nvidia_information(user_by_pid: &UserTable) -> Result<Vec<gpu::Proces
 // TODO: We could consider using the underlying C library instead, but this adds a fair
 // amount of complexity.  See the nvidia-smi manual page.
 
-const NVIDIA_PMON_COMMAND: &str = "nvidia-smi pmon -c 1 -s mu";
+const NVIDIA_PMON_COMMAND: &str = "nvidia-smi";
+const NVIDIA_PMON_ARGS: &[&str] = &["pmon", "-c", "1", "-s", "mu"];
 
 // Returns (user-name, pid, command-name) -> (device-mask, gpu-util-pct, gpu-mem-pct, gpu-mem-size-in-kib)
 // where the values are summed across all devices and the device-mask is a bitmask for the
@@ -154,8 +155,10 @@ fn parse_pmon_output(raw_text: &str, user_by_pid: &UserTable) -> Vec<gpu::Proces
 // We use this to get information about processes that are not captured by pmon.  It's hacky
 // but it works.
 
-const NVIDIA_QUERY_COMMAND: &str =
-    "nvidia-smi --query-compute-apps=pid,used_memory --format=csv,noheader,nounits";
+const NVIDIA_QUERY_COMMAND: &str = "nvidia-smi";
+
+const NVIDIA_QUERY_ARGS: &[&str] =
+    &["--query-compute-apps=pid,used_memory", "--format=csv,noheader,nounits"];
 
 // Same signature as extract_nvidia_pmon_processes(), q.v. but user is always "_zombie_" and command
 // is always "_unknown_".  Only pids not in user_by_pid are returned.
