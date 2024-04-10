@@ -11,6 +11,7 @@ pub struct Process {
     pub cpu_pct: f64,
     pub mem_pct: f64,
     pub cputime_sec: usize,
+    pub childtime_sec: usize,
     pub mem_size_kib: usize,
     pub rssanon_kib: usize,
     pub command: String,
@@ -146,6 +147,7 @@ pub fn get_process_information(
         // various roundoff artifacts resulting in NaN or Infinity.
 
         let bsdtime_ticks;
+        let childtime_ticks;
         let mut realtime_ticks;
         let ppid;
         let sess;
@@ -210,6 +212,7 @@ pub fn get_process_information(
             let cutime_ticks = parse_usize_field(&fields, 13, &line, "stat", pid, "cutime")? as f64;
             let cstime_ticks = parse_usize_field(&fields, 14, &line, "stat", pid, "cstime")? as f64;
             bsdtime_ticks = utime_ticks + stime_ticks + cutime_ticks + cstime_ticks;
+            childtime_ticks = cutime_ticks + cstime_ticks;
             let start_time_ticks =
                 parse_usize_field(&fields, 19, &line, "stat", pid, "starttime")? as f64;
 
@@ -318,6 +321,7 @@ pub fn get_process_information(
 
         // clock_ticks_per_sec is nonzero, so this division will not produce NaN or Infinity
         let cputime_sec = (bsdtime_ticks / clock_ticks_per_sec).round() as usize;
+        let childtime_sec = (childtime_ticks / clock_ticks_per_sec).round() as usize;
 
         // Note ps uses rss not size here.  Also, ps doesn't trust rss to be <= 100% of memory, so
         // let's not trust it either.  memtotal_kib is nonzero, so this division will not produce
@@ -334,6 +338,7 @@ pub fn get_process_information(
             cpu_pct: pcpu_formatted,
             mem_pct: pmem,
             cputime_sec,
+            childtime_sec,
             mem_size_kib: size_kib,
             rssanon_kib,
             ppid,

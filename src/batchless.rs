@@ -1,10 +1,11 @@
 // jobs::JobManager for systems without a job queue.
 //
-// In this system, the job ID of a process is found by walking the tree of jobs from the PID until
-// we reach a process that is directly below a session leader, and then taking that process's PID as
-// the job ID.  (The session leader is a process whose session PID is its own PID.)  If the process
-// we're given is a session leader then we take its own PID to be the job ID.  Most other things end
-// up at the init process or at "the system", which is OK - their own PIDs are their job IDs.
+// In this system, the job ID of a process is found by walking the tree of processes from the PID
+// until we reach a process that is directly below a session leader, and then taking that process's
+// PID as the job ID.  (The session leader is a process whose session PID is its own PID.)  If the
+// process we're given is a session leader then we take its own PID to be the job ID.  Most other
+// things end up at the init process or at "the system", which is OK - their own PIDs are their job
+// IDs.
 //
 // There's a possibility that the job ID will be reused during the lifetime of the system, confusing
 // our statistics.  On Linux, the PIDs wrap around at about 4e6, and on a busy system this happens
@@ -14,14 +15,15 @@
 // There's also a challenge with this scheme in that, since the output is keyed on program name as
 // well as on user name and job ID, multiple output lines are going to have the same user name and
 // job ID in a tree of *different* processes (ie where subprocesses of the root process in the job
-// exec something with a different name).  This is not wrong but it is something that the consumer
-// must take into account.  For example, in assessing the resources for a job, the resources for all
-// the different programs for the job must be taken into account.
+// `exec()` something with a different name).  This is not wrong but it is something that the
+// consumer must take into account.  For example, in assessing the resources for a job, the
+// resources for all the different programs for the job must be taken into account.
 
 use crate::jobs;
 #[cfg(test)]
 use crate::jobs::JobManager;
 use crate::procfs;
+use std::cmp::max;
 use std::collections::HashMap;
 
 pub struct BatchlessJobManager {
@@ -91,6 +93,17 @@ impl jobs::JobManager for BatchlessJobManager {
                 probe = probe_parent;
             }
         }
+    }
+
+    fn rectify(&mut self, mut proc: procfs::Process) -> procfs::Process {
+        if proc.session == proc.pid {
+            // This is a session leader.  It should only have self time, not self+children, because
+            // its children are roots of process trees that constitute jobs, and we do not want the
+            // spent cpu time of terminated children to accumulate to e.g. login shells, nor do we
+            // want that time further accumulated up into processes that started a new subsession.
+            proc.cputime_sec = max(0, proc.cputime_sec - proc.childtime_sec);
+        }
+        proc
     }
 }
 
@@ -444,6 +457,7 @@ fn parsed_full_test_output() -> Vec<procfs::Process> {
         session: *session,
         cpu_pct: 0.0,
         cputime_sec: 0,
+        childtime_sec: 0,
         mem_pct: 0.0,
         mem_size_kib: 0,
         rssanon_kib: 0,
