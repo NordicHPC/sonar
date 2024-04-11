@@ -37,6 +37,5 @@ sleep $WAITTIME
 kill -TERM $SONARPID
 
 # Now process the output.  See check-output.c for details.
-cat $OUTFILE | awk -v WALLTIME=$((now - then)) -f check-output.awk
-
-
+gawk -vWALLTIME=$((now - then)) -f check-output.awk $OUTFILE
+echo "Everything is fine"
