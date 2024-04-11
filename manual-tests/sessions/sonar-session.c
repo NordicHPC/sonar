@@ -1,3 +1,5 @@
+/* The job of this program is to be the a session leader above the job root. */
+
 #include <assert.h>
 #include <errno.h>
 #include <stdio.h>
@@ -20,16 +22,16 @@ int main(int argc, char **argv) {
     /* Fork off the job root below us. */
     pid_t child = fork();
     if (child == (pid_t)-1) {
-        perror("Trying to fork a new process for sonar-job-root");
+        perror("Trying to fork a new process for sonar-job");
         exit(1);
     }
     if (child == 0) {
-        execl("sonar-job-root", "sonar-job-root", NULL);
-        perror("Trying to exec sonar-job-root");
+        execl("sonar-job", "sonar-job", NULL);
+        perror("Trying to exec sonar-job");
         exit(1);
     }
     if (wait(NULL) == -1) {
-        perror("Waiting for sonar-job-root");
+        perror("Waiting for sonar-job");
         exit(1);
     }
 }

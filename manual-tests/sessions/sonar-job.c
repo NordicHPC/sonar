@@ -1,15 +1,14 @@
+/* The job of this program is to be the parent process for a bunch of worker processes, which we run
+ * serially as that provides the best signal. */
+
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <sys/wait.h>
 
-/* This could be a parameter */
+/* TODO: This could be a parameter */
 #define ITERATIONS 5
-
-/* TODO: Whether we run things in parallel (multicore is a thing) could be a parameter,
- * complicates the wait logic slightly.
- */
 
 int main(int argc, char **argv) {
     for ( int i=0 ; i < ITERATIONS ; i++ ) {
