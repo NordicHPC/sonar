@@ -17,6 +17,7 @@ pub struct Process {
     pub command: String,
     pub ppid: usize,
     pub session: usize,
+    pub process_group: usize,
 }
 
 /// Read the /proc/meminfo file from the fs and return the value for total installed memory.
@@ -150,6 +151,7 @@ pub fn get_process_information(
         let childtime_ticks;
         let mut realtime_ticks;
         let ppid;
+        let pgrp;
         let sess;
         let mut comm;
         let utime_ticks;
@@ -206,6 +208,7 @@ pub fn get_process_information(
             }
 
             ppid = parse_usize_field(&fields, 1, &line, "stat", pid, "ppid")?;
+            pgrp = parse_usize_field(&fields, 2, &line, "stat", pid, "pgrp")?;
             sess = parse_usize_field(&fields, 3, &line, "stat", pid, "sess")?;
             utime_ticks = parse_usize_field(&fields, 11, &line, "stat", pid, "utime")? as f64;
             stime_ticks = parse_usize_field(&fields, 12, &line, "stat", pid, "stime")? as f64;
@@ -343,6 +346,7 @@ pub fn get_process_information(
             rssanon_kib,
             ppid,
             session: sess,
+            process_group: pgrp,
             command: comm,
         });
     }
