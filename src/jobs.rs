@@ -10,6 +10,6 @@ pub trait JobManager {
     // performed on a particular instance of JobManager.
     fn job_id_from_pid(&mut self, pid: usize, processes: &[procfs::Process]) -> usize;
 
-    // Postprocess the raw process data in a context-specific way.
-    fn rectify(&mut self, proc: procfs::Process) -> procfs::Process;
+    // After process extraction, apply process-local adjustments for the job manager type.
+    fn adjust_process_in_isolation(&mut self, proc: procfs::Process) -> procfs::Process;
 }

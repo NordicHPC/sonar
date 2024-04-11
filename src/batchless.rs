@@ -95,7 +95,7 @@ impl jobs::JobManager for BatchlessJobManager {
         }
     }
 
-    fn rectify(&mut self, mut proc: procfs::Process) -> procfs::Process {
+    fn adjust_process_in_isolation(&mut self, mut proc: procfs::Process) -> procfs::Process {
         if proc.session == proc.pid {
             // This is a session leader.  It should only have self time, not self+children, because
             // its children are roots of process trees that constitute jobs, and we do not want the

@@ -14,7 +14,7 @@ impl jobs::JobManager for SlurmJobManager {
         slurm_job_id.trim().parse::<usize>().unwrap_or_default()
     }
 
-    fn rectify(&mut self, proc: procfs::Process) -> procfs::Process {
+    fn adjust_process_in_isolation(&mut self, proc: procfs::Process) -> procfs::Process {
         // No-op
         proc
     }
