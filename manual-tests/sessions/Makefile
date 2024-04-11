@@ -5,5 +5,4 @@ CXXFLAGS=-O2
 
 all: $(PROGRAMS)
 clean:
-	rm -f $(PROGRAMS) *.o
-
+	rm -f $(PROGRAMS) *.o sonar-output.txt
