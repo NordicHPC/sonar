@@ -281,9 +281,7 @@ fn do_create_snapshot(
     };
 
     let procinfo_output = match procfs::get_process_information(&fs, memtotal_kib) {
-        Ok(mut result) => {
-            result.drain(0..).map(|p| jobs.adjust_process_in_isolation(p)).collect::<Vec<procfs::Process>>()
-        }
+        Ok(result) => jobs.preprocess(result),
         Err(msg) => {
             log::error(&format!("procfs failed: {msg}"));
             return;

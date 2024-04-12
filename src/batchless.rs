@@ -27,31 +27,41 @@ use crate::jobs;
 #[cfg(test)]
 use crate::jobs::JobManager;
 use crate::procfs;
-use std::cmp::max;
 use std::collections::HashMap;
 
 struct Procinfo {
+    // the index of this process in the process table
     index: usize,
+
+    // the index of the process's parent
     parent_index: Option<usize>,
+
+    // the indices of the process's children
     child_indices: Vec<usize>,
 }
 
 pub struct BatchlessJobManager {
-    tree: HashMap<usize, Procinfo>,
+    procs: HashMap<usize, Procinfo>,
 }
 
 impl BatchlessJobManager {
     pub fn new() -> BatchlessJobManager {
         BatchlessJobManager {
-            tree: HashMap::new(),
+            procs: HashMap::new(),
         }
     }
 }
 
 impl jobs::JobManager for BatchlessJobManager {
+    // Preprocessing does two things:
+    //
+    //  - it populates self.procs so that we can quickly find process data by pid
+    //  - it adjusts the cputime_sec field of processes whose child processes are process group
+    //    leaders, so that the time from a job does not accrue to the parent process of the job.
+    //
     fn preprocess(&mut self, mut processes: Vec<procfs::Process>) -> Vec<procfs::Process> {
         for (ix, proc) in processes.iter().enumerate() {
-            self.tree.insert(proc.pid, Procinfo{
+            self.procs.insert(proc.pid, Procinfo{
                 index: ix,
                 parent_index: None,
                 child_indices: vec![],
@@ -60,69 +70,44 @@ impl jobs::JobManager for BatchlessJobManager {
 
         for (ix, proc) in processes.iter().enumerate() {
             let parent_ix =
-                if let Some(parent) = self.tree.get_mut(&proc.ppid) {
+                if let Some(parent) = self.procs.get_mut(&proc.ppid) {
                     parent.child_indices.push(ix);
                     Some(parent.index)
                 } else {
                     None
                 };
-            if let Some(entry) = self.tree.get_mut(&proc.pid) {
-                entry.parent_index = parent_ix;
-            }
+            self.procs.get_mut(&proc.pid).expect("No process!").parent_index = parent_ix;
         }
 
-        // TODO: Adjust the cputime_sec field of all the entries!  Then we need do nothing more.
+        // Adjust the cputime_sec field of the entries.
+        //
+        // This needs to be careful about ordering - it must proceed bottom-up.  Consider a case where
+        // jobs are nested A - B - C.  B must be adjusted before A is adjusted.
+
+        let mut i = 0;
+        while i < processes.len() {
+            let pid = processes[i].pid;
+            let mut time = processes[i].cputime_sec;
+            for c in self.procs.get(&pid).expect("No process!").child_indices.iter() {
+                let child = &processes[self.procs.get(c).expect("No child!").index];
+                if child.pid == child.process_group {
+                    time -= child.cputime_sec;
+                }
+            }
+            processes[i].cputime_sec = time;
+            i += 1;
+        }
+
+        processes
     }
 
     fn job_id_from_pid(&mut self, proc_pid: usize, processes: &[procfs::Process]) -> usize {
-        if self.tree.is_empty() {
-            panic!("Not initialized");
-        }
-        if let Some(probe) = self.tree.get(&proc_pid) {
+        if let Some(probe) = self.procs.get(&proc_pid) {
             processes[probe.index].process_group
         } else {
             // Lost process is job 0
             0
         }
-    }
-
-/*
-            loop {
-                let (proc_session, parent_pid) = probe.unwrap();
-                if proc_session == 0 {
-                    // System process is its own job
-                    break proc_session;
-                }
-                if proc_session == proc_pid {
-                    // Session leader is its own job
-                    break proc_session;
-                }
-                let probe_parent = self.lookup(processes, parent_pid);
-                if probe_parent.is_none() {
-                    // Orphaned subprocess is its own job
-                    break proc_session;
-                }
-                let (parent_session, _) = probe_parent.unwrap();
-                if parent_pid == parent_session {
-                    // Parent process is session leader, so this process is the job root
-                    break proc_pid;
-                }
-                proc_pid = parent_pid;
-                probe = probe_parent;
-            }
-        }
-    }
-     */
-
-    fn adjust_process_in_isolation(&mut self, mut proc: procfs::Process) -> procfs::Process {
-        if proc.session == proc.pid {
-            // This is a session leader.  It should only have self time, not self+children, because
-            // its children are roots of process trees that constitute jobs, and we do not want the
-            // spent cpu time of terminated children to accumulate to e.g. login shells, nor do we
-            // want that time further accumulated up into processes that started a new subsession.
-            proc.cputime_sec = max(0, proc.cputime_sec - proc.childtime_sec);
-        }
-        proc
     }
 }
 

@@ -4,12 +4,14 @@
 use crate::procfs;
 
 pub trait JobManager {
+    // After process extraction, preprocess process data for the job manager type.  This may alter
+    // some process data.
+    fn preprocess(&mut self, processes: Vec<procfs::Process>) -> Vec<procfs::Process>;
+
     // Compute a job ID from a process ID.
     //
     // There's an assumption here that the process slice is always the same for all lookups
-    // performed on a particular instance of JobManager.
+    // performed on a particular instance of JobManager, and that this slice is of the full vector
+    // returned from preprocess(), above.
     fn job_id_from_pid(&mut self, pid: usize, processes: &[procfs::Process]) -> usize;
-
-    // After process extraction, apply process-local adjustments for the job manager type.
-    fn adjust_process_in_isolation(&mut self, proc: procfs::Process) -> procfs::Process;
 }

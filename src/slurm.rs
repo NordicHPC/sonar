@@ -9,14 +9,14 @@ use std::io::{BufRead, BufReader};
 pub struct SlurmJobManager {}
 
 impl jobs::JobManager for SlurmJobManager {
+    fn preprocess(&mut self, processes: Vec<procfs::Process>) -> Vec<procfs::Process> {
+        // No-op for slurm
+        processes
+    }
+
     fn job_id_from_pid(&mut self, pid: usize, _processes: &[procfs::Process]) -> usize {
         let slurm_job_id = get_slurm_job_id(pid).unwrap_or_default();
         slurm_job_id.trim().parse::<usize>().unwrap_or_default()
-    }
-
-    fn adjust_process_in_isolation(&mut self, proc: procfs::Process) -> procfs::Process {
-        // No-op
-        proc
     }
 }
 
