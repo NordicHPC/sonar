@@ -1,7 +1,8 @@
 .PHONY: all clean
 
 PROGRAMS=sonar-session sonar-job sonar-worker
-CXXFLAGS=-O2
+CFLAGS=-Wall
+CXXFLAGS=-O2 -Wall
 
 all: $(PROGRAMS)
 clean:

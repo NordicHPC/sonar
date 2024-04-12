@@ -20,12 +20,12 @@ void init_matrix(T mat[N][M], int scheme) {
 }
 
 void mmul(float A[N][N], float B[N][N], float C[N][N]) {
-  for ( int kk=0 ; kk < N ; kk+=S ) {
-    for ( int jj=0 ; jj < N ; jj+=S ) {
-      for ( int i=0 ; i < N ; i++ ) {
-	for ( int j=jj ; j < jj + S ; j++ ) {
+  for ( size_t kk=0 ; kk < N ; kk+=S ) {
+    for ( size_t jj=0 ; jj < N ; jj+=S ) {
+      for ( size_t i=0 ; i < N ; i++ ) {
+	for ( size_t j=jj ; j < jj + S ; j++ ) {
 	  float sum = C[i][j];
-	  for ( int k=kk ; k < kk + S ; k++ ) {
+	  for ( size_t k=kk ; k < kk + S ; k++ ) {
 	    sum += A[i][k] * B[k][j];
 	  }
 	  C[i][j] = sum;
@@ -46,8 +46,8 @@ int main(int argc, char** argv) {
 
   // Use the result
   float sum = 0.0f;
-  for ( int j=0 ; j < N ; j++ ) {
-      for ( int i=0 ; i < N ; i++ ) {
+  for ( size_t j=0 ; j < N ; j++ ) {
+      for ( size_t i=0 ; i < N ; i++ ) {
           sum += C[j][i];
       }
   }

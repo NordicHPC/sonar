@@ -8,10 +8,10 @@
 #include <sys/wait.h>
 
 int main(int argc, char **argv) {
-    /* When the shell starts this process it may make it a session leader, otherwise, become one. */
+    /* When the shell starts this process it may make it a process group leader, otherwise, become one. */
     if (getpid() != getpgid(0)) {
-        if (setsid() == (pid_t)-1) {
-            perror("Trying to become session leader");
+        if (setpgid(0, 0) == -1) {
+            perror("Trying to become process group leader");
             exit(1);
         }
     }
@@ -36,6 +36,6 @@ int main(int argc, char **argv) {
 
     /* Wait a bit, so that information from the terminated job can be accounted to the current
        process. */
-    printf("Waiting 10s for things to settle...\n");
+    printf("Waiting 10s in sonar-session for things to settle...\n");
     sleep(10);
 }

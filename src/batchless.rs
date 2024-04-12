@@ -79,17 +79,67 @@ impl jobs::JobManager for BatchlessJobManager {
             self.procs.get_mut(&proc.pid).expect("No process!").parent_index = parent_ix;
         }
 
+        // TODO: The "job ID" for a job should be the process group ID.  This does not really
+        // reflect much of a change from the current setup but is More Correct.
+        //
+        // Note that *mostly* processes will be created and destroyed in a structured way, it is
+        // rare that a parent exits before the child.  So *mostly* a traversal of the data with a
+        // tree assumption will be just fine.
+        //
+        // If a parent exits before its child then there are special rules.  From the waitpid(2) man
+        // page:
+        /*
+       A  child  that  terminates, but has not been waited for becomes a "zom‐
+       bie".  The kernel maintains a minimal set of information about the zom‐
+       bie process (PID, termination status, resource  usage  information)  in
+       order to allow the parent to later perform a wait to obtain information
+       about  the  child.   As long as a zombie is not removed from the system
+       via a wait, it will consume a slot in the kernel process table, and  if
+       this  table fills, it will not be possible to create further processes.
+       If a parent process terminates, then its "zombie" children (if any) are
+       adopted by init(1), (or by the nearest "subreaper" process  as  defined
+       through  the  use  of  the  prctl(2) PR_SET_CHILD_SUBREAPER operation);
+       init(1) automatically performs a wait to remove the zombies.
+
+       POSIX.1-2001 specifies that if the disposition of  SIGCHLD  is  set  to
+       SIG_IGN or the SA_NOCLDWAIT flag is set for SIGCHLD (see sigaction(2)),
+       then children that terminate do not become zombies and a call to wait()
+       or  waitpid()  will  block until all children have terminated, and then
+       fail with errno set to ECHILD.
+         */
+        //
+        // Note the normal disposition for SIGCHLD is SIG_IGN.
+        //
+        // I think the upshot of this is that (a) *almost always* we can depend on a tree structure
+        // and (b) in the cases when there isn't a tree structure because the parent has exited, the
+        // usage data from the child will *not* percolate up our process tree, but will be lost in
+        // init, which is exactly what we want.
+
+
+
         // Adjust the cputime_sec field of the entries.
         //
         // This needs to be careful about ordering - it must proceed bottom-up.  Consider a case where
         // jobs are nested A - B - C.  B must be adjusted before A is adjusted.
+
+        // When we subtract T from a process P and P is a child of a job A then we need to subtract T
+        // from all the parents of A up to P.
+
+        // In general, the two aspects fit together:
+        //  - dfs-traverse the tree yielding a toposort
+        //  - working from the rear, if a process is a pg leader then subtract its total time from all
+        //    the process parents all the way to the top of its tree
+        //  - there is going to be a problem with discontinuities in the tree if an intermediary process exits,
+        //    sonar may not observe it
+
+        // even dfs is suspect, there is not one root but many
 
         let mut i = 0;
         while i < processes.len() {
             let pid = processes[i].pid;
             let mut time = processes[i].cputime_sec;
             for c in self.procs.get(&pid).expect("No process!").child_indices.iter() {
-                let child = &processes[self.procs.get(c).expect("No child!").index];
+                let child = &processes[*c];
                 if child.pid == child.process_group {
                     time -= child.cputime_sec;
                 }
