@@ -1,8 +1,73 @@
-// jobs::JobManager for systems without a job queue.
+// jobs::JobManager for systems without a batch job queue.
 //
-// In this system, the job ID of a process is always its process group.  Since 4.3BSD it's been the
-// case that the process group *is* a job, and POSIX defines it thus.
+// Since 4.3BSD it's been the case that "job" === "a process group", and POSIX defines it thus.
+// Hence the process group ID of a process is its job ID.  The process group ID is usually the
+// process ID of the first process in the process group (and it's always the process ID of *some*
+// process).
 //
+// Each job is a little tree of processes, and a job can and frequently will have subjobs.  For
+// example, when the shell forks off a pipeline it puts the pipeline into a new process group.
+// Shell job control works on the level of the process group.
+//
+// When a process creates a subprocess the subprocess will accumulate usage information, notably
+// system and user time.  When the subprocess exits, and the parent process waits for it, this usage
+// information is aggregated in the parent process as the "cutime" and "cstime" fields.  Thus when a
+// job consists of multiple processes, the root process in the job will eventually have an
+// accounting of all the time spent in the children in the job.
+//
+// This system is fairly reliable because processes almost always are created and destroyed in a
+// tree-like fashion - data will bubble up toward the job root.  When Sonar observes process data,
+// it will see this tree.
+//
+// This system breaks down however when a job creates a subjob, because the root process of the
+// subjob is a subprocess of a process in the parent job.  The usage data for the subjob will be
+// aggregated in the parent process of the subjob's root process, in the parent job.  We don't want
+// that: the usage for each job should not affect that of other jobs.
+//
+// In order to fix this, the batchless job manager of Sonar will recreate the process and job tree,
+// and, working bottom-up, will subtract job data for subjobs from parent jobs.
+//
+// ==> But oh, sonar is history-less, and this accounting only happens after a process has been
+//     waited on, at which point we don't know the subjob data.
+//
+// The way to fix this is probably in sonalyze: for each process, log its job ID and its self time
+// and the fact that it's batchless, and roll up the job when we have all the data for all the
+// processes.  Always roll up "self" times, ignore child times - children will account for
+// themselves.  This will strongly tend to underreport short-lived child jobs though.
+//
+//
+//
+//  : if A creates B which creates C, and B exits, B is kept around as a zombie until C exits,
+// at which point data for B and C are aggregated into A.
+//
+// From the waitpid(2) man page:
+//
+//     A  child  that  terminates, but has not been waited for becomes a "zom‐
+//     bie".  The kernel maintains a minimal set of information about the zom‐
+//     bie process (PID, termination status, resource  usage  information)  in
+//     order to allow the parent to later perform a wait to obtain information
+//     about  the  child.   As long as a zombie is not removed from the system
+//     via a wait, it will consume a slot in the kernel process table ....
+//     If a parent process terminates, then its "zombie" children (if any) are
+//     adopted by init(1), (or by the nearest "subreaper" process  as  defined
+//     through  the  use  of  the  prctl(2) PR_SET_CHILD_SUBREAPER operation);
+//     init(1) automatically performs a wait to remove the zombies.
+//
+//     POSIX.1-2001 specifies that if the disposition of  SIGCHLD  is  set  to
+//     SIG_IGN or the SA_NOCLDWAIT flag is set for SIGCHLD (see sigaction(2)),
+//     then children that terminate do not become zombies and a call to wait()
+//     or  waitpid()  will  block until all children have terminated, and then
+//     fail with errno set to ECHILD.
+//
+// (The normal disposition for SIGCHLD is SIG_IGN.)
+//
+// I think the upshot of this is that (a) *almost always* we can depend on a tree structure
+// and (b) in the cases when there isn't a tree structure because the parent has exited, the
+// usage data from the child will *not* percolate up our process tree, but will be lost in
+// init, which is exactly what we want.
+
+// To solve this problem,
+
 // A process group leader L is always a subprocess of some P and thus normally L's CPU time is going
 // to be accounted to the child time in P when P has wait()ed for L.  But this will confuse the
 // statistics, and we must avoid that.  Any parent P of a process group leader L should therefore
