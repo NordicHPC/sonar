@@ -1,11 +1,13 @@
 /// Collect CPU process information without GPU information, from files in /proc.
 use crate::procfsapi::{self, parse_usize_field};
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 #[derive(PartialEq, Debug)]
 pub struct Process {
     pub pid: usize,
+    pub ppid: usize,
+    pub pgrp: usize,
     pub uid: usize,
     pub user: String, // _noinfo_<uid> if name unobtainable
     pub cpu_pct: f64,
@@ -14,8 +16,7 @@ pub struct Process {
     pub mem_size_kib: usize,
     pub rssanon_kib: usize,
     pub command: String,
-    pub ppid: usize,
-    pub session: usize,
+    pub has_children: bool,
 }
 
 /// Read the /proc/meminfo file from the fs and return the value for total installed memory.
@@ -88,8 +89,8 @@ fn i32_field(l: &str) -> Result<i32, String> {
     }
 }
 
-/// Obtain process information via /proc and return a vector of structures with all the information
-/// we need.  In the returned vector, pids uniquely tag the records.
+/// Obtain process information via /proc and return a hashmap of structures with all the information
+/// we need, keyed by pid.  Pids uniquely tag the records.
 ///
 /// This returns Ok(data) on success, otherwise Err(msg).
 ///
@@ -102,7 +103,7 @@ fn i32_field(l: &str) -> Result<i32, String> {
 pub fn get_process_information(
     fs: &dyn procfsapi::ProcfsAPI,
     memtotal_kib: usize,
-) -> Result<Vec<Process>, String> {
+) -> Result<HashMap<usize, Process>, String> {
     // The boot time is the `btime` field of /proc/stat.  It is measured in seconds since epoch.  We
     // need this to compute the process's real time, which we need to compute ps-compatible cpu
     // utilization.
@@ -134,7 +135,8 @@ pub fn get_process_information(
     // Collect remaining system data from /proc/{pid}/stat for the enumerated pids.
 
     let kib_per_page = fs.page_size_in_kib();
-    let mut result = vec![];
+    let mut result = HashMap::<usize, Process>::new();
+    let mut ppids = HashSet::<usize>::new();
     let mut user_table = UserTable::new();
     let clock_ticks_per_sec = fs.clock_ticks_per_sec() as f64;
     if clock_ticks_per_sec == 0.0 {
@@ -148,7 +150,7 @@ pub fn get_process_information(
         let bsdtime_ticks;
         let mut realtime_ticks;
         let ppid;
-        let sess;
+        let pgrp;
         let mut comm;
         let utime_ticks;
         let stime_ticks;
@@ -204,7 +206,7 @@ pub fn get_process_information(
             }
 
             ppid = parse_usize_field(&fields, 1, &line, "stat", pid, "ppid")?;
-            sess = parse_usize_field(&fields, 3, &line, "stat", pid, "sess")?;
+            pgrp = parse_usize_field(&fields, 2, &line, "stat", pid, "pgrp")?;
 
             // Generally we want to record cumulative self+child time.  The child time we read will
             // be for children that have terminated and have been wait()ed for.  The logic is that
@@ -348,8 +350,10 @@ pub fn get_process_information(
             99.9,
         );
 
-        result.push(Process {
+        result.insert(pid, Process {
             pid,
+            ppid,
+            pgrp,
             uid: uid as usize,
             user: user_table.lookup(fs, uid),
             cpu_pct: pcpu_formatted,
@@ -357,10 +361,15 @@ pub fn get_process_information(
             cputime_sec,
             mem_size_kib: size_kib,
             rssanon_kib,
-            ppid,
-            session: sess,
             command: comm,
+            has_children: false,
         });
+        ppids.insert(ppid);
+    }
+
+    // Mark the processes that have children.
+    for (_, p) in result.iter_mut() {
+        p.has_children = ppids.contains(&p.pid);
     }
 
     Ok(result)
@@ -506,15 +515,16 @@ DirectMap1G:    11534336 kB
 
     let fs = procfsapi::MockFS::new(files, pids, users, now);
     let memtotal_kib = get_memtotal_kib(&fs).unwrap();
-    let info = get_process_information(&fs, memtotal_kib).unwrap();
+    let mut info = get_process_information(&fs, memtotal_kib).unwrap();
     assert!(info.len() == 1);
-    let p = &info[0];
+    let mut xs = info.drain();
+    let p = xs.next().expect("Something").1;
     assert!(p.pid == 4018); // from enumeration of /proc
     assert!(p.uid == 1000); // ditto
     assert!(p.user == "zappa"); // from getent
     assert!(p.command == "firefox"); // field(/proc/4018/stat, 2)
     assert!(p.ppid == 2190); // field(/proc/4018/stat, 4)
-    assert!(p.session == 2189); // field(/proc/4018/stat, 6)
+    assert!(p.pgrp == 2189); // field(/proc/4018/stat, 5)
 
     let now_time = now as f64;
     let now_ticks = now_time * ticks_per_sec;
@@ -572,15 +582,21 @@ pub fn procfs_dead_and_undead_test() {
 
     let fs = procfsapi::MockFS::new(files, pids, users, procfsapi::unix_now());
     let memtotal_kib = get_memtotal_kib(&fs).unwrap();
-    let info = get_process_information(&fs, memtotal_kib).unwrap();
+    let mut info = get_process_information(&fs, memtotal_kib).unwrap();
 
     // 4020 should be dropped - it's dead
     assert!(info.len() == 2);
 
-    assert!(info[0].pid == 4018);
-    assert!(info[0].command == "firefox");
-    assert!(info[1].pid == 4019);
-    assert!(info[1].command == "firefox <defunct>");
+    let mut xs = info.drain();
+    let mut p = xs.next().expect("Something").1;
+    let mut q = xs.next().expect("Something else").1;
+    if p.pid > q.pid {
+        (p, q) = (q, p);
+    }
+    assert!(p.pid == 4018);
+    assert!(p.command == "firefox");
+    assert!(q.pid == 4019);
+    assert!(q.command == "firefox <defunct>");
 }
 
 #[test]

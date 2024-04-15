@@ -54,6 +54,10 @@ These rules are new with v0.8.0.
 
 **Less output**.  Removed the `cores` and `memtotalkib` fields, as they are supplied by `sonar sysinfo`.
 
+**Batchless job ID**.  The meaning of the `job` field for systems without a batch queue (`sonar ps
+--batchless`) has changed from being the pid of the process below the session leader to being the
+more conventional process group id.  In most situations this won't make a difference.
+
 ### Changes in v0.9.x
 
 **Sysinfo introduced**.  The `sonar sysinfo` subcommand was introduced to extract information about

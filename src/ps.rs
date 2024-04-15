@@ -292,13 +292,13 @@ fn do_create_snapshot(
 
     // The table of users is needed to get GPU information, see comments at UserTable.
     let mut user_by_pid = UserTable::new();
-    for proc in pprocinfo_output {
+    for (_, proc) in pprocinfo_output {
         user_by_pid.insert(proc.pid, (&proc.user, proc.uid));
     }
 
     let mut lookup_job_by_pid = |pid: Pid| jobs.job_id_from_pid(pid, pprocinfo_output);
 
-    for proc in pprocinfo_output {
+    for (_, proc) in pprocinfo_output {
         add_proc_info(
             &mut proc_by_pid,
             &mut lookup_job_by_pid,
