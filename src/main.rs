@@ -17,6 +17,7 @@ mod users;
 mod util;
 
 const TIMEOUT_SECONDS: u64 = 5; // For subprocesses
+const USAGE_ERROR: i32 = 2;     // clap, Python, Go
 
 enum Commands {
     /// Take a snapshot of the currently running processes
@@ -166,6 +167,10 @@ fn command_line() -> Commands {
                         break;
                     }
                 }
+                if rollup && batchless {
+                    eprintln!("--rollup and --batchless are incompatible");
+                    std::process::exit(USAGE_ERROR);
+                }
                 return Commands::PS {
                     batchless,
                     rollup,
@@ -228,7 +233,8 @@ Options for `ps`:
   --batchless
       Synthesize a job ID from the process tree in which a process finds itself
   --rollup
-      Merge process records that have the same job ID and command name
+      Merge process records that have the same job ID and command name (not
+      compatible with --batchless)
   --min-cpu-percent percentage
       Include records for jobs that have on average used at least this
       percentage of CPU, note this is nonmonotonic [default: none]
@@ -250,5 +256,5 @@ Options for `ps`:
 ",
     );
     let _ = out.flush();
-    std::process::exit(if is_error { 2 } else { 0 });
+    std::process::exit(if is_error { USAGE_ERROR } else { 0 });
 }

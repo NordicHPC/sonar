@@ -650,7 +650,13 @@ fn print_record(
         fields.push(format!("job={}", proc_info.job_id));
     }
     if proc_info.rolledup == 0 && proc_info.pid != 0 {
+        // pid must be 0 for rolledup > 0 as there is no guarantee that there is any fixed
+        // representative pid for a rolled-up set of processes: the set can change from run to run,
+        // and sonar has no history.
         fields.push(format!("pid={}", proc_info.pid));
+    }
+    if proc_info.ppid != 0 {
+        fields.push(format!("ppid={}", proc_info.ppid));
     }
     if proc_info.cpu_percentage != 0.0 {
         fields.push(format!("cpu%={}", three_places(proc_info.cpu_percentage)));

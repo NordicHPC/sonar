@@ -50,13 +50,18 @@ affect the output nevertheless, ie, most changes not covered by changes to the m
 
 These rules are new with v0.8.0.
 
+### Changes in v0.11.x
+
+**Better `ps` data**.  More data points. (v0.11.0)
+
 ### Changes in v0.10.x
 
-**Less output**.  Removed the `cores` and `memtotalkib` fields, as they are supplied by `sonar sysinfo`.
+**Less output**.  Removed the `cores` and `memtotalkib` fields, as they are supplied by `sonar
+sysinfo`. (v0.10.0)
 
 **Batchless job ID**.  The meaning of the `job` field for systems without a batch queue (`sonar ps
 --batchless`) has changed from being the pid of the process below the session leader to being the
-more conventional process group id.  In most situations this won't make a difference.
+more conventional process group id.  In most situations this won't make a difference. (v0.10.1)
 
 ### Changes in v0.9.x
 
@@ -174,6 +179,12 @@ v=0.7.0,time=2023-08-10T11:09:41+02:00,host=somehost,cores=8,user=someone,job=0,
 v=0.7.0,time=2023-08-10T11:09:41+02:00,host=somehost,cores=8,user=someone,job=0,cmd=slack,cpu%=3.9,cpukib=716924,gpus=none,gpu%=0,gpumem%=0,gpukib=0,cputime_sec=266
 ```
 
+### Version 0.11.0 `ps` output format
+
+Version 0.11.0 adds one field:
+
+`ppid` (optional, default "0"): The parent process ID of the job, a positive integer.
+
 ### Version 0.10.0 `ps` output format
 
 The fields `cores` and `memtotalkib` were removed, as they were unused by all clients and are
@@ -255,6 +266,8 @@ ID.  Multiple records with the job ID 0 should never be merged into a single job
 `pid` (optional, default "0"): The process ID of the job, a positive integer.  For a rolled-up job
 (see `rolledup` below) this has value zero.  Otherwise, this record represents one process and so
 the field holds the process ID.
+
+`ppid` (optional, default "0"): The parent process ID of the job, a positive integer.
 
 `cpu%` (optional, default "0"): The running average CPU percentage over the true lifetime of the
 process (ie computed independently of the sonar log), a nonnegative floating-point number.  100.0
