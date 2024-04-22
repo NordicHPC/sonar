@@ -205,6 +205,26 @@ pub fn get_process_information(
 
             ppid = parse_usize_field(&fields, 1, &line, "stat", pid, "ppid")?;
             sess = parse_usize_field(&fields, 3, &line, "stat", pid, "sess")?;
+
+            // Generally we want to record cumulative self+child time.  The child time we read will
+            // be for children that have terminated and have been wait()ed for.  The logic is that
+            // in a tree of processes in a job, Sonar will observe the parent and the children
+            // independently and their respective (cumulative) cpu times, and then when the children
+            // exit the time they spent will not be lost but will be accounted for as child time in
+            // the parent, and the parent will later be observed by Sonar again.  In addition,
+            // children that are relatively short-lived and not observed by Sonar at all are
+            // accounted for in this manner.  The result is that the observed CPU time in a process
+            // tree is pretty accurate (except that we lose some data between the last observation
+            // and root process termination).
+            //
+            // However, there is a problem if jobs can be nested within the process tree and we want
+            // to account jobs separately.  The root process of a subjob is the child of some
+            // process in the parent job.  When the root of the subjob exits, its time is propagated
+            // up to the parent job, which therefore can sometimes appear to have used an impossible
+            // amount of CPU time in a very short time.  Sonar *cannot* correct for this problem: it
+            // has no history, and has no notion of a job or process being "gone".  Instead, enough
+            // data must be emitted by Sonar for a postprocessor of the data to reconstruct the job
+            // tree and correct the data, if necessary.
             utime_ticks = parse_usize_field(&fields, 11, &line, "stat", pid, "utime")? as f64;
             stime_ticks = parse_usize_field(&fields, 12, &line, "stat", pid, "stime")? as f64;
             let cutime_ticks = parse_usize_field(&fields, 13, &line, "stat", pid, "cutime")? as f64;
@@ -316,7 +336,8 @@ pub fn get_process_information(
         let pcpu_value = (utime_ticks + stime_ticks) / realtime_ticks;
         let pcpu_formatted = (pcpu_value * 1000.0).round() / 10.0;
 
-        // clock_ticks_per_sec is nonzero, so this division will not produce NaN or Infinity
+        // clock_ticks_per_sec is nonzero, so this division will not produce NaN or Infinity.  See
+        // block comment earlier about why bsdtime_ticks is the best base value here.
         let cputime_sec = (bsdtime_ticks / clock_ticks_per_sec).round() as usize;
 
         // Note ps uses rss not size here.  Also, ps doesn't trust rss to be <= 100% of memory, so
