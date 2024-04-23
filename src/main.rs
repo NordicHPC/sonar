@@ -167,7 +167,14 @@ fn command_line() -> Commands {
                         break;
                     }
                 }
-                if rollup && batchless {
+
+                #[cfg(debug_assertions)]
+                let allow_incompatible = std::env::var("SONARTEST_ROLLUP").is_ok();
+
+                #[cfg(not(debug_assertions))]
+                let allow_incompatible = false;
+
+                if rollup && batchless && !allow_incompatible {
                     eprintln!("--rollup and --batchless are incompatible");
                     std::process::exit(USAGE_ERROR);
                 }
