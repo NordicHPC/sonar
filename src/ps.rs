@@ -66,8 +66,10 @@ struct ProcInfo<'a> {
     _uid: usize,
     command: &'a str,
     pid: Pid,
+    ppid: Pid,
     rolledup: usize,
     is_system_job: bool,
+    has_children: bool,
     job_id: usize,
     cpu_percentage: f64,
     cputime_sec: usize,
@@ -108,6 +110,8 @@ fn add_proc_info<'a, F>(
     uid: usize,
     command: &'a str,
     pid: Pid,
+    ppid: Pid,
+    has_children: bool,
     cpu_percentage: f64,
     cputime_sec: usize,
     mem_percentage: f64,
@@ -133,14 +137,18 @@ fn add_proc_info<'a, F>(
             e.gpu_percentage += gpu_percentage;
             e.gpu_mem_percentage += gpu_mem_percentage;
             e.gpu_mem_size_kib += gpu_mem_size_kib;
+            assert!(has_children == e.has_children);
+            assert!(ppid == e.ppid);
         })
         .or_insert(ProcInfo {
             user,
             _uid: uid,
             command,
             pid,
+            ppid,
             rolledup: 0,
             is_system_job: uid < 1000,
+            has_children,
             job_id: lookup_job_by_pid(pid),
             cpu_percentage,
             cputime_sec,
@@ -292,13 +300,13 @@ fn do_create_snapshot(
 
     // The table of users is needed to get GPU information, see comments at UserTable.
     let mut user_by_pid = UserTable::new();
-    for proc in pprocinfo_output {
+    for (_, proc) in pprocinfo_output {
         user_by_pid.insert(proc.pid, (&proc.user, proc.uid));
     }
 
     let mut lookup_job_by_pid = |pid: Pid| jobs.job_id_from_pid(pid, pprocinfo_output);
 
-    for proc in pprocinfo_output {
+    for (_, proc) in pprocinfo_output {
         add_proc_info(
             &mut proc_by_pid,
             &mut lookup_job_by_pid,
@@ -306,6 +314,8 @@ fn do_create_snapshot(
             proc.uid,
             &proc.command,
             proc.pid,
+            proc.ppid,
+            proc.has_children,
             proc.cpu_pct,
             proc.cputime_sec,
             proc.mem_pct,
@@ -337,6 +347,12 @@ fn do_create_snapshot(
         }
         Ok(ref nvidia_output) => {
             for proc in nvidia_output {
+                let (ppid, has_children) =
+                    if let Some(process) = pprocinfo_output.get(&proc.pid) {
+                        (process.ppid, process.has_children)
+                    } else {
+                        (1, true)
+                    };
                 add_proc_info(
                     &mut proc_by_pid,
                     &mut lookup_job_by_pid,
@@ -344,6 +360,8 @@ fn do_create_snapshot(
                     proc.uid,
                     &proc.command,
                     proc.pid,
+                    ppid,
+                    has_children,
                     0.0, // cpu_percentage
                     0,   // cputime_sec
                     0.0, // mem_percentage
@@ -372,6 +390,12 @@ fn do_create_snapshot(
         }
         Ok(ref amd_output) => {
             for proc in amd_output {
+                let (ppid, has_children) =
+                    if let Some(process) = pprocinfo_output.get(&proc.pid) {
+                        (process.ppid, process.has_children)
+                    } else {
+                        (1, true)
+                    };
                 add_proc_info(
                     &mut proc_by_pid,
                     &mut lookup_job_by_pid,
@@ -379,6 +403,8 @@ fn do_create_snapshot(
                     proc.uid,
                     &proc.command,
                     proc.pid,
+                    ppid,
+                    has_children,
                     0.0, // cpu_percentage
                     0,   // cputime_sec
                     0.0, // mem_percentage
@@ -421,17 +447,25 @@ fn do_create_snapshot(
     };
 
     let mut candidates = if opts.rollup {
-        // This is a little complicated because jobs with job_id 0 cannot be rolled up.
+        // This is a little complicated because processes with job_id 0 or processes that have
+        // subprocesses cannot be rolled up, nor can we roll up processes with different ppid.
+        //
+        // The reason we cannot roll up processes with job_id 0 is that we don't know that they are
+        // related at all - 0 means "no information".
+        //
+        // The reason we cannot roll up processes with children or processes with different ppids is
+        // that this would break subsequent processing - it would make it impossible to build a
+        // sensible process tree from the sample data.
         //
         // - There is an array `rolledup` of ProcInfo nodes that represent rolled-up data
         //
-        // - When the job ID of a job in `proc_by_pid` is zero, the entry in `rolledup` is a copy of
-        //   that job; these jobs cannot be rolled up (this is why it's complicated)
+        // - When the job ID of a process in `proc_by_pid` is zero, or a process has children, the
+        //   entry in `rolledup` is a copy of that job
         //
-        // - Otherwise, the entry in `rolledup` represent rolled-up information for a (job, command)
-        //   pair
+        // - Otherwise, the entry in `rolledup` represent rolled-up information for a
+        //   (jobid,ppid,command) triple
         //
-        // - There is a hash table `index` that maps the (job, command) pair to the entry in
+        // - There is a hash table `index` that maps the (jobid,ppid,command) triple to the entry in
         //   `rolledup`, if any
         //
         // - When we're done rolling up, we print the `rolledup` table.
@@ -441,12 +475,12 @@ fn do_create_snapshot(
         // is probably the right thing.
 
         let mut rolledup = vec![];
-        let mut index = HashMap::<(JobID, &str), usize>::new();
+        let mut index = HashMap::<(JobID, Pid, &str), usize>::new();
         for proc_info in proc_by_pid.values() {
-            if proc_info.job_id == 0 {
+            if proc_info.job_id == 0 || proc_info.has_children {
                 rolledup.push(proc_info.clone());
             } else {
-                let key = (proc_info.job_id, proc_info.command);
+                let key = (proc_info.job_id, proc_info.ppid, proc_info.command);
                 if let Some(x) = index.get(&key) {
                     let p = &mut rolledup[*x];
                     p.cpu_percentage += proc_info.cpu_percentage;
@@ -504,8 +538,10 @@ fn do_create_snapshot(
             _uid: 0,
             command: "_heartbeat_",
             pid: 0,
+            ppid: 0,
             rolledup: 0,
             is_system_job: true,
+            has_children: false,
             job_id: 0,
             cpu_percentage: 0.0,
             cputime_sec: 0,
@@ -614,7 +650,13 @@ fn print_record(
         fields.push(format!("job={}", proc_info.job_id));
     }
     if proc_info.rolledup == 0 && proc_info.pid != 0 {
+        // pid must be 0 for rolledup > 0 as there is no guarantee that there is any fixed
+        // representative pid for a rolled-up set of processes: the set can change from run to run,
+        // and sonar has no history.
         fields.push(format!("pid={}", proc_info.pid));
+    }
+    if proc_info.ppid != 0 {
+        fields.push(format!("ppid={}", proc_info.ppid));
     }
     if proc_info.cpu_percentage != 0.0 {
         fields.push(format!("cpu%={}", three_places(proc_info.cpu_percentage)));
