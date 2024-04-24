@@ -297,13 +297,13 @@ fn do_create_snapshot(jobs: &mut dyn jobs::JobManager, opts: &PsOptions, timesta
 
     // The table of users is needed to get GPU information, see comments at UserTable.
     let mut user_by_pid = UserTable::new();
-    for (_, proc) in pprocinfo_output {
+    for proc in pprocinfo_output.values() {
         user_by_pid.insert(proc.pid, (&proc.user, proc.uid));
     }
 
     let mut lookup_job_by_pid = |pid: Pid| jobs.job_id_from_pid(pid, pprocinfo_output);
 
-    for (_, proc) in pprocinfo_output {
+    for proc in pprocinfo_output.values() {
         add_proc_info(
             &mut proc_by_pid,
             &mut lookup_job_by_pid,
@@ -344,12 +344,11 @@ fn do_create_snapshot(jobs: &mut dyn jobs::JobManager, opts: &PsOptions, timesta
         }
         Ok(ref nvidia_output) => {
             for proc in nvidia_output {
-                let (ppid, has_children) =
-                    if let Some(process) = pprocinfo_output.get(&proc.pid) {
-                        (process.ppid, process.has_children)
-                    } else {
-                        (1, true)
-                    };
+                let (ppid, has_children) = if let Some(process) = pprocinfo_output.get(&proc.pid) {
+                    (process.ppid, process.has_children)
+                } else {
+                    (1, true)
+                };
                 add_proc_info(
                     &mut proc_by_pid,
                     &mut lookup_job_by_pid,
@@ -387,12 +386,11 @@ fn do_create_snapshot(jobs: &mut dyn jobs::JobManager, opts: &PsOptions, timesta
         }
         Ok(ref amd_output) => {
             for proc in amd_output {
-                let (ppid, has_children) =
-                    if let Some(process) = pprocinfo_output.get(&proc.pid) {
-                        (process.ppid, process.has_children)
-                    } else {
-                        (1, true)
-                    };
+                let (ppid, has_children) = if let Some(process) = pprocinfo_output.get(&proc.pid) {
+                    (process.ppid, process.has_children)
+                } else {
+                    (1, true)
+                };
                 add_proc_info(
                     &mut proc_by_pid,
                     &mut lookup_job_by_pid,

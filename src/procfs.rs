@@ -350,20 +350,23 @@ pub fn get_process_information(
             99.9,
         );
 
-        result.insert(pid, Process {
+        result.insert(
             pid,
-            ppid,
-            pgrp,
-            uid: uid as usize,
-            user: user_table.lookup(fs, uid),
-            cpu_pct: pcpu_formatted,
-            mem_pct: pmem,
-            cputime_sec,
-            mem_size_kib: size_kib,
-            rssanon_kib,
-            command: comm,
-            has_children: false,
-        });
+            Process {
+                pid,
+                ppid,
+                pgrp,
+                uid: uid as usize,
+                user: user_table.lookup(fs, uid),
+                cpu_pct: pcpu_formatted,
+                mem_pct: pmem,
+                cputime_sec,
+                mem_size_kib: size_kib,
+                rssanon_kib,
+                command: comm,
+                has_children: false,
+            },
+        );
         ppids.insert(ppid);
     }
 

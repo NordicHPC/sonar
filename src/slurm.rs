@@ -3,14 +3,18 @@
 use crate::jobs;
 use crate::procfs;
 
+use std::collections::HashMap;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
-use std::collections::HashMap;
 
 pub struct SlurmJobManager {}
 
 impl jobs::JobManager for SlurmJobManager {
-    fn job_id_from_pid(&mut self, pid: usize, _processes: &HashMap<usize, procfs::Process>) -> usize {
+    fn job_id_from_pid(
+        &mut self,
+        pid: usize,
+        _processes: &HashMap<usize, procfs::Process>,
+    ) -> usize {
         let slurm_job_id = get_slurm_job_id(pid).unwrap_or_default();
         slurm_job_id.trim().parse::<usize>().unwrap_or_default()
     }
