@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 #
 # Check that sonar can look up users.  There will be at least one process for the user: sonar.
 

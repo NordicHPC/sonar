@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 #
 # Test the lock file logic in sonar.  Sonar creates a lock file when it runs; a subsequent run that
 # starts while the lock file exists will terminate immediately with a log message.

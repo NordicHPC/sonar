@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 #
 # Check that `sonar sysinfo` produces properly formatted JSON.
 # Requirement: the `jq` utility.

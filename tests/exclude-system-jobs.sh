@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 #
 # Test that the --exclude-system-jobs switch works.  System jobs have uid < 1000.  For each user
 # name UNAME, run `getent passwd $UNAME` and then extract the third field from the colon-separated
