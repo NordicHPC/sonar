@@ -14,7 +14,20 @@ jobs:
     steps:
     - name: Checkout
       uses: actions/checkout@v2
+
     - name: Build
       run: cargo build --verbose
+
     - name: Test
       run: cargo test --verbose
+
+      # one of the shell tests below needs jq
+    - name: Install jq
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y jq
+
+    - name: Shell tests
+      run: |
+        cd tests
+        ./run_tests.sh
