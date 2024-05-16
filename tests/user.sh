@@ -4,7 +4,7 @@
 
 set -e
 ( cd ..; cargo build )
-if [[ $(../target/debug/sonar ps | grep ",user=$LOGNAME," | wc -l) == 0 ]]; then
+if [[ $(../target/debug/sonar ps | grep ",user=$USER," | wc -l) == 0 ]]; then
     echo "User name lookup fails??"
     exit 1
 fi
