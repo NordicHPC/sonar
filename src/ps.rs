@@ -9,7 +9,7 @@ use crate::log;
 use crate::nvidia;
 use crate::procfs;
 use crate::procfsapi;
-use crate::util::{csv_quote,three_places};
+use crate::util::{csv_quote, three_places};
 
 use std::collections::{HashMap, HashSet};
 use std::io::{self, Result, Write};
@@ -253,6 +253,7 @@ pub fn create_snapshot(jobs: &mut dyn jobs::JobManager, opts: &PsOptions, timest
         }
 
         if skip {
+            // Test cases depend on this exact message.
             log::info("Lockfile present, exiting");
         }
         if failed {
@@ -263,11 +264,7 @@ pub fn create_snapshot(jobs: &mut dyn jobs::JobManager, opts: &PsOptions, timest
     }
 }
 
-fn do_create_snapshot(
-    jobs: &mut dyn jobs::JobManager,
-    opts: &PsOptions,
-    timestamp: &str,
-) {
+fn do_create_snapshot(jobs: &mut dyn jobs::JobManager, opts: &PsOptions, timestamp: &str) {
     let no_gpus = empty_gpuset();
     let mut proc_by_pid = ProcTable::new();
 
@@ -300,13 +297,13 @@ fn do_create_snapshot(
 
     // The table of users is needed to get GPU information, see comments at UserTable.
     let mut user_by_pid = UserTable::new();
-    for (_, proc) in pprocinfo_output {
+    for proc in pprocinfo_output.values() {
         user_by_pid.insert(proc.pid, (&proc.user, proc.uid));
     }
 
     let mut lookup_job_by_pid = |pid: Pid| jobs.job_id_from_pid(pid, pprocinfo_output);
 
-    for (_, proc) in pprocinfo_output {
+    for proc in pprocinfo_output.values() {
         add_proc_info(
             &mut proc_by_pid,
             &mut lookup_job_by_pid,
@@ -347,12 +344,11 @@ fn do_create_snapshot(
         }
         Ok(ref nvidia_output) => {
             for proc in nvidia_output {
-                let (ppid, has_children) =
-                    if let Some(process) = pprocinfo_output.get(&proc.pid) {
-                        (process.ppid, process.has_children)
-                    } else {
-                        (1, true)
-                    };
+                let (ppid, has_children) = if let Some(process) = pprocinfo_output.get(&proc.pid) {
+                    (process.ppid, process.has_children)
+                } else {
+                    (1, true)
+                };
                 add_proc_info(
                     &mut proc_by_pid,
                     &mut lookup_job_by_pid,
@@ -390,12 +386,11 @@ fn do_create_snapshot(
         }
         Ok(ref amd_output) => {
             for proc in amd_output {
-                let (ppid, has_children) =
-                    if let Some(process) = pprocinfo_output.get(&proc.pid) {
-                        (process.ppid, process.has_children)
-                    } else {
-                        (1, true)
-                    };
+                let (ppid, has_children) = if let Some(process) = pprocinfo_output.get(&proc.pid) {
+                    (process.ppid, process.has_children)
+                } else {
+                    (1, true)
+                };
                 add_proc_info(
                     &mut proc_by_pid,
                     &mut lookup_job_by_pid,
@@ -714,7 +709,7 @@ fn print_record(
     }
     s += "\n";
 
-    writer.write(s.as_bytes())?;
+    let _ = writer.write(s.as_bytes())?;
 
     Ok(true)
 }

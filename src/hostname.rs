@@ -28,24 +28,20 @@ SOFTWARE.
  */
 
 use std::ffi::OsString;
-use std::os::unix::ffi::OsStringExt;
 use std::io;
-use libc;
+use std::os::unix::ffi::OsStringExt;
 
 pub fn get() -> io::Result<OsString> {
     // According to the POSIX specification,
     // host names are limited to `HOST_NAME_MAX` bytes
     //
     // https://pubs.opengroup.org/onlinepubs/9699919799/functions/gethostname.html
-    let size =
-        unsafe { libc::sysconf(libc::_SC_HOST_NAME_MAX) as libc::size_t };
+    let size = unsafe { libc::sysconf(libc::_SC_HOST_NAME_MAX) as libc::size_t };
 
     // Stack buffer OK: HOST_NAME_MAX is typically very small (64 on Linux).
     let mut buffer = vec![0u8; size];
 
-    let result = unsafe {
-        libc::gethostname(buffer.as_mut_ptr() as *mut libc::c_char, size)
-    };
+    let result = unsafe { libc::gethostname(buffer.as_mut_ptr() as *mut libc::c_char, size) };
 
     if result != 0 {
         return Err(io::Error::last_os_error());
@@ -61,9 +57,8 @@ fn wrap_buffer(mut bytes: Vec<u8>) -> OsString {
     let end = bytes
         .iter()
         .position(|&byte| byte == 0x00)
-        .unwrap_or_else(|| bytes.len());
+        .unwrap_or(bytes.len());
     bytes.resize(end, 0x00);
 
     OsString::from_vec(bytes)
 }
-

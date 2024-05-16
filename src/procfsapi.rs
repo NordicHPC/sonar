@@ -1,8 +1,6 @@
 // This creates a API by which procfs can access the underlying computing system, allowing the
 // system to be virtualized.  In turn, that allows sensible test cases to be written.
 
-extern crate libc;
-
 use crate::users::get_user_by_uid;
 
 use std::fs;
@@ -58,14 +56,12 @@ impl ProcfsAPI for RealFS {
     fn read_proc_pids(&self) -> Result<Vec<(usize, u32)>, String> {
         let mut pids = vec![];
         if let Ok(dir) = fs::read_dir("/proc") {
-            for dirent in dir {
-                if let Ok(dirent) = dirent {
-                    if let Ok(meta) = dirent.metadata() {
-                        let uid = meta.st_uid();
-                        if let Some(name) = dirent.path().file_name() {
-                            if let Ok(pid) = name.to_string_lossy().parse::<usize>() {
-                                pids.push((pid, uid));
-                            }
+            for dirent in dir.flatten() {
+                if let Ok(meta) = dirent.metadata() {
+                    let uid = meta.st_uid();
+                    if let Some(name) = dirent.path().file_name() {
+                        if let Ok(pid) = name.to_string_lossy().parse::<usize>() {
+                            pids.push((pid, uid));
                         }
                     }
                 }

@@ -17,7 +17,7 @@ mod users;
 mod util;
 
 const TIMEOUT_SECONDS: u64 = 5; // For subprocesses
-const USAGE_ERROR: i32 = 2;     // clap, Python, Go
+const USAGE_ERROR: i32 = 2; // clap, Python, Go
 
 enum Commands {
     /// Take a snapshot of the currently running processes
@@ -115,10 +115,12 @@ fn main() {
 //  - all error reporting is via a generic "usage" message, without specificity as to what was wrong
 
 fn command_line() -> Commands {
-    let mut args = std::env::args();
-    let _executable = args.next();
-    if let Some(command) = args.next() {
-        match command.as_str() {
+    let args = std::env::args().collect::<Vec<String>>();
+    let mut next = 1;
+    if next < args.len() {
+        let command = args[next].as_ref();
+        next += 1;
+        match command {
             "ps" => {
                 let mut batchless = false;
                 let mut rollup = false;
@@ -129,42 +131,43 @@ fn command_line() -> Commands {
                 let mut exclude_users = None;
                 let mut exclude_commands = None;
                 let mut lockdir = None;
-                loop {
-                    if let Some(arg) = args.next() {
-                        match arg.as_str() {
-                            "--batchless" => {
-                                batchless = true;
-                            }
-                            "--rollup" => {
-                                rollup = true;
-                            }
-                            "--exclude-system-jobs" => {
-                                exclude_system_jobs = true;
-                            }
-                            "--exclude-users" => {
-                                (args, exclude_users) = string_value(args);
-                            }
-                            "--exclude-commands" => {
-                                (args, exclude_commands) = string_value(args);
-                            }
-                            "--lockdir" => {
-                                (args, lockdir) = string_value(args);
-                            }
-                            "--min-cpu-percent" => {
-                                (args, min_cpu_percent) = parsed_value::<f64>(args);
-                            }
-                            "--min-mem-percent" => {
-                                (args, min_mem_percent) = parsed_value::<f64>(args);
-                            }
-                            "--min-cpu-time" => {
-                                (args, min_cpu_time) = parsed_value::<usize>(args);
-                            }
-                            _ => {
-                                usage(true);
-                            }
-                        }
+                while next < args.len() {
+                    let arg = args[next].as_ref();
+                    next += 1;
+                    if let Some(new_next) = bool_arg(arg, &args, next, "--batchless") {
+                        (next, batchless) = (new_next, true);
+                    } else if let Some(new_next) = bool_arg(arg, &args, next, "--rollup") {
+                        (next, rollup) = (new_next, true);
+                    } else if let Some(new_next) =
+                        bool_arg(arg, &args, next, "--exclude-system-jobs")
+                    {
+                        (next, exclude_system_jobs) = (new_next, true);
+                    } else if let Some((new_next, value)) =
+                        string_arg(arg, &args, next, "--exclude-users")
+                    {
+                        (next, exclude_users) = (new_next, Some(value));
+                    } else if let Some((new_next, value)) =
+                        string_arg(arg, &args, next, "--exclude-commands")
+                    {
+                        (next, exclude_commands) = (new_next, Some(value));
+                    } else if let Some((new_next, value)) =
+                        string_arg(arg, &args, next, "--lockdir")
+                    {
+                        (next, lockdir) = (new_next, Some(value));
+                    } else if let Some((new_next, value)) =
+                        numeric_arg::<f64>(arg, &args, next, "--min-cpu-percent")
+                    {
+                        (next, min_cpu_percent) = (new_next, Some(value));
+                    } else if let Some((new_next, value)) =
+                        numeric_arg::<f64>(arg, &args, next, "--min-mem-percent")
+                    {
+                        (next, min_mem_percent) = (new_next, Some(value));
+                    } else if let Some((new_next, value)) =
+                        numeric_arg::<usize>(arg, &args, next, "--min-cpu-time")
+                    {
+                        (next, min_cpu_time) = (new_next, Some(value));
                     } else {
-                        break;
+                        usage(true);
                     }
                 }
 
@@ -178,7 +181,8 @@ fn command_line() -> Commands {
                     eprintln!("--rollup and --batchless are incompatible");
                     std::process::exit(USAGE_ERROR);
                 }
-                return Commands::PS {
+
+                Commands::PS {
                     batchless,
                     rollup,
                     min_cpu_percent,
@@ -188,9 +192,9 @@ fn command_line() -> Commands {
                     exclude_users,
                     exclude_commands,
                     lockdir,
-                };
+                }
             }
-            "sysinfo" => return Commands::Sysinfo {},
+            "sysinfo" => Commands::Sysinfo {},
             "help" => {
                 usage(false);
             }
@@ -203,24 +207,47 @@ fn command_line() -> Commands {
     }
 }
 
-fn string_value(mut args: std::env::Args) -> (std::env::Args, Option<String>) {
-    if let Some(val) = args.next() {
-        (args, Some(val))
+fn bool_arg(arg: &str, _args: &[String], next: usize, opt_name: &str) -> Option<usize> {
+    if arg == opt_name {
+        Some(next)
     } else {
-        usage(true);
+        None
     }
 }
 
-fn parsed_value<T: std::str::FromStr>(mut args: std::env::Args) -> (std::env::Args, Option<T>) {
-    if let Some(val) = args.next() {
-        match val.parse::<T>() {
-            Ok(value) => (args, Some(value)),
+fn string_arg(arg: &str, args: &[String], next: usize, opt_name: &str) -> Option<(usize, String)> {
+    if arg == opt_name {
+        if next < args.len() {
+            Some((next + 1, args[next].to_string()))
+        } else {
+            None
+        }
+    } else if let Some((first, rest)) = arg.split_once('=') {
+        if first == opt_name {
+            Some((next, rest.to_string()))
+        } else {
+            None
+        }
+    } else {
+        None
+    }
+}
+
+fn numeric_arg<T: std::str::FromStr>(
+    arg: &str,
+    args: &[String],
+    next: usize,
+    opt_name: &str,
+) -> Option<(usize, T)> {
+    if let Some((next, strval)) = string_arg(arg, args, next, opt_name) {
+        match strval.parse::<T>() {
+            Ok(value) => Some((next, value)),
             _ => {
                 usage(true);
             }
         }
     } else {
-        usage(true);
+        None
     }
 }
 

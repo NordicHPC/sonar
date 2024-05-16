@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 #
 # Test these aspects of the process rollup algorithm:
 #  - only siblings with the same name are rolled up

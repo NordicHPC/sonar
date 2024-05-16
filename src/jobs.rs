@@ -9,5 +9,6 @@ pub trait JobManager {
     //
     // There's an assumption here that the process map is always the same for all lookups
     // performed on a particular instance of JobManager.
-    fn job_id_from_pid(&mut self, pid: usize, processes: &HashMap<usize, procfs::Process>) -> usize;
+    fn job_id_from_pid(&mut self, pid: usize, processes: &HashMap<usize, procfs::Process>)
+        -> usize;
 }

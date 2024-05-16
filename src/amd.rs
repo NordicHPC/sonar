@@ -76,7 +76,11 @@ pub fn get_amd_information(user_by_pid: &UserTable) -> Result<Vec<gpu::Process>,
 
     match command::safe_command(AMD_CONCISE_COMMAND, AMD_CONCISE_ARGS, TIMEOUT_SECONDS) {
         Ok(concise_raw_text) => {
-            match command::safe_command(AMD_SHOWPIDGPUS_COMMAND, AMD_SHOWPIDGPUS_ARGS, TIMEOUT_SECONDS) {
+            match command::safe_command(
+                AMD_SHOWPIDGPUS_COMMAND,
+                AMD_SHOWPIDGPUS_ARGS,
+                TIMEOUT_SECONDS,
+            ) {
                 Ok(showpidgpus_raw_text) => Ok(extract_amd_information(
                     &concise_raw_text,
                     &showpidgpus_raw_text,

@@ -22,7 +22,11 @@ pub enum CmdError {
 // especially at https://github.com/rust-lang/rust/issues/45572#issuecomment-860134955.  See also
 // https://doc.rust-lang.org/std/process/index.html (second code blob under "Handling I/O").
 
-pub fn safe_command(command: &str, args: &[&str], timeout_seconds: u64) -> Result<String, CmdError> {
+pub fn safe_command(
+    command: &str,
+    args: &[&str],
+    timeout_seconds: u64,
+) -> Result<String, CmdError> {
     let mut p = match Exec::cmd(command)
         .args(args)
         .stdout(Redirection::Pipe)
@@ -168,7 +172,9 @@ fn test_safe_command() {
         Err(_) => assert!(false),
     }
     // This really needs to be the output
-    assert!(safe_command("grep", &["^name =", "Cargo.toml"], 2) == Ok("name = \"sonar\"\n".to_string()));
+    assert!(
+        safe_command("grep", &["^name =", "Cargo.toml"], 2) == Ok("name = \"sonar\"\n".to_string())
+    );
     // Not found
     match safe_command("no-such-command-we-hope", &[], 2) {
         Err(CmdError::CouldNotStart(_)) => {}

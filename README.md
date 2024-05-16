@@ -434,6 +434,22 @@ of processes.
 
 Optionally, `sonar` will use a lockfile to avoid a pile-up of processes.
 
+## Dependencies and updates
+
+Sonar runs everywhere and all the time, and even though it currently runs without privileges it
+strives to have as few dependencies as possible, so as not to become a target through a supply chain
+attack.  There are some rules:
+
+- It's OK to depend on libc and to incorporate new versions of libc
+- It's better to depend on something from the rust-lang organization than on something else
+- Every dependency needs to be justified
+- Every dependency must have a compatible license
+- Every dependency needs to be vetted as to active development, apparent quality, test cases
+- Every dependency update - even for security issues - is to be considered a code change that needs review
+- Remember that indirect dependencies are dependencies for us, too, and need to be treated the same way
+- If in doubt: copy the parts we need, vet them thoroughly, and maintain them separately
+
+There is a useful discussion of these matters [here](https://research.swtch.com/deps).
 
 ## How we run sonar on a cluster
 

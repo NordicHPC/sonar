@@ -1,3 +1,6 @@
+#[cfg(debug_assertions)]
+use crate::log;
+
 use std::sync::atomic::{AtomicBool, Ordering};
 
 // Signal handling logic.
@@ -19,15 +22,15 @@ extern "C" fn sonar_signal_handler(_: libc::c_int) {
 
 pub fn handle_interruptions() {
     unsafe {
-        let nomask : libc::sigset_t = std::mem::zeroed();
-        let mut action = libc::sigaction {
+        let nomask: libc::sigset_t = std::mem::zeroed();
+        let action = libc::sigaction {
             sa_sigaction: sonar_signal_handler as usize,
             sa_mask: nomask,
             sa_flags: 0,
             sa_restorer: None,
         };
-        libc::sigaction(libc::SIGTERM, &mut action, std::ptr::null_mut());
-        libc::sigaction(libc::SIGHUP, &mut action, std::ptr::null_mut());
+        libc::sigaction(libc::SIGTERM, &action, std::ptr::null_mut());
+        libc::sigaction(libc::SIGHUP, &action, std::ptr::null_mut());
     }
 }
 
@@ -38,7 +41,8 @@ pub fn is_interrupted() -> bool {
     }
     let flag = INTERRUPTED.load(Ordering::Relaxed);
     if flag {
-        println!("Interrupt flag was set!")
+        // Test cases depend on this exact output.
+        log::info("Interrupt flag was set!")
     }
     flag
 }

@@ -238,8 +238,10 @@ fn parse_pmon_output(raw_text: &str, user_by_pid: &UserTable) -> Result<Vec<gpu:
 
 const NVIDIA_QUERY_COMMAND: &str = "nvidia-smi";
 
-const NVIDIA_QUERY_ARGS: &[&str] =
-    &["--query-compute-apps=pid,used_memory", "--format=csv,noheader,nounits"];
+const NVIDIA_QUERY_ARGS: &[&str] = &[
+    "--query-compute-apps=pid,used_memory",
+    "--format=csv,noheader,nounits",
+];
 
 // Same signature as extract_nvidia_pmon_processes(), q.v. but user is always "_zombie_<PID>" and
 // command is always "_unknown_".  Only pids not in user_by_pid are returned.
