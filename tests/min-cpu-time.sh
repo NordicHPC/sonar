@@ -4,7 +4,7 @@
 
 set -e
 ( cd .. ; cargo build )
-numbad=$(../target/debug/sonar ps --min-cpu-time 120 | \
+numbad=$(../target/debug/sonar ps --min-cpu-time 5 | \
              awk '
 {
     s=substr($0, index($0, ",cputime_sec=")+13)
@@ -12,7 +12,7 @@ numbad=$(../target/debug/sonar ps --min-cpu-time 120 | \
     ix = index(s, ",")
     if (ix > 0)
         s=substr(s, 0, ix-1)
-    if (strtonum(s) < 120)
+    if (strtonum(s) < 5)
         print($0)
 }' | \
              wc -l )
