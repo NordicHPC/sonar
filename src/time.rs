@@ -1,6 +1,6 @@
 use std::ffi::CStr;
 
-// Get current time as an ISO time stamp: yyyy-mm-ddThh:mm:ss+hhmm
+// Get current time as an ISO time stamp: yyyy-mm-ddThh:mm:ss+hh:mm
 //
 // Use libc to avoid pulling in all of Chrono for this:
 //   t = time()
@@ -25,7 +25,7 @@ pub fn now_iso8601() -> String {
     };
     const SIZE: usize = 32; // We need 25 unless something is greatly off
     let mut buffer = vec![0i8; SIZE];
-    unsafe {
+    let s = unsafe {
         let t = libc::time(std::ptr::null_mut());
 
         if libc::localtime_r(&t, &mut timebuf).is_null() {
@@ -43,10 +43,24 @@ pub fn now_iso8601() -> String {
             panic!("strftime");
         }
 
-        return CStr::from_ptr(buffer.as_ptr())
+        CStr::from_ptr(buffer.as_ptr())
             .to_str()
             .unwrap()
-            .to_string();
+            .to_string()
+    };
+
+    // We have +/-hhmm for the time zone but want +/-hh:mm for compatibility with older data and
+    // consumers.  strftime() won't do that for us.  We could do the formatting ourselves from raw
+    // data, here we fix up the string instead.  The code is conservative: it looks for the sign,
+    // and does nothing to the string if the sign isn't found in the expected location.
+    let bs = s.as_bytes();
+    match bs[bs.len() - 5] {
+        b'+' | b'-' => {
+            format!("{}:{}",
+                    std::str::from_utf8(&bs[..bs.len() - 2]).expect("Must have string"),
+                    std::str::from_utf8(&bs[bs.len() - 2..]).expect("Must have string"))
+        }
+        _ => s,
     }
 }
 
@@ -54,7 +68,7 @@ pub fn now_iso8601() -> String {
 pub fn test_isotime() {
     let t = now_iso8601();
     let ts = t.as_str().chars().collect::<Vec<char>>();
-    let expect = "dddd-dd-ddTdd:dd:dd+dddd";
+    let expect = "dddd-dd-ddTdd:dd:dd+dd:dd";
     let mut i = 0;
     for c in expect.chars() {
         match c {
