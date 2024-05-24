@@ -56,9 +56,11 @@ pub fn now_iso8601() -> String {
     let bs = s.as_bytes();
     match bs[bs.len() - 5] {
         b'+' | b'-' => {
-            format!("{}:{}",
-                    std::str::from_utf8(&bs[..bs.len() - 2]).expect("Must have string"),
-                    std::str::from_utf8(&bs[bs.len() - 2..]).expect("Must have string"))
+            format!(
+                "{}:{}",
+                std::str::from_utf8(&bs[..bs.len() - 2]).expect("Must have string"),
+                std::str::from_utf8(&bs[bs.len() - 2..]).expect("Must have string")
+            )
         }
         _ => s,
     }

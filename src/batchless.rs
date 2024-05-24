@@ -18,7 +18,11 @@ impl BatchlessJobManager {
 }
 
 impl jobs::JobManager for BatchlessJobManager {
-    fn job_id_from_pid(&mut self, proc_pid: usize, processes: &HashMap<usize, procfs::Process>) -> usize {
+    fn job_id_from_pid(
+        &mut self,
+        proc_pid: usize,
+        processes: &HashMap<usize, procfs::Process>,
+    ) -> usize {
         if let Some(p) = processes.get(&proc_pid) {
             p.pgrp
         } else {
@@ -144,22 +148,25 @@ fn parsed_full_test_output() -> HashMap<usize, procfs::Process> {
         (211405, 207228, 211404, "awk"),
     ]
     .iter()
-    .map(|(pid, ppid, pgrp, command)|
-         (*pid,
-          procfs::Process {
-              pid: *pid,
-              ppid: *ppid,
-              pgrp: *pgrp,
-              command: command.to_string(),
-              // The following are wrong but we don't need them now
-              cpu_pct: 0.0,
-              cputime_sec: 0,
-              mem_pct: 0.0,
-              mem_size_kib: 0,
-              rssanon_kib: 0,
-              uid: 0,
-              user: "user".to_string(),
-              has_children: false,
-          }))
+    .map(|(pid, ppid, pgrp, command)| {
+        (
+            *pid,
+            procfs::Process {
+                pid: *pid,
+                ppid: *ppid,
+                pgrp: *pgrp,
+                command: command.to_string(),
+                // The following are wrong but we don't need them now
+                cpu_pct: 0.0,
+                cputime_sec: 0,
+                mem_pct: 0.0,
+                mem_size_kib: 0,
+                rssanon_kib: 0,
+                uid: 0,
+                user: "user".to_string(),
+                has_children: false,
+            },
+        )
+    })
     .collect::<HashMap<usize, procfs::Process>>()
 }

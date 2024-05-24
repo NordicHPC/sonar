@@ -132,76 +132,81 @@ fn parse_pmon_output(raw_text: &str, user_by_pid: &UserTable) -> Result<Vec<gpu:
             assert!(header_parts[0] == "#");
             assert!(header_parts[1] == "gpu");
             if device_index.is_some() {
-                return Err("Duplicate header line in pmon output".to_string())
+                return Err("Duplicate header line in pmon output".to_string());
             }
             device_index = Some(0);
             for (i, p) in header_parts.iter().enumerate() {
                 match *p {
                     "pid" => {
                         if pid_index.is_some() {
-                            return Err("Duplicate pid index".to_string())
+                            return Err("Duplicate pid index".to_string());
                         }
-                        pid_index = Some(i-1)
+                        pid_index = Some(i - 1)
                     }
                     "fb" => {
                         if mem_size_index.is_some() {
-                            return Err("Duplicate fb index".to_string())
+                            return Err("Duplicate fb index".to_string());
                         }
-                        mem_size_index = Some(i-1)
+                        mem_size_index = Some(i - 1)
                     }
                     "sm" => {
                         if gpu_util_index.is_some() {
-                            return Err("Duplicate sm index".to_string())
+                            return Err("Duplicate sm index".to_string());
                         }
-                        gpu_util_index = Some(i-1)
+                        gpu_util_index = Some(i - 1)
                     }
                     "mem" => {
                         if mem_util_index.is_some() {
-                            return Err("Duplicate mem index".to_string())
+                            return Err("Duplicate mem index".to_string());
                         }
-                        mem_util_index = Some(i-1)
+                        mem_util_index = Some(i - 1)
                     }
                     "command" => {
                         if command_index.is_some() {
-                            return Err("Duplicate command index".to_string())
+                            return Err("Duplicate command index".to_string());
                         }
-                        command_index = Some(i-1)
+                        command_index = Some(i - 1)
                     }
                     _ => {}
                 }
             }
             // Require all indices to come from the same header.
-            if device_index.is_none() || pid_index.is_none() || mem_size_index.is_none() ||
-                gpu_util_index.is_none() || mem_util_index.is_none() || command_index.is_none() {
-                return Err("Missing required field in pmon output".to_string())
+            if device_index.is_none()
+                || pid_index.is_none()
+                || mem_size_index.is_none()
+                || gpu_util_index.is_none()
+                || mem_util_index.is_none()
+                || command_index.is_none()
+            {
+                return Err("Missing required field in pmon output".to_string());
             }
-            continue
+            continue;
         }
         if line.starts_with('#') {
-            continue
+            continue;
         }
         if device_index.is_none() {
-            return Err("Missing header in pmon output".to_string())
+            return Err("Missing header in pmon output".to_string());
         }
         let parts = util::chunks(line).1;
         let pid_str = parts[pid_index.unwrap()];
         let device_str = parts[device_index.unwrap()];
         if pid_str == "-" || device_str == "-" {
             // This is definitely not an error but we can't use the data
-            continue
+            continue;
         }
         let pid = match pid_str.parse::<usize>() {
             Ok(n) => n,
             Err(_) => {
                 // It's possible that this ought to be reported as an error
-                continue
+                continue;
             }
         };
         let device = match device_str.parse::<usize>() {
             Ok(n) => Some(n),
             Err(_) => {
                 // It's possible that this ought to be reported as an error
-                continue
+                continue;
             }
         };
         // The following parsers are allowed to fail quietly as missing information may be
@@ -228,7 +233,7 @@ fn parse_pmon_output(raw_text: &str, user_by_pid: &UserTable) -> Result<Vec<gpu:
         });
     }
     if device_index.is_none() {
-        return Err("Missing header line in pmon output".to_string())
+        return Err("Missing header line in pmon output".to_string());
     }
     Ok(processes)
 }
@@ -252,29 +257,37 @@ const NVIDIA_QUERY_ARGS: &[&str] = &[
 // are separated not by "," but by ",<SPACE>".  There's a risk this could change.  So there's some
 // checking here.
 
-fn parse_query_output(raw_text: &str, user_by_pid: &UserTable) -> Result<Vec<gpu::Process>, String> {
+fn parse_query_output(
+    raw_text: &str,
+    user_by_pid: &UserTable,
+) -> Result<Vec<gpu::Process>, String> {
     let mut result = vec![];
     for line in raw_text.lines() {
         let (_start_indices, parts) = util::chunks(line);
         if parts.len() != 2 {
-            return Err("Unexpected output from nvidia-smi query: too many fields".to_string())
+            return Err("Unexpected output from nvidia-smi query: too many fields".to_string());
         }
         let pid_str = parts[0].trim_end_matches(',');
         let pid = match pid_str.parse::<usize>() {
             Ok(n) => n,
             Err(_) => {
-                return Err("Unexpected output from nvidia-smi query: first field is not pid".to_string())
+                return Err(
+                    "Unexpected output from nvidia-smi query: first field is not pid".to_string(),
+                )
             }
         };
         let mem_usage = match parts[1].parse::<usize>() {
             Ok(n) => n,
             Err(_) => {
-                return Err("Unexpected output from nvidia-smi query: second field is not memory size".to_string())
+                return Err(
+                    "Unexpected output from nvidia-smi query: second field is not memory size"
+                        .to_string(),
+                )
             }
         };
         // Do this after parsing to get some sensible syntax checking
         if user_by_pid.contains_key(&pid) {
-            continue
+            continue;
         }
         let user = "_zombie_".to_owned() + pid_str;
         let command = "_unknown_";
@@ -368,7 +381,7 @@ fn test_parse_pmon_545_output() {
         proc! { Some(2), 1864615, "alice",          1002, 0.0,  0.0,   535 * 1024, "python" },
         proc! { Some(2), 1448150, "_zombie_1448150", gpu::ZOMBIE_UID, 0.0,  0.0,  9383 * 1024, "python3"},
         proc! { Some(3), 1864615, "alice",          1002,  0.0,  0.0,   535 * 1024, "python" },
-        proc! { Some(3), 2233469, "charlie",        1003, 90.0, 23.0, 15771 * 1024, "python3" }
+        proc! { Some(3), 2233469, "charlie",        1003, 90.0, 23.0, 15771 * 1024, "python3" },
     ];
     let actual = parsed_pmon_545_output();
     assert!(expected.eq(&actual));
@@ -386,7 +399,7 @@ fn test_parse_pmon_550_output() {
         proc! { Some(2), 1864615, "alice",          1002, 0.0,  0.0,   535 * 1024, "python" },
         proc! { Some(2), 1448150, "_zombie_1448150", gpu::ZOMBIE_UID, 0.0,  0.0,  9383 * 1024, "python3"},
         proc! { Some(3), 1864615, "alice",          1002,  0.0,  0.0,   535 * 1024, "python" },
-        proc! { Some(3), 2233469, "charlie",        1003, 90.0, 23.0, 15771 * 1024, "python3" }
+        proc! { Some(3), 2233469, "charlie",        1003, 90.0, 23.0, 15771 * 1024, "python3" },
     ];
     let actual = parsed_pmon_550_output();
     assert!(expected.eq(&actual));
@@ -498,4 +511,3 @@ fn test_parsed_bad_query_output5() {
 1864615, y1426";
     assert!(parse_query_output(text, &mkusers()).is_err());
 }
-
