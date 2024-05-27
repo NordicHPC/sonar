@@ -23,6 +23,8 @@ for test in command-line \
                 lockfile \
                 min-cpu-time \
                 ps-syntax \
+                rollup \
+                rollup2 \
                 sysinfo-syntax \
                 user \
             ; do
