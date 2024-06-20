@@ -285,13 +285,14 @@ fn do_create_snapshot(jobs: &mut dyn jobs::JobManager, opts: &PsOptions, timesta
         }
     };
 
-    let procinfo_output = match procfs::get_process_information(&fs, memtotal_kib) {
-        Ok(result) => result,
-        Err(msg) => {
-            log::error(&format!("procfs failed: {msg}"));
-            return;
-        }
-    };
+    let (procinfo_output, _cpu_total_secs, per_cpu_secs) =
+        match procfs::get_process_information(&fs, memtotal_kib) {
+            Ok(result) => result,
+            Err(msg) => {
+                log::error(&format!("procfs failed: {msg}"));
+                return;
+            }
+        };
 
     let pprocinfo_output = &procinfo_output;
 
@@ -514,7 +515,16 @@ fn do_create_snapshot(jobs: &mut dyn jobs::JobManager, opts: &PsOptions, timesta
 
     let mut did_print = false;
     for c in candidates {
-        match print_record(&mut writer, &print_params, &c) {
+        match print_record(
+            &mut writer,
+            &print_params,
+            &c,
+            if !did_print {
+                Some(&per_cpu_secs)
+            } else {
+                None
+            },
+        ) {
             Ok(did_print_one) => did_print = did_print_one || did_print,
             Err(_) => {
                 // Discard the error: there's nothing very sensible we can do at this point if the
@@ -550,7 +560,16 @@ fn do_create_snapshot(jobs: &mut dyn jobs::JobManager, opts: &PsOptions, timesta
             gpu_status: GpuStatus::Ok,
         };
         // Discard the error, see above.
-        let _ = print_record(&mut writer, &print_params, &synth);
+        let _ = print_record(
+            &mut writer,
+            &print_params,
+            &synth,
+            if !did_print {
+                Some(&per_cpu_secs)
+            } else {
+                None
+            },
+        );
     }
 
     // Discard the error code, see above.
@@ -627,6 +646,7 @@ fn print_record(
     writer: &mut dyn io::Write,
     params: &PrintParameters,
     proc_info: &ProcInfo,
+    per_cpu_secs: Option<&[u64]>,
 ) -> Result<bool> {
     // Mandatory fields.
 
@@ -699,6 +719,11 @@ fn print_record(
     if proc_info.rolledup > 0 {
         fields.push(format!("rolledup={}", proc_info.rolledup));
     }
+    if let Some(cpu_secs) = per_cpu_secs {
+        if cpu_secs.len() > 0 {
+            fields.push(format!("load={}", encode_cpu_secs_base45el(cpu_secs)))
+        }
+    }
 
     let mut s = "".to_string();
     for f in fields {
@@ -712,4 +737,54 @@ fn print_record(
     let _ = writer.write(s.as_bytes())?;
 
     Ok(true)
+}
+
+// Encode a nonempty u64 array compactly.
+//
+// The values to be represented are always cpu seconds of active time since boot, one item per cpu.
+// The output must be ASCII text (32 <= c < 128), ideally without ',' or '"' or '\' or ' ' to not
+// make it difficult for the various output formats we use.
+//
+// We have many encodings to choose from, see https://github.com/NordicHPC/sonar/issues/178.
+//
+// The encoding here first finds the minimum input value and subtracts that from all entries.  The
+// minimum value, and all the entries, are then emitted as unsigned little-endian base-45 with the
+// initial digit chosen from a different character set to indicate that it is initial.  The
+// algorithm is simple and reasonably fast for our data volumes.
+
+fn encode_cpu_secs_base45el(cpu_secs: &[u64]) -> String {
+    let base = *cpu_secs
+        .iter()
+        .reduce(std::cmp::min)
+        .expect("Non-empty");
+    let mut s = encode_u64_base45el(base);
+    for x in cpu_secs {
+        s += encode_u64_base45el(*x - base).as_str();
+    }
+    return s;
+}
+
+// The only character unused by the encoding, other than the ones we're not allowed to use, is '='.
+const BASE: u64 = 45;
+const INITIAL: &[u8] = "(){}[]<>+-abcdefghijklmnopqrstuvwxyz!@#$%^&*_".as_bytes();
+const SUBSEQUENT: &[u8] = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ~|';:.?/`".as_bytes();
+
+fn encode_u64_base45el(mut x: u64) -> String {
+    let mut s = String::from(INITIAL[(x % BASE) as usize] as char);
+    x /= BASE;
+    while x > 0 {
+        s.push(SUBSEQUENT[(x % BASE) as usize] as char);
+        x /= BASE;
+    }
+    return s;
+}
+
+#[test]
+pub fn test_encoding() {
+    assert!(INITIAL.len() == BASE as usize);
+    assert!(SUBSEQUENT.len() == BASE as usize);
+    // This should be *1, *0, *29, *43, 1, *11 with * denoting an INITIAL char.
+    let v = vec![1, 30, 89, 12];
+    println!("{}", encode_cpu_secs_base45el(&v));
+    assert!(encode_cpu_secs_base45el(&v) == ")(t*1b");
 }

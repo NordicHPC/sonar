@@ -9,6 +9,7 @@
       "name": "Bockwoldt, Mathias"
     },
     {
+      "affiliation": "University of Oslo",
       "name": "Hansen, Lars T."
     },
     {
@@ -25,5 +26,5 @@
     "id": "GPL-3.0"
   },
   "title": "sonar: Tool to profile usage of HPC resources by regularly probing processes using ps.",
-  "version": "0.11.0"
+  "version": "0.12.0"
 }
