@@ -744,16 +744,19 @@ fn print_record(
 
 // Encode a nonempty u64 array compactly.
 //
-// The values to be represented are always cpu seconds of active time since boot, one item per cpu.
 // The output must be ASCII text (32 <= c < 128), ideally without ',' or '"' or '\' or ' ' to not
-// make it difficult for the various output formats we use.
+// make it difficult for the various output formats we use.  Also avoid DEL, because it is a weird
+// control character.
 //
 // We have many encodings to choose from, see https://github.com/NordicHPC/sonar/issues/178.
 //
-// The encoding here first finds the minimum input value and subtracts that from all entries.  The
+// The values to be represented are always cpu seconds of active time since boot, one item per cpu,
+// and it is assumed that they are roughly in the vicinity of each other (the largest is rarely more
+// than 4x the smallest, say).  The assumption does not affect correctness, only compactness.
+//
+// The encoding first finds the minimum input value and subtracts that from all entries.  The
 // minimum value, and all the entries, are then emitted as unsigned little-endian base-45 with the
-// initial digit chosen from a different character set to indicate that it is initial.  The
-// algorithm is simple and reasonably fast for our data volumes.
+// initial digit chosen from a different character set to indicate that it is initial.
 
 fn encode_cpu_secs_base45el(cpu_secs: &[u64]) -> String {
     let base = *cpu_secs
