@@ -173,6 +173,7 @@ pub struct PsOptions<'a> {
     pub exclude_users: Vec<&'a str>,
     pub exclude_commands: Vec<&'a str>,
     pub lockdir: Option<String>,
+    pub load: bool,
 }
 
 pub fn create_snapshot(jobs: &mut dyn jobs::JobManager, opts: &PsOptions, timestamp: &str) {
@@ -719,9 +720,11 @@ fn print_record(
     if proc_info.rolledup > 0 {
         fields.push(format!("rolledup={}", proc_info.rolledup));
     }
-    if let Some(cpu_secs) = per_cpu_secs {
-        if cpu_secs.len() > 0 {
-            fields.push(format!("load={}", encode_cpu_secs_base45el(cpu_secs)))
+    if params.opts.load {
+        if let Some(cpu_secs) = per_cpu_secs {
+            if cpu_secs.len() > 0 {
+                fields.push(format!("load={}", encode_cpu_secs_base45el(cpu_secs)))
+            }
         }
     }
 
