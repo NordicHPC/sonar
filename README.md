@@ -28,7 +28,6 @@ Usage: sonar <COMMAND>
 Commands:
   ps       Take a snapshot of the currently running processes
   sysinfo  Extract system information
-  analyze  Not yet implemented
   help     Print this message or the help of the given subcommand(s)
 
 Options:
@@ -49,6 +48,11 @@ The bugfix version is updated for changes that do not alter the output format pe
 affect the output nevertheless, ie, most changes not covered by changes to the minor version number.
 
 These rules are new with v0.8.0.
+
+### Changes in v0.12.x
+
+**System load data introduced**.  Added the `load` field which is printed with one of the records
+per sonar invocation. (v0.12.0)
 
 ### Changes in v0.11.x
 
@@ -178,6 +182,27 @@ v=0.7.0,time=2023-08-10T11:09:41+02:00,host=somehost,cores=8,user=someone,job=0,
 v=0.7.0,time=2023-08-10T11:09:41+02:00,host=somehost,cores=8,user=someone,job=0,cmd=pulseaudio,cpu%=0.7,cpukib=90640,gpus=none,gpu%=0,gpumem%=0,gpukib=0,cputime_sec=399
 v=0.7.0,time=2023-08-10T11:09:41+02:00,host=somehost,cores=8,user=someone,job=0,cmd=slack,cpu%=3.9,cpukib=716924,gpus=none,gpu%=0,gpumem%=0,gpukib=0,cputime_sec=266
 ```
+
+### Version 0.12.0 `ps` output format
+
+Version 0.12.0 adds one field:
+
+`load` (optional, default blank): This is an encoding of the per-cpu time usage in seconds on the
+node since boot.  It is the same for all records and is therefore printed only with one of them per
+sonar invocation.  The encoding is an array of N+1 u64 values for an N-cpu node.  The first value is
+the "base" value, it is to be added to all the subsequent values.  The remaining are per-cpu values
+in order from cpu0 through cpuN-1.  Each value is encoded little-endian base-45, with the initial
+character of each value chosen from a different set than the subsequent characters.  The character
+sets are:
+
+```
+INITIAL = "(){}[]<>+-abcdefghijklmnopqrstuvwxyz!@#$%^&*_"
+SUBSEQUENT = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ~|';:.?/`"
+```
+
+The base-45 digits of the value `897` are (in little-endian order) 42 and 19, and the encoding of
+this value is thus `&J`.  As the initial character is from a different character set, no explicit
+separator is needed in the array - the initial digit acts as a separator.
 
 ### Version 0.11.0 `ps` output format
 
@@ -366,9 +391,9 @@ Numeric fields that are zero may or may not be omitted by the producer.
 
 Note the v0.9.0 `sysinfo` output does not carry a version number.
 
-## Collect results with `sonar analyze` :construction:
+## Collect and analyze results
 
-The `analyze` command is work in progress.  Sonar data are used by two other tools:
+Sonar data are used by two other tools:
 
 * [JobGraph](https://github.com/NordicHPC/jobgraph) provides high-level plots of system activity. Mapping
   files for JobGraph can be found in the [data](data) folder.

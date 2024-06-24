@@ -20,6 +20,7 @@ for test in command-line \
                 exclude-users \
                 hostname \
                 interrupt \
+                load \
                 lockfile \
                 min-cpu-time \
                 ps-syntax \

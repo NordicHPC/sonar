@@ -51,6 +51,10 @@ enum Commands {
 
         /// Create a per-host lockfile in this directory and exit early if the file exists on startup [default: none]
         lockdir: Option<String>,
+
+        /// One output record per Sonar invocation will contain a load= field with an encoding of
+        /// the per-cpu usage since boot.
+        load: bool,
     },
     /// Extract system information
     Sysinfo {},
@@ -76,6 +80,7 @@ fn main() {
             exclude_users,
             exclude_commands,
             lockdir,
+            load,
         } => {
             let opts = ps::PsOptions {
                 rollup: *rollup,
@@ -84,6 +89,7 @@ fn main() {
                 min_mem_percent: *min_mem_percent,
                 min_cpu_time: *min_cpu_time,
                 exclude_system_jobs: *exclude_system_jobs,
+                load: *load,
                 exclude_users: if let Some(s) = exclude_users {
                     s.split(',').collect::<Vec<&str>>()
                 } else {
@@ -131,6 +137,7 @@ fn command_line() -> Commands {
                 let mut exclude_users = None;
                 let mut exclude_commands = None;
                 let mut lockdir = None;
+                let mut load = false;
                 while next < args.len() {
                     let arg = args[next].as_ref();
                     next += 1;
@@ -138,6 +145,8 @@ fn command_line() -> Commands {
                         (next, batchless) = (new_next, true);
                     } else if let Some(new_next) = bool_arg(arg, &args, next, "--rollup") {
                         (next, rollup) = (new_next, true);
+                    } else if let Some(new_next) = bool_arg(arg, &args, next, "--load") {
+                        (next, load) = (new_next, true);
                     } else if let Some(new_next) =
                         bool_arg(arg, &args, next, "--exclude-system-jobs")
                     {
@@ -192,6 +201,7 @@ fn command_line() -> Commands {
                     exclude_users,
                     exclude_commands,
                     lockdir,
+                    load,
                 }
             }
             "sysinfo" => Commands::Sysinfo {},
