@@ -103,18 +103,58 @@ fn i32_field(l: &str) -> Result<i32, String> {
 pub fn get_process_information(
     fs: &dyn procfsapi::ProcfsAPI,
     memtotal_kib: usize,
-) -> Result<HashMap<usize, Process>, String> {
-    // The boot time is the `btime` field of /proc/stat.  It is measured in seconds since epoch.  We
-    // need this to compute the process's real time, which we need to compute ps-compatible cpu
-    // utilization.
+) -> Result<(HashMap<usize, Process>, u64, Vec<u64>), String> {
+    // We need this for a lot of things.  On x86 and x64 this is always 100 but in principle it
+    // might be something else, so read the true value.
+
+    let ticks_per_sec = fs.clock_ticks_per_sec() as u64;
+    if ticks_per_sec == 0 {
+        return Err("Could not get a sensible CLK_TCK".to_string());
+    }
+
+    // Extract system data from /proc/stat.  https://man7.org/linux/man-pages/man5/procfs.5.html.
+    //
+    // The per-CPU usage is the sum of some fields of the `cpuN` lines.  These are in ticks since
+    // boot.  In addition there is an across-the-system line called simply `cpu` with the same
+    // format.  These data are useful for analyzing core bindings.
+    //
+    // The boot time is first field of the `btime` line of /proc/stat.  It is measured in seconds
+    // since epoch.  We need this to compute the process's real time, which we need to compute
+    // ps-compatible cpu utilization.
 
     let mut boot_time = 0;
+    let mut cpu_total_secs = 0;
+    let mut per_cpu_secs = vec![];
     let stat_s = fs.read_to_string("stat")?;
     for l in stat_s.split('\n') {
-        if l.starts_with("btime ") {
+        if l.starts_with("cpu") {
+            // Based on sysstat sources, the "nice" time is not included in the "user" time.  (But
+            // guest times, which we ignore here, are included in their overall times.)  And
+            // irq/softirq numbers can be a substantial fraction of "system" time.  So sum user,
+            // nice, sys, irq, and softirq as a sensible proxy for time spent on "work" on the CPU.
+            const STAT_FIELDS: [usize; 5] = [1, 2, 3, 6, 7];
+
+            let fields = l.split_ascii_whitespace().collect::<Vec<&str>>();
+            let mut sum = 0;
+            for i in STAT_FIELDS {
+                sum += parse_usize_field(&fields, i, l, "stat", 0, "cpu")? as u64;
+            }
+            if l.starts_with("cpu ") {
+                cpu_total_secs = sum / ticks_per_sec;
+            } else {
+                let cpu_no =
+                    match fields[0][3..].parse::<usize>() {
+                        Ok(x) => x,
+                        Err(_) => { continue } // Too harsh to error out
+                    };
+                if per_cpu_secs.len() < cpu_no + 1 {
+                    per_cpu_secs.resize(cpu_no + 1, 0u64);
+                }
+                per_cpu_secs[cpu_no] = sum / ticks_per_sec;
+            }
+        } else if l.starts_with("btime ") {
             let fields = l.split_ascii_whitespace().collect::<Vec<&str>>();
             boot_time = parse_usize_field(&fields, 1, l, "stat", 0, "btime")? as u64;
-            break;
         }
     }
     if boot_time == 0 {
@@ -138,10 +178,7 @@ pub fn get_process_information(
     let mut result = HashMap::<usize, Process>::new();
     let mut ppids = HashSet::<usize>::new();
     let mut user_table = UserTable::new();
-    let clock_ticks_per_sec = fs.clock_ticks_per_sec() as f64;
-    if clock_ticks_per_sec == 0.0 {
-        return Err("Could not get a sensible CLK_TCK".to_string());
-    }
+    let clock_ticks_per_sec = ticks_per_sec as f64;
 
     for (pid, uid) in pids {
         // Basic system variables.  Intermediate time values are represented in ticks to prevent
@@ -375,7 +412,7 @@ pub fn get_process_information(
         p.has_children = ppids.contains(&p.pid);
     }
 
-    Ok(result)
+    Ok((result, cpu_total_secs, per_cpu_secs))
 }
 
 // The UserTable optimizes uid -> name lookup.
@@ -518,7 +555,7 @@ DirectMap1G:    11534336 kB
 
     let fs = procfsapi::MockFS::new(files, pids, users, now);
     let memtotal_kib = get_memtotal_kib(&fs).unwrap();
-    let mut info = get_process_information(&fs, memtotal_kib).unwrap();
+    let (mut info, total_secs, per_cpu_secs) = get_process_information(&fs, memtotal_kib).unwrap();
     assert!(info.len() == 1);
     let mut xs = info.drain();
     let p = xs.next().expect("Something").1;
@@ -542,6 +579,11 @@ DirectMap1G:    11534336 kB
 
     assert!(p.mem_size_kib == size);
     assert!(p.rssanon_kib == rssanon);
+
+    assert!(total_secs == (241155 + 582 + 127006 + 0 + 3816) / 100); // "cpu " line of "stat" data
+    assert!(per_cpu_secs.len() == 8);
+    assert!(per_cpu_secs[0] == (32528 + 189 + 19573 + 0 + 1149) / 100); // "cpu0 " line of "stat" data
+    assert!(per_cpu_secs[7] == (27582 + 61 + 12558 + 0 + 426) / 100);   // "cpu7 " line of "stat" data
 }
 
 #[test]
@@ -585,7 +627,7 @@ pub fn procfs_dead_and_undead_test() {
 
     let fs = procfsapi::MockFS::new(files, pids, users, procfsapi::unix_now());
     let memtotal_kib = get_memtotal_kib(&fs).unwrap();
-    let mut info = get_process_information(&fs, memtotal_kib).unwrap();
+    let (mut info, _, _) = get_process_information(&fs, memtotal_kib).unwrap();
 
     // 4020 should be dropped - it's dead
     assert!(info.len() == 2);
