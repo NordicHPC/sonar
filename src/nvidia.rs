@@ -97,18 +97,20 @@ pub fn get_nvidia_information(user_by_pid: &UserTable) -> Result<Vec<gpu::Proces
 // `nvidia-smi pmon`.  This output has a couple of problems:
 //
 //  - it is (documented to be) not necessarily stable
-//  - it does not orphaned processes holding onto GPU memory, the way nvtop can do
+//  - it does not show orphaned processes holding onto GPU memory, the way nvtop can do
 //
 // To fix the former (in part), we parse the line that starts with '# gpu' to get field name
 // indices, and then use those indices to fetch data.
 //
 // To fix the latter problem we do something with --query-compute-apps, see later.
 //
-// Note that `-c 1 -s u` gives us more or less instantaneous utilization, not some long-running
+// Note that `-c 1 -s mu` gives us more or less instantaneous utilization, not some long-running
 // average.
 //
-// TODO: We could consider using the underlying C library instead, but this adds a fair
-// amount of complexity.  See the nvidia-smi manual page.
+// TODO: We could consider using the underlying C library instead, but this adds a fair amount of
+// complexity.  See https://docs.nvidia.com/deploy/nvml-api/index.html and the nvidia-smi manual
+// page.  This however looks like a bit of a nightmare: it is not installed by default, it must be
+// downloaded as part of some cuda kit, the documentation appears to be not great.
 
 const NVIDIA_PMON_COMMAND: &str = "nvidia-smi";
 const NVIDIA_PMON_ARGS: &[&str] = &["pmon", "-c", "1", "-s", "mu"];
