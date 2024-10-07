@@ -22,19 +22,19 @@ if [[ $count -le 0 ]]; then
 fi
 l=$(head -n 1 <<< $output)
 if [[ !( $l =~ ^v=[0-9]+\.[0-9]+\.[0-9], ) ]]; then
-    echo "Version missing"
+    echo "Version missing, got $l"
     exit 1
 fi
 if [[ !( $l =~ ,user=[a-z0-9]+, ) ]]; then
-    echo "User missing"
+    echo "User missing, got $l"
     exit 1
 fi
 # The command may be quoted so match only the beginning
 if [[ !( $l =~ ,\"?cmd= ) ]]; then
-    echo "Cmd missing"
+    echo "Cmd missing, got $l"
     exit 1
 fi
 if [[ !( $l =~ ,host=$HOSTNAME, ) ]]; then
-    echo "Host missing"
+    echo "Host missing, got $l"
     exit 1
 fi
