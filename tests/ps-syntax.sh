@@ -6,7 +6,7 @@
 #  - check that at least one line is produced
 #  - the line starts with `v=` with a sensible version syntax
 #  - there is a `host=$HOSTNAME` field
-#  - there is a `user=` field with a plausible string
+#  - there is a `user=` field with a plausible string (note bug 192, may contain "-")
 #  - there is a `cmd=` field
 #
 # We don't have the infra at the moment to check the CSV output (cf sysinfo-syntax.sh where we use
@@ -22,19 +22,19 @@ if [[ $count -le 0 ]]; then
 fi
 l=$(head -n 1 <<< $output)
 if [[ !( $l =~ ^v=[0-9]+\.[0-9]+\.[0-9], ) ]]; then
-    echo "Version missing"
+    echo "Version missing, got $l"
     exit 1
 fi
-if [[ !( $l =~ ,user=[a-z0-9]+, ) ]]; then
-    echo "User missing"
+if [[ !( $l =~ ,user=[-a-z0-9]+, ) ]]; then
+    echo "User missing, got $l"
     exit 1
 fi
 # The command may be quoted so match only the beginning
 if [[ !( $l =~ ,\"?cmd= ) ]]; then
-    echo "Cmd missing"
+    echo "Cmd missing, got $l"
     exit 1
 fi
 if [[ !( $l =~ ,host=$HOSTNAME, ) ]]; then
-    echo "Host missing"
+    echo "Host missing, got $l"
     exit 1
 fi
