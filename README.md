@@ -35,7 +35,7 @@ Options:
   -V, --version  Print version
 ```
 
-## Versions
+## Versions and release procedures
 
 We use semantic versioning.  The major version is expected to remain at zero for the foreseeable
 future, reflecting the experimental nature of Sonar.
@@ -47,7 +47,21 @@ itself changes.  For example, v0.8.0 both added fields and stopped printing fiel
 The bugfix version is updated for changes that do not alter the output format per se but that might
 affect the output nevertheless, ie, most changes not covered by changes to the minor version number.
 
-These rules are new with v0.8.0.
+The versioning rules are new with v0.8.0.
+
+For every freeze of the the minor release number, a new release branch is created in the repo with
+the name `release_<major>_<minor>`, again we expect `<major>` to remain `0` for the foreseeable
+future, ergo, `release_0_12` is the v0.12.x release branch.  At that time, the minor release number
+is to be incremented on main.
+
+The branching scheme is new with v0.12.x.
+
+With the branches come some additional rules:
+
+- If a bugfix is made to a release branch it shall be uplifted to main at the time it is made.
+- If a bugfix is made to main it shall be considered whether it should be backported the most
+  recent release branch.  No older release branches shall automatically be considered for
+  backports.
 
 ### Changes in v0.12.x
 
