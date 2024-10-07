@@ -19,9 +19,17 @@ use crate::ps::UserTable;
 use crate::TIMEOUT_SECONDS;
 
 use std::cmp::Ordering;
+use std::path::Path;
 
 #[cfg(test)]
 use crate::util::map;
+
+// On all nodes we've looked at (ML systems, Lumi), /sys/module/amdgpu exists iff there are AMD
+// accelerators present.
+
+fn amd_present() -> bool {
+    return Path::new("/sys/module/amdgpu").exists()
+}
 
 // We only have one machine with AMD GPUs at UiO and rocm-smi is unable to show eg how much memory
 // is installed on each card on this machine, so this is pretty limited.  But we are at least able
@@ -40,6 +48,9 @@ use crate::util::map;
 // too small.  This is presumably all driver dependent.)
 
 pub fn get_amd_configuration() -> Option<Vec<gpu::Card>> {
+    if !amd_present() {
+        return None
+    }
     match command::safe_command("rocm-smi", &["--showproductname"], TIMEOUT_SECONDS) {
         Ok(raw_text) => {
             let mut cards = vec![];
@@ -65,12 +76,16 @@ pub fn get_amd_configuration() -> Option<Vec<gpu::Card>> {
     }
 }
 
-/// Get information about AMD cards.
-///
-/// Err(e) really means the command started running but failed, for the reason given.  If the
-/// command could not be found, we return Ok(vec![]).
+// Get information about AMD cards.
+//
+// Err(e) really means the command started running but failed, for the reason given.  If the
+// command could not be found or no card is present, we return Ok(vec![]).
 
 pub fn get_amd_information(user_by_pid: &UserTable) -> Result<Vec<gpu::Process>, String> {
+    if !amd_present() {
+        return Ok(vec![])
+    }
+
     // I've not been able to combine the two invocations of rocm-smi yet; we have to run the command
     // twice.  Not a happy situation.
 
