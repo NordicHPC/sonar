@@ -265,6 +265,12 @@ fn usage(is_error: bool) -> ! {
     let mut stdout = std::io::stdout();
     let mut stderr = std::io::stderr();
     let out: &mut dyn std::io::Write = if is_error { &mut stderr } else { &mut stdout };
+
+    let _ = out.write(b"sonar ");
+    let _ = out.write(env!("CARGO_PKG_VERSION").as_bytes());
+    let _ = out.write(b"\n");
+    let _ = out.write(env!("CARGO_PKG_REPOSITORY").as_bytes());
+    let _ = out.write(b"\n\n");
     let _ = out.write(
         b"Usage: sonar <COMMAND>
 
