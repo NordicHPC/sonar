@@ -21,7 +21,7 @@ if [[ $count -le 0 ]]; then
     exit 1
 fi
 l=$(head -n 1 <<< $output)
-if [[ !( $l =~ ^v=[0-9]+\.[0-9]+\.[0-9], ) ]]; then
+if [[ !( $l =~ ^v=[0-9]+\.[0-9]+\.[0-9](-.+)?, ) ]]; then
     echo "Version missing, got $l"
     exit 1
 fi

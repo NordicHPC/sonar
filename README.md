@@ -37,6 +37,10 @@ Options:
 
 ## Versions and release procedures
 
+### Version numbers
+
+The following basic versioning rules are new with v0.8.0.
+
 We use semantic versioning.  The major version is expected to remain at zero for the foreseeable
 future, reflecting the experimental nature of Sonar.
 
@@ -47,23 +51,35 @@ itself changes.  For example, v0.8.0 both added fields and stopped printing fiel
 The bugfix version is updated for changes that do not alter the output format per se but that might
 affect the output nevertheless, ie, most changes not covered by changes to the minor version number.
 
-The versioning rules are new with v0.8.0.
+### Release branches, uplifts and backports
+
+The following branching scheme is new with v0.12.x.
+
+The `main` branch is used for development and has a version number of the form `M.N.O-PRE` where
+"PRE" is some arbitrary string, eg "devel", "rc4".  Note that this version number form will also be
+present in the output of `sonar ps`, to properly tag those data.  If clients are exposed to
+prerelease `ps` data they must be prepared to deal with this.
 
 For every freeze of the the minor release number, a new release branch is created in the repo with
 the name `release_<major>_<minor>`, again we expect `<major>` to remain `0` for the foreseeable
-future, ergo, `release_0_12` is the v0.12.x release branch.  At that time, the minor release number
-is to be incremented on main.
+future, ergo, `release_0_12` is the v0.12.x release branch.  At branching time, the minor release
+number is incremented on main (so when we created `release_0_12` for v0.12.1, the version number on
+`main` went to `0.13.0-devel`).  The version number on a release branch is strictly of the form
+M.N.O.
 
-The branching scheme is new with v0.12.x.
+When a release `M.N.O` is to be made from a release branch, a tag is created of the form
+`release_M_N_O` on that branch and the release is built from that changeset.  Once the release has
+shipped, the bugfix version number on the branch is incremented.
 
-With the branches come some additional rules:
+With the branches come some additional rules for how to move patches around:
 
-- If a bugfix is made to a release branch it shall be uplifted to main at the time it is made.
+- If a bugfix is made to a release branch it shall be uplifted to main at the time it has been
+  verified, if the bug is present on main.
 - If a bugfix is made to main it shall be considered whether it should be backported the most
   recent release branch.  No older release branches shall automatically be considered for
   backports.
 
-### Changes in v0.13.x (on `main`)
+### Changes in v0.13.x-devel (on `main`)
 
 Version in progress, no changes as of yet.
 
