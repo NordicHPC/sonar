@@ -48,7 +48,9 @@ fn union_gpuset(lhs: &mut GpuSet, rhs: &GpuSet) {
     } else if rhs.is_none() {
         *lhs = None;
     } else {
-        lhs.as_mut().unwrap().extend(rhs.as_ref().unwrap());
+        lhs.as_mut()
+            .expect("LHS is nonempty")
+            .extend(rhs.as_ref().expect("RHS is nonempty"));
     }
 }
 
@@ -198,7 +200,7 @@ pub fn create_snapshot(jobs: &mut dyn jobs::JobManager, opts: &PsOptions, timest
         let mut created = false;
         let mut failed = false;
         let mut skip = false;
-        let hostname = hostname::get().unwrap().into_string().unwrap();
+        let hostname = hostname::get();
 
         let mut p = PathBuf::new();
         p.push(dirname);
@@ -434,7 +436,7 @@ fn do_create_snapshot(jobs: &mut dyn jobs::JobManager, opts: &PsOptions, timesta
 
     let mut writer = io::stdout();
 
-    let hostname = hostname::get().unwrap().into_string().unwrap();
+    let hostname = hostname::get();
     const VERSION: &str = env!("CARGO_PKG_VERSION");
     let print_params = PrintParameters {
         hostname: &hostname,
@@ -762,7 +764,7 @@ fn encode_cpu_secs_base45el(cpu_secs: &[u64]) -> String {
     let base = *cpu_secs
         .iter()
         .reduce(std::cmp::min)
-        .expect("Non-empty");
+        .expect("Must have a non-empty array");
     let mut s = encode_u64_base45el(base);
     for x in cpu_secs {
         s += encode_u64_base45el(*x - base).as_str();

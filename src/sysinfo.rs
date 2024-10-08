@@ -37,7 +37,7 @@ fn do_show_system(
     } else {
         vec![]
     };
-    let hostname = hostname::get().unwrap().into_string().unwrap();
+    let hostname = hostname::get();
     let ht = if threads_per_core > 1 {
         " (hyperthreaded)"
     } else {
