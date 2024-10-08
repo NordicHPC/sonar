@@ -31,7 +31,19 @@ use std::ffi::OsString;
 use std::io;
 use std::os::unix::ffi::OsStringExt;
 
-pub fn get() -> io::Result<OsString> {
+pub fn get() -> String {
+    match primitive_get() {
+        Ok(hn) => {
+            match hn.into_string() {
+                Ok(s) => s,
+                Err(_) => "unknown-host".to_string()
+            }
+        }
+        Err(_) => "unknown-host".to_string()
+    }
+}
+
+pub fn primitive_get() -> io::Result<OsString> {
     // According to the POSIX specification,
     // host names are limited to `HOST_NAME_MAX` bytes
     //

@@ -29,10 +29,12 @@ pub fn now_iso8601() -> String {
         let t = libc::time(std::ptr::null_mut());
 
         if libc::localtime_r(&t, &mut timebuf).is_null() {
+            // There might be legitimate reasons for localtime_r to fail, but it's unclear what we
+            // can do in that case.  We could return a dummy time?  Unclear if that's better than a
+            // panic here.
             panic!("localtime_r");
         }
 
-        // strftime returns 0 if the buffer is too small for the result + NUL.
         if libc::strftime(
             buffer.as_mut_ptr(),
             SIZE,
@@ -40,12 +42,14 @@ pub fn now_iso8601() -> String {
             &timebuf,
         ) == 0
         {
+            // strftime returns 0 if the buffer is too small for the result + NUL, but we should
+            // have ensured above that this is never a problem.
             panic!("strftime");
         }
 
         CStr::from_ptr(buffer.as_ptr())
             .to_str()
-            .unwrap()
+            .expect("Will always be utf8")
             .to_string()
     };
 

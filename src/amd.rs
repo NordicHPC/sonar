@@ -175,7 +175,7 @@ PID 28154 is using 1 DRM device(s):
     let users = map! {
     28156 => ("bob", 1001usize)
     };
-    let zs = extract_amd_information(concise, pidgpu, &users).unwrap();
+    let zs = extract_amd_information(concise, pidgpu, &users).expect("Test: AMD information");
     assert!(zs.eq(&vec![
         proc! { Some(0), 28154, "_zombie_28154", gpu::ZOMBIE_UID, 99.0/2.0, 57.0/2.0 },
         proc! { Some(0), 28156, "bob", 1001, 99.0/2.0, 57.0/2.0 },
@@ -203,14 +203,16 @@ fn parse_concise_command(raw_text: &str) -> Result<Vec<(f64, f64)>, String> {
             while i < block.len() {
                 let fields = block[i].split_whitespace().collect::<Vec<&str>>();
                 let dev = fields[0].parse::<usize>().unwrap_or_default();
+                // The fields should have the format N% and if they don't we always
+                // default to 0.
                 let mem = fields[fields.len() - 2]
                     .strip_suffix('%')
-                    .unwrap()
+                    .unwrap_or("0")
                     .parse::<f64>()
                     .unwrap_or_default();
                 let gpu = fields[fields.len() - 1]
                     .strip_suffix('%')
-                    .unwrap()
+                    .unwrap_or("0")
                     .parse::<f64>()
                     .unwrap_or_default();
                 if mappings.len() < dev + 1 {
@@ -239,7 +241,7 @@ GPU  Temp (DieEdge)  AvgPwr  SCLK     MCLK    Fan     Perf  PwrCap  VRAM%  GPU%
 ================================================================================
 ",
     )
-    .unwrap();
+    .expect("Test: Must have data");
     assert!(xs.eq(&vec![(99.0, 57.0), (63.0, 5.0)]));
 }
 
@@ -295,7 +297,7 @@ PID 25774 is using 1 DRM device(s):
 ================================================================================
 ",
     )
-    .unwrap();
+    .expect("Test: Must have data");
     assert!(xs.eq(&vec![(25774, vec![0])]));
     let xs = parse_showpidgpus_command(
         "
@@ -304,7 +306,7 @@ No KFD PIDs currently running
 ================================================================================
 ",
     )
-    .unwrap();
+    .expect("Test: Must have data");
     assert!(xs.eq(&vec![]));
 
     let xs = parse_showpidgpus_command(
@@ -317,7 +319,7 @@ PID 28154 is using 1 DRM device(s):
 ================================================================================
 ",
     )
-    .unwrap();
+    .expect("Test: Must have data");
     assert!(xs.eq(&vec![(28156, vec![1]), (28154, vec![0])]));
     let xs = parse_showpidgpus_command(
         "
@@ -327,7 +329,7 @@ PID 29212 is using 2 DRM device(s):
 ================================================================================
 ",
     )
-    .unwrap();
+    .expect("Test: Must have data");
     assert!(xs.eq(&vec![(29212, vec![0, 1])]));
 }
 

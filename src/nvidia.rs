@@ -41,7 +41,7 @@ pub fn get_nvidia_configuration() -> Option<Vec<gpu::Card>> {
                 if looking_for_total {
                     if l.starts_with("Total") && l.ends_with("MiB") {
                         if let Some((_, after)) = l.split_once(':') {
-                            let rest = after.strip_suffix("MiB").unwrap().trim();
+                            let rest = after.strip_suffix("MiB").expect("Suffix checked").trim();
                             if let Ok(n) = rest.parse::<i64>() {
                                 if let Some(m) = model_name {
                                     cards.push(gpu::Card {
@@ -190,9 +190,15 @@ fn parse_pmon_output(raw_text: &str, user_by_pid: &UserTable) -> Result<Vec<gpu:
         if device_index.is_none() {
             return Err("Missing header in pmon output".to_string());
         }
+        let pid_index = pid_index.expect("pid_index already checked");
+        let device_index = device_index.expect("device_index already checked");
+        let mem_size_index = mem_size_index.expect("mem_size_index already checked");
+        let gpu_util_index = gpu_util_index.expect("gpu_util_index already checked");
+        let mem_util_index = mem_util_index.expect("mem_util_index already checked");
+        let command_index = command_index.expect("command_index already checked");
         let parts = util::chunks(line).1;
-        let pid_str = parts[pid_index.unwrap()];
-        let device_str = parts[device_index.unwrap()];
+        let pid_str = parts[pid_index];
+        let device_str = parts[device_index];
         if pid_str == "-" || device_str == "-" {
             // This is definitely not an error but we can't use the data
             continue;
@@ -213,12 +219,12 @@ fn parse_pmon_output(raw_text: &str, user_by_pid: &UserTable) -> Result<Vec<gpu:
         };
         // The following parsers are allowed to fail quietly as missing information may be
         // represented simply as "-", and we're OK with that.
-        let mem_size = parts[mem_size_index.unwrap()].parse::<usize>().unwrap_or(0);
-        let gpu_util_pct = parts[gpu_util_index.unwrap()].parse::<f64>().unwrap_or(0.0);
-        let mem_util_pct = parts[mem_util_index.unwrap()].parse::<f64>().unwrap_or(0.0);
+        let mem_size = parts[mem_size_index].parse::<usize>().unwrap_or(0);
+        let gpu_util_pct = parts[gpu_util_index].parse::<f64>().unwrap_or(0.0);
+        let mem_util_pct = parts[mem_util_index].parse::<f64>().unwrap_or(0.0);
         // For nvidia-smi, we use the first word because the command produces blank-padded
         // output.  We can maybe do better by considering non-empty words.
-        let command = parts[command_index.unwrap()].to_string();
+        let command = parts[command_index].to_string();
         let user = match user_by_pid.get(&pid) {
             Some((name, uid)) => (name.to_string(), *uid),
             None => ("_zombie_".to_owned() + pid_str, gpu::ZOMBIE_UID),
@@ -334,7 +340,7 @@ pub fn parsed_pmon_545_output() -> Vec<gpu::Process> {
     3    1864615     C   535     -     -     -     -   python
     3    2233469     C 15771    90    23     -     -   python3
 ";
-    parse_pmon_output(text, &mkusers()).unwrap()
+    parse_pmon_output(text, &mkusers()).expect("Test: Must have data")
 }
 
 // 550 added a number of columns, these are from gpu-13.fox (new are ccpm, jpg, ofa).  The data are
@@ -354,7 +360,7 @@ pub fn parsed_pmon_550_output() -> Vec<gpu::Process> {
     3    1864615     C   535    -      -     -     -     -     -     -   python
     3    2233469     C 15771    -     90    23     -     -     -     -   python3
 ";
-    parse_pmon_output(text, &mkusers()).unwrap()
+    parse_pmon_output(text, &mkusers()).expect("Test: Must have data")
 }
 
 #[cfg(test)]
@@ -459,7 +465,7 @@ pub fn parsed_query_output() -> Vec<gpu::Process> {
     let text = "2233095, 1190
 3079002, 2350
 1864615, 1426";
-    parse_query_output(text, &mkusers()).unwrap()
+    parse_query_output(text, &mkusers()).expect("Test: Must have data")
 }
 
 #[test]
