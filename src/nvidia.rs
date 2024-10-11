@@ -12,8 +12,16 @@ use crate::ps::UserTable;
 use crate::util;
 use crate::TIMEOUT_SECONDS;
 
+use std::path::Path;
 #[cfg(test)]
 use crate::util::map;
+
+// On all nodes we've looked at (Fox, Betzy, ML systems), /sys/module/nvidia exists iff there are
+// nvidia accelerators present.
+
+fn nvidia_present() -> bool {
+    return Path::new("/sys/module/nvidia").exists()
+}
 
 // `nvidia-smi -a` dumps a lot of information about all the cards in a semi-structured form,
 // each line a textual keyword/value pair.
@@ -24,6 +32,9 @@ use crate::util::map;
 // Parsing all the output lines in order yields the information about all the cards.
 
 pub fn get_nvidia_configuration() -> Option<Vec<gpu::Card>> {
+    if !nvidia_present() {
+        return None
+    }
     match command::safe_command("nvidia-smi", &["-a"], TIMEOUT_SECONDS) {
         Ok(raw_text) => {
             let mut cards = vec![];
@@ -74,9 +85,12 @@ pub fn get_nvidia_configuration() -> Option<Vec<gpu::Card>> {
 }
 
 // Err(e) really means the command started running but failed, for the reason given.  If the
-// command could not be found, we return Ok(vec![]).
+// command could not be found or no card is present, we return Ok(vec![]).
 
 pub fn get_nvidia_information(user_by_pid: &UserTable) -> Result<Vec<gpu::Process>, String> {
+    if !nvidia_present() {
+        return Ok(vec![])
+    }
     match command::safe_command(NVIDIA_PMON_COMMAND, NVIDIA_PMON_ARGS, TIMEOUT_SECONDS) {
         Ok(pmon_raw_text) => {
             let mut processes = parse_pmon_output(&pmon_raw_text, user_by_pid)?;
