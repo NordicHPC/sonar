@@ -73,11 +73,15 @@ shipped, the bugfix version number on the branch is incremented.
 
 With the branches come some additional rules for how to move patches around:
 
-- If a bugfix is made to a release branch it shall be uplifted to main at the time it has been
-  verified, if the bug is present on main.
-- If a bugfix is made to main it shall be considered whether it should be backported the most
-  recent release branch.  No older release branches shall automatically be considered for
+- If a bugfix is made to any release branch and the bug is present on main then the PR shall be
+  tagged "uplift-required"; the PR shall subsequently be uplifted main; and following uplift the tag
+  shall be changed to "uplifted-to-main".
+- If a bugfix is made to main it shall be considered whether it should be backported the most recent
+  release branch.  If so, the PR shall be tagged "backport-required"; the PR shall subsequently be
+  cherry-picked or backported to the release branch; and following backport the tag shall be changed
+  to "backported-to-release".  No older release branches shall automatically be considered for
   backports.
+
 
 ### Changes in v0.13.x-devel (on `main`)
 
