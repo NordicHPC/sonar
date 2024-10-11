@@ -58,6 +58,7 @@ enum Commands {
     },
     /// Extract system information
     Sysinfo {},
+    Version {},
 }
 
 fn main() {
@@ -112,6 +113,9 @@ fn main() {
         }
         Commands::Sysinfo {} => {
             sysinfo::show_system(&timestamp);
+        }
+        Commands::Version {} => {
+            show_version(&mut std::io::stdout());
         }
     }
 }
@@ -205,6 +209,7 @@ fn command_line() -> Commands {
                 }
             }
             "sysinfo" => Commands::Sysinfo {},
+            "version" => Commands::Version {},
             "help" => {
                 usage(false);
             }
@@ -265,8 +270,13 @@ fn usage(is_error: bool) -> ! {
     let mut stdout = std::io::stdout();
     let mut stderr = std::io::stderr();
     let out: &mut dyn std::io::Write = if is_error { &mut stderr } else { &mut stdout };
+
+    show_version(out);
+    let _ = out.write(env!("CARGO_PKG_REPOSITORY").as_bytes());
     let _ = out.write(
-        b"Usage: sonar <COMMAND>
+        b"
+
+Usage: sonar <COMMAND>
 
 Commands:
   ps       Take a snapshot of the currently running processes
@@ -301,4 +311,10 @@ Options for `ps`:
     );
     let _ = out.flush();
     std::process::exit(if is_error { USAGE_ERROR } else { 0 });
+}
+
+fn show_version(out: &mut dyn std::io::Write) {
+    let _ = out.write(b"sonar version ");
+    let _ = out.write(env!("CARGO_PKG_VERSION").as_bytes());
+    let _ = out.write(b"\n");
 }
