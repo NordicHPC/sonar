@@ -92,7 +92,7 @@ impl ProcfsAPI for RealFS {
 pub fn unix_now() -> u64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
-        .unwrap()
+        .expect("System time precedes epoch")
         .as_secs()
 }
 

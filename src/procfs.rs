@@ -196,14 +196,20 @@ pub fn get_process_information(
             // the first '(' and the last ')' in the line.
             let commstart = line.find('(');
             let commend = line.rfind(')');
-            if commstart.is_none() || commend.is_none() {
-                return Err(format!(
-                    "Could not parse command from /proc/{pid}/stat: {line}"
-                ));
-            }
-            comm = line[commstart.unwrap() + 1..commend.unwrap()].to_string();
-            let s = line[commend.unwrap() + 1..].trim().to_string();
-            let fields = s.split_ascii_whitespace().collect::<Vec<&str>>();
+            let field_storage: String;
+            let fields: Vec<&str>;
+            match (commstart, commend) {
+                (None, _) | (_, None) => {
+                    return Err(format!(
+                        "Could not parse command from /proc/{pid}/stat: {line}"
+                    ));
+                }
+                (Some(commstart), Some(commend)) => {
+                    comm = line[commstart + 1..commend].to_string();
+                    field_storage = line[commend + 1..].trim().to_string();
+                    fields = field_storage.split_ascii_whitespace().collect::<Vec<&str>>();
+                }
+            };
 
             // NOTE relative to the `proc` documentation: All field offsets in the following are
             // relative to the command (so ppid is 2, not 4), and then they are zero-based, not
@@ -554,11 +560,11 @@ DirectMap1G:    11534336 kB
         + 2000.0) as u64;
 
     let fs = procfsapi::MockFS::new(files, pids, users, now);
-    let memtotal_kib = get_memtotal_kib(&fs).unwrap();
-    let (mut info, total_secs, per_cpu_secs) = get_process_information(&fs, memtotal_kib).unwrap();
+    let memtotal_kib = get_memtotal_kib(&fs).expect("Test: Must have data");
+    let (mut info, total_secs, per_cpu_secs) = get_process_information(&fs, memtotal_kib).expect("Test: Must have data");
     assert!(info.len() == 1);
     let mut xs = info.drain();
-    let p = xs.next().expect("Something").1;
+    let p = xs.next().expect("Test: Should have data").1;
     assert!(p.pid == 4018); // from enumeration of /proc
     assert!(p.uid == 1000); // ditto
     assert!(p.user == "zappa"); // from getent
@@ -626,15 +632,15 @@ pub fn procfs_dead_and_undead_test() {
     files.insert("4020/status".to_string(), "RssAnon: 12345 kB".to_string());
 
     let fs = procfsapi::MockFS::new(files, pids, users, procfsapi::unix_now());
-    let memtotal_kib = get_memtotal_kib(&fs).unwrap();
-    let (mut info, _, _) = get_process_information(&fs, memtotal_kib).unwrap();
+    let memtotal_kib = get_memtotal_kib(&fs).expect("Test: Must have data");
+    let (mut info, _, _) = get_process_information(&fs, memtotal_kib).expect("Test: Must have data");
 
     // 4020 should be dropped - it's dead
     assert!(info.len() == 2);
 
     let mut xs = info.drain();
-    let mut p = xs.next().expect("Something").1;
-    let mut q = xs.next().expect("Something else").1;
+    let mut p = xs.next().expect("Test: Should have some data").1;
+    let mut q = xs.next().expect("Test: Should have more data").1;
     if p.pid > q.pid {
         (p, q) = (q, p);
     }
@@ -1100,7 +1106,7 @@ power management:
     let pids = vec![];
     let users = HashMap::new();
     let fs = procfsapi::MockFS::new(files, pids, users, procfsapi::unix_now());
-    let (model, sockets, cores, threads) = get_cpu_info(&fs).unwrap();
+    let (model, sockets, cores, threads) = get_cpu_info(&fs).expect("Test: Must have data");
     assert!(model.find("E5-2637").is_some());
     assert!(sockets == 2);
     assert!(cores == 4);
