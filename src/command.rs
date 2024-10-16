@@ -60,6 +60,7 @@ pub fn safe_command(
                     stderr_result += &stderr;
                     break Some(CmdError::Failed(format_failure(
                         command,
+                        "Unexpected output on stderr",
                         &stdout_result,
                         &stderr_result,
                     )));
@@ -73,6 +74,7 @@ pub fn safe_command(
             Ok((_, _)) => {
                 break Some(CmdError::InternalError(format_failure(
                     command,
+                    "Unknown internal failure",
                     &stdout_result,
                     &stderr_result,
                 )))
@@ -83,13 +85,15 @@ pub fn safe_command(
                         Ok(_) => {
                             break Some(CmdError::Hung(format_failure(
                                 command,
+                                "Timed out and had to be killed",
                                 &stdout_result,
                                 &stderr_result,
                             )))
                         }
-                        Err(_) => {
+                        Err(e) => {
                             break Some(CmdError::InternalError(format_failure(
                                 command,
+                                format!("Unknown internal error {:?}", e).as_str(),
                                 &stdout_result,
                                 &stderr_result,
                             )))
@@ -98,6 +102,7 @@ pub fn safe_command(
                 }
                 break Some(CmdError::InternalError(format_failure(
                     command,
+                    format!("Unknown internal failure after error {:?}", e).as_str(),
                     &stdout_result,
                     &stderr_result,
                 )));
@@ -114,53 +119,55 @@ pub fn safe_command(
             }
         }
         Ok(ExitStatus::Exited(126)) => {
-            // 126 == "Command cannot execute"
             Err(CmdError::CouldNotStart(format_failure(
                 command,
+                "Command cannot execute",
                 &stdout_result,
                 &stderr_result,
             )))
         }
         Ok(ExitStatus::Exited(127)) => {
-            // 127 == "Command not found"
             Err(CmdError::CouldNotStart(format_failure(
                 command,
+                "Command not found",
                 &stdout_result,
                 &stderr_result,
             )))
         }
         Ok(ExitStatus::Signaled(15)) => {
-            // Signal 15 == SIGTERM
             Err(CmdError::Hung(format_failure(
                 command,
+                "Killed by SIGTERM",
                 &stdout_result,
                 &stderr_result,
             )))
         }
-        Ok(_) => Err(CmdError::Failed(format_failure(
+        Ok(x) => Err(CmdError::Failed(format_failure(
             command,
+            format!("Unspecified other exit status {:?}", x).as_str(),
             &stdout_result,
             &stderr_result,
         ))),
-        Err(_) => Err(CmdError::InternalError(format_failure(
+        Err(e) => Err(CmdError::InternalError(format_failure(
             command,
+            format!("Internal error {:?}", e).as_str(),
             &stdout_result,
             &stderr_result,
         ))),
     }
 }
 
-fn format_failure(command: &str, stdout: &str, stderr: &str) -> String {
+fn format_failure(command: &str, root_cause: &str, stdout: &str, stderr: &str) -> String {
     if !stdout.is_empty() {
         if !stderr.is_empty() {
-            format!("COMMAND:\n{command}\nSTDOUT:\n{stdout}\nSTDERR:\n{stderr}")
+            format!("COMMAND:\n{command}\nROOT CAUSE:\n{root_cause}\nSTDOUT:\n{stdout}\nSTDERR:\n{stderr}")
         } else {
-            format!("COMMAND:\n{command}\nSTDOUT:\n{stdout}")
+            format!("COMMAND:\n{command}\nROOT CAUSE:\n{root_cause}\nSTDOUT:\n{stdout}")
         }
     } else if !stderr.is_empty() {
-        format!("COMMAND:\n{command}\nSTDERR:\n{stderr}")
+        format!("COMMAND:\n{command}\nROOT CAUSE:\n{root_cause}\nSTDERR:\n{stderr}")
     } else {
-        format!("COMMAND:\n{command}")
+        format!("COMMAND:\n{command}\nROOT CAUSE:\n{root_cause}")
     }
 }
 
