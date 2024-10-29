@@ -24,11 +24,35 @@ use std::path::Path;
 #[cfg(test)]
 use crate::util::map;
 
+pub struct AmdGPU {}
+
+pub fn probe() -> Option<Box<dyn gpu::GPU>> {
+    if amd_present() {
+        Some(Box::new(AmdGPU {}))
+    } else {
+        None
+    }
+}
+
+impl gpu::GPU for AmdGPU {
+    fn get_manufacturer(&self) -> String {
+        "AMD".to_string()
+    }
+
+    fn get_configuration(&self) -> Result<Vec<gpu::Card>, String> {
+        get_amd_configuration()
+    }
+
+    fn get_utilization(&self, user_by_pid: &UserTable) -> Result<Vec<gpu::Process>, String> {
+        get_amd_utilization(user_by_pid)
+    }
+}
+
 // On all nodes we've looked at (ML systems, Lumi), /sys/module/amdgpu exists iff there are AMD
 // accelerators present.
 
 fn amd_present() -> bool {
-    return Path::new("/sys/module/amdgpu").exists()
+    return Path::new("/sys/module/amdgpu").exists();
 }
 
 // We only have one machine with AMD GPUs at UiO and rocm-smi is unable to show eg how much memory
@@ -47,32 +71,33 @@ fn amd_present() -> bool {
 // (It does not appear that the lspci trick works with the nvidia cards - the memory block sizes are
 // too small.  This is presumably all driver dependent.)
 
-pub fn get_amd_configuration() -> Option<Vec<gpu::Card>> {
-    if !amd_present() {
-        return None
-    }
+fn get_amd_configuration() -> Result<Vec<gpu::Card>, String> {
     match command::safe_command("rocm-smi", &["--showproductname"], TIMEOUT_SECONDS) {
         Ok(raw_text) => {
             let mut cards = vec![];
             for l in raw_text.lines() {
                 // We want to match /^GPU\[(\d+)\].*Card series:\s*(.*)$/ but we really only care
                 // about \2, which is the description.
+                //
+                // Newer rocm-smi switched from "Card series" to "Card Series", sigh.
                 if l.starts_with("GPU[") {
                     if let Some((_, after)) = l.split_once("Card series:") {
                         cards.push(gpu::Card {
                             model: after.trim().to_string(),
-                            mem_size_kib: 0,
+                            ..Default::default()
+                        });
+                    } else if let Some((_, after)) = l.split_once("Card Series:") {
+                        cards.push(gpu::Card {
+                            model: after.trim().to_string(),
+                            ..Default::default()
                         });
                     }
                 }
             }
-            if !cards.is_empty() {
-                Some(cards)
-            } else {
-                None
-            }
+            Ok(cards)
         }
-        Err(_) => None,
+        Err(CmdError::CouldNotStart(_)) => Ok(vec![]),
+        Err(e) => Err(format!("{:?}", e)),
     }
 }
 
@@ -81,11 +106,7 @@ pub fn get_amd_configuration() -> Option<Vec<gpu::Card>> {
 // Err(e) really means the command started running but failed, for the reason given.  If the
 // command could not be found or no card is present, we return Ok(vec![]).
 
-pub fn get_amd_information(user_by_pid: &UserTable) -> Result<Vec<gpu::Process>, String> {
-    if !amd_present() {
-        return Ok(vec![])
-    }
-
+fn get_amd_utilization(user_by_pid: &UserTable) -> Result<Vec<gpu::Process>, String> {
     // I've not been able to combine the two invocations of rocm-smi yet; we have to run the command
     // twice.  Not a happy situation.
 
