@@ -11,6 +11,7 @@ mod procfs;
 mod procfsapi;
 mod ps;
 mod slurm;
+mod slurmjobs;
 mod sysinfo;
 mod time;
 mod users;
@@ -49,7 +50,8 @@ enum Commands {
         /// Exclude records whose commands start with these comma-separated names [default: none]
         exclude_commands: Option<String>,
 
-        /// Create a per-host lockfile in this directory and exit early if the file exists on startup [default: none]
+        /// Create a per-host lockfile in this directory and exit early if the file exists on
+        /// startup [default: none]
         lockdir: Option<String>,
 
         /// One output record per Sonar invocation will contain a load= field with an encoding of
@@ -58,6 +60,17 @@ enum Commands {
     },
     /// Extract system information
     Sysinfo {},
+    /// Extract slurm job information
+    Slurmjobs {
+        /// Set the sacct start time to now-`window` and the end time to now, and dump records that
+        /// are relevant for that interval.  Normally the running interval of `sonar slurm` should
+        /// be less than the window.  Precludes -span.
+        window: Option<u32>,
+
+        /// From-to dates on the form yyyy-mm-dd,yyyy-mm-dd (with the comma); from is inclusive,
+        /// to is exclusive.  Precludes -window.
+        span: Option<String>,
+    },
     Version {},
 }
 
@@ -113,6 +126,9 @@ fn main() {
         }
         Commands::Sysinfo {} => {
             sysinfo::show_system(&timestamp);
+        }
+        Commands::Slurmjobs { window, span } => {
+            slurmjobs::show_slurm_jobs(window, span);
         }
         Commands::Version {} => {
             show_version(&mut std::io::stdout());
@@ -209,6 +225,27 @@ fn command_line() -> Commands {
                 }
             }
             "sysinfo" => Commands::Sysinfo {},
+            "slurm" => {
+                let mut window = None;
+                let mut span = None;
+                while next < args.len() {
+                    let arg = args[next].as_ref();
+                    next += 1;
+                    if let Some((new_next, value)) =
+                        numeric_arg::<u32>(arg, &args, next, "--window")
+                    {
+                        (next, window) = (new_next, Some(value));
+                    } else if let Some((new_next, value)) = string_arg(arg, &args, next, "--span") {
+                        (next, span) = (new_next, Some(value));
+                    } else {
+                        usage(true);
+                    }
+                }
+                if window.is_some() && span.is_some() {
+                    usage(true);
+                }
+                Commands::Slurmjobs { window, span }
+            }
             "version" => Commands::Version {},
             "help" => {
                 usage(false);
@@ -281,6 +318,7 @@ Usage: sonar <COMMAND>
 Commands:
   ps       Take a snapshot of the currently running processes
   sysinfo  Extract system information
+  slurm    Extract slurm job information for a [start,end) time interval
   help     Print this message
 
 Options for `ps`:
@@ -307,6 +345,14 @@ Options for `ps`:
   --lockdir directory
       Create a per-host lockfile in this directory and exit early if the file
       exists on startup [default: none]
+
+Options for `slurm`:
+  --window minutes
+      Set the `start` time to now-minutes [default: 90] and the `end` time to now+1.
+      Precludes --span
+  --span start,end
+      Both `start` and `end` are on the form yyyy-mm-dd.  Mostly useful for seeding a
+      database with older data.  Precludes --window
 ",
     );
     let _ = out.flush();
