@@ -340,12 +340,58 @@ fn do_create_snapshot(jobs: &mut dyn jobs::JobManager, opts: &PsOptions, timesta
     let mut gpu_status = GpuStatus::Ok;
 
     let gpu_utilization: Vec<gpu::Process>;
+    let mut gpu_info: String = "".to_string();
     match gpu::probe() {
         None => {
             gpu_status = GpuStatus::UnknownFailure;
         }
-        Some(gpu) => {
-            match gpu.get_utilization(&user_by_pid) {
+        Some(mut gpu) => {
+            match gpu.get_card_utilization() {
+                Err(_) => {}
+                Ok(ref cards) => {
+                    let mut s = "".to_string();
+                    s = add_key(s, "fan%", cards, |c: &gpu::CardState| {
+                        nonzero(c.fan_speed_pct as i64)
+                    });
+                    s = add_key(s, "mode", cards, |c: &gpu::CardState| {
+                        if c.compute_mode == "Default" {
+                            "".to_string()
+                        } else {
+                            c.compute_mode.clone()
+                        }
+                    });
+                    s = add_key(s, "perf", cards, |c: &gpu::CardState| c.perf_state.clone());
+                    // Reserved memory is really not interesting, it's possible it would have been
+                    // interesting as part of the card configuration.
+                    //s = add_key(s, "mreskib", cards, |c: &gpu::CardState| nonzero(c.mem_reserved_kib));
+                    s = add_key(s, "musekib", cards, |c: &gpu::CardState| {
+                        nonzero(c.mem_used_kib)
+                    });
+                    s = add_key(s, "cutil%", cards, |c: &gpu::CardState| {
+                        nonzero(c.gpu_utilization_pct as i64)
+                    });
+                    s = add_key(s, "mutil%", cards, |c: &gpu::CardState| {
+                        nonzero(c.mem_utilization_pct as i64)
+                    });
+                    s = add_key(s, "tempc", cards, |c: &gpu::CardState| {
+                        nonzero(c.temp_c.into())
+                    });
+                    s = add_key(s, "poww", cards, |c: &gpu::CardState| {
+                        nonzero(c.power_watt.into())
+                    });
+                    s = add_key(s, "powlimw", cards, |c: &gpu::CardState| {
+                        nonzero(c.power_limit_watt.into())
+                    });
+                    s = add_key(s, "cez", cards, |c: &gpu::CardState| {
+                        nonzero(c.ce_clock_mhz.into())
+                    });
+                    s = add_key(s, "memz", cards, |c: &gpu::CardState| {
+                        nonzero(c.mem_clock_mhz.into())
+                    });
+                    gpu_info = s;
+                }
+            }
+            match gpu.get_process_utilization(&user_by_pid) {
                 Err(_e) => {
                     gpu_status = GpuStatus::UnknownFailure;
                 }
@@ -496,6 +542,7 @@ fn do_create_snapshot(jobs: &mut dyn jobs::JobManager, opts: &PsOptions, timesta
             } else {
                 None
             },
+            if !did_print { Some(&gpu_info) } else { None },
         ) {
             Ok(did_print_one) => did_print = did_print_one || did_print,
             Err(_) => {
@@ -541,11 +588,50 @@ fn do_create_snapshot(jobs: &mut dyn jobs::JobManager, opts: &PsOptions, timesta
             } else {
                 None
             },
+            if !did_print { Some(&gpu_info) } else { None },
         );
     }
 
     // Discard the error code, see above.
     let _ = writer.flush();
+}
+
+fn add_key(
+    mut s: String,
+    key: &str,
+    cards: &[gpu::CardState],
+    extract: fn(&gpu::CardState) -> String,
+) -> String {
+    let mut vs = "".to_string();
+    let mut any = false;
+    let mut first = true;
+    for c in cards {
+        let v = extract(c);
+        if !first {
+            vs = vs + "|";
+        }
+        if v != "" {
+            any = true;
+            vs = vs + &v;
+        }
+        first = false;
+    }
+    if any {
+        if s != "" {
+            s += ",";
+        }
+        s + key + "=" + &vs
+    } else {
+        s
+    }
+}
+
+fn nonzero(x: i64) -> String {
+    if x == 0 {
+        "".to_string()
+    } else {
+        format!("{:?}", x)
+    }
 }
 
 fn filter_proc(proc_info: &ProcInfo, params: &PrintParameters) -> bool {
@@ -619,6 +705,7 @@ fn print_record(
     params: &PrintParameters,
     proc_info: &ProcInfo,
     per_cpu_secs: Option<&[u64]>,
+    gpu_info: Option<&str>,
 ) -> Result<bool> {
     // Mandatory fields.
 
@@ -694,7 +781,12 @@ fn print_record(
     if params.opts.load {
         if let Some(cpu_secs) = per_cpu_secs {
             if cpu_secs.len() > 0 {
-                fields.push(format!("load={}", encode_cpu_secs_base45el(cpu_secs)))
+                fields.push(format!("load={}", encode_cpu_secs_base45el(cpu_secs)));
+            }
+        }
+        if let Some(gpu_info) = gpu_info {
+            if gpu_info != "" {
+                fields.push(format!("gpuinfo={gpu_info}"));
             }
         }
     }

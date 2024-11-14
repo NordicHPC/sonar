@@ -1,18 +1,7 @@
-/// Get info about AMD graphics cards by parsing the output of rocm-smi.
-///
-/// This is pretty hacky!  Something better than this is likely needed and hopefully possible.
-///
-/// The returned information is keyed by (device, pid) so that if a process uses multiple devices,
-/// the total utilization for the process must be summed across devices.  We do this to be
-/// compatible with the NVIDIA module (nvidia.rs).
-///
-/// There is no information here about absolute memory usage numbers.  The cards I have don't
-/// support getting that information.  Other cards might.  In that case, the --showmemusage switch
-/// (can be combined with --showgpupids in a single invocation) might be useful.
-///
-/// Even though the output is presented in the same format as for NVIDIA, we only have partial stats
-/// about the usage of various processes on the various devices.  We divide the utilization of a
-/// device by the number of processes on the device.  This is approximate.
+// Get info about AMD graphics cards by parsing the output of rocm-smi.
+//
+// This is pretty hacky!  Something better than this is likely needed and hopefully possible.
+
 use crate::command::{self, CmdError};
 use crate::gpu;
 use crate::ps::UserTable;
@@ -35,16 +24,23 @@ pub fn probe() -> Option<Box<dyn gpu::GPU>> {
 }
 
 impl gpu::GPU for AmdGPU {
-    fn get_manufacturer(&self) -> String {
+    fn get_manufacturer(&mut self) -> String {
         "AMD".to_string()
     }
 
-    fn get_configuration(&self) -> Result<Vec<gpu::Card>, String> {
+    fn get_card_configuration(&mut self) -> Result<Vec<gpu::Card>, String> {
         get_amd_configuration()
     }
 
-    fn get_utilization(&self, user_by_pid: &UserTable) -> Result<Vec<gpu::Process>, String> {
+    fn get_process_utilization(
+        &mut self,
+        user_by_pid: &UserTable,
+    ) -> Result<Vec<gpu::Process>, String> {
         get_amd_utilization(user_by_pid)
+    }
+
+    fn get_card_utilization(&mut self) -> Result<Vec<gpu::CardState>, String> {
+        Ok(vec![])
     }
 }
 

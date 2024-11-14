@@ -1,11 +1,5 @@
-/// Run nvidia-smi and return a vector of process samples.
-///
-/// The information is keyed by (device, pid) so that if a process uses multiple devices, the total
-/// utilization for the process must be summed across devices.  (This is the natural mode of output
-/// for `nvidia-smi pmon`.)
-///
-/// Crucially, the data are sampling data: they contain no (long) running averages, but are
-/// snapshots of the system at the time the sample is taken.
+// Get info about Nvidia graphics cards by parsing the output of nvidia-smi.
+
 use crate::command::{self, CmdError};
 use crate::gpu;
 use crate::ps::UserTable;
@@ -16,27 +10,64 @@ use crate::TIMEOUT_SECONDS;
 use crate::util::map;
 use std::path::Path;
 
-pub struct NvidiaGPU {}
+pub struct NvidiaGPU {
+    // At the moment, all this information is the result of a single run of nvidia-smi, so we cache
+    // it since there will otherwise be two runs.
+    //
+    // TODO: It's possible the process information should be derived from this run, too.
+    info: Option<Result<Vec<PerCard>, String>>,
+}
+
+#[derive(Default)]
+struct PerCard {
+    info: gpu::Card,
+    state: gpu::CardState,
+}
 
 pub fn probe() -> Option<Box<dyn gpu::GPU>> {
     if nvidia_present() {
-        Some(Box::new(NvidiaGPU {}))
+        Some(Box::new(NvidiaGPU { info: None }))
     } else {
         None
     }
 }
 
 impl gpu::GPU for NvidiaGPU {
-    fn get_manufacturer(&self) -> String {
+    fn get_manufacturer(&mut self) -> String {
         "NVIDIA".to_string()
     }
 
-    fn get_configuration(&self) -> Result<Vec<gpu::Card>, String> {
-        get_nvidia_configuration()
+    fn get_card_configuration(&mut self) -> Result<Vec<gpu::Card>, String> {
+        if self.info.is_none() {
+            self.info = Some(get_nvidia_configuration(&vec!["-a"]))
+        }
+        match self.info.as_ref().unwrap() {
+            Ok(data) => Ok(data
+                .iter()
+                .map(|pc| pc.info.clone())
+                .collect::<Vec<gpu::Card>>()),
+            Err(e) => Err(e.clone()),
+        }
     }
 
-    fn get_utilization(&self, user_by_pid: &UserTable) -> Result<Vec<gpu::Process>, String> {
+    fn get_process_utilization(
+        &mut self,
+        user_by_pid: &UserTable,
+    ) -> Result<Vec<gpu::Process>, String> {
         get_nvidia_utilization(user_by_pid)
+    }
+
+    fn get_card_utilization(&mut self) -> Result<Vec<gpu::CardState>, String> {
+        if self.info.is_none() {
+            self.info = Some(get_nvidia_configuration(&vec!["-a"]))
+        }
+        match self.info.as_ref().unwrap() {
+            Ok(data) => Ok(data
+                .iter()
+                .map(|pc| pc.state.clone())
+                .collect::<Vec<gpu::CardState>>()),
+            Err(e) => Err(e.clone()),
+        }
     }
 }
 
@@ -48,8 +79,9 @@ fn nvidia_present() -> bool {
 }
 
 // `nvidia-smi -a` (aka `nvidia-smi -q`) dumps a lot of information about all the cards in a
-// semi-structured form.  It is fairly slow, the reason being it also obtains information about
-// running processes.  But if we only run this function for sysinfo that's OK.
+// semi-structured form.  Without additional arguments it is fairly slow, the reason being it also
+// obtains information about running processes.  But if we only run it without more arguments for
+// sysinfo then that's OK.  For other purposes, adding -d <SELECTOR>,... is helpful for performance.
 //
 // In brief, the input is a set of lines with a preamble followed by zero or more cards.
 // Indentation indicates nesting of sections and subsections.  Everything ends implicitly; if an
@@ -78,121 +110,198 @@ fn nvidia_present() -> bool {
 // just take that to be the card index.  (In contrast, the Minor Number does not always follow that
 // order.)
 
-pub fn get_nvidia_configuration() -> Result<Vec<gpu::Card>, String> {
-    match command::safe_command("nvidia-smi", &["-a"], TIMEOUT_SECONDS) {
-        Ok(raw_text) => {
-            enum State {
-                Preamble,
-                InCard,
-                FbMemoryUsage,
-                GpuPowerReadings,
-                MaxClocks,
-            }
-            let mut cuda = "".to_string();
-            let mut driver = "".to_string();
-            let mut state = State::Preamble;
-            let mut cards = vec![];
-            let mut card: gpu::Card = Default::default();
-            'next_line: for l in raw_text.lines() {
-                'reprocess_line: loop {
-                    match state {
-                        State::Preamble => {
-                            if l.starts_with("CUDA Version") {
-                                cuda = field_value(l);
-                            } else if l.starts_with("Driver Version") {
-                                driver = field_value(l);
-                            } else if l.starts_with("GPU ") {
-                                if !card.bus_addr.is_empty() {
-                                    cards.push(card);
-                                }
-                                card = Default::default();
-                                card.bus_addr = l[4..].to_string();
-                                card.driver = driver.clone();
-                                card.firmware = cuda.clone();
-                                card.index = cards.len() as i32;
-                                state = State::InCard;
-                            }
-                            continue 'next_line;
-                        }
-                        State::InCard => {
-                            if !l.starts_with("    ") {
-                                state = State::Preamble;
-                                continue 'reprocess_line;
-                            }
-                            if l.starts_with("    Product Name") {
-                                card.model = field_value(l);
-                            } else if l.starts_with("    Product Architecture") {
-                                card.arch = field_value(l);
-                            } else if l.starts_with("    GPU UUID") {
-                                card.uuid = field_value(l);
-                            } else if l == "    FB Memory Usage" {
-                                state = State::FbMemoryUsage;
-                            } else if l == "    GPU Power Readings" {
-                                state = State::GpuPowerReadings;
-                            } else if l == "    Max Clocks" {
-                                state = State::MaxClocks;
-                            }
-                            continue 'next_line;
-                        }
-                        State::FbMemoryUsage => {
-                            if !l.starts_with("        ") {
-                                state = State::InCard;
-                                continue 'reprocess_line;
-                            }
-                            if l.starts_with("        Total") {
-                                if let Ok(n) = field_value_stripped(l, "MiB").parse::<i64>() {
-                                    card.mem_size_kib = n * 1024;
-                                }
-                            }
-                            continue 'next_line;
-                        }
-                        State::GpuPowerReadings => {
-                            if !l.starts_with("        ") {
-                                state = State::InCard;
-                                continue 'reprocess_line;
-                            }
-                            if l.starts_with("        Current Power Limit") {
-                                if let Ok(n) = field_value_stripped(l, "W").parse::<f64>() {
-                                    card.power_limit_watt = n.ceil() as i32;
-                                }
-                            } else if l.starts_with("        Min Power Limit") {
-                                if let Ok(n) = field_value_stripped(l, "W").parse::<f64>() {
-                                    card.min_power_limit_watt = n.ceil() as i32;
-                                }
-                            } else if l.starts_with("        Max Power Limit") {
-                                if let Ok(n) = field_value_stripped(l, "W").parse::<f64>() {
-                                    card.max_power_limit_watt = n.ceil() as i32;
-                                }
-                            }
-                            continue 'next_line;
-                        }
-                        State::MaxClocks => {
-                            if !l.starts_with("        ") {
-                                state = State::InCard;
-                                continue 'reprocess_line;
-                            }
-                            if l.starts_with("        SM") {
-                                if let Ok(n) = field_value_stripped(l, "MHz").parse::<i32>() {
-                                    card.max_ce_clock_mhz = n;
-                                }
-                            } else if l.starts_with("        Memory") {
-                                if let Ok(n) = field_value_stripped(l, "MHz").parse::<i32>() {
-                                    card.max_mem_clock_mhz = n;
-                                }
-                            }
-                            continue 'next_line;
-                        }
-                    }
-                }
-            }
-            if !card.bus_addr.is_empty() {
-                cards.push(card);
-            }
-            Ok(cards)
-        }
+fn get_nvidia_configuration(smi_args: &[&str]) -> Result<Vec<PerCard>, String> {
+    match command::safe_command("nvidia-smi", smi_args, TIMEOUT_SECONDS) {
+        Ok(raw_text) => Ok(parse_nvidia_configuration(&raw_text)),
         Err(CmdError::CouldNotStart(_)) => Ok(vec![]),
         Err(e) => Err(format!("{:?}", e)),
     }
+}
+
+fn parse_nvidia_configuration(raw_text: &str) -> Vec<PerCard> {
+    enum State {
+        Preamble,
+        InCard,
+        FbMemoryUsage,
+        GpuPowerReadings,
+        MaxClocks,
+        Clocks,
+        Utilization,
+        Temperature,
+    }
+    let mut cuda = "".to_string();
+    let mut driver = "".to_string();
+    let mut state = State::Preamble;
+    let mut cards = vec![];
+    let mut card: PerCard = Default::default();
+    'next_line: for l in raw_text.lines() {
+        'reprocess_line: loop {
+            match state {
+                State::Preamble => {
+                    if l.starts_with("CUDA Version") {
+                        cuda = field_value(l);
+                    } else if l.starts_with("Driver Version") {
+                        driver = field_value(l);
+                    } else if l.starts_with("GPU ") {
+                        if !card.info.bus_addr.is_empty() {
+                            cards.push(card);
+                        }
+                        card = Default::default();
+                        card.info.bus_addr = l[4..].to_string();
+                        card.info.driver = driver.clone();
+                        card.info.firmware = cuda.clone();
+                        card.info.index = cards.len() as i32;
+                        card.state.index = card.info.index;
+                        state = State::InCard;
+                    }
+                    continue 'next_line;
+                }
+                State::InCard => {
+                    if !l.starts_with("    ") {
+                        state = State::Preamble;
+                        continue 'reprocess_line;
+                    }
+                    if l.starts_with("    Product Name") {
+                        card.info.model = field_value(l);
+                    } else if l.starts_with("    Product Architecture") {
+                        card.info.arch = field_value(l);
+                    } else if l.starts_with("    GPU UUID") {
+                        card.info.uuid = field_value(l);
+                    } else if l.starts_with("    Fan Speed") {
+                        if let Ok(n) = field_value_stripped(l, "%").parse::<f32>() {
+                            card.state.fan_speed_pct = n;
+                        }
+                    } else if l.starts_with("    Compute Mode") {
+                        card.state.compute_mode = field_value(l);
+                    } else if l.starts_with("    Performance State") {
+                        card.state.perf_state = field_value(l);
+                    } else if l == "    FB Memory Usage" {
+                        state = State::FbMemoryUsage;
+                    } else if l == "    GPU Power Readings" {
+                        state = State::GpuPowerReadings;
+                    } else if l == "    Max Clocks" {
+                        state = State::MaxClocks;
+                    } else if l == "    Clocks" {
+                        state = State::Clocks;
+                    } else if l == "    Utilization" {
+                        state = State::Utilization;
+                    } else if l == "    Temperature" {
+                        state = State::Temperature;
+                    }
+                    continue 'next_line;
+                }
+                State::FbMemoryUsage => {
+                    if !l.starts_with("        ") {
+                        state = State::InCard;
+                        continue 'reprocess_line;
+                    }
+                    if l.starts_with("        Total") {
+                        if let Ok(n) = field_value_stripped(l, "MiB").parse::<i64>() {
+                            card.info.mem_size_kib = n * 1024;
+                        }
+                    } else if l.starts_with("        Reserved") {
+                        if let Ok(n) = field_value_stripped(l, "MiB").parse::<i64>() {
+                            card.state.mem_reserved_kib = n * 1024;
+                        }
+                    } else if l.starts_with("        Used") {
+                        if let Ok(n) = field_value_stripped(l, "MiB").parse::<i64>() {
+                            card.state.mem_used_kib = n * 1024;
+                        }
+                    }
+                    continue 'next_line;
+                }
+                State::GpuPowerReadings => {
+                    if !l.starts_with("        ") {
+                        state = State::InCard;
+                        continue 'reprocess_line;
+                    }
+                    if l.starts_with("        Current Power Limit") {
+                        if let Ok(n) = field_value_stripped(l, "W").parse::<f64>() {
+                            card.info.power_limit_watt = n.ceil() as i32;
+                            card.state.power_limit_watt = card.info.power_limit_watt;
+                        }
+                    } else if l.starts_with("        Min Power Limit") {
+                        if let Ok(n) = field_value_stripped(l, "W").parse::<f64>() {
+                            card.info.min_power_limit_watt = n.ceil() as i32;
+                        }
+                    } else if l.starts_with("        Max Power Limit") {
+                        if let Ok(n) = field_value_stripped(l, "W").parse::<f64>() {
+                            card.info.max_power_limit_watt = n.ceil() as i32;
+                        }
+                    } else if l.starts_with("        Power Draw") {
+                        if let Ok(n) = field_value_stripped(l, "W").parse::<f64>() {
+                            card.state.power_watt = n.ceil() as i32;
+                        }
+                    }
+                    continue 'next_line;
+                }
+                State::MaxClocks => {
+                    if !l.starts_with("        ") {
+                        state = State::InCard;
+                        continue 'reprocess_line;
+                    }
+                    if l.starts_with("        SM") {
+                        if let Ok(n) = field_value_stripped(l, "MHz").parse::<i32>() {
+                            card.info.max_ce_clock_mhz = n;
+                        }
+                    } else if l.starts_with("        Memory") {
+                        if let Ok(n) = field_value_stripped(l, "MHz").parse::<i32>() {
+                            card.info.max_mem_clock_mhz = n;
+                        }
+                    }
+                    continue 'next_line;
+                }
+                State::Clocks => {
+                    if !l.starts_with("        ") {
+                        state = State::InCard;
+                        continue 'reprocess_line;
+                    }
+                    if l.starts_with("        SM") {
+                        if let Ok(n) = field_value_stripped(l, "MHz").parse::<i32>() {
+                            card.state.ce_clock_mhz = n;
+                        }
+                    } else if l.starts_with("        Memory") {
+                        if let Ok(n) = field_value_stripped(l, "MHz").parse::<i32>() {
+                            card.state.mem_clock_mhz = n;
+                        }
+                    }
+                    continue 'next_line;
+                }
+                State::Utilization => {
+                    if !l.starts_with("        ") {
+                        state = State::InCard;
+                        continue 'reprocess_line;
+                    }
+                    if l.starts_with("        Gpu") {
+                        if let Ok(n) = field_value_stripped(l, "%").parse::<f32>() {
+                            card.state.gpu_utilization_pct = n;
+                        }
+                    } else if l.starts_with("        Memory") {
+                        if let Ok(n) = field_value_stripped(l, "%").parse::<f32>() {
+                            card.state.mem_utilization_pct = n;
+                        }
+                    }
+                    continue 'next_line;
+                }
+                State::Temperature => {
+                    if !l.starts_with("        ") {
+                        state = State::InCard;
+                        continue 'reprocess_line;
+                    }
+                    if l.starts_with("        GPU Current Temp") {
+                        if let Ok(n) = field_value_stripped(l, "C").parse::<i32>() {
+                            card.state.temp_c = n;
+                        }
+                    }
+                    continue 'next_line;
+                }
+            }
+        }
+    }
+    if !card.info.bus_addr.is_empty() {
+        cards.push(card);
+    }
+    cards
 }
 
 fn field_value(l: &str) -> String {
@@ -660,4 +769,50 @@ fn test_parsed_bad_query_output5() {
 3079002, 1
 1864615, y1426";
     assert!(parse_query_output(text, &mkusers()).is_err());
+}
+
+#[test]
+fn test_parse_nvidia_configuration() {
+    // Some fields in that output have been anonymized and a few have been changed to make it more
+    // interesting.
+    let cs = parse_nvidia_configuration(std::include_str!("testdata/nvidia-smi-output.txt"));
+
+    // Check # of cards and that they are plausibly independent
+    assert!(cs.len() == 4);
+    assert!(cs[0].info.bus_addr == "00000000:18:00.0");
+    assert!(cs[0].info.index == 0);
+    assert!(cs[1].info.bus_addr == "00000000:3B:00.0");
+    assert!(cs[1].info.index == 1);
+    assert!(cs[2].info.bus_addr == "00000000:86:00.0");
+    assert!(cs[2].info.index == 2);
+    assert!(cs[3].info.bus_addr == "00000000:AF:00.0");
+    assert!(cs[3].info.index == 3);
+
+    // Check details of cs[3] (more interesting than cs[0])
+    let c = &cs[3];
+    assert!(c.info.model == "NVIDIA GeForce RTX 2080 Ti");
+    assert!(c.info.arch == "Turing");
+    assert!(c.info.driver == "545.23.08");
+    assert!(c.info.firmware == "12.3");
+    assert!(c.info.uuid == "GPU-198d6802-0000-0000-0000-000000000000");
+    assert!(c.info.mem_size_kib == 11264*1024);
+    assert!(c.info.power_limit_watt == 250);
+    assert!(c.info.max_power_limit_watt == 280);
+    assert!(c.info.min_power_limit_watt == 100);
+    assert!(c.info.max_ce_clock_mhz == 2100);
+    assert!(c.info.max_mem_clock_mhz == 7000);
+
+    assert!(c.state.index == 3);
+    assert!(c.state.fan_speed_pct == 28.0);
+    assert!(c.state.compute_mode == "Default");
+    assert!(c.state.perf_state == "P8");
+    assert!(c.state.mem_reserved_kib == 252*1024);
+    assert!(c.state.mem_used_kib == 3*1024);
+    assert!(c.state.gpu_utilization_pct == 5.0);
+    assert!(c.state.mem_utilization_pct == 8.0);
+    assert!(c.state.temp_c == 34);
+    assert!(c.state.power_watt == 19); // ceil(18.10)
+    assert!(c.state.power_limit_watt == 250);
+    assert!(c.state.ce_clock_mhz == 300);
+    assert!(c.state.mem_clock_mhz == 405);
 }

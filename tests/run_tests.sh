@@ -18,6 +18,7 @@ for test in command-line \
                 exclude-commands \
                 exclude-system-jobs \
                 exclude-users \
+                gpuinfo \
                 hostname \
                 interrupt \
                 load \
