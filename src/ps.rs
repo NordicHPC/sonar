@@ -1,12 +1,11 @@
 #![allow(clippy::type_complexity)]
 #![allow(clippy::too_many_arguments)]
 
-use crate::amd;
+use crate::gpu;
 use crate::hostname;
 use crate::interrupt;
 use crate::jobs;
 use crate::log;
-use crate::nvidia;
 use crate::procfs;
 use crate::procfsapi;
 use crate::util::{csv_quote, three_places};
@@ -333,89 +332,59 @@ fn do_create_snapshot(jobs: &mut dyn jobs::JobManager, opts: &PsOptions, timesta
         return;
     }
 
-    // When a GPU fails it may be a transient error or a permanent error, but either
-    // way sonar does not know.  We just record the failure.
-
+    // When a GPU fails it may be a transient error or a permanent error, but either way sonar does
+    // not know.  We just record the failure.
+    //
+    // This is a soft failure, surfaced through dashboards; we do not want mail about it under
+    // normal circumstances.
     let mut gpu_status = GpuStatus::Ok;
 
-    let nvidia_probe = nvidia::get_nvidia_information(&user_by_pid);
-    match nvidia_probe {
-        Err(_e) => {
+    let gpu_utilization: Vec<gpu::Process>;
+    match gpu::probe() {
+        None => {
             gpu_status = GpuStatus::UnknownFailure;
-            // This is a soft failure, surfaced through dashboards; we do not want mail about it
-            // under normal circumstances.
-            //log::error(&format!("GPU (Nvidia) process listing failed: {:?}", e));
         }
-        Ok(ref nvidia_output) => {
-            for proc in nvidia_output {
-                let (ppid, has_children) = if let Some(process) = pprocinfo_output.get(&proc.pid) {
-                    (process.ppid, process.has_children)
-                } else {
-                    (1, true)
-                };
-                add_proc_info(
-                    &mut proc_by_pid,
-                    &mut lookup_job_by_pid,
-                    &proc.user,
-                    proc.uid,
-                    &proc.command,
-                    proc.pid,
-                    ppid,
-                    has_children,
-                    0.0, // cpu_percentage
-                    0,   // cputime_sec
-                    0.0, // mem_percentage
-                    0,   // mem_size_kib
-                    0,   // rssanon_kib
-                    &singleton_gpuset(proc.device),
-                    proc.gpu_pct,
-                    proc.mem_pct,
-                    proc.mem_size_kib,
-                );
+        Some(gpu) => {
+            match gpu.get_utilization(&user_by_pid) {
+                Err(_e) => {
+                    gpu_status = GpuStatus::UnknownFailure;
+                }
+                Ok(conf) => {
+                    gpu_utilization = conf;
+                    for proc in &gpu_utilization {
+                        let (ppid, has_children) =
+                            if let Some(process) = pprocinfo_output.get(&proc.pid) {
+                                (process.ppid, process.has_children)
+                            } else {
+                                (1, true)
+                            };
+                        add_proc_info(
+                            &mut proc_by_pid,
+                            &mut lookup_job_by_pid,
+                            &proc.user,
+                            proc.uid,
+                            &proc.command,
+                            proc.pid,
+                            ppid,
+                            has_children,
+                            0.0, // cpu_percentage
+                            0,   // cputime_sec
+                            0.0, // mem_percentage
+                            0,   // mem_size_kib
+                            0,   // rssanon_kib
+                            &singleton_gpuset(proc.device),
+                            proc.gpu_pct,
+                            proc.mem_pct,
+                            proc.mem_size_kib,
+                        );
+                    }
+                }
             }
         }
     }
 
     if interrupt::is_interrupted() {
         return;
-    }
-
-    let amd_probe = amd::get_amd_information(&user_by_pid);
-    match amd_probe {
-        Err(_e) => {
-            gpu_status = GpuStatus::UnknownFailure;
-            // This is a soft failure, surfaced through dashboards; we do not want mail about it
-            // under normal circumstances.
-            //log::error(&format!("GPU (AMD) process listing failed: {:?}", e));
-        }
-        Ok(ref amd_output) => {
-            for proc in amd_output {
-                let (ppid, has_children) = if let Some(process) = pprocinfo_output.get(&proc.pid) {
-                    (process.ppid, process.has_children)
-                } else {
-                    (1, true)
-                };
-                add_proc_info(
-                    &mut proc_by_pid,
-                    &mut lookup_job_by_pid,
-                    &proc.user,
-                    proc.uid,
-                    &proc.command,
-                    proc.pid,
-                    ppid,
-                    has_children,
-                    0.0, // cpu_percentage
-                    0,   // cputime_sec
-                    0.0, // mem_percentage
-                    0,   // mem_size_kib
-                    0,   // rssanon_kib
-                    &singleton_gpuset(proc.device),
-                    proc.gpu_pct,
-                    proc.mem_pct,
-                    proc.mem_size_kib,
-                );
-            }
-        }
     }
 
     // If there was a gpu failure, signal it in all the process structures.  This is pretty

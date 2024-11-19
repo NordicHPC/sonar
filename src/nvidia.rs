@@ -12,84 +12,212 @@ use crate::ps::UserTable;
 use crate::util;
 use crate::TIMEOUT_SECONDS;
 
-use std::path::Path;
 #[cfg(test)]
 use crate::util::map;
+use std::path::Path;
+
+pub struct NvidiaGPU {}
+
+pub fn probe() -> Option<Box<dyn gpu::GPU>> {
+    if nvidia_present() {
+        Some(Box::new(NvidiaGPU {}))
+    } else {
+        None
+    }
+}
+
+impl gpu::GPU for NvidiaGPU {
+    fn get_manufacturer(&self) -> String {
+        "NVIDIA".to_string()
+    }
+
+    fn get_configuration(&self) -> Result<Vec<gpu::Card>, String> {
+        get_nvidia_configuration()
+    }
+
+    fn get_utilization(&self, user_by_pid: &UserTable) -> Result<Vec<gpu::Process>, String> {
+        get_nvidia_utilization(user_by_pid)
+    }
+}
 
 // On all nodes we've looked at (Fox, Betzy, ML systems), /sys/module/nvidia exists iff there are
 // nvidia accelerators present.
 
 fn nvidia_present() -> bool {
-    return Path::new("/sys/module/nvidia").exists()
+    return Path::new("/sys/module/nvidia").exists();
 }
 
-// `nvidia-smi -a` dumps a lot of information about all the cards in a semi-structured form,
-// each line a textual keyword/value pair.
+// `nvidia-smi -a` (aka `nvidia-smi -q`) dumps a lot of information about all the cards in a
+// semi-structured form.  It is fairly slow, the reason being it also obtains information about
+// running processes.  But if we only run this function for sysinfo that's OK.
 //
-// "Product Name" names the card.  Following the string "FB Memory Usage", "Total" has the
-// memory of the card.
+// In brief, the input is a set of lines with a preamble followed by zero or more cards.
+// Indentation indicates nesting of sections and subsections.  Everything ends implicitly; if an
+// indent-4 line is encountered inside a section then that ends the section, if an indent-0 line is
+// encountered inside a section or card then that ends the card.
 //
-// Parsing all the output lines in order yields the information about all the cards.
+// Against that background, these regexes matching full lines describe a state machine:
+//
+// - a line matching /^CUDA Version\s*:\s*(.*)$/ registers the common CUDA version
+// - a line matching /^Driver Version\s*:\s*(.*)$/ registers the common driver version
+// - a line matching /^GPU (.*)/ starts a new card, the card is named by $1.
+// - a line matching /^\s{4}(${name})\s*:\s*(.*)$/ names a keyword-value pair not in a section
+//   where $1 is the keyword and $2 is the value; ${name} is /[A-Z][^:]*/
+// - a line matching /^\s{4}(${name})$/ is the start of a top-level section
+//   a line matching /^\s{8}(${name})\s*:\s*(.*)$/ names a keyword-value pair in a section,
+//   where $1 is the keyword and $2 is the value
+// - a line matching /^\s+(.*)$/ but not any of the above is either a subsubsection value,
+//   a subsubsection start, or other gunk we don't care about
+// - a blank line or eof marks the end of the card
+//
+// To avoid building a lexer/parser or playing with regexes we can match against the entire line or
+// the beginning of line, within a context.  Note the use of "==" rather than "starts_with" to enter
+// into subsections is deliberate, as several subsections may start with the same word ("Clocks").
+//
+// It looks like nvidia-smi enumerates cards in a consistent order by increasing bus address, so
+// just take that to be the card index.  (In contrast, the Minor Number does not always follow that
+// order.)
 
-pub fn get_nvidia_configuration() -> Option<Vec<gpu::Card>> {
-    if !nvidia_present() {
-        return None
-    }
+pub fn get_nvidia_configuration() -> Result<Vec<gpu::Card>, String> {
     match command::safe_command("nvidia-smi", &["-a"], TIMEOUT_SECONDS) {
         Ok(raw_text) => {
+            enum State {
+                Preamble,
+                InCard,
+                FbMemoryUsage,
+                GpuPowerReadings,
+                MaxClocks,
+            }
+            let mut cuda = "".to_string();
+            let mut driver = "".to_string();
+            let mut state = State::Preamble;
             let mut cards = vec![];
-            let mut looking_for_total = false;
-            let mut model_name = None;
-            for l in raw_text.lines() {
-                // The regular expressions that trigger state transitions are really these:
-                //
-                //   /^\s*Product Name\s*:\s*(.*)$/
-                //   /^\s*FB Memory Usage\s*$/
-                //   /^\s*Total\s*:\s*(\d+)\s*MiB\s*$/
-                //
-                // but we simplify a bit and use primitive string manipulation.
-                let l = l.trim();
-                if looking_for_total {
-                    if l.starts_with("Total") && l.ends_with("MiB") {
-                        if let Some((_, after)) = l.split_once(':') {
-                            let rest = after.strip_suffix("MiB").expect("Suffix checked").trim();
-                            if let Ok(n) = rest.parse::<i64>() {
-                                if let Some(m) = model_name {
-                                    cards.push(gpu::Card {
-                                        model: m,
-                                        mem_size_kib: n * 1024,
-                                    });
-                                    model_name = None;
+            let mut card: gpu::Card = Default::default();
+            'next_line: for l in raw_text.lines() {
+                'reprocess_line: loop {
+                    match state {
+                        State::Preamble => {
+                            if l.starts_with("CUDA Version") {
+                                cuda = field_value(l);
+                            } else if l.starts_with("Driver Version") {
+                                driver = field_value(l);
+                            } else if l.starts_with("GPU ") {
+                                if !card.bus_addr.is_empty() {
+                                    cards.push(card);
+                                }
+                                card = Default::default();
+                                card.bus_addr = l[4..].to_string();
+                                card.driver = driver.clone();
+                                card.firmware = cuda.clone();
+                                card.index = cards.len() as i32;
+                                state = State::InCard;
+                            }
+                            continue 'next_line;
+                        }
+                        State::InCard => {
+                            if !l.starts_with("    ") {
+                                state = State::Preamble;
+                                continue 'reprocess_line;
+                            }
+                            if l.starts_with("    Product Name") {
+                                card.model = field_value(l);
+                            } else if l.starts_with("    Product Architecture") {
+                                card.arch = field_value(l);
+                            } else if l.starts_with("    GPU UUID") {
+                                card.uuid = field_value(l);
+                            } else if l == "    FB Memory Usage" {
+                                state = State::FbMemoryUsage;
+                            } else if l == "    GPU Power Readings" {
+                                state = State::GpuPowerReadings;
+                            } else if l == "    Max Clocks" {
+                                state = State::MaxClocks;
+                            }
+                            continue 'next_line;
+                        }
+                        State::FbMemoryUsage => {
+                            if !l.starts_with("        ") {
+                                state = State::InCard;
+                                continue 'reprocess_line;
+                            }
+                            if l.starts_with("        Total") {
+                                if let Ok(n) = field_value_stripped(l, "MiB").parse::<i64>() {
+                                    card.mem_size_kib = n * 1024;
                                 }
                             }
+                            continue 'next_line;
                         }
-                    }
-                } else {
-                    if l.starts_with("Product Name") {
-                        if let Some((_, rest)) = l.split_once(':') {
-                            model_name = Some(rest.trim().to_string());
-                            continue;
+                        State::GpuPowerReadings => {
+                            if !l.starts_with("        ") {
+                                state = State::InCard;
+                                continue 'reprocess_line;
+                            }
+                            if l.starts_with("        Current Power Limit") {
+                                if let Ok(n) = field_value_stripped(l, "W").parse::<f64>() {
+                                    card.power_limit_watt = n.ceil() as i32;
+                                }
+                            } else if l.starts_with("        Min Power Limit") {
+                                if let Ok(n) = field_value_stripped(l, "W").parse::<f64>() {
+                                    card.min_power_limit_watt = n.ceil() as i32;
+                                }
+                            } else if l.starts_with("        Max Power Limit") {
+                                if let Ok(n) = field_value_stripped(l, "W").parse::<f64>() {
+                                    card.max_power_limit_watt = n.ceil() as i32;
+                                }
+                            }
+                            continue 'next_line;
                         }
-                    }
-                    if l.starts_with("FB Memory Usage") {
-                        looking_for_total = true;
-                        continue;
+                        State::MaxClocks => {
+                            if !l.starts_with("        ") {
+                                state = State::InCard;
+                                continue 'reprocess_line;
+                            }
+                            if l.starts_with("        SM") {
+                                if let Ok(n) = field_value_stripped(l, "MHz").parse::<i32>() {
+                                    card.max_ce_clock_mhz = n;
+                                }
+                            } else if l.starts_with("        Memory") {
+                                if let Ok(n) = field_value_stripped(l, "MHz").parse::<i32>() {
+                                    card.max_mem_clock_mhz = n;
+                                }
+                            }
+                            continue 'next_line;
+                        }
                     }
                 }
-                looking_for_total = false;
             }
-            Some(cards)
+            if !card.bus_addr.is_empty() {
+                cards.push(card);
+            }
+            Ok(cards)
         }
-        Err(_) => None,
+        Err(CmdError::CouldNotStart(_)) => Ok(vec![]),
+        Err(e) => Err(format!("{:?}", e)),
     }
+}
+
+fn field_value(l: &str) -> String {
+    if let Some((_, rest)) = l.split_once(':') {
+        rest.trim().to_string()
+    } else {
+        "".to_string()
+    }
+}
+
+fn field_value_stripped(l: &str, suffix: &str) -> String {
+    if let Some((_, rest)) = l.split_once(':') {
+        if let Some(s) = rest.strip_suffix(suffix) {
+            return s.trim().to_string();
+        }
+    }
+    "".to_string()
 }
 
 // Err(e) really means the command started running but failed, for the reason given.  If the
 // command could not be found or no card is present, we return Ok(vec![]).
 
-pub fn get_nvidia_information(user_by_pid: &UserTable) -> Result<Vec<gpu::Process>, String> {
+fn get_nvidia_utilization(user_by_pid: &UserTable) -> Result<Vec<gpu::Process>, String> {
     if !nvidia_present() {
-        return Ok(vec![])
+        return Ok(vec![]);
     }
     match command::safe_command(NVIDIA_PMON_COMMAND, NVIDIA_PMON_ARGS, TIMEOUT_SECONDS) {
         Ok(pmon_raw_text) => {
