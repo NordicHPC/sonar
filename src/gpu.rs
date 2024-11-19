@@ -1,8 +1,10 @@
 use crate::amd;
 use crate::nvidia;
-use crate::ps::UserTable;
+use crate::ps;
 
-#[derive(PartialEq)]
+// Per-sample process information, across cards
+
+#[derive(PartialEq, Default, Clone)]
 pub struct Process {
     pub device: Option<usize>, // Device ID
     pub pid: usize,            // Process ID
@@ -14,9 +16,13 @@ pub struct Process {
     pub command: String,       // The command, _unknown_ for zombies, _noinfo_ if not known
 }
 
+// Used to tag a Process entry when the uid can't be determined
+
 pub const ZOMBIE_UID: usize = 666666;
 
-#[derive(PartialEq, Default)]
+// Sample-invariant card information
+
+#[derive(PartialEq, Default, Clone)]
 pub struct Card {
     pub bus_addr: String,
     pub index: i32,       // Card index (changes at boot)
@@ -33,11 +39,44 @@ pub struct Card {
     pub max_mem_clock_mhz: i32,
 }
 
-pub trait GPU {
-    fn get_manufacturer(&self) -> String;
-    fn get_configuration(&self) -> Result<Vec<Card>, String>;
-    fn get_utilization(&self, user_by_pid: &UserTable) -> Result<Vec<Process>, String>;
+// Per-sample card information, across processes
+
+#[derive(PartialEq, Default, Clone)]
+pub struct CardState {
+    pub index: i32, // Stable card identifier
+    pub fan_speed_pct: f32,
+    pub compute_mode: String,
+    pub perf_state: String,
+    pub mem_reserved_kib: i64,
+    pub mem_used_kib: i64,
+    pub gpu_utilization_pct: f32,
+    pub mem_utilization_pct: f32,
+    pub temp_c: i32,
+    pub power_watt: i32,
+    pub power_limit_watt: i32,
+    pub ce_clock_mhz: i32,
+    pub mem_clock_mhz: i32,
 }
+
+// Abstract GPU information across GPU types.
+//
+// As get_manufacturer() is for the GPU object as a whole and not per-card, we are currently
+// assuming that nodes don't have cards from multiple manufacturers.
+//
+// get_card_configuration() and get_card_utilization() return vectors that are sorted by their index
+// fields, and indices shall be tightly packed.
+
+pub trait GPU {
+    fn get_manufacturer(&mut self) -> String;
+    fn get_card_configuration(&mut self) -> Result<Vec<Card>, String>;
+    fn get_process_utilization(
+        &mut self,
+        user_by_pid: &ps::UserTable,
+    ) -> Result<Vec<Process>, String>;
+    fn get_card_utilization(&mut self) -> Result<Vec<CardState>, String>;
+}
+
+// Probe the system for GPUs.
 
 pub fn probe() -> Option<Box<dyn GPU>> {
     if let Some(nvidia) = nvidia::probe() {

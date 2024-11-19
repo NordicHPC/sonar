@@ -29,8 +29,8 @@ fn do_show_system(
     let mem_by = procfs::get_memtotal_kib(fs)? * 1024;
     let mem_gib = (mem_by as f64 / GIB as f64).round() as i64;
     let (mut cards, manufacturer) = match gpu::probe() {
-        Some(device) => (
-            match device.get_configuration() {
+        Some(mut device) => (
+            match device.get_card_configuration() {
                 Ok(cards) => cards,
                 Err(_) => vec![],
             },
