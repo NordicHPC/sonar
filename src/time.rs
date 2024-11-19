@@ -183,10 +183,10 @@ pub fn test_now_iso8601() {
 #[test]
 pub fn test_parse_date_and_time_no_tzo() {
     let t = parse_date_and_time_no_tzo("2024-10-31T11:17").unwrap();
-    assert!(t.tm_year == 2024-1900 && t.tm_mon == 10-1 && t.tm_mday == 31);
+    assert!(t.tm_year == 2024 - 1900 && t.tm_mon == 10 - 1 && t.tm_mday == 31);
     assert!(t.tm_hour == 11 && t.tm_min == 17);
     let t = parse_date_and_time_no_tzo("2022-07-01T23:59:14").unwrap();
-    assert!(t.tm_year == 2022-1900 && t.tm_mon == 7-1 && t.tm_mday == 1);
+    assert!(t.tm_year == 2022 - 1900 && t.tm_mon == 7 - 1 && t.tm_mday == 1);
     assert!(t.tm_hour == 23 && t.tm_min == 59 && t.tm_sec == 14);
 
     assert!(parse_date_and_time_no_tzo("1969-07-01T23:59:14").is_err());

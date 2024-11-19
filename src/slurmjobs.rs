@@ -131,7 +131,12 @@ fn check_ymd(s: &str) -> bool {
     return k == 3;
 }
 
-fn format_jobs(writer: &mut dyn io::Write, sacct_output: &str, field_names: &[&str], local: &libc::tm) {
+fn format_jobs(
+    writer: &mut dyn io::Write,
+    sacct_output: &str,
+    field_names: &[&str],
+    local: &libc::tm,
+) {
     // Fields that are dates that may be reinterpreted before transmission.
     let date_fields = HashSet::from(["Start", "End", "Submit"]);
 
@@ -156,8 +161,7 @@ fn format_jobs(writer: &mut dyn io::Write, sacct_output: &str, field_names: &[&s
         for (i, name) in field_names.iter().enumerate() {
             let mut val = fields[i].to_string();
             let is_zero = val == ""
-                || (!uncontrolled_fields.contains(name)
-                    && zero_values.contains(val.as_str()));
+                || (!uncontrolled_fields.contains(name) && zero_values.contains(val.as_str()));
             if !is_zero {
                 if date_fields.contains(name) {
                     // The slurm date format is localtime without a time zone offset.  This
