@@ -140,7 +140,7 @@ of fields and the use of default values.
 
 **Clearer division of labor with a front-end tool.** Front-end tools such as
 [jobgraph](https://github.com/NordicHPC/jobgraph) and
-[sonalyze](https://github.com/NAICNO/Jobanalyzer/tree/main/sonalyze) ingest well-defined and
+[sonalyze](https://github.com/NAICNO/Jobanalyzer/tree/main/code/sonalyze) ingest well-defined and
 simply-created sonar data, process it and present it in specialized ways, removing those burdens
 from sonar.
 
