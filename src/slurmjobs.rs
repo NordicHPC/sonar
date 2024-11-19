@@ -39,7 +39,7 @@ pub fn show_slurm_jobs(window: &Option<u32>, span: &Option<String>) {
     // Run sacct and parse the output.
     match command::safe_command(
         "sacct",
-        &vec![
+        &[
             "-aP",
             "-s",
             &job_states.join(","),
@@ -128,7 +128,7 @@ fn check_ymd(s: &str) -> bool {
             return false;
         }
     }
-    return k == 3;
+    k == 3
 }
 
 fn format_jobs(
@@ -160,7 +160,7 @@ fn format_jobs(
         let mut output_line = "v=".to_string() + VERSION;
         for (i, name) in field_names.iter().enumerate() {
             let mut val = fields[i].to_string();
-            let is_zero = val == ""
+            let is_zero = val.is_empty()
                 || (!uncontrolled_fields.contains(name) && zero_values.contains(val.as_str()));
             if !is_zero {
                 if date_fields.contains(name) {

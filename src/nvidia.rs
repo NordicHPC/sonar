@@ -39,7 +39,7 @@ impl gpu::GPU for NvidiaGPU {
 
     fn get_card_configuration(&mut self) -> Result<Vec<gpu::Card>, String> {
         if self.info.is_none() {
-            self.info = Some(get_nvidia_configuration(&vec!["-a"]))
+            self.info = Some(get_nvidia_configuration(&["-a"]))
         }
         match self.info.as_ref().unwrap() {
             Ok(data) => Ok(data
@@ -59,7 +59,7 @@ impl gpu::GPU for NvidiaGPU {
 
     fn get_card_utilization(&mut self) -> Result<Vec<gpu::CardState>, String> {
         if self.info.is_none() {
-            self.info = Some(get_nvidia_configuration(&vec!["-a"]))
+            self.info = Some(get_nvidia_configuration(&["-a"]))
         }
         match self.info.as_ref().unwrap() {
             Ok(data) => Ok(data

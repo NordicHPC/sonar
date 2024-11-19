@@ -110,7 +110,7 @@ pub fn parse_date_and_time_no_tzo(s: &str) -> Result<libc::tm, String> {
 }
 
 fn parse_int_err(_e: ParseIntError) -> String {
-    return "Not an unsigned int value".to_string();
+    "Not an unsigned int value".to_string()
 }
 
 // Format a time as an ISO time stamp: yyyy-mm-ddThh:mm:ss+hh:mm
