@@ -142,11 +142,10 @@ pub fn get_process_information(
             if l.starts_with("cpu ") {
                 cpu_total_secs = sum / ticks_per_sec;
             } else {
-                let cpu_no =
-                    match fields[0][3..].parse::<usize>() {
-                        Ok(x) => x,
-                        Err(_) => { continue } // Too harsh to error out
-                    };
+                let cpu_no = match fields[0][3..].parse::<usize>() {
+                    Ok(x) => x,
+                    Err(_) => continue, // Too harsh to error out
+                };
                 if per_cpu_secs.len() < cpu_no + 1 {
                     per_cpu_secs.resize(cpu_no + 1, 0u64);
                 }
@@ -207,7 +206,9 @@ pub fn get_process_information(
                 (Some(commstart), Some(commend)) => {
                     comm = line[commstart + 1..commend].to_string();
                     field_storage = line[commend + 1..].trim().to_string();
-                    fields = field_storage.split_ascii_whitespace().collect::<Vec<&str>>();
+                    fields = field_storage
+                        .split_ascii_whitespace()
+                        .collect::<Vec<&str>>();
                 }
             };
 
@@ -561,7 +562,8 @@ DirectMap1G:    11534336 kB
 
     let fs = procfsapi::MockFS::new(files, pids, users, now);
     let memtotal_kib = get_memtotal_kib(&fs).expect("Test: Must have data");
-    let (mut info, total_secs, per_cpu_secs) = get_process_information(&fs, memtotal_kib).expect("Test: Must have data");
+    let (mut info, total_secs, per_cpu_secs) =
+        get_process_information(&fs, memtotal_kib).expect("Test: Must have data");
     assert!(info.len() == 1);
     let mut xs = info.drain();
     let p = xs.next().expect("Test: Should have data").1;
@@ -589,7 +591,7 @@ DirectMap1G:    11534336 kB
     assert!(total_secs == (241155 + 582 + 127006 + 0 + 3816) / 100); // "cpu " line of "stat" data
     assert!(per_cpu_secs.len() == 8);
     assert!(per_cpu_secs[0] == (32528 + 189 + 19573 + 0 + 1149) / 100); // "cpu0 " line of "stat" data
-    assert!(per_cpu_secs[7] == (27582 + 61 + 12558 + 0 + 426) / 100);   // "cpu7 " line of "stat" data
+    assert!(per_cpu_secs[7] == (27582 + 61 + 12558 + 0 + 426) / 100); // "cpu7 " line of "stat" data
 }
 
 #[test]
@@ -633,7 +635,8 @@ pub fn procfs_dead_and_undead_test() {
 
     let fs = procfsapi::MockFS::new(files, pids, users, procfsapi::unix_now());
     let memtotal_kib = get_memtotal_kib(&fs).expect("Test: Must have data");
-    let (mut info, _, _) = get_process_information(&fs, memtotal_kib).expect("Test: Must have data");
+    let (mut info, _, _) =
+        get_process_information(&fs, memtotal_kib).expect("Test: Must have data");
 
     // 4020 should be dropped - it's dead
     assert!(info.len() == 2);

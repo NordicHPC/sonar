@@ -608,16 +608,16 @@ fn add_key(
     for c in cards {
         let v = extract(c);
         if !first {
-            vs = vs + "|";
+            vs += "|";
         }
-        if v != "" {
+        if !v.is_empty() {
             any = true;
             vs = vs + &v;
         }
         first = false;
     }
     if any {
-        if s != "" {
+        if !s.is_empty() {
             s += ",";
         }
         s + key + "=" + &vs
@@ -780,12 +780,12 @@ fn print_record(
     }
     if params.opts.load {
         if let Some(cpu_secs) = per_cpu_secs {
-            if cpu_secs.len() > 0 {
+            if !cpu_secs.is_empty() {
                 fields.push(format!("load={}", encode_cpu_secs_base45el(cpu_secs)));
             }
         }
         if let Some(gpu_info) = gpu_info {
-            if gpu_info != "" {
+            if !gpu_info.is_empty() {
                 fields.push(format!("gpuinfo={gpu_info}"));
             }
         }
@@ -830,7 +830,7 @@ fn encode_cpu_secs_base45el(cpu_secs: &[u64]) -> String {
     for x in cpu_secs {
         s += encode_u64_base45el(*x - base).as_str();
     }
-    return s;
+    s
 }
 
 // The only character unused by the encoding, other than the ones we're not allowed to use, is '='.
@@ -845,7 +845,7 @@ fn encode_u64_base45el(mut x: u64) -> String {
         s.push(SUBSEQUENT[(x % BASE) as usize] as char);
         x /= BASE;
     }
-    return s;
+    s
 }
 
 #[test]

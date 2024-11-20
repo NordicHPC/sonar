@@ -33,13 +33,11 @@ use std::os::unix::ffi::OsStringExt;
 
 pub fn get() -> String {
     match primitive_get() {
-        Ok(hn) => {
-            match hn.into_string() {
-                Ok(s) => s,
-                Err(_) => "unknown-host".to_string()
-            }
-        }
-        Err(_) => "unknown-host".to_string()
+        Ok(hn) => match hn.into_string() {
+            Ok(s) => s,
+            Err(_) => "unknown-host".to_string(),
+        },
+        Err(_) => "unknown-host".to_string(),
     }
 }
 

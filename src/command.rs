@@ -118,30 +118,24 @@ pub fn safe_command(
                 Ok(stdout_result)
             }
         }
-        Ok(ExitStatus::Exited(126)) => {
-            Err(CmdError::CouldNotStart(format_failure(
-                command,
-                "Command cannot execute",
-                &stdout_result,
-                &stderr_result,
-            )))
-        }
-        Ok(ExitStatus::Exited(127)) => {
-            Err(CmdError::CouldNotStart(format_failure(
-                command,
-                "Command not found",
-                &stdout_result,
-                &stderr_result,
-            )))
-        }
-        Ok(ExitStatus::Signaled(15)) => {
-            Err(CmdError::Hung(format_failure(
-                command,
-                "Killed by SIGTERM",
-                &stdout_result,
-                &stderr_result,
-            )))
-        }
+        Ok(ExitStatus::Exited(126)) => Err(CmdError::CouldNotStart(format_failure(
+            command,
+            "Command cannot execute",
+            &stdout_result,
+            &stderr_result,
+        ))),
+        Ok(ExitStatus::Exited(127)) => Err(CmdError::CouldNotStart(format_failure(
+            command,
+            "Command not found",
+            &stdout_result,
+            &stderr_result,
+        ))),
+        Ok(ExitStatus::Signaled(15)) => Err(CmdError::Hung(format_failure(
+            command,
+            "Killed by SIGTERM",
+            &stdout_result,
+            &stderr_result,
+        ))),
         Ok(x) => Err(CmdError::Failed(format_failure(
             command,
             format!("Unspecified other exit status {:?}", x).as_str(),

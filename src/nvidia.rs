@@ -39,7 +39,7 @@ impl gpu::GPU for NvidiaGPU {
 
     fn get_card_configuration(&mut self) -> Result<Vec<gpu::Card>, String> {
         if self.info.is_none() {
-            self.info = Some(get_nvidia_configuration(&vec!["-a"]))
+            self.info = Some(get_nvidia_configuration(&["-a"]))
         }
         match self.info.as_ref().unwrap() {
             Ok(data) => Ok(data
@@ -59,7 +59,7 @@ impl gpu::GPU for NvidiaGPU {
 
     fn get_card_utilization(&mut self) -> Result<Vec<gpu::CardState>, String> {
         if self.info.is_none() {
-            self.info = Some(get_nvidia_configuration(&vec!["-a"]))
+            self.info = Some(get_nvidia_configuration(&["-a"]))
         }
         match self.info.as_ref().unwrap() {
             Ok(data) => Ok(data
@@ -795,7 +795,7 @@ fn test_parse_nvidia_configuration() {
     assert!(c.info.driver == "545.23.08");
     assert!(c.info.firmware == "12.3");
     assert!(c.info.uuid == "GPU-198d6802-0000-0000-0000-000000000000");
-    assert!(c.info.mem_size_kib == 11264*1024);
+    assert!(c.info.mem_size_kib == 11264 * 1024);
     assert!(c.info.power_limit_watt == 250);
     assert!(c.info.max_power_limit_watt == 280);
     assert!(c.info.min_power_limit_watt == 100);
@@ -806,8 +806,8 @@ fn test_parse_nvidia_configuration() {
     assert!(c.state.fan_speed_pct == 28.0);
     assert!(c.state.compute_mode == "Default");
     assert!(c.state.perf_state == "P8");
-    assert!(c.state.mem_reserved_kib == 252*1024);
-    assert!(c.state.mem_used_kib == 3*1024);
+    assert!(c.state.mem_reserved_kib == 252 * 1024);
+    assert!(c.state.mem_used_kib == 3 * 1024);
     assert!(c.state.gpu_utilization_pct == 5.0);
     assert!(c.state.mem_utilization_pct == 8.0);
     assert!(c.state.temp_c == 34);
