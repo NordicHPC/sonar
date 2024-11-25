@@ -28,7 +28,7 @@ use crate::util::map;
 // accelerators present.
 
 fn amd_present() -> bool {
-    return Path::new("/sys/module/amdgpu").exists()
+    return Path::new("/sys/module/amdgpu").exists();
 }
 
 // We only have one machine with AMD GPUs at UiO and rocm-smi is unable to show eg how much memory
@@ -49,7 +49,7 @@ fn amd_present() -> bool {
 
 pub fn get_amd_configuration() -> Option<Vec<gpu::Card>> {
     if !amd_present() {
-        return None
+        return None;
     }
     match command::safe_command("rocm-smi", &["--showproductname"], TIMEOUT_SECONDS) {
         Ok(raw_text) => {
@@ -57,8 +57,15 @@ pub fn get_amd_configuration() -> Option<Vec<gpu::Card>> {
             for l in raw_text.lines() {
                 // We want to match /^GPU\[(\d+)\].*Card series:\s*(.*)$/ but we really only care
                 // about \2, which is the description.
+                //
+                // Newer rocm-smi changed the capitalization, sigh.
                 if l.starts_with("GPU[") {
                     if let Some((_, after)) = l.split_once("Card series:") {
+                        cards.push(gpu::Card {
+                            model: after.trim().to_string(),
+                            mem_size_kib: 0,
+                        });
+                    } else if let Some((_, after)) = l.split_once("Card Series:") {
                         cards.push(gpu::Card {
                             model: after.trim().to_string(),
                             mem_size_kib: 0,
@@ -83,41 +90,26 @@ pub fn get_amd_configuration() -> Option<Vec<gpu::Card>> {
 
 pub fn get_amd_information(user_by_pid: &UserTable) -> Result<Vec<gpu::Process>, String> {
     if !amd_present() {
-        return Ok(vec![])
+        return Ok(vec![]);
     }
 
     // I've not been able to combine the two invocations of rocm-smi yet; we have to run the command
     // twice.  Not a happy situation.
 
-    match command::safe_command(AMD_CONCISE_COMMAND, AMD_CONCISE_ARGS, TIMEOUT_SECONDS) {
-        Ok(concise_raw_text) => {
-            match command::safe_command(
-                AMD_SHOWPIDGPUS_COMMAND,
-                AMD_SHOWPIDGPUS_ARGS,
-                TIMEOUT_SECONDS,
-            ) {
-                Ok(showpidgpus_raw_text) => Ok(extract_amd_information(
-                    &concise_raw_text,
-                    &showpidgpus_raw_text,
-                    user_by_pid,
-                )?),
-                Err(e) => Err(format!("{:?}", e)),
-            }
-        }
-        Err(CmdError::CouldNotStart(_)) => Ok(vec![]),
-        Err(e) => Err(format!("{:?}", e)),
-    }
+    Ok(extract_amd_information(
+        &get_raw_per_device_info()?,
+        &get_raw_per_pid_info()?,
+        user_by_pid,
+    ))
 }
 
 // Put it all together from the command output.
 
 fn extract_amd_information(
-    concise_raw_text: &str,
-    showpidgpus_raw_text: &str,
+    per_device_info: &[(f64, f64)],
+    per_pid_info: &[(usize, Vec<usize>)],
     user_by_pid: &UserTable,
-) -> Result<Vec<gpu::Process>, String> {
-    let per_device_info = parse_concise_command(concise_raw_text)?; // device -> (gpu%, mem%)
-    let per_pid_info = parse_showpidgpus_command(showpidgpus_raw_text)?; // pid -> [device, ...]
+) -> Vec<gpu::Process> {
     let mut num_processes_per_device = vec![0; per_device_info.len()];
     per_pid_info.iter().for_each(|(_, devs)| {
         devs.iter()
@@ -153,53 +145,109 @@ fn extract_amd_information(
             fst
         }
     });
-    Ok(processes)
+    processes
 }
 
-#[cfg(test)]
-macro_rules! proc(
-    { $a:expr, $b:expr, $c:expr, $d:expr, $e: expr, $f: expr } => {
-        gpu::Process { device: $a,
-                       pid: $b,
-                       user: $c.to_string(),
-                       uid: $d,
-                       gpu_pct: $e,
-                       mem_pct: $f,
-                       mem_size_kib: 0,
-                       command: "_noinfo_".to_string()
+// Return a dense map from device index starting at zero to gpu and gpumem utilization; empty if
+// rocm-smi is not present; or an error if rocm-smi failed.
+//
+// Unfortunately the output format of rocm-smi is not stable.  So first we try to parse the CSV
+// form, subsequently we try the old format.
+
+fn get_raw_per_device_info() -> Result<Vec<(f64, f64)>, String> {
+    match command::safe_command(
+        "rocm-smi",
+        &["--showuse", "--showmemuse", "--csv"],
+        TIMEOUT_SECONDS,
+    ) {
+        Ok(text) => {
+            if let Ok(info) = parse_csv_concise_command(&text) {
+                return Ok(info);
+            }
+            // Otherwise fall through to second attempt below
         }
-    });
+        Err(CmdError::CouldNotStart(_)) => {
+            return Ok(vec![]);
+        }
+        Err(_) => {
+            // Fall through, we're going to assume this is some problem with the command line
+            // switches, the next attempt will hopefully surface any problems with the cards
+            // themselves.
+        }
+    }
 
-#[test]
-fn test_extract_amd_information() {
-    let concise = "
-================================= Concise Info =================================
-GPU  Temp (DieEdge)  AvgPwr  SCLK     MCLK    Fan     Perf  PwrCap  VRAM%  GPU%
-0    53.0c           220.0W  1576Mhz  945Mhz  10.98%  auto  220.0W   57%   99%
-1    26.0c           3.0W    852Mhz   167Mhz  9.41%   auto  220.0W    5%   63%
-================================================================================
-";
-    let pidgpu = "
-============================= GPUs Indexed by PID ==============================
-PID 28156 is using 2 DRM device(s):
-0 1
-PID 28154 is using 1 DRM device(s):
-0
-================================================================================
-";
-    let users = map! {
-    28156 => ("bob", 1001usize)
-    };
-    let zs = extract_amd_information(concise, pidgpu, &users).unwrap();
-    assert!(zs.eq(&vec![
-        proc! { Some(0), 28154, "_zombie_28154", gpu::ZOMBIE_UID, 99.0/2.0, 57.0/2.0 },
-        proc! { Some(0), 28156, "bob", 1001, 99.0/2.0, 57.0/2.0 },
-        proc! { Some(1), 28156, "bob", 1001, 63.0, 5.0 },
-    ]));
+    match command::safe_command("rocm-smi", &[], TIMEOUT_SECONDS) {
+        Ok(text) => parse_text_concise_command(&text),
+        Err(CmdError::CouldNotStart(_)) => Ok(vec![]),
+        Err(e) => Err(format!("{:?}", e)),
+    }
 }
 
-const AMD_CONCISE_COMMAND: &str = "rocm-smi";
-const AMD_CONCISE_ARGS: &[&str] = &[];
+// The format here is line-oriented:
+//
+// There should initially be at least one line with at least three fields which should
+// start with these strings in order (with this capitalization, sigh):
+//    device
+//    GPU use
+//    GPU Memory
+//
+// Subsequently there should be lines starting with "cardN,", these are are information for that
+// card.
+//
+// All other lines are junk.
+
+fn parse_csv_concise_command(raw_text: &str) -> Result<Vec<(f64, f64)>, String> {
+    let lines = raw_text.lines().collect::<Vec<&str>>();
+    let mut mappings = vec![];
+    let mut found_device = false;
+    for l in lines {
+        if l.starts_with("device") {
+            if found_device {
+                return Err("Inconsistent output".to_string());
+            }
+            let fields = l.split(',').collect::<Vec<&str>>();
+            if fields.len() >= 3
+                && fields[1].starts_with("GPU use")
+                && fields[2].starts_with("GPU Memory")
+            {
+                found_device = true;
+            }
+        } else if let Some(rest) = l.strip_prefix("card") {
+            let fields = rest.split(',').collect::<Vec<&str>>();
+            let mut dev = None;
+            let mut gpu = None;
+            let mut gpumem = None;
+            if fields.len() >= 3 {
+                dev = match fields[0].parse::<usize>() {
+                    Ok(n) => Some(n),
+                    _ => None,
+                };
+                gpu = match fields[1].parse::<f64>() {
+                    Ok(n) => Some(n),
+                    _ => None,
+                };
+                gpumem = match fields[2].parse::<f64>() {
+                    Ok(n) => Some(n),
+                    _ => None,
+                };
+            }
+            match (dev, gpu, gpumem) {
+                (Some(dev), Some(gpu), Some(gpumem)) => {
+                    if mappings.len() < dev + 1 {
+                        mappings.resize(dev + 1, (0.0, 0.0))
+                    }
+                    mappings[dev] = (gpu, gpumem);
+                }
+                _ => {}
+            }
+        }
+    }
+    if found_device && mappings.len() > 0 {
+        Ok(mappings)
+    } else {
+        Err("Inconsistent output".to_string())
+    }
+}
 
 // Return a vector of AMD GPU utilization indexed by device number: (gpu%, mem%)
 //
@@ -208,7 +256,7 @@ const AMD_CONCISE_ARGS: &[&str] = &[];
 //
 // The mem% is instantaneous memory utilization as expected.
 
-fn parse_concise_command(raw_text: &str) -> Result<Vec<(f64, f64)>, String> {
+fn parse_text_concise_command(raw_text: &str) -> Result<Vec<(f64, f64)>, String> {
     let block = find_block(raw_text, "= Concise Info =");
     if block.len() > 1 {
         let hdr = block[0].split_whitespace().collect::<Vec<&str>>();
@@ -243,23 +291,16 @@ fn parse_concise_command(raw_text: &str) -> Result<Vec<(f64, f64)>, String> {
     }
 }
 
-#[test]
-fn test_parse_concise_command() {
-    let xs = parse_concise_command(
-        "
-================================= Concise Info =================================
-GPU  Temp (DieEdge)  AvgPwr  SCLK     MCLK    Fan     Perf  PwrCap  VRAM%  GPU%
-0    53.0c           220.0W  1576Mhz  945Mhz  10.98%  auto  220.0W   57%   99%
-1    26.0c           3.0W    852Mhz   167Mhz  9.41%   auto  220.0W    5%   63%
-================================================================================
-",
-    )
-    .unwrap();
-    assert!(xs.eq(&vec![(99.0, 57.0), (63.0, 5.0)]));
-}
+// Return a sparse map from pid to devices used by the pid; empty if rocm-smi is not present; or an
+// error if rocm-smi failed.
 
-const AMD_SHOWPIDGPUS_COMMAND: &str = "rocm-smi";
-const AMD_SHOWPIDGPUS_ARGS: &[&str] = &["--showpidgpus"];
+fn get_raw_per_pid_info() -> Result<Vec<(usize, Vec<usize>)>, String> {
+    match command::safe_command("rocm-smi", &["--showpidgpus"], TIMEOUT_SECONDS) {
+        Ok(showpidgpus_raw_text) => parse_showpidgpus_command(&showpidgpus_raw_text),
+        Err(CmdError::CouldNotStart(_)) => Ok(vec![]),
+        Err(e) => Err(format!("{:?}", e)),
+    }
+}
 
 // Return a vector of (PID, DEVICES) where DEVICES is a vector of the devices used by the PID.  The
 // PID is a string, the devices are numbers.  See test cases below for the various forms
@@ -299,6 +340,118 @@ fn parse_showpidgpus_command(raw_text: &str) -> Result<Vec<(usize, Vec<usize>)>,
 }
 
 // TODO: Multiple processes on a single device
+
+// Grab the first block of rocm-smi output we see that contains the trigger string, and return the
+// lines within that block.
+
+fn find_block<'a>(raw_text: &'a str, trigger: &str) -> Vec<&'a str> {
+    let lines = raw_text.lines().collect::<Vec<&str>>();
+    let mut i = 0;
+    let mut b = vec![];
+    while i < lines.len() && !lines[i].contains(trigger) {
+        i += 1;
+    }
+    if i < lines.len() && lines[i].contains(trigger) {
+        i += 1;
+        while i < lines.len() && !is_terminator(lines[i]) {
+            b.push(lines[i]);
+            i += 1;
+        }
+    }
+    b
+}
+
+fn is_terminator(s: &str) -> bool {
+    s.chars().all(|c| c == '=')
+}
+
+#[cfg(test)]
+macro_rules! proc(
+    { $a:expr, $b:expr, $c:expr, $d:expr, $e: expr, $f: expr } => {
+        gpu::Process { device: $a,
+                       pid: $b,
+                       user: $c.to_string(),
+                       uid: $d,
+                       gpu_pct: $e,
+                       mem_pct: $f,
+                       mem_size_kib: 0,
+                       command: "_noinfo_".to_string()
+        }
+    });
+
+#[test]
+fn test_extract_amd_information() {
+    let concise = "
+================================= Concise Info =================================
+GPU  Temp (DieEdge)  AvgPwr  SCLK     MCLK    Fan     Perf  PwrCap  VRAM%  GPU%
+0    53.0c           220.0W  1576Mhz  945Mhz  10.98%  auto  220.0W   57%   99%
+1    26.0c           3.0W    852Mhz   167Mhz  9.41%   auto  220.0W    5%   63%
+================================================================================
+";
+    let pidgpu = "
+============================= GPUs Indexed by PID ==============================
+PID 28156 is using 2 DRM device(s):
+0 1
+PID 28154 is using 1 DRM device(s):
+0
+================================================================================
+";
+    let users = map! {
+    28156 => ("bob", 1001usize)
+    };
+    let zs = extract_amd_information(
+        &parse_text_concise_command(concise).unwrap(),
+        &parse_showpidgpus_command(pidgpu).unwrap(),
+        &users);
+    assert!(zs.eq(&vec![
+        proc! { Some(0), 28154, "_zombie_28154", gpu::ZOMBIE_UID, 99.0/2.0, 57.0/2.0 },
+        proc! { Some(0), 28156, "bob", 1001, 99.0/2.0, 57.0/2.0 },
+        proc! { Some(1), 28156, "bob", 1001, 63.0, 5.0 },
+    ]));
+}
+
+#[test]
+fn test_text_parse_concise_command() {
+    let xs = parse_text_concise_command(
+        "
+================================= Concise Info =================================
+GPU  Temp (DieEdge)  AvgPwr  SCLK     MCLK    Fan     Perf  PwrCap  VRAM%  GPU%
+0    53.0c           220.0W  1576Mhz  945Mhz  10.98%  auto  220.0W   57%   99%
+1    26.0c           3.0W    852Mhz   167Mhz  9.41%   auto  220.0W    5%   63%
+================================================================================
+",
+    )
+    .unwrap();
+    assert!(xs.eq(&vec![(99.0, 57.0), (63.0, 5.0)]));
+}
+
+#[test]
+fn test_csv_concise_command() {
+    let xs = parse_csv_concise_command(
+        "
+device,GPU use (%),GPU Memory Allocated (VRAM%),Memory Activity
+card0,99,57,N/A
+card1,63,5,N/A
+",
+    )
+    .unwrap();
+    assert!(xs.eq(&vec![(99.0, 57.0), (63.0, 5.0)]));
+}
+
+#[test]
+fn test_find_block() {
+    assert!(find_block(
+        "
+============================= xGPUs Indexed by PID ==============================
+============================= GPUs Indexed by PID ==============================
+PID 25774 is using 1 DRM device(s):
+0
+================================================================================
+",
+        "= GPUs Indexed by PID ="
+    )
+    .eq(&vec!["PID 25774 is using 1 DRM device(s):", "0"]))
+}
 
 #[test]
 fn test_parse_showpidgpus_command() {
@@ -344,43 +497,4 @@ PID 29212 is using 2 DRM device(s):
     )
     .unwrap();
     assert!(xs.eq(&vec![(29212, vec![0, 1])]));
-}
-
-// Grab the first block of rocm-smi output we see that contains the trigger string, and return the
-// lines within that block.
-
-fn find_block<'a>(raw_text: &'a str, trigger: &str) -> Vec<&'a str> {
-    let lines = raw_text.lines().collect::<Vec<&str>>();
-    let mut i = 0;
-    let mut b = vec![];
-    while i < lines.len() && !lines[i].contains(trigger) {
-        i += 1;
-    }
-    if i < lines.len() && lines[i].contains(trigger) {
-        i += 1;
-        while i < lines.len() && !is_terminator(lines[i]) {
-            b.push(lines[i]);
-            i += 1;
-        }
-    }
-    b
-}
-
-fn is_terminator(s: &str) -> bool {
-    s.chars().all(|c| c == '=')
-}
-
-#[test]
-fn test_find_block() {
-    assert!(find_block(
-        "
-============================= xGPUs Indexed by PID ==============================
-============================= GPUs Indexed by PID ==============================
-PID 25774 is using 1 DRM device(s):
-0
-================================================================================
-",
-        "= GPUs Indexed by PID ="
-    )
-    .eq(&vec!["PID 25774 is using 1 DRM device(s):", "0"]))
 }
