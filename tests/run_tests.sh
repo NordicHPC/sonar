@@ -14,7 +14,8 @@ fi
 # keep tests alphabetical
 # later we could just iterate over all scripts that end with .sh
 # and are not this script
-for test in command-line \
+for test in amd-gpu \
+                command-line \
                 exclude-commands \
                 exclude-system-jobs \
                 exclude-users \
@@ -24,6 +25,7 @@ for test in command-line \
                 load \
                 lockfile \
                 min-cpu-time \
+                nvidia-gpu \
                 ps-syntax \
                 rollup \
                 rollup2 \
