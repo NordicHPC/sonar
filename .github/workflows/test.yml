@@ -15,6 +15,9 @@ jobs:
     - name: Checkout
       uses: actions/checkout@v4
 
+    - name: Display Rust version
+      run: cargo --version
+
     - name: Build
       run: cargo build --verbose
 
