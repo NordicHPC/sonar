@@ -14,6 +14,7 @@ probe the system and reports on its overall configuration.
 
 Image: [Midjourney](https://midjourney.com/), [CC BY-NC 4.0](https://creativecommons.org/licenses/by-nc/4.0/legalcode)
 
+
 ## Subcommands
 
 Sonar has two subcommands, `ps` and `sysinfo`.  Both collect information about the system and print
@@ -35,6 +36,7 @@ Options:
   -V, --version  Print version
 ```
 
+
 ## Versions and release procedures
 
 ### Version numbers
@@ -50,6 +52,7 @@ itself changes.  For example, v0.8.0 both added fields and stopped printing fiel
 
 The bugfix version is updated for changes that do not alter the output format per se but that might
 affect the output nevertheless, ie, most changes not covered by changes to the minor version number.
+
 
 ### Release branches, uplifts and backports
 
@@ -87,14 +90,17 @@ With the branches come some additional rules for how to move patches around:
 
 Version in progress, no changes as of yet.
 
+
 ### Changes in v0.12.x (on `release_0_12`)
 
 **System load data introduced**.  Added the `load` field which is printed with one of the records
 per sonar invocation. (v0.12.0)
 
+
 ### Changes in v0.11.x
 
 **Better `ps` data**.  More data points. (v0.11.0)
+
 
 ### Changes in v0.10.x
 
@@ -105,6 +111,7 @@ sysinfo`. (v0.10.0)
 --batchless`) has changed from being the pid of the process below the session leader to being the
 more conventional process group id.  In most situations this won't make a difference. (v0.10.1)
 
+
 ### Changes in v0.9.x
 
 **Sysinfo introduced**.  The `sonar sysinfo` subcommand was introduced to extract information about
@@ -113,6 +120,7 @@ the system itself.
 **More help when information is missing**.  The user name field now includes the UID if the user
 name can't be obtained from system databases but the UID is known. (v0.9.0)
 
+
 ### Changes in v0.8.x
 
 **Better `ps` data**.  More clarifications, more data points. (v0.8.0)
@@ -120,6 +128,7 @@ name can't be obtained from system databases but the UID is known. (v0.9.0)
 **Less use of external programs**.  We go directly to `/proc` for data, and no longer run `ps`.
 
 **Less `ps` output**. Fields that hold default values are not printed. (v0.8.0)
+
 
 ### Changes in v0.7.x
 
@@ -143,6 +152,7 @@ of fields and the use of default values.
 [sonalyze](https://github.com/NAICNO/Jobanalyzer/tree/main/code/sonalyze) ingest well-defined and
 simply-created sonar data, process it and present it in specialized ways, removing those burdens
 from sonar.
+
 
 ### Changes in v0.6.0
 
@@ -242,16 +252,19 @@ The base-45 digits of the value `897` are (in little-endian order) 42 and 19, an
 this value is thus `&J`.  As the initial character is from a different character set, no explicit
 separator is needed in the array - the initial digit acts as a separator.
 
+
 ### Version 0.11.0 `ps` output format
 
 Version 0.11.0 adds one field:
 
 `ppid` (optional, default "0"): The parent process ID of the job, a positive integer.
 
+
 ### Version 0.10.0 `ps` output format
 
 The fields `cores` and `memtotalkib` were removed, as they were unused by all clients and are
 supplied by `sonar sysinfo` for clients that need that information.
+
 
 ### Version 0.9.0 `ps` output format
 
@@ -262,6 +275,7 @@ were looking for it).
 Version 0.9.0 extends the encoding of the `user` field: it can now (also) have the value
 `_noinfo_<uid>` where `<uid>` is the user ID, if user information was unobtainable for any reason
 but we have a UID.  Clients could be able to handle both this encoding and the older encoding.
+
 
 ### Version 0.8.0 `ps` output format
 
@@ -277,6 +291,7 @@ a nonnegative integer, with 0 meaning "no data available".
 
 Version 0.8.0 also clarifies that the existing `cpukib` field reports virtual data+stack memory, not
 resident memory nor virtual total memory.
+
 
 ### Version 0.7.0 `ps` output format
 
@@ -413,6 +428,7 @@ VMs) once every 24 hours, and to aggregate the information in some database.
 
 The `sysinfo` subcommand currently has no options.
 
+
 ### Version 0.9.0 `sysinfo` format
 
 The JSON structure has these fields:
@@ -429,6 +445,7 @@ Numeric fields that are zero may or may not be omitted by the producer.
 
 Note the v0.9.0 `sysinfo` output does not carry a version number.
 
+
 ## Collect and analyze results
 
 Sonar data are used by two other tools:
@@ -438,6 +455,7 @@ Sonar data are used by two other tools:
 * [JobAnalyzer](https://github.com/NAICNO/Jobanalyzer) allows sonar logs to be queried and analyzed, and
   provides dashboards, interactive and batch queries, and reporting of system activity, policy violations,
   hung jobs, and more.
+
 
 ## Authors
 
@@ -497,6 +515,7 @@ of processes.
 
 Optionally, `sonar` will use a lockfile to avoid a pile-up of processes.
 
+
 ## Dependencies and updates
 
 Sonar runs everywhere and all the time, and even though it currently runs without privileges it
@@ -513,6 +532,7 @@ attack.  There are some rules:
 - If in doubt: copy the parts we need, vet them thoroughly, and maintain them separately
 
 There is a useful discussion of these matters [here](https://research.swtch.com/deps).
+
 
 ## How we run sonar on a cluster
 
