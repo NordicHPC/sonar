@@ -86,6 +86,21 @@ With the branches come some additional rules for how to move patches around:
   backports.
 
 
+### Policies for changing Rust edition and minimum Rust version
+
+At the time of writing we require:
+- 2021 edition of Rust
+- Rust 1.59.0, released 2022-02-24 (can be found with `cargo msrv find`)
+
+Policy for changing the minimum Rust version:
+- Open a GitHub issue and motivate the change
+- Once we reach agreement in the issue discussion:
+  - Update the version inside the test workflow [test-minimal.yml](.github/workflows/test-minimal.yml)
+  - Update the documentation (this section)
+
+
+## Changelog
+
 ### Changes in v0.13.x-devel (on `main`)
 
 Version in progress, no changes as of yet.
