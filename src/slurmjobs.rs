@@ -394,20 +394,5 @@ v=0.1.0,JobID=974819.extern,JobIDRaw=974819.extern,Account=ec35,State=COMPLETED,
 v=0.1.0,JobID=974819.0,JobIDRaw=974819.0,Account=ec35,State=CANCELLED,Start=2024-11-13T13:09:19+01:00,End=2024-11-13T13:09:34+01:00,AveCPU=00:00:05,AveDiskRead=19.75M,AveRSS=54518K,ElapsedRaw=15,ExitCode=0:15,Layout=Block,MaxRSS=79648K,MinCPU=00:00:05,ReqCPUS=20,ReqNodes=1,Submit=2024-11-13T13:09:19+01:00,SystemCPU=00:04.761,UserCPU=00:05.688,NodeList=gpu-4,"AllocTRES=cpu=20,gres/gpu:rtx30=1,gres/gpu=1,mem=50G,node=1",JobName=python
 "#;
 
-    if sacct_output != expected {
-        let xs = &output;
-        let ys = expected.as_bytes();
-        if xs.len() != ys.len() {
-            print!("Lengths differ: {} {}\n", xs.len(), ys.len());
-            print!("{:?}", output);
-            assert!(false);
-        }
-        for i in 0..xs.len() {
-            if xs[i] != ys[i] {
-                print!("Failing at {i}: {} {}\n", xs[i], ys[i]);
-                print!("{:?}", output);
-                assert!(false);
-            }
-        }
-    }
+    assert!(sacct_output == expected);
 }
