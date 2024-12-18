@@ -28,6 +28,7 @@ Usage: sonar <COMMAND>
 Commands:
   ps       Take a snapshot of the currently running processes
   sysinfo  Extract system information
+  slurm    Extract slurm information
   help     Print this message or the help of the given subcommand(s)
 
 Options:
@@ -85,12 +86,16 @@ With the branches come some additional rules for how to move patches around:
 
 ### Changes in v0.13.x-devel (on `main`)
 
-Version in progress, no changes as of yet.
+**Per-GPU load data introduced**.  Added the `gpuinfo` field which is printed with one of the records
+per `sonar ps` invocation. (v0.13.0)
+
+**`sonar slurm` command introduced**.  This extracts information from the Slurm database about
+completed jobs within a time window, on CSV format.
 
 ### Changes in v0.12.x (on `release_0_12`)
 
 **System load data introduced**.  Added the `load` field which is printed with one of the records
-per sonar invocation. (v0.12.0)
+per `sonar ps` invocation. (v0.12.0)
 
 ### Changes in v0.11.x
 
