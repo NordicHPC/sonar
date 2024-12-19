@@ -7,5 +7,6 @@ repository = "https://github.com/NordicHPC/sonar"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+cty = "0.2.2"
 libc = "0.2"
 subprocess = { version = "= 0.2.9" }

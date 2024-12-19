@@ -1,6 +1,8 @@
 #![allow(unused_imports)]
 #![allow(unused_macros)]
 
+use std::ffi::CStr;
+
 // Populate a HashSet.
 #[cfg(test)]
 macro_rules! set(
@@ -138,4 +140,13 @@ pub fn csv_quote_test() {
     assert!(&csv_quote(r#"abc,de"#) == r#""abc,de""#);
     assert!(&csv_quote(r#"abc"de"#) == r#""abc""de""#);
     assert!(&csv_quote(r#"abc""de"#) == r#""abc""""de""#);
+}
+
+// Copy a C string.
+
+pub fn cstrdup(s: &[i8]) -> String {
+    unsafe { CStr::from_ptr(s.as_ptr()) }
+        .to_str()
+        .expect("Will always be utf8")
+        .to_string()
 }

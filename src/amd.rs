@@ -3,8 +3,10 @@
 // This is pretty hacky!  Something better than this is likely needed and hopefully possible.
 
 use crate::command::{self, CmdError};
+use crate::amd_smi;
 use crate::gpu;
-use crate::ps::UserTable;
+use crate::gpuset;
+use crate::ps;
 use crate::TIMEOUT_SECONDS;
 
 use std::cmp::Ordering;
@@ -29,18 +31,34 @@ impl gpu::GPU for AmdGPU {
     }
 
     fn get_card_configuration(&mut self) -> Result<Vec<gpu::Card>, String> {
-        get_amd_configuration()
+        if let Some(info) = amd_smi::get_card_configuration() {
+            Ok(info)
+        } else {
+            println!("FALLBACK get_card_configuration!!");
+            get_amd_configuration()
+        }
     }
 
     fn get_process_utilization(
         &mut self,
-        user_by_pid: &UserTable,
+        user_by_pid: &ps::UserTable,
     ) -> Result<Vec<gpu::Process>, String> {
-        get_amd_utilization(user_by_pid)
+        if let Some(info) = amd_smi::get_process_utilization(user_by_pid) {
+            Ok(info)
+        } else {
+            println!("FALLBACK get_process_utilization!!");
+            get_amd_utilization(user_by_pid)
+        }
     }
 
     fn get_card_utilization(&mut self) -> Result<Vec<gpu::CardState>, String> {
-        Ok(vec![])
+        if let Some(info) = amd_smi::get_card_utilization() {
+            Ok(info)
+        } else {
+            println!("FALLBACK get_card_utilization!!");
+            // Never had anything here
+            Ok(vec![])
+        }
     }
 }
 
@@ -102,7 +120,7 @@ fn get_amd_configuration() -> Result<Vec<gpu::Card>, String> {
 // Err(e) really means the command started running but failed, for the reason given.  If the
 // command could not be found or no card is present, we return Ok(vec![]).
 
-fn get_amd_utilization(user_by_pid: &UserTable) -> Result<Vec<gpu::Process>, String> {
+fn get_amd_utilization(user_by_pid: &ps::UserTable) -> Result<Vec<gpu::Process>, String> {
     // I've not been able to combine the two invocations of rocm-smi yet; we have to run the command
     // twice.  Not a happy situation.
 
@@ -118,7 +136,7 @@ fn get_amd_utilization(user_by_pid: &UserTable) -> Result<Vec<gpu::Process>, Str
 fn extract_amd_information(
     per_device_info: &[(f64, f64)],
     per_pid_info: &[(usize, Vec<usize>)],
-    user_by_pid: &UserTable,
+    user_by_pid: &ps::UserTable,
 ) -> Vec<gpu::Process> {
     let mut num_processes_per_device = vec![0; per_device_info.len()];
     per_pid_info.iter().for_each(|(_, devs)| {
@@ -136,19 +154,22 @@ fn extract_amd_information(
                 ("_zombie_".to_owned() + &pid.to_string(), gpu::ZOMBIE_UID)
             };
             processes.push(gpu::Process {
-                device: Some(*dev),
+                devices: gpuset::singleton_gpuset(Some(*dev)),
                 pid: *pid,
                 user,
                 uid,
                 gpu_pct: per_device_info[*dev].0 / num_processes_per_device[*dev] as f64,
                 mem_pct: per_device_info[*dev].1 / num_processes_per_device[*dev] as f64,
                 mem_size_kib: 0,
-                command: "_noinfo_".to_string(),
+                command: Some("_noinfo_".to_string()),
             })
         })
     });
     processes.sort_by(|p, q| {
-        let fst = p.device.cmp(&q.device);
+        // This is dumb but short-term, and it only matters for testing.
+        let dp = gpuset::pick_one(&p.devices);
+        let dq = gpuset::pick_one(&q.devices);
+        let fst = dp.cmp(&dq);
         if fst == Ordering::Equal {
             p.pid.cmp(&q.pid)
         } else {
@@ -195,14 +216,14 @@ fn get_raw_per_device_info() -> Result<Vec<(f64, f64)>, String> {
 #[cfg(test)]
 macro_rules! proc(
     { $a:expr, $b:expr, $c:expr, $d:expr, $e: expr, $f: expr } => {
-        gpu::Process { device: $a,
+        gpu::Process { devices: gpuset::singleton_gpuset($a),
                        pid: $b,
                        user: $c.to_string(),
                        uid: $d,
                        gpu_pct: $e,
                        mem_pct: $f,
                        mem_size_kib: 0,
-                       command: "_noinfo_".to_string()
+                       command: Some("_noinfo_".to_string())
         }
     });
 

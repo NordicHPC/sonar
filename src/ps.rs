@@ -2,6 +2,7 @@
 #![allow(clippy::too_many_arguments)]
 
 use crate::gpu;
+use crate::gpuset;
 use crate::hostname;
 use crate::interrupt;
 use crate::jobs;
@@ -10,48 +11,9 @@ use crate::procfs;
 use crate::procfsapi;
 use crate::util::{csv_quote, three_places};
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::io::{self, Result, Write};
 use std::path::PathBuf;
-
-// The GpuSet has three states:
-//
-//  - the set is known to be empty, this is Some({})
-//  - the set is known to be nonempty and have only known gpus in the set, this is Some({a,b,..})
-//  - the set is known to be nonempty but have (some) unknown members, this is None
-//
-// During processing, the set starts out as Some({}).  If a device reports "unknown" GPUs then the
-// set can transition from Some({}) to None or from Some({a,b,..}) to None.  Once in the None state,
-// the set will stay in that state.  There is no representation for some known + some unknown GPUs,
-// it is not believed to be worthwhile.
-
-type GpuSet = Option<HashSet<usize>>;
-
-fn empty_gpuset() -> GpuSet {
-    Some(HashSet::new())
-}
-
-fn singleton_gpuset(maybe_device: Option<usize>) -> GpuSet {
-    if let Some(dev) = maybe_device {
-        let mut gpus = HashSet::new();
-        gpus.insert(dev);
-        Some(gpus)
-    } else {
-        None
-    }
-}
-
-fn union_gpuset(lhs: &mut GpuSet, rhs: &GpuSet) {
-    if lhs.is_none() {
-        // The result is also None
-    } else if rhs.is_none() {
-        *lhs = None;
-    } else {
-        lhs.as_mut()
-            .expect("LHS is nonempty")
-            .extend(rhs.as_ref().expect("RHS is nonempty"));
-    }
-}
 
 type Pid = usize;
 type JobID = usize;
@@ -77,7 +39,7 @@ struct ProcInfo<'a> {
     mem_percentage: f64,
     mem_size_kib: usize,
     rssanon_kib: usize,
-    gpu_cards: GpuSet,
+    gpu_cards: gpuset::GpuSet,
     gpu_percentage: f64,
     gpu_mem_percentage: f64,
     gpu_mem_size_kib: usize,
@@ -118,7 +80,7 @@ fn add_proc_info<'a, F>(
     mem_percentage: f64,
     mem_size_kib: usize,
     rssanon_kib: usize,
-    gpu_cards: &GpuSet,
+    gpu_cards: &gpuset::GpuSet,
     gpu_percentage: f64,
     gpu_mem_percentage: f64,
     gpu_mem_size_kib: usize,
@@ -134,7 +96,7 @@ fn add_proc_info<'a, F>(
             e.mem_percentage += mem_percentage;
             e.mem_size_kib += mem_size_kib;
             e.rssanon_kib += rssanon_kib;
-            union_gpuset(&mut e.gpu_cards, gpu_cards);
+            gpuset::union_gpuset(&mut e.gpu_cards, gpu_cards);
             e.gpu_percentage += gpu_percentage;
             e.gpu_mem_percentage += gpu_mem_percentage;
             e.gpu_mem_size_kib += gpu_mem_size_kib;
@@ -267,7 +229,7 @@ pub fn create_snapshot(jobs: &mut dyn jobs::JobManager, opts: &PsOptions, timest
 }
 
 fn do_create_snapshot(jobs: &mut dyn jobs::JobManager, opts: &PsOptions, timestamp: &str) {
-    let no_gpus = empty_gpuset();
+    let no_gpus = gpuset::empty_gpuset();
     let mut proc_by_pid = ProcTable::new();
 
     if interrupt::is_interrupted() {
@@ -404,12 +366,17 @@ fn do_create_snapshot(jobs: &mut dyn jobs::JobManager, opts: &PsOptions, timesta
                             } else {
                                 (1, true)
                             };
+                        // FIXME: This is not what we want, we can do better.
+                        let command = match &proc.command {
+                            Some(cmd) => cmd,
+                            _ => "_unknown_",
+                        };
                         add_proc_info(
                             &mut proc_by_pid,
                             &mut lookup_job_by_pid,
                             &proc.user,
                             proc.uid,
-                            &proc.command,
+                            command,
                             proc.pid,
                             ppid,
                             has_children,
@@ -418,7 +385,7 @@ fn do_create_snapshot(jobs: &mut dyn jobs::JobManager, opts: &PsOptions, timesta
                             0.0, // mem_percentage
                             0,   // mem_size_kib
                             0,   // rssanon_kib
-                            &singleton_gpuset(proc.device),
+                            &proc.devices,
                             proc.gpu_pct,
                             proc.mem_pct,
                             proc.mem_size_kib,
@@ -502,7 +469,7 @@ fn do_create_snapshot(jobs: &mut dyn jobs::JobManager, opts: &PsOptions, timesta
                     p.mem_percentage += proc_info.mem_percentage;
                     p.mem_size_kib += proc_info.mem_size_kib;
                     p.rssanon_kib += proc_info.rssanon_kib;
-                    union_gpuset(&mut p.gpu_cards, &proc_info.gpu_cards);
+                    gpuset::union_gpuset(&mut p.gpu_cards, &proc_info.gpu_cards);
                     p.gpu_percentage += proc_info.gpu_percentage;
                     p.gpu_mem_percentage += proc_info.gpu_mem_percentage;
                     p.gpu_mem_size_kib += proc_info.gpu_mem_size_kib;
@@ -572,7 +539,7 @@ fn do_create_snapshot(jobs: &mut dyn jobs::JobManager, opts: &PsOptions, timesta
             mem_percentage: 0.0,
             mem_size_kib: 0,
             rssanon_kib: 0,
-            gpu_cards: empty_gpuset(),
+            gpu_cards: gpuset::empty_gpuset(),
             gpu_percentage: 0.0,
             gpu_mem_percentage: 0.0,
             gpu_mem_size_kib: 0,

@@ -1,12 +1,15 @@
 mod amd;
+mod amd_smi;
 mod batchless;
 mod command;
 mod gpu;
+mod gpuset;
 mod hostname;
 mod interrupt;
 mod jobs;
 mod log;
 mod nvidia;
+mod nvidia_nvml;
 mod procfs;
 mod procfsapi;
 mod ps;

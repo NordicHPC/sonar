@@ -2,7 +2,9 @@
 
 use crate::command::{self, CmdError};
 use crate::gpu;
-use crate::ps::UserTable;
+use crate::gpuset;
+use crate::nvidia_nvml;
+use crate::ps;
 use crate::util;
 use crate::TIMEOUT_SECONDS;
 
@@ -38,35 +40,50 @@ impl gpu::GPU for NvidiaGPU {
     }
 
     fn get_card_configuration(&mut self) -> Result<Vec<gpu::Card>, String> {
-        if self.info.is_none() {
-            self.info = Some(get_nvidia_configuration(&["-a"]))
-        }
-        match self.info.as_ref().unwrap() {
-            Ok(data) => Ok(data
-                .iter()
-                .map(|pc| pc.info.clone())
-                .collect::<Vec<gpu::Card>>()),
-            Err(e) => Err(e.clone()),
+        if let Some(info) = nvidia_nvml::get_card_configuration() {
+            Ok(info)
+        } else {
+            println!("FALLBACK get_card_configuration!!");
+            if self.info.is_none() {
+                self.info = Some(get_nvidia_configuration(&["-a"]))
+            }
+            match self.info.as_ref().unwrap() {
+                Ok(data) => Ok(data
+                    .iter()
+                    .map(|pc| pc.info.clone())
+                    .collect::<Vec<gpu::Card>>()),
+                Err(e) => Err(e.clone()),
+            }
         }
     }
 
     fn get_process_utilization(
         &mut self,
-        user_by_pid: &UserTable,
+        user_by_pid: &ps::UserTable,
     ) -> Result<Vec<gpu::Process>, String> {
-        get_nvidia_utilization(user_by_pid)
+        if let Some(info) = nvidia_nvml::get_process_utilization(user_by_pid) {
+            Ok(info)
+        } else {
+            println!("FALLBACK get_process_utilization!!");
+            get_nvidia_utilization(user_by_pid)
+        }
     }
 
     fn get_card_utilization(&mut self) -> Result<Vec<gpu::CardState>, String> {
-        if self.info.is_none() {
-            self.info = Some(get_nvidia_configuration(&["-a"]))
-        }
-        match self.info.as_ref().unwrap() {
-            Ok(data) => Ok(data
-                .iter()
-                .map(|pc| pc.state.clone())
-                .collect::<Vec<gpu::CardState>>()),
-            Err(e) => Err(e.clone()),
+        if let Some(info) = nvidia_nvml::get_card_utilization() {
+            Ok(info)
+        } else {
+            println!("FALLBACK get_card_utilization!!");
+            if self.info.is_none() {
+                self.info = Some(get_nvidia_configuration(&["-a"]))
+            }
+            match self.info.as_ref().unwrap() {
+                Ok(data) => Ok(data
+                    .iter()
+                    .map(|pc| pc.state.clone())
+                    .collect::<Vec<gpu::CardState>>()),
+                Err(e) => Err(e.clone()),
+            }
         }
     }
 }
@@ -324,7 +341,7 @@ fn field_value_stripped(l: &str, suffix: &str) -> String {
 // Err(e) really means the command started running but failed, for the reason given.  If the
 // command could not be found or no card is present, we return Ok(vec![]).
 
-fn get_nvidia_utilization(user_by_pid: &UserTable) -> Result<Vec<gpu::Process>, String> {
+fn get_nvidia_utilization(user_by_pid: &ps::UserTable) -> Result<Vec<gpu::Process>, String> {
     if !nvidia_present() {
         return Ok(vec![]);
     }
@@ -371,7 +388,7 @@ const NVIDIA_PMON_ARGS: &[&str] = &["pmon", "-c", "1", "-s", "mu"];
 // devices used by that process.  For a system with 8 cards, utilization can reach 800% and the
 // memory size can reach the sum of the memories on the cards.
 
-fn parse_pmon_output(raw_text: &str, user_by_pid: &UserTable) -> Result<Vec<gpu::Process>, String> {
+fn parse_pmon_output(raw_text: &str, user_by_pid: &ps::UserTable) -> Result<Vec<gpu::Process>, String> {
     let mut device_index = None;
     let mut pid_index = None;
     let mut mem_size_index = None;
@@ -481,14 +498,14 @@ fn parse_pmon_output(raw_text: &str, user_by_pid: &UserTable) -> Result<Vec<gpu:
             None => ("_zombie_".to_owned() + pid_str, gpu::ZOMBIE_UID),
         };
         processes.push(gpu::Process {
-            device,
+            devices: gpuset::singleton_gpuset(device),
             pid,
             user: user.0,
             uid: user.1,
             gpu_pct: gpu_util_pct,
             mem_pct: mem_util_pct,
             mem_size_kib: mem_size * 1024,
-            command,
+            command: Some(command),
         });
     }
     if device_index.is_none() {
@@ -518,7 +535,7 @@ const NVIDIA_QUERY_ARGS: &[&str] = &[
 
 fn parse_query_output(
     raw_text: &str,
-    user_by_pid: &UserTable,
+    user_by_pid: &ps::UserTable,
 ) -> Result<Vec<gpu::Process>, String> {
     let mut result = vec![];
     for line in raw_text.lines() {
@@ -552,21 +569,21 @@ fn parse_query_output(
         let command = "_unknown_";
         let mem_size_kib = mem_usage * 1024;
         result.push(gpu::Process {
-            device: None,
+            devices: None,
             pid,
             user,
             uid: gpu::ZOMBIE_UID,
             gpu_pct: 0.0,
             mem_pct: 0.0,
             mem_size_kib,
-            command: command.to_string(),
+            command: Some(command.to_string()),
         })
     }
     Ok(result)
 }
 
 #[cfg(test)]
-fn mkusers() -> UserTable<'static> {
+fn mkusers() -> ps::UserTable<'static> {
     map! {
         447153 => ("bob", 1001),
         447160 => ("bob", 1001),
@@ -617,14 +634,14 @@ pub fn parsed_pmon_550_output() -> Vec<gpu::Process> {
 #[cfg(test)]
 macro_rules! proc(
     { $a:expr, $b:expr, $c:expr, $d:expr, $e: expr, $f:expr, $g:expr, $h:expr } => {
-        gpu::Process { device: $a,
+        gpu::Process { devices: gpuset::singleton_gpuset($a),
                        pid: $b,
                        user: $c.to_string(),
                        uid: $d,
                        gpu_pct: $e,
                        mem_pct: $f,
                        mem_size_kib: $g,
-                       command: $h.to_string()
+                       command: Some($h.to_string())
         }
     });
 
