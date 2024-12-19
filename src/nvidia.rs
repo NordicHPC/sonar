@@ -42,7 +42,7 @@ impl gpu::GPU for NvidiaGPU {
         if let Some(info) = nvidia_nvml::get_card_configuration() {
             Ok(info)
         } else {
-            println!("FALLBACK!!");
+            println!("FALLBACK get_card_configuration!!");
             if self.info.is_none() {
                 self.info = Some(get_nvidia_configuration(&["-a"]))
             }
@@ -63,7 +63,7 @@ impl gpu::GPU for NvidiaGPU {
         if let Some(info) = nvidia_nvml::get_process_utilization(user_by_pid) {
             Ok(info)
         } else {
-            println!("FALLBACK!!");
+            println!("FALLBACK get_process_utilization!!");
             get_nvidia_utilization(user_by_pid)
         }
     }
@@ -72,7 +72,7 @@ impl gpu::GPU for NvidiaGPU {
         if let Some(info) = nvidia_nvml::get_card_utilization() {
             Ok(info)
         } else {
-            println!("FALLBACK!!");
+            println!("FALLBACK get_card_utilization!!");
             if self.info.is_none() {
                 self.info = Some(get_nvidia_configuration(&["-a"]))
             }

@@ -5,9 +5,6 @@
 
 #include <inttypes.h>
 
-int nvml_open();
-int nvml_close();
-
 int nvml_device_get_count(uint32_t* count);
 
 /* The buffer sizes are mostly mandated by the underlying NVML API */
@@ -38,7 +35,7 @@ int nvml_device_get_card_info(uint32_t device, struct nvml_card_info* infobuf);
 struct nvml_card_state {
     unsigned fan_speed;
     char compute_mode[32];
-    char perf_state[8];
+    char perf_state[8];         /* May be "Unknown" or P<n> for lowish n */
     uint64_t mem_reserved;
     uint64_t mem_used;
     float gpu_util;

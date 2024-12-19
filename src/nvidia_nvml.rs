@@ -9,8 +9,6 @@ use crate::ps::UserTable;
 // Should use bindgen for this but not important yet.
 
 extern "C" {
-    pub fn nvml_open() -> cty::c_int;
-    pub fn nvml_close() -> cty::c_int;
     pub fn nvml_device_get_count(count: *mut cty::uint32_t) -> cty::c_int;
 }
 
@@ -115,13 +113,8 @@ extern "C" {
 ////// End C library API //////////////////////////////////////////////////////
 
 pub fn get_card_configuration() -> Option<Vec<gpu::Card>> {
-    if unsafe { nvml_open() } != 0 {
-        return None;
-    }
-
     let mut num_devices: cty::uint32_t = 0;
     if unsafe { nvml_device_get_count(&mut num_devices) } != 0 {
-        unsafe { nvml_close() };
         return None;
     }
 
@@ -147,20 +140,14 @@ pub fn get_card_configuration() -> Option<Vec<gpu::Card>> {
         }
     }
 
-    unsafe { nvml_close() };
     Some(result)
 }
 
 pub fn get_process_utilization(_user_by_pid: &UserTable) -> Option<Vec<gpu::Process>> {
     let mut result = vec![];
 
-    if unsafe { nvml_open() } != 0 {
-        return None;
-    }
-
     let mut num_devices: cty::uint32_t = 0;
     if unsafe { nvml_device_get_count(&mut num_devices) } != 0 {
-        unsafe { nvml_close() };
         return None;
     }
 
@@ -183,18 +170,12 @@ pub fn get_process_utilization(_user_by_pid: &UserTable) -> Option<Vec<gpu::Proc
         unsafe { nvml_free_processes() };
     }
 
-    unsafe { nvml_close() };
     Some(result)
 }
 
 pub fn get_card_utilization() -> Option<Vec<gpu::CardState>> {
-    if unsafe { nvml_open() } != 0 {
-        return None;
-    }
-
     let mut num_devices: cty::uint32_t = 0;
     if unsafe { nvml_device_get_count(&mut num_devices) } != 0 {
-        unsafe { nvml_close() };
         return None;
     }
 
@@ -220,6 +201,5 @@ pub fn get_card_utilization() -> Option<Vec<gpu::CardState>> {
         }
     }
 
-    unsafe { nvml_close() };
     Some(result)
 }

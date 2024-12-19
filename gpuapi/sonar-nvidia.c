@@ -14,8 +14,8 @@
 
 #include "sonar-nvidia.h"
 
-static void* lib;
-static nvmlReturn_t (*xnvmlInit)();
+static nvmlReturn_t (*xnvmlDeviceGetClockInfo)(nvmlDevice_t,nvmlClockType_t,unsigned*);
+static nvmlReturn_t (*xnvmlDeviceGetComputeMode)(nvmlDevice_t,nvmlComputeMode_t*);
 static nvmlReturn_t (*xnvmlDeviceGetCount_v2)(unsigned*);
 static nvmlReturn_t (*xnvmlDeviceGetHandleByIndex_v2)(int index, nvmlDevice_t* dev);
 static nvmlReturn_t (*xnvmlDeviceGetArchitecture)(nvmlDevice_t, nvmlDeviceArchitecture_t*);
@@ -24,26 +24,41 @@ static nvmlReturn_t (*xnvmlDeviceGetMemoryInfo)(nvmlDevice_t, nvmlMemory_t*);
 static nvmlReturn_t (*xnvmlDeviceGetMaxClockInfo)(nvmlDevice_t,nvmlClockType_t,unsigned*);
 static nvmlReturn_t (*xnvmlDeviceGetName)(nvmlDevice_t,char*,unsigned);
 static nvmlReturn_t (*xnvmlDeviceGetPciInfo_v3)(nvmlDevice_t,nvmlPciInfo_t*);
-static nvmlReturn_t (*xnvmlDeviceGetPowerManagementLimit)(nvmlDevice_t,unsigned*);
-static nvmlReturn_t (*xnvmlDeviceGetUUID)(nvmlDevice_t,char*,unsigned);
+static nvmlReturn_t (*xnvmlDeviceGetPerformanceState)(nvmlDevice_t,nvmlPstates_t*);
 static nvmlReturn_t (*xnvmlDeviceGetPowerManagementLimitConstraints)(nvmlDevice_t,unsigned*,unsigned*);
+static nvmlReturn_t (*xnvmlDeviceGetPowerManagementLimit)(nvmlDevice_t,unsigned*);
+static nvmlReturn_t (*xnvmlDeviceGetPowerUsage)(nvmlDevice_t,unsigned*);
+static nvmlReturn_t (*xnvmlDeviceGetTemperature)(nvmlDevice_t,nvmlTemperatureSensors_t,unsigned*);
+static nvmlReturn_t (*xnvmlDeviceGetUUID)(nvmlDevice_t,char*,unsigned);
+static nvmlReturn_t (*xnvmlDeviceGetUtilizationRates)(nvmlDevice_t,nvmlUtilization_t*);
+static nvmlReturn_t (*xnvmlInit)();
 static nvmlReturn_t (*xnvmlSystemGetDriverVersion)(char*,unsigned);
 static nvmlReturn_t (*xnvmlSystemGetCudaDriverVersion)(int*);
 
 static int load_nvml() {
+    static void* lib;
+
+    if (lib != NULL) {
+        return 0;
+    }
+
+    lib = dlopen("/usr/lib64/libnvidia-ml.so", RTLD_NOW);
     if (lib == NULL) {
-        lib = dlopen("/usr/lib64/libnvidia-ml.so", RTLD_NOW);
-        if (lib == NULL) {
-            return -1;
-        }
+        return -1;
     }
 
     /* You'll be tempted to try some magic here with # and ## but it won't work because sometimes
        nvml.h introduces #defines of some of the names we want to use. */
 
-#define DLSYM(var, str) if ((var = dlsym(lib, str)) == NULL) { return -1; }
+#define DLSYM(var, str) \
+    if ((var = dlsym(lib, str)) == NULL) {      \
+        /* puts(str); */                        \
+        lib = NULL;                             \
+        return -1;                              \
+    }
 
-    DLSYM(xnvmlInit, "nvmlInit");
+    DLSYM(xnvmlDeviceGetClockInfo, "nvmlDeviceGetClockInfo");
+    DLSYM(xnvmlDeviceGetComputeMode, "nvmlDeviceGetComputeMode");
     DLSYM(xnvmlDeviceGetCount_v2, "nvmlDeviceGetCount_v2");
     DLSYM(xnvmlDeviceGetHandleByIndex_v2, "nvmlDeviceGetHandleByIndex_v2");
     DLSYM(xnvmlDeviceGetArchitecture, "nvmlDeviceGetArchitecture");
@@ -52,49 +67,27 @@ static int load_nvml() {
     DLSYM(xnvmlDeviceGetMaxClockInfo, "nvmlDeviceGetMaxClockInfo");
     DLSYM(xnvmlDeviceGetName, "nvmlDeviceGetName");
     DLSYM(xnvmlDeviceGetPciInfo_v3, "nvmlDeviceGetPciInfo_v3");
-    DLSYM(xnvmlDeviceGetPowerManagementLimit, "nvmlDeviceGetPowerManagementLimit");
-    DLSYM(xnvmlDeviceGetUUID, "nvmlDeviceGetUUID");
+    DLSYM(xnvmlDeviceGetPerformanceState, "nvmlDeviceGetPerformanceState");
     DLSYM(xnvmlDeviceGetPowerManagementLimitConstraints, "nvmlDeviceGetPowerManagementLimitConstraints");
+    DLSYM(xnvmlDeviceGetPowerManagementLimit, "nvmlDeviceGetPowerManagementLimit");
+    DLSYM(xnvmlDeviceGetPowerUsage, "nvmlDeviceGetPowerUsage");
+    DLSYM(xnvmlDeviceGetTemperature, "nvmlDeviceGetTemperature");
+    DLSYM(xnvmlDeviceGetUUID, "nvmlDeviceGetUUID");
+    DLSYM(xnvmlDeviceGetUtilizationRates, "nvmlDeviceGetUtilizationRates");
+    DLSYM(xnvmlInit, "nvmlInit");
     DLSYM(xnvmlSystemGetDriverVersion, "nvmlSystemGetDriverVersion");
     DLSYM(xnvmlSystemGetCudaDriverVersion, "nvmlSystemGetCudaDriverVersion");
 
-    return 0;
-}
-
-static void unload_nvml() {
-    dlclose(lib);
-    lib = NULL;
-}
-
-// TODO: Not sure that the open/close protocol is quite what we want.  It may be that for typical
-// cases, sonar will open/close multiple times, which leads to load/unload of the library multiple
-// times.  It may be better to just dispense with nvml_close(), and have an atexit() that dlcloses
-// the library, if that's even needed.  Furthermore, nvml_open() should do nothing if the lib is
-// already open and the card is initialized and functions are linked.
-//
-// Indeed the open() may not be required, it can be performed from the API accessors if the library
-// is null.
-
-int nvml_open() {
-    if (load_nvml() != 0) {
-        return -1;
-    }
     if (xnvmlInit() != 0) {
+        lib = NULL;
         return -1;
     }
-    return 0;
-}
 
-int nvml_close() {
-    if (lib == NULL) {
-        return -1;
-    }
-    unload_nvml();
     return 0;
 }
 
 int nvml_device_get_count(uint32_t* count) {
-    if (lib == NULL) {
+    if (load_nvml() == -1) {
         return -1;
     }
     unsigned ndev;
@@ -106,10 +99,7 @@ int nvml_device_get_count(uint32_t* count) {
 }
 
 int nvml_device_get_card_info(uint32_t device, struct nvml_card_info* infobuf) {
-    // FIXME:
-    // - bus_addr
-
-    if (lib == NULL) {
+    if (load_nvml() == -1) {
         return -1;
     }
     nvmlDevice_t dev;
@@ -199,10 +189,7 @@ int nvml_device_get_card_info(uint32_t device, struct nvml_card_info* infobuf) {
 }
 
 int nvml_device_get_card_state(uint32_t device, struct nvml_card_state* infobuf) {
-    // FIXME:
-    // more fields
-
-    if (lib == NULL) {
+    if (load_nvml() == -1) {
         return -1;
     }
     nvmlDevice_t dev;
@@ -213,6 +200,69 @@ int nvml_device_get_card_state(uint32_t device, struct nvml_card_state* infobuf)
 
     xnvmlDeviceGetFanSpeed(dev, &infobuf->fan_speed);
     // etc
+
+    nvmlMemory_t mem;
+    if (xnvmlDeviceGetMemoryInfo(dev, &mem) == 0) {
+        infobuf->mem_reserved = mem.total - (mem.free + mem.used);
+        infobuf->mem_used = mem.used;
+    }
+
+    unsigned power_limit;
+    if (xnvmlDeviceGetPowerManagementLimit(dev, &power_limit) == 0) {
+        infobuf->power_limit = power_limit;
+    }
+
+    unsigned clock;
+    if (xnvmlDeviceGetClockInfo(dev, NVML_CLOCK_SM, &clock) == 0) {
+        infobuf->ce_clock = clock;
+    }
+    if (xnvmlDeviceGetClockInfo(dev, NVML_CLOCK_MEM, &clock) == 0) {
+        infobuf->mem_clock = clock;
+    }
+
+    nvmlComputeMode_t mode;
+    if (xnvmlDeviceGetComputeMode(dev, &mode) == 0) {
+        // Note, only the "Default" string is known to match nvidia-smi.
+        switch (mode) {
+          case NVML_COMPUTEMODE_DEFAULT:
+            strcpy(infobuf->compute_mode, "Default");
+            break;
+          case NVML_COMPUTEMODE_PROHIBITED:
+            strcpy(infobuf->compute_mode, "Prohibited");
+            break;
+          case NVML_COMPUTEMODE_EXCLUSIVE_PROCESS:
+            strcpy(infobuf->compute_mode, "ExclusiveProcess");
+            break;
+          default:
+            strcpy(infobuf->compute_mode, "Unknown");
+            break;
+        }
+    }
+
+    nvmlPstates_t pstate;
+    if (xnvmlDeviceGetPerformanceState(dev, &pstate) == 0) {
+        if (pstate != NVML_PSTATE_UNKNOWN) {
+            snprintf(infobuf->perf_state, sizeof(infobuf->perf_state), "P%d", (int)pstate);
+        } else {
+            strcpy(infobuf->perf_state, "Unknown");
+        }
+    }
+
+    unsigned temp;
+    if (xnvmlDeviceGetTemperature(dev, NVML_TEMPERATURE_GPU, &temp) == 0) {
+        infobuf->temp = temp;
+    }
+
+    unsigned power_draw;
+    if (xnvmlDeviceGetPowerUsage(dev, &power_draw) == 0) {
+        infobuf->power = power_draw;
+    }
+
+    nvmlUtilization_t rates;
+    if (xnvmlDeviceGetUtilizationRates(dev, &rates) == 0) {
+        infobuf->gpu_util = rates.gpu;
+        infobuf->mem_util = rates.memory;
+    }
 
     return 0;
 }
