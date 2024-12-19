@@ -11,13 +11,17 @@ int nvml_close();
 int nvml_device_get_count(uint32_t* count);
 
 /* The buffer sizes are mostly mandated by the underlying NVML API */
+/* Some of the others are conservative too */
+/* CUDA Version is only one possible interpretation of "firmware", the CUDA compute capability
+   version could be another. */
+
 /* This structure must be reflected exactly on the Rust side */
 struct nvml_card_info {
-    char bus_addr[80];
+    char bus_addr[80];          /* PCI busId */
     char model[96];
     char architecture[32];
     char driver[80];            /* Same for all cards on a node */
-    char firmware[80];
+    char firmware[10];          /* CUDA Version */
     char uuid[96];
     uint64_t totalmem;          /* Bytes */
     unsigned power_limit;       /* Milliwatts */
@@ -49,5 +53,13 @@ struct nvml_card_state {
 /* Clear the infobuf and fill it with available information. Return 0 on success, -1 on any kind of
    error. */
 int nvml_device_get_card_state(uint32_t device, struct nvml_card_state* infobuf);
+
+struct nvml_gpu_process {
+    uint32_t index;
+};
+
+int nvml_device_probe_processes(uint32_t device, uint32_t* count);
+int nvml_get_process(uint32_t index, struct nvml_gpu_process* infobuf);
+int nvml_free_processes();
 
 #endif /* sonar_nvidia_h_included */

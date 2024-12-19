@@ -8,6 +8,7 @@
 #include <stddef.h>
 #include <string.h>
 #include <inttypes.h>
+#include <stdio.h> /* snprintf, we can fix this */
 #include <dlfcn.h>
 #include <nvml.h>
 
@@ -18,12 +19,16 @@ static nvmlReturn_t (*xnvmlInit)();
 static nvmlReturn_t (*xnvmlDeviceGetCount_v2)(unsigned*);
 static nvmlReturn_t (*xnvmlDeviceGetHandleByIndex_v2)(int index, nvmlDevice_t* dev);
 static nvmlReturn_t (*xnvmlDeviceGetArchitecture)(nvmlDevice_t, nvmlDeviceArchitecture_t*);
-static nvmlReturn_t (*xnvmlDeviceGetMemoryInfo)(nvmlDevice_t, nvmlMemory_t*);
 static nvmlReturn_t (*xnvmlDeviceGetFanSpeed)(nvmlDevice_t,unsigned*);
+static nvmlReturn_t (*xnvmlDeviceGetMemoryInfo)(nvmlDevice_t, nvmlMemory_t*);
+static nvmlReturn_t (*xnvmlDeviceGetMaxClockInfo)(nvmlDevice_t,nvmlClockType_t,unsigned*);
 static nvmlReturn_t (*xnvmlDeviceGetName)(nvmlDevice_t,char*,unsigned);
+static nvmlReturn_t (*xnvmlDeviceGetPciInfo_v3)(nvmlDevice_t,nvmlPciInfo_t*);
+static nvmlReturn_t (*xnvmlDeviceGetPowerManagementLimit)(nvmlDevice_t,unsigned*);
 static nvmlReturn_t (*xnvmlDeviceGetUUID)(nvmlDevice_t,char*,unsigned);
 static nvmlReturn_t (*xnvmlDeviceGetPowerManagementLimitConstraints)(nvmlDevice_t,unsigned*,unsigned*);
 static nvmlReturn_t (*xnvmlSystemGetDriverVersion)(char*,unsigned);
+static nvmlReturn_t (*xnvmlSystemGetCudaDriverVersion)(int*);
 
 static int load_nvml() {
     if (lib == NULL) {
@@ -44,10 +49,14 @@ static int load_nvml() {
     DLSYM(xnvmlDeviceGetArchitecture, "nvmlDeviceGetArchitecture");
     DLSYM(xnvmlDeviceGetFanSpeed, "nvmlDeviceGetFanSpeed");
     DLSYM(xnvmlDeviceGetMemoryInfo, "nvmlDeviceGetMemoryInfo");
+    DLSYM(xnvmlDeviceGetMaxClockInfo, "nvmlDeviceGetMaxClockInfo");
     DLSYM(xnvmlDeviceGetName, "nvmlDeviceGetName");
+    DLSYM(xnvmlDeviceGetPciInfo_v3, "nvmlDeviceGetPciInfo_v3");
+    DLSYM(xnvmlDeviceGetPowerManagementLimit, "nvmlDeviceGetPowerManagementLimit");
     DLSYM(xnvmlDeviceGetUUID, "nvmlDeviceGetUUID");
-    DLSYM(xnvmlSystemGetDriverVersion, "nvmlSystemGetDriverVersion");
     DLSYM(xnvmlDeviceGetPowerManagementLimitConstraints, "nvmlDeviceGetPowerManagementLimitConstraints");
+    DLSYM(xnvmlSystemGetDriverVersion, "nvmlSystemGetDriverVersion");
+    DLSYM(xnvmlSystemGetCudaDriverVersion, "nvmlSystemGetCudaDriverVersion");
 
     return 0;
 }
@@ -56,6 +65,15 @@ static void unload_nvml() {
     dlclose(lib);
     lib = NULL;
 }
+
+// TODO: Not sure that the open/close protocol is quite what we want.  It may be that for typical
+// cases, sonar will open/close multiple times, which leads to load/unload of the library multiple
+// times.  It may be better to just dispense with nvml_close(), and have an atexit() that dlcloses
+// the library, if that's even needed.  Furthermore, nvml_open() should do nothing if the lib is
+// already open and the card is initialized and functions are linked.
+//
+// Indeed the open() may not be required, it can be performed from the API accessors if the library
+// is null.
 
 int nvml_open() {
     if (load_nvml() != 0) {
@@ -90,10 +108,6 @@ int nvml_device_get_count(uint32_t* count) {
 int nvml_device_get_card_info(uint32_t device, struct nvml_card_info* infobuf) {
     // FIXME:
     // - bus_addr
-    // - firmware
-    // - power_limit_watt
-    // - max_ce_clock
-    // - max_mem_clock
 
     if (lib == NULL) {
         return -1;
@@ -108,6 +122,13 @@ int nvml_device_get_card_info(uint32_t device, struct nvml_card_info* infobuf) {
     xnvmlDeviceGetUUID(dev, infobuf->uuid, sizeof(infobuf->uuid));
     xnvmlSystemGetDriverVersion(infobuf->driver, sizeof(infobuf->driver));
     xnvmlDeviceGetPowerManagementLimitConstraints(dev, &infobuf->min_power_limit, &infobuf->max_power_limit);
+
+    int cuda;
+    if (xnvmlSystemGetCudaDriverVersion(&cuda) == 0) {
+        snprintf(infobuf->firmware, sizeof(infobuf->firmware), "%d.%d",
+                 NVML_CUDA_DRIVER_VERSION_MAJOR(cuda),
+                 NVML_CUDA_DRIVER_VERSION_MINOR(cuda));
+    }
 
     nvmlDeviceArchitecture_t n_arch;
     if (xnvmlDeviceGetArchitecture(dev, &n_arch) == 0) {
@@ -155,6 +176,25 @@ int nvml_device_get_card_info(uint32_t device, struct nvml_card_info* infobuf) {
         infobuf->totalmem = mem.total;
     }
 
+    unsigned power_limit;
+    if (xnvmlDeviceGetPowerManagementLimit(dev, &power_limit) == 0) {
+        infobuf->power_limit = power_limit;
+    }
+
+    unsigned clock;
+    if (xnvmlDeviceGetMaxClockInfo(dev, NVML_CLOCK_SM, &clock) == 0) {
+        infobuf->max_ce_clock = clock;
+    }
+    if (xnvmlDeviceGetMaxClockInfo(dev, NVML_CLOCK_MEM, &clock) == 0) {
+        infobuf->max_mem_clock = clock;
+    }
+
+    nvmlPciInfo_t pci;
+    if (xnvmlDeviceGetPciInfo_v3(dev, &pci) == 0) {
+        strncpy(infobuf->bus_addr, pci.busId, sizeof(infobuf->bus_addr));
+        infobuf->bus_addr[sizeof(infobuf->bus_addr)-1] = 0;
+    }
+
     return 0;
 }
 
@@ -177,5 +217,39 @@ int nvml_device_get_card_state(uint32_t device, struct nvml_card_state* infobuf)
     return 0;
 }
 
-/* Dynamic library management */
+// The requirement here is that we should also see orphaned processes.
+//
+// In terms of the nvml API:
+//
+//  - nvmlDeviceGetProcessUtilization() is like pmon and can get per-pid utilization
+//  - nvmlDeviceGetComputeRunningProcesses_v3() will return a vector
+//    of running processes, with pid and used memories.
+//
+// It's unclear if these two together are sufficient to get information about orphaned
+// processes but it's a start.
+//
+// Possibly nvmlDeviceGetProcessesUtilizationInfo() is really the better API?
+//
+// MIG: Of the three, only nvmlDeviceGetComputeRunningProcesses_v3() is supported on MIG-enabled
+// GPUs, and here information about other users' processes may not be available to unprivileged
+// users.
+//
+// In either case, this will probably have some kind of setup / lookup / cleanup API,
+// so that any memory management can be confined to the GPU layer.
+//
+// Not yet clear how to discover whether a node / card is in MIG mode.
 
+int nvml_device_probe_processes(uint32_t device, uint32_t* count) {
+    // FIXME
+    return -1;
+}
+
+int nvml_get_process(uint32_t index, struct nvml_gpu_process* infobuf) {
+    // FIXME
+    return -1;
+}
+
+int nvml_free_processes() {
+    // FIXME
+    return -1;
+}

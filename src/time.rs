@@ -7,6 +7,7 @@
 
 use std::ffi::CStr;
 use std::num::ParseIntError;
+use crate::util::cstrdup;
 
 // Get current time as an ISO time stamp: yyyy-mm-ddThh:mm:ss+hh:mm
 //
@@ -132,11 +133,7 @@ pub fn format_iso8601(timebuf: &libc::tm) -> String {
             // have ensured above that this is never a problem.
             panic!("strftime");
         }
-
-        CStr::from_ptr(buffer.as_ptr())
-            .to_str()
-            .expect("Will always be utf8")
-            .to_string()
+        cstrdup(&buffer)
     };
 
     // We have +/-hhmm for the time zone but want +/-hh:mm for compatibility with older data and

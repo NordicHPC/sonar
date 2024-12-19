@@ -1,6 +1,6 @@
 use crate::gpu;
+use crate::util::cstrdup;
 use crate::ps::UserTable;
-use std::ffi::CStr;
 
 ////// C library API //////////////////////////////////////////////////////////////////////////////
 
@@ -20,7 +20,7 @@ pub struct NvmlCardInfo {
     model: [cty::c_char; 96],
     architecture: [cty::c_char; 32],
     driver: [cty::c_char; 80],
-    firmware: [cty::c_char; 80],
+    firmware: [cty::c_char; 10],
     uuid: [cty::c_char; 96],
     mem_total: cty::uint64_t,
     power_limit: cty::c_uint,
@@ -37,7 +37,7 @@ impl Default for NvmlCardInfo {
             model: [0; 96],
             architecture: [0; 32],
             driver: [0; 80],
-            firmware: [0; 80],
+            firmware: [0; 10],
             uuid: [0; 96],
             mem_total: 0,
             power_limit: 0,
@@ -93,6 +93,25 @@ extern "C" {
         -> cty::c_int;
 }
 
+#[repr(C)]
+pub struct NvmlGpuProcess {
+    index: cty::uint32_t,
+}
+
+impl Default for NvmlGpuProcess {
+    fn default() -> Self {
+        Self {
+            index: 0,
+        }
+    }
+}
+
+extern "C" {
+    pub fn nvml_device_probe_processes(device: cty::uint32_t, count: *mut cty::uint32_t) -> cty::c_int;
+    pub fn nvml_get_process(index: cty::uint32_t, buf: *mut NvmlGpuProcess) -> cty::c_int;
+    pub fn nvml_free_processes() -> cty::c_int;
+}
+
 ////// End C library API //////////////////////////////////////////////////////
 
 pub fn get_card_configuration() -> Option<Vec<gpu::Card>> {
@@ -132,31 +151,40 @@ pub fn get_card_configuration() -> Option<Vec<gpu::Card>> {
     Some(result)
 }
 
-// The requirement here is that we should also see orphaned processes.
-//
-// In terms of the nvml API:
-//
-//  - nvmlDeviceGetProcessUtilization() is like pmon and can get per-pid utilization
-//  - nvmlDeviceGetComputeRunningProcesses_v3() will return a vector
-//    of running processes, with pid and used memories.
-//
-// It's unclear if these two together are sufficient to get information about orphaned
-// processes but it's a start.
-//
-// Possibly nvmlDeviceGetProcessesUtilizationInfo() is really the better API?
-//
-// MIG: Of the three, only nvmlDeviceGetComputeRunningProcesses_v3() is supported on MIG-enabled
-// GPUs, and here information about other users' processes may not be available to unprivileged
-// users.
-//
-// In either case, this will probably have some kind of setup / lookup / cleanup API,
-// so that any memory management can be confined to the GPU layer.
-//
-// Not yet clear how to discover whether a node / card is in MIG mode.
-
 pub fn get_process_utilization(_user_by_pid: &UserTable) -> Option<Vec<gpu::Process>> {
-    // FIXME
-    None
+    let mut result = vec![];
+
+    if unsafe { nvml_open() } != 0 {
+        return None;
+    }
+
+    let mut num_devices: cty::uint32_t = 0;
+    if unsafe { nvml_device_get_count(&mut num_devices) } != 0 {
+        unsafe { nvml_close() };
+        return None;
+    }
+
+    let mut infobuf : NvmlGpuProcess = Default::default();
+    for dev in 0..num_devices {
+        let mut num_processes: cty::uint32_t = 0;
+        if unsafe { nvml_device_probe_processes(dev, &mut num_processes) } != 0 {
+            continue;
+        }
+
+        for proc in 0..num_processes {
+            if unsafe { nvml_get_process(proc, &mut infobuf) } != 0 {
+                continue;
+            }
+
+            // FIXME
+            // Note that if a pid is on several cards we must combine the data.
+        }
+
+        unsafe { nvml_free_processes() };
+    }
+
+    unsafe { nvml_close() };
+    Some(result)
 }
 
 pub fn get_card_utilization() -> Option<Vec<gpu::CardState>> {
@@ -194,16 +222,4 @@ pub fn get_card_utilization() -> Option<Vec<gpu::CardState>> {
 
     unsafe { nvml_close() };
     Some(result)
-}
-
-////////////////////////////////////////////////////////////////////////////////
-
-// Utilities
-
-// TODO: Share this with the code in time.rs.
-fn cstrdup(s: &[i8]) -> String {
-    unsafe { CStr::from_ptr(s.as_ptr()) }
-        .to_str()
-        .expect("Will always be utf8")
-        .to_string()
 }
