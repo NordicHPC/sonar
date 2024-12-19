@@ -7,6 +7,7 @@ mod interrupt;
 mod jobs;
 mod log;
 mod nvidia;
+mod nvidia_nvml;
 mod procfs;
 mod procfsapi;
 mod ps;
