@@ -404,12 +404,16 @@ fn do_create_snapshot(jobs: &mut dyn jobs::JobManager, opts: &PsOptions, timesta
                             } else {
                                 (1, true)
                             };
+                        let command = match &proc.command {
+                            Some(cmd) => cmd,
+                            _ => "_unknown_",
+                        };
                         add_proc_info(
                             &mut proc_by_pid,
                             &mut lookup_job_by_pid,
                             &proc.user,
                             proc.uid,
-                            &proc.command,
+                            command,
                             proc.pid,
                             ppid,
                             has_children,

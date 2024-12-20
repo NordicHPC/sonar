@@ -5,9 +5,9 @@
 // and tzset() should be called before using it (at least once).  Need to figure that out somehow.
 // So far it seems we've not needed to do this.
 
+use crate::util::cstrdup;
 use std::ffi::CStr;
 use std::num::ParseIntError;
-use crate::util::cstrdup;
 
 // Get current time as an ISO time stamp: yyyy-mm-ddThh:mm:ss+hh:mm
 //

@@ -142,7 +142,6 @@ pub fn csv_quote_test() {
     assert!(&csv_quote(r#"abc""de"#) == r#""abc""""de""#);
 }
 
-
 // Copy a C string.
 
 pub fn cstrdup(s: &[i8]) -> String {

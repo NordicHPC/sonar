@@ -1,10 +1,11 @@
 use crate::gpu;
-use crate::util::cstrdup;
 use crate::ps::UserTable;
+use crate::util::cstrdup;
 
 ////// C library API //////////////////////////////////////////////////////////////////////////////
 
-// These APIs must match the C APIs *exactly*.  For documentation of the units, see sonar-nvml.h.
+// These APIs must match the C APIs *exactly*.  See ../gpuapi/sonar-nvidia.h for documentation of
+// functionality and units.
 
 // Should use bindgen for this but not important yet.
 
@@ -93,24 +94,33 @@ extern "C" {
 
 #[repr(C)]
 pub struct NvmlGpuProcess {
-    index: cty::uint32_t,
+    pid: cty::uint32_t,
+    mem_util: cty::uint32_t,
+    gpu_util: cty::uint32_t,
+    mem_size: cty::uint64_t,
 }
 
 impl Default for NvmlGpuProcess {
     fn default() -> Self {
         Self {
-            index: 0,
+            pid: 0,
+            mem_util: 0,
+            gpu_util: 0,
+            mem_size: 0,
         }
     }
 }
 
 extern "C" {
-    pub fn nvml_device_probe_processes(device: cty::uint32_t, count: *mut cty::uint32_t) -> cty::c_int;
+    pub fn nvml_device_probe_processes(
+        device: cty::uint32_t,
+        count: *mut cty::uint32_t,
+    ) -> cty::c_int;
     pub fn nvml_get_process(index: cty::uint32_t, buf: *mut NvmlGpuProcess) -> cty::c_int;
-    pub fn nvml_free_processes() -> cty::c_int;
+    pub fn nvml_free_processes();
 }
 
-////// End C library API //////////////////////////////////////////////////////
+////// End C library API //////////////////////////////////////////////////////////////////////////
 
 pub fn get_card_configuration() -> Option<Vec<gpu::Card>> {
     let mut num_devices: cty::uint32_t = 0;
@@ -143,36 +153,6 @@ pub fn get_card_configuration() -> Option<Vec<gpu::Card>> {
     Some(result)
 }
 
-pub fn get_process_utilization(_user_by_pid: &UserTable) -> Option<Vec<gpu::Process>> {
-    let mut result = vec![];
-
-    let mut num_devices: cty::uint32_t = 0;
-    if unsafe { nvml_device_get_count(&mut num_devices) } != 0 {
-        return None;
-    }
-
-    let mut infobuf : NvmlGpuProcess = Default::default();
-    for dev in 0..num_devices {
-        let mut num_processes: cty::uint32_t = 0;
-        if unsafe { nvml_device_probe_processes(dev, &mut num_processes) } != 0 {
-            continue;
-        }
-
-        for proc in 0..num_processes {
-            if unsafe { nvml_get_process(proc, &mut infobuf) } != 0 {
-                continue;
-            }
-
-            // FIXME
-            // Note that if a pid is on several cards we must combine the data.
-        }
-
-        unsafe { nvml_free_processes() };
-    }
-
-    Some(result)
-}
-
 pub fn get_card_utilization() -> Option<Vec<gpu::CardState>> {
     let mut num_devices: cty::uint32_t = 0;
     if unsafe { nvml_device_get_count(&mut num_devices) } != 0 {
@@ -199,6 +179,76 @@ pub fn get_card_utilization() -> Option<Vec<gpu::CardState>> {
                 mem_clock_mhz: infobuf.mem_clock as i32,
             })
         }
+    }
+
+    Some(result)
+}
+
+// We get these from the device:
+//
+// - device index
+// - pid
+// - gpu_pct
+// - mem_pct
+// - mem_size_kib
+//
+// We get these from user_by_pid:
+//
+// - uid
+// - user name
+//
+// That leaves:
+//
+// - command
+//
+// The command is most easily gotten from the pid: we look it up in procfs.  Really not clear why we
+// would want the GPU to supply the command name.  It does not appear that the GPU has this
+// information anyway.  So we can make it an option.
+
+pub fn get_process_utilization(user_by_pid: &UserTable) -> Option<Vec<gpu::Process>> {
+    let mut result = vec![];
+
+    let mut num_devices: cty::uint32_t = 0;
+    if unsafe { nvml_device_get_count(&mut num_devices) } != 0 {
+        return None;
+    }
+
+    println!("{num_devices} devices");
+
+    let mut infobuf: NvmlGpuProcess = Default::default();
+    for dev in 0..num_devices {
+        let mut num_processes: cty::uint32_t = 0;
+        if unsafe { nvml_device_probe_processes(dev, &mut num_processes) } != 0 {
+            println!("probe_processes found 0 processes");
+            continue;
+        }
+
+        println!("{num_processes} processes");
+
+        for proc in 0..num_processes {
+            if unsafe { nvml_get_process(proc, &mut infobuf) } != 0 {
+                println!("  get_process {proc} failed");
+                continue;
+            }
+
+            let (username, uid) = match user_by_pid.get(&(infobuf.pid as usize)) {
+                Some(x) => *x,
+                None => ("_unknown_", 1),
+            };
+            println!("  pid {} mem% {} gpu% {} memkb {}", infobuf.pid, infobuf.mem_util, infobuf.gpu_util, infobuf.mem_size);
+            result.push(gpu::Process{
+                device: Some(dev as usize),
+                pid: infobuf.pid as usize,
+                user: username.to_string(),
+                uid: uid,
+                mem_pct: infobuf.mem_util as f64,
+                gpu_pct: infobuf.gpu_util as f64,
+                mem_size_kib: infobuf.mem_size as usize,
+                command: None,
+            })
+        }
+
+        unsafe { nvml_free_processes() };
     }
 
     Some(result)

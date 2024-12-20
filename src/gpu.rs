@@ -13,7 +13,8 @@ pub struct Process {
     pub gpu_pct: f64,          // Percent of GPU /for this sample/, 0.0 for zombies
     pub mem_pct: f64,          // Percent of memory /for this sample/, 0.0 for zombies
     pub mem_size_kib: usize,   // Memory use in KiB /for this sample/, _not_ zero for zombies
-    pub command: String,       // The command, _unknown_ for zombies, _noinfo_ if not known
+    pub command: Option<String>, // The command, _unknown_ for zombies, _noinfo_ if not known, None
+                                 //   when the GPU layer simply can't know.
 }
 
 // Used to tag a Process entry when the uid can't be determined

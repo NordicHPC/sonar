@@ -504,7 +504,7 @@ fn parse_pmon_output(raw_text: &str, user_by_pid: &UserTable) -> Result<Vec<gpu:
             gpu_pct: gpu_util_pct,
             mem_pct: mem_util_pct,
             mem_size_kib: mem_size * 1024,
-            command,
+            command: Some(command),
         });
     }
     if device_index.is_none() {
@@ -575,7 +575,7 @@ fn parse_query_output(
             gpu_pct: 0.0,
             mem_pct: 0.0,
             mem_size_kib,
-            command: command.to_string(),
+            command: Some(command.to_string()),
         })
     }
     Ok(result)

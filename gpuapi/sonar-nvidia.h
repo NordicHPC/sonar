@@ -52,11 +52,25 @@ struct nvml_card_state {
 int nvml_device_get_card_state(uint32_t device, struct nvml_card_state* infobuf);
 
 struct nvml_gpu_process {
-    uint32_t index;
+    uint32_t pid;
+    uint32_t mem_util;          /* percent */
+    uint32_t gpu_util;          /* percent */
+    uint64_t mem_size;          /* KB */
 };
 
+/* Probe the card's process tables and save the information in an internal data structure.  Return 0
+   on success along with a count of processes, -1 on failure.  If 0 is returned then a data
+   structure is always allocated even if count = 0, and this data structure must be freed with
+   nvml_free_processes().
+ */
 int nvml_device_probe_processes(uint32_t device, uint32_t* count);
+
+/* Get information for the given process from the internal buffers and store it into *infobuf.  Return 0
+   on success, -1 on failure (eg, out of bounds - but this indicates a program bug, not a system failure).
+*/
 int nvml_get_process(uint32_t index, struct nvml_gpu_process* infobuf);
-int nvml_free_processes();
+
+/* Free any internal data structures. */
+void nvml_free_processes();
 
 #endif /* sonar_nvidia_h_included */

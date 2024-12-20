@@ -143,7 +143,7 @@ fn extract_amd_information(
                 gpu_pct: per_device_info[*dev].0 / num_processes_per_device[*dev] as f64,
                 mem_pct: per_device_info[*dev].1 / num_processes_per_device[*dev] as f64,
                 mem_size_kib: 0,
-                command: "_noinfo_".to_string(),
+                command: Some("_noinfo_".to_string()),
             })
         })
     });
@@ -229,7 +229,8 @@ PID 28154 is using 1 DRM device(s):
     let zs = extract_amd_information(
         &parse_text_concise_command(concise).expect("Test: AMD text concise information"),
         &parse_showpidgpus_command(pidgpu).expect("Test: AMD pid gpu information"),
-        &users);
+        &users,
+    );
     assert!(zs.eq(&vec![
         proc! { Some(0), 28154, "_zombie_28154", gpu::ZOMBIE_UID, 99.0/2.0, 57.0/2.0 },
         proc! { Some(0), 28156, "bob", 1001, 99.0/2.0, 57.0/2.0 },
