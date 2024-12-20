@@ -4,6 +4,7 @@
 
 use crate::command::{self, CmdError};
 use crate::gpu;
+use crate::amd_smi;
 use crate::ps::UserTable;
 use crate::TIMEOUT_SECONDS;
 
@@ -29,6 +30,7 @@ impl gpu::GPU for AmdGPU {
     }
 
     fn get_card_configuration(&mut self) -> Result<Vec<gpu::Card>, String> {
+        amd_smi::test();
         get_amd_configuration()
     }
 

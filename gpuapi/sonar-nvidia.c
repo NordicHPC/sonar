@@ -1,6 +1,9 @@
-/* Remember to `module load CUDA/11.1.1-GCC-10.2.0` or similar for nvml.h.
+/* Static-linkable wrapper around the NVIDIA NVML dynamic library with some abstractions
+   for our needs.  See sonar-nvidia.h for more.
 
-   On the UiO ML nodes, header files are here:
+   Remember to `module load CUDA/11.1.1-GCC-10.2.0` or similar for access to nvml.h.
+
+   On the UiO ML nodes, nvml.h is here (etc for other versions):
      /storage/software/CUDA/11.3.1/targets/x86_64-linux/include/nvml.h
      /storage/software/CUDAcore/11.1.1/targets/x86_64-linux/include/nvml.h
 */
@@ -8,7 +11,7 @@
 #include <dlfcn.h>
 #include <inttypes.h>
 #include <stddef.h>
-#include <stdio.h> /* snprintf, we can fix this */
+#include <stdio.h> /* snprintf, we can fix this if we don't want the baggage */
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
@@ -50,6 +53,9 @@ static int load_nvml() {
         return 0;
     }
 
+    /* This is the location of the library on all the UiO ML nodes and on the Fox GPU nodes. */
+    /* The Web also seems to think this is the right spot. */
+    /* TBD is Saga, Betzy GPU nodes. */
     lib = dlopen("/usr/lib64/libnvidia-ml.so", RTLD_NOW);
     if (lib == NULL) {
         return -1;

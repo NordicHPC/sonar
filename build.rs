@@ -6,4 +6,5 @@ fn main() {
         Err(_) => panic!("No CWD"),
     };
     println!("cargo:rustc-link-lib={here}/gpuapi/sonar-nvidia.a");
+    println!("cargo:rustc-link-lib={here}/gpuapi/sonar-amd.a");
 }

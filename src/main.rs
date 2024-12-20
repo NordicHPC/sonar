@@ -1,4 +1,5 @@
 mod amd;
+mod amd_smi;
 mod batchless;
 mod command;
 mod gpu;
