@@ -1,4 +1,4 @@
-CFLAGS=-g -O0 -Wall -fPIC
+CFLAGS=-g -O2 -Wall -fPIC
 LDFLAGS=-ldl
 
 .PHONY: default

@@ -19,7 +19,7 @@ pub struct NvmlCardInfo {
     model: [cty::c_char; 96],
     architecture: [cty::c_char; 32],
     driver: [cty::c_char; 80],
-    firmware: [cty::c_char; 10],
+    firmware: [cty::c_char; 32],
     uuid: [cty::c_char; 96],
     mem_total: cty::uint64_t,
     power_limit: cty::c_uint,
@@ -36,7 +36,7 @@ impl Default for NvmlCardInfo {
             model: [0; 96],
             architecture: [0; 32],
             driver: [0; 80],
-            firmware: [0; 10],
+            firmware: [0; 32],
             uuid: [0; 96],
             mem_total: 0,
             power_limit: 0,
@@ -184,27 +184,6 @@ pub fn get_card_utilization() -> Option<Vec<gpu::CardState>> {
     Some(result)
 }
 
-// We get these from the device:
-//
-// - device index
-// - pid
-// - gpu_pct
-// - mem_pct
-// - mem_size_kib
-//
-// We get these from user_by_pid:
-//
-// - uid
-// - user name
-//
-// That leaves:
-//
-// - command
-//
-// The command is most easily gotten from the pid: we look it up in procfs.  Really not clear why we
-// would want the GPU to supply the command name.  It does not appear that the GPU has this
-// information anyway.  So we can make it an option.
-
 pub fn get_process_utilization(user_by_pid: &UserTable) -> Option<Vec<gpu::Process>> {
     let mut result = vec![];
 
@@ -213,21 +192,15 @@ pub fn get_process_utilization(user_by_pid: &UserTable) -> Option<Vec<gpu::Proce
         return None;
     }
 
-    println!("{num_devices} devices");
-
     let mut infobuf: NvmlGpuProcess = Default::default();
     for dev in 0..num_devices {
         let mut num_processes: cty::uint32_t = 0;
         if unsafe { nvml_device_probe_processes(dev, &mut num_processes) } != 0 {
-            println!("probe_processes found 0 processes");
             continue;
         }
 
-        println!("{num_processes} processes");
-
         for proc in 0..num_processes {
             if unsafe { nvml_get_process(proc, &mut infobuf) } != 0 {
-                println!("  get_process {proc} failed");
                 continue;
             }
 
@@ -235,7 +208,6 @@ pub fn get_process_utilization(user_by_pid: &UserTable) -> Option<Vec<gpu::Proce
                 Some(x) => *x,
                 None => ("_unknown_", 1),
             };
-            println!("  pid {} mem% {} gpu% {} memkb {}", infobuf.pid, infobuf.mem_util, infobuf.gpu_util, infobuf.mem_size);
             result.push(gpu::Process{
                 device: Some(dev as usize),
                 pid: infobuf.pid as usize,

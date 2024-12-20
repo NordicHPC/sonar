@@ -18,7 +18,7 @@ struct nvml_card_info {
     char model[96];
     char architecture[32];
     char driver[80];            /* Same for all cards on a node */
-    char firmware[10];          /* CUDA Version */
+    char firmware[32];          /* CUDA Version */
     char uuid[96];
     uint64_t totalmem;          /* Bytes */
     unsigned power_limit;       /* Milliwatts */

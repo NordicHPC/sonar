@@ -261,9 +261,7 @@ int nvml_device_get_card_state(uint32_t device, struct nvml_card_state* infobuf)
     return 0;
 }
 
-/* (The following is probably wrong for MIG mode.)
-
-   When probing processes, run nvmlDeviceGetProcessUtilization to get a mapping from pid to compute
+/* When probing processes, run nvmlDeviceGetProcessUtilization to get a mapping from pid to compute
    and memory utilization (integer percent).  Also run xnvmlDeviceGetMemoryInfo to get memory
    information.  Tuck these data away in a global table and return the count of table elements.
 
@@ -272,11 +270,16 @@ int nvml_device_get_card_state(uint32_t device, struct nvml_card_state* infobuf)
 
    The GPU has no knowledge of user IDs or command names for the pid - these have to be supplied
    by the caller.
+
+   NOTE: The code is probably wrong or incomplete for MIG mode, more investigation needed.  In MIG
+   mode, some of the APIs are simply not supported.  We can get some information with
+   nvmlDeviceGetComputeRunningProcesses_v3(), but it's not clear how much information is actually
+   available to unprivileged processes: the device may be locked down.  In either case the handle
+   should then be a MIG handle, not a device handle.
  */
 
-static nvmlProcessUtilizationSample_t* infos; /* NULL for no info yet */
-static unsigned info_count;
-static unsigned long long total_memory;
+static struct nvml_gpu_process* infos;  /* NULL for no info yet */
+static unsigned info_count = 0;
 
 /* Probe the last five seconds only, both for the sake of efficiency and because sonar is supposed
    to be a sampler.  It's arguable that we could do better if we were to use a larger window, but
@@ -288,55 +291,86 @@ int nvml_device_probe_processes(uint32_t device, uint32_t* count) {
     if (infos != NULL) {
         return -1;
     }
-
     if (load_nvml() == -1) {
         return -1;
     }
+
     nvmlDevice_t dev;
     if (xnvmlDeviceGetHandleByIndex_v2(device, &dev) != 0) {
         return -1;
     }
 
-    unsigned long long t = (unsigned long long)(time(NULL) - PROBE_WINDOW_SECS) * 1000000;
+    unsigned running_procs_count = 0;
+    xnvmlDeviceGetComputeRunningProcesses_v3(dev, &running_procs_count, NULL);
 
-    info_count = 0;
-    nvmlReturn_t r = xnvmlDeviceGetProcessUtilization(dev, NULL, &info_count, t);
-    if (r == NVML_SUCCESS) {
-        *count = 0;
-        infos = malloc(sizeof(*infos)); /* Never alloc zero elements */
-        if (infos == NULL) {
+    nvmlProcessInfo_t *running_procs = NULL;
+    if (running_procs_count > 0) {
+        running_procs = malloc(sizeof(nvmlProcessInfo_t)*running_procs_count);
+        if (running_procs == NULL) {
             return -1;
         }
-        return 0;
+        xnvmlDeviceGetComputeRunningProcesses_v3(dev, &running_procs_count, running_procs);
     }
 
-    infos = malloc(sizeof(*infos)*info_count);
-    xnvmlDeviceGetProcessUtilization(dev, infos, &info_count, t);
-    *count = info_count;
+    unsigned long long t = (unsigned long long)(time(NULL) - PROBE_WINDOW_SECS) * 1000000;
+
+    unsigned utilized_procs_count = 0;
+    xnvmlDeviceGetProcessUtilization(dev, NULL, &utilized_procs_count, t);
+
+    nvmlProcessUtilizationSample_t* utilized_procs = NULL;
+    if (utilized_procs_count > 0) {
+        utilized_procs = malloc(sizeof(nvmlProcessUtilizationSample_t)*utilized_procs_count);
+        if (utilized_procs == NULL) {
+            free(running_procs);
+            return -1;
+        }
+        xnvmlDeviceGetProcessUtilization(dev, utilized_procs, &utilized_procs_count, t);
+    }
 
     nvmlMemory_t mem;
-    if (xnvmlDeviceGetMemoryInfo(dev, &mem) == 0) {
-        total_memory = mem.total;
+    xnvmlDeviceGetMemoryInfo(dev, &mem);
+
+    info_count = 0;
+    infos = malloc(sizeof(struct nvml_gpu_process)*(running_procs_count+utilized_procs_count));
+    if (infos == NULL) {
+        free(running_procs);
+        free(utilized_procs);
+        return -1;
+    }
+    for ( unsigned i = 0 ; i < running_procs_count ; i++ ) {
+        infos[i].pid = running_procs[i].pid;
+        infos[i].mem_size = running_procs[i].usedGpuMemory / 1024;
+    }
+    info_count = running_procs_count;
+    for ( unsigned i = 0 ; i < utilized_procs_count ; i++ ) {
+        unsigned j;
+        for ( j = 0 ; j < info_count && infos[j].pid != utilized_procs[i].pid ; j++ ) {
+        }
+        if (j == info_count) {
+            infos[j].pid = utilized_procs[i].pid;
+            infos[j].mem_size = (utilized_procs[i].memUtil * mem.used) / 100 / 1024;
+            info_count++;
+        }
+        infos[j].mem_util = utilized_procs[i].memUtil;
+        infos[j].gpu_util = utilized_procs[i].smUtil;
     }
 
+    free(running_procs);
+    free(utilized_procs);
+
+    *count = info_count;
     return 0;
 }
 
 int nvml_get_process(uint32_t index, struct nvml_gpu_process* infobuf) {
     if (infos == NULL) {
-        printf("No array\n");
         return -1;
     }
     if (index >= info_count) {
-        printf("Index OOB, %u %u\n", index, info_count);
         return -1;
     }
 
-    infobuf->pid = infos[index].pid;
-    infobuf->mem_size = (infos[index].memUtil * total_memory) / (100 * 1024);
-    infobuf->mem_util = infos[index].memUtil;
-    infobuf->gpu_util = infos[index].smUtil;
-
+    memcpy(infobuf, infos+index, sizeof(struct nvml_gpu_process));
     return 0;
 }
 
@@ -346,131 +380,3 @@ void nvml_free_processes() {
         infos = NULL;
     }
 }
-
-#if 0
-
-/* Sketches and notes - keeping it for future use
-
-   The code above is probably wrong / incomplete for MIG mode, for which some of the APIs are simply
-   not supported.  For MIG mode, we can get some information with
-   nvmlDeviceGetComputeRunningProcesses_v3(), but it's not clear how much information is actually
-   available to unprivileged processes: the device may be locked down.  In either case the handle
-   should then be a MIG handle, not a device handle.
-
-   In MIG mode, nvmlDeviceGetComputeRunningProcesses_v3() returns info other than (unsigned)-1 for
-   at least one of the two MIG fields.  Also see comments inline below.
-*/
-
-static void experiment() {
-    if (load_nvml() == -1) {
-        return;
-    }
-
-    unsigned ndev;
-    if (xnvmlDeviceGetCount_v2(&ndev) != 0) {
-        printf("no devices\n");
-        return;
-    }
-
-    for ( unsigned devno=0 ; devno < ndev ; devno++ ) {
-        nvmlDevice_t dev;
-        if (xnvmlDeviceGetHandleByIndex_v2(devno, &dev) != 0) {
-            printf("%u: no handle\n", devno);
-            continue;
-        }
-
-        {
-            unsigned info_count = 0;
-            nvmlReturn_t r = xnvmlDeviceGetComputeRunningProcesses_v3(dev, &info_count, NULL);
-            if (r == NVML_SUCCESS) {
-                printf("%u: no processes\n", devno);
-                continue;
-            }
-
-            printf("%u: %u processes\n", devno, info_count);
-
-            nvmlProcessInfo_t *infos = malloc(sizeof(nvmlProcessInfo_t)*info_count);
-            if (xnvmlDeviceGetComputeRunningProcesses_v3(dev, &info_count, infos) != 0) {
-                printf("%u: process lookup failed\n", devno);
-            }
-
-            printf("%u got %u processes\n", devno, info_count);
-
-            for ( unsigned p = 0 ; p < info_count ; p++ ) {
-                printf("  %u %llu / %u %u\n", infos[p].pid, infos[p].usedGpuMemory,
-                       infos[p].computeInstanceId, infos[p].gpuInstanceId);
-            }
-
-            /* if computeInstanceId != (unsigned)-1 or gpuInstanceId != (unsigned)-1 then MIG mode
-               and there may be multiple processes running on it in different partitions.  In this
-               case we should really not have been using the device handle to lookup info in the
-               first place as the information may be privileged, but should have been using a MIG
-               handle to ask for individual partitions.  (May still be privileged?)  It's generally
-               complex.
-
-               Plus I don't like that.  The Default compute mode allows for multiple contexts per
-               device, per the docs.
-
-               otherwise the device is exclusive I guess?  */
-
-            free(infos);
-        }
-
-#if 0
-        /* This API is documented but not available as of the CUDA 12.3 header file */
-        {
-            nvmlProcessesUtilizationInfo_t overall;
-            overall.processSamplesCount = 0;
-            overall.procUtilArray = NULL;
-            overall.lastSeenTimestamp = time() - 300; /* five minute window */
-            nvmlReturn_t r = xnvmlDeviceGetProcessesUtilizationInfo(dev, &overall);
-            if (r == NVML_SUCCESS) {
-                printf("%u: no processes\n", devno);
-                /* No processes */
-                continue;
-            }
-
-            overall.procUtilArray = malloc(
-                sizeof(nvmlProcessUtilizationInfo_v1_t)*overall.processSamplesCount);
-            nvmlReturn_t r = xnvmlDeviceGetProcessesUtilizationInfo(dev, &overall);
-            if (r != NVML_SUCCESS) {
-                printf("%u: failed to lookup\n", devno);
-                /* No processes */
-                continue;
-            }
-
-            for ( unsigned pn = 0 ; pn < overall.processSamplesCount ; pn++ ) {
-                printf("  %u: %u %u %u\n", devno,
-                       overall.procUtilArray[pn].pid,
-                       overall.procUtilArray[pn].smUtil,
-                       overall.procUtilArray[pn].memUtil);
-            }
-
-            free(overall.procUtilArray);
-        }
-#endif
-
-        {
-            long window_sec = 5;
-            nvmlProcessUtilizationSample_t *infos;
-            unsigned info_count = 0;
-            unsigned long long t = (unsigned long long)(time(NULL) - window_sec) * 1000000;
-            nvmlReturn_t r = xnvmlDeviceGetProcessUtilization(dev, NULL, &info_count, t);
-            if (r == NVML_SUCCESS) {
-                printf("%u: no processes\n", devno);
-                continue;
-            }
-
-            infos = malloc(sizeof(*infos)*info_count);
-            xnvmlDeviceGetProcessUtilization(dev, infos, &info_count, t);
-
-            for ( unsigned i = 0 ; i < info_count ; i++ ) {
-                printf("  %u: %d %d\n", infos[i].pid, infos[i].smUtil, infos[i].memUtil);
-            }
-
-            free(infos);
-        }
-    }
-}
-
-#endif /* #if 0 */
