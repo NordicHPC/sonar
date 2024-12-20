@@ -2,6 +2,7 @@
 
 use crate::command::{self, CmdError};
 use crate::gpu;
+use crate::nvidia_nvml;
 use crate::ps::UserTable;
 use crate::util;
 use crate::TIMEOUT_SECONDS;
@@ -38,15 +39,20 @@ impl gpu::GPU for NvidiaGPU {
     }
 
     fn get_card_configuration(&mut self) -> Result<Vec<gpu::Card>, String> {
-        if self.info.is_none() {
-            self.info = Some(get_nvidia_configuration(&["-a"]))
-        }
-        match self.info.as_ref().unwrap() {
-            Ok(data) => Ok(data
-                .iter()
-                .map(|pc| pc.info.clone())
-                .collect::<Vec<gpu::Card>>()),
-            Err(e) => Err(e.clone()),
+        if let Some(info) = nvidia_nvml::get_card_configuration() {
+            Ok(info)
+        } else {
+            println!("FALLBACK get_card_configuration!!");
+            if self.info.is_none() {
+                self.info = Some(get_nvidia_configuration(&["-a"]))
+            }
+            match self.info.as_ref().unwrap() {
+                Ok(data) => Ok(data
+                    .iter()
+                    .map(|pc| pc.info.clone())
+                    .collect::<Vec<gpu::Card>>()),
+                Err(e) => Err(e.clone()),
+            }
         }
     }
 
@@ -54,19 +60,29 @@ impl gpu::GPU for NvidiaGPU {
         &mut self,
         user_by_pid: &UserTable,
     ) -> Result<Vec<gpu::Process>, String> {
-        get_nvidia_utilization(user_by_pid)
+        if let Some(info) = nvidia_nvml::get_process_utilization(user_by_pid) {
+            Ok(info)
+        } else {
+            println!("FALLBACK get_process_utilization!!");
+            get_nvidia_utilization(user_by_pid)
+        }
     }
 
     fn get_card_utilization(&mut self) -> Result<Vec<gpu::CardState>, String> {
-        if self.info.is_none() {
-            self.info = Some(get_nvidia_configuration(&["-a"]))
-        }
-        match self.info.as_ref().unwrap() {
-            Ok(data) => Ok(data
-                .iter()
-                .map(|pc| pc.state.clone())
-                .collect::<Vec<gpu::CardState>>()),
-            Err(e) => Err(e.clone()),
+        if let Some(info) = nvidia_nvml::get_card_utilization() {
+            Ok(info)
+        } else {
+            println!("FALLBACK get_card_utilization!!");
+            if self.info.is_none() {
+                self.info = Some(get_nvidia_configuration(&["-a"]))
+            }
+            match self.info.as_ref().unwrap() {
+                Ok(data) => Ok(data
+                    .iter()
+                    .map(|pc| pc.state.clone())
+                    .collect::<Vec<gpu::CardState>>()),
+                Err(e) => Err(e.clone()),
+            }
         }
     }
 }
@@ -488,7 +504,7 @@ fn parse_pmon_output(raw_text: &str, user_by_pid: &UserTable) -> Result<Vec<gpu:
             gpu_pct: gpu_util_pct,
             mem_pct: mem_util_pct,
             mem_size_kib: mem_size * 1024,
-            command,
+            command: Some(command),
         });
     }
     if device_index.is_none() {
@@ -559,7 +575,7 @@ fn parse_query_output(
             gpu_pct: 0.0,
             mem_pct: 0.0,
             mem_size_kib,
-            command: command.to_string(),
+            command: Some(command.to_string()),
         })
     }
     Ok(result)

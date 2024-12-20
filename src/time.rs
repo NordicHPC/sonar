@@ -5,6 +5,7 @@
 // and tzset() should be called before using it (at least once).  Need to figure that out somehow.
 // So far it seems we've not needed to do this.
 
+use crate::util::cstrdup;
 use std::ffi::CStr;
 use std::num::ParseIntError;
 
@@ -132,11 +133,7 @@ pub fn format_iso8601(timebuf: &libc::tm) -> String {
             // have ensured above that this is never a problem.
             panic!("strftime");
         }
-
-        CStr::from_ptr(buffer.as_ptr())
-            .to_str()
-            .expect("Will always be utf8")
-            .to_string()
+        cstrdup(&buffer)
     };
 
     // We have +/-hhmm for the time zone but want +/-hh:mm for compatibility with older data and
