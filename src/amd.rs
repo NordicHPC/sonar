@@ -229,7 +229,8 @@ PID 28154 is using 1 DRM device(s):
     let zs = extract_amd_information(
         &parse_text_concise_command(concise).expect("Test: AMD text concise information"),
         &parse_showpidgpus_command(pidgpu).expect("Test: AMD pid gpu information"),
-        &users);
+        &users,
+    );
     assert!(zs.eq(&vec![
         proc! { Some(0), 28154, "_zombie_28154", gpu::ZOMBIE_UID, 99.0/2.0, 57.0/2.0 },
         proc! { Some(0), 28156, "bob", 1001, 99.0/2.0, 57.0/2.0 },
