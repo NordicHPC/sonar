@@ -268,12 +268,12 @@ fn parse_text_concise_command(raw_text: &str) -> Result<Vec<(f64, f64)>, String>
                 let dev = fields[0].parse::<usize>().unwrap_or_default();
                 let mem = fields[fields.len() - 2]
                     .strip_suffix('%')
-                    .unwrap()
+                    .unwrap_or("0.0")
                     .parse::<f64>()
                     .unwrap_or_default();
                 let gpu = fields[fields.len() - 1]
                     .strip_suffix('%')
-                    .unwrap()
+                    .unwrap_or("0.0")
                     .parse::<f64>()
                     .unwrap_or_default();
                 if mappings.len() < dev + 1 {
@@ -423,6 +423,23 @@ GPU  Temp (DieEdge)  AvgPwr  SCLK     MCLK    Fan     Perf  PwrCap  VRAM%  GPU%
     )
     .unwrap();
     assert!(xs.eq(&vec![(99.0, 57.0), (63.0, 5.0)]));
+}
+
+// This removes the % in a couple of places which will cause a fallback to 0.0,
+// the output format has changed for newer commands.
+#[test]
+fn test_text_parse_concise_command2() {
+    let xs = parse_text_concise_command(
+        "
+================================= Concise Info =================================
+GPU  Temp (DieEdge)  AvgPwr  SCLK     MCLK    Fan     Perf  PwrCap  VRAM%  GPU%
+0    53.0c           220.0W  1576Mhz  945Mhz  10.98%  auto  220.0W   57%   99
+1    26.0c           3.0W    852Mhz   167Mhz  9.41%   auto  220.0W    5    63%
+================================================================================
+",
+    )
+    .unwrap();
+    assert!(xs.eq(&vec![(0.0, 57.0), (63.0, 0.0)]));
 }
 
 #[test]
