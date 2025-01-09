@@ -55,13 +55,3 @@ pub fn union_gpuset(lhs: &mut GpuSet, rhs: &GpuSet) {
             .extend(rhs.as_ref().expect("RHS is nonempty"));
     }
 }
-
-pub fn pick_one(s: &GpuSet) -> Option<usize> {
-    if let Some(x) = s {
-        if x.is_empty() {
-            return None;
-        }
-        return Some(*x.iter().nth(0).unwrap());
-    }
-    return None
-}

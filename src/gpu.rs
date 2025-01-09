@@ -20,10 +20,6 @@ pub struct Process {
                                  //   when the GPU layer simply can't know.
 }
 
-// Used to tag a Process entry when the uid can't be determined
-
-pub const ZOMBIE_UID: usize = 666666;
-
 // Sample-invariant card information
 
 #[derive(PartialEq, Default, Clone, Debug)]

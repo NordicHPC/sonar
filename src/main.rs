@@ -20,7 +20,6 @@ mod time;
 mod users;
 mod util;
 
-const TIMEOUT_SECONDS: u64 = 5; // For subprocesses
 const USAGE_ERROR: i32 = 2; // clap, Python, Go
 
 enum Commands {
