@@ -7,12 +7,13 @@ use crate::hostname;
 use crate::interrupt;
 use crate::jobs;
 use crate::log;
+use crate::output;
 use crate::procfs;
 use crate::procfsapi;
-use crate::util::{csv_quote, three_places};
+use crate::util::three_places;
 
 use std::collections::HashMap;
-use std::io::{self, Result, Write};
+use std::io::{self, Write};
 use std::path::PathBuf;
 
 type Pid = usize;
@@ -137,9 +138,15 @@ pub struct PsOptions<'a> {
     pub exclude_commands: Vec<&'a str>,
     pub lockdir: Option<String>,
     pub load: bool,
+    pub json: bool,
 }
 
-pub fn create_snapshot(jobs: &mut dyn jobs::JobManager, opts: &PsOptions, timestamp: &str) {
+pub fn create_snapshot(
+    writer: &mut dyn io::Write,
+    jobs: &mut dyn jobs::JobManager,
+    opts: &PsOptions,
+    timestamp: &str,
+) {
     // If a lock file was requested, create one before the operation, exit early if it already
     // exists, and if we performed the operation, remove the file afterwards.  Otherwise, just
     // perform the operation.
@@ -196,7 +203,7 @@ pub fn create_snapshot(jobs: &mut dyn jobs::JobManager, opts: &PsOptions, timest
         }
 
         if !failed && !skip {
-            do_create_snapshot(jobs, opts, timestamp);
+            do_create_snapshot(writer, jobs, opts, timestamp);
 
             // Testing code: If we got the lockfile and produced a report, wait 10s after producing
             // it while holding onto the lockfile.  It is then possible to run sonar in that window
@@ -224,11 +231,16 @@ pub fn create_snapshot(jobs: &mut dyn jobs::JobManager, opts: &PsOptions, timest
             log::error("Unable to properly manage or delete lockfile");
         }
     } else {
-        do_create_snapshot(jobs, opts, timestamp);
+        do_create_snapshot(writer, jobs, opts, timestamp);
     }
 }
 
-fn do_create_snapshot(jobs: &mut dyn jobs::JobManager, opts: &PsOptions, timestamp: &str) {
+fn do_create_snapshot(
+    writer: &mut dyn io::Write,
+    jobs: &mut dyn jobs::JobManager,
+    opts: &PsOptions,
+    timestamp: &str,
+) {
     let no_gpus = gpuset::empty_gpuset();
     let mut proc_by_pid = ProcTable::new();
 
@@ -302,7 +314,7 @@ fn do_create_snapshot(jobs: &mut dyn jobs::JobManager, opts: &PsOptions, timesta
     let mut gpu_status = GpuStatus::Ok;
 
     let gpu_utilization: Vec<gpu::Process>;
-    let mut gpu_info: String = "".to_string();
+    let mut gpu_info: Option<output::Object> = None;
     match gpu::probe() {
         None => {}
         Some(mut gpu) => {
@@ -311,18 +323,20 @@ fn do_create_snapshot(jobs: &mut dyn jobs::JobManager, opts: &PsOptions, timesta
                     gpu_status = GpuStatus::UnknownFailure;
                 }
                 Ok(ref cards) => {
-                    let mut s = "".to_string();
+                    let mut s = output::Object::new();
                     s = add_key(s, "fan%", cards, |c: &gpu::CardState| {
                         nonzero(c.fan_speed_pct as i64)
                     });
                     s = add_key(s, "mode", cards, |c: &gpu::CardState| {
                         if c.compute_mode == "Default" {
-                            "".to_string()
+                            output::Value::E()
                         } else {
-                            c.compute_mode.clone()
+                            output::Value::S(c.compute_mode.clone())
                         }
                     });
-                    s = add_key(s, "perf", cards, |c: &gpu::CardState| c.perf_state.clone());
+                    s = add_key(s, "perf", cards, |c: &gpu::CardState| {
+                        output::Value::S(c.perf_state.clone())
+                    });
                     // Reserved memory is really not interesting, it's possible it would have been
                     // interesting as part of the card configuration.
                     //s = add_key(s, "mreskib", cards, |c: &gpu::CardState| nonzero(c.mem_reserved_kib));
@@ -350,7 +364,9 @@ fn do_create_snapshot(jobs: &mut dyn jobs::JobManager, opts: &PsOptions, timesta
                     s = add_key(s, "memz", cards, |c: &gpu::CardState| {
                         nonzero(c.mem_clock_mhz.into())
                     });
-                    gpu_info = s;
+                    if !s.is_empty() {
+                        gpu_info = Some(s);
+                    }
                 }
             }
             match gpu.get_process_utilization(&user_by_pid) {
@@ -415,8 +431,6 @@ fn do_create_snapshot(jobs: &mut dyn jobs::JobManager, opts: &PsOptions, timesta
     }
 
     // Once we start printing we'll print everything and not check the interrupted flag any more.
-
-    let mut writer = io::stdout();
 
     let hostname = hostname::get();
     const VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -498,106 +512,123 @@ fn do_create_snapshot(jobs: &mut dyn jobs::JobManager, opts: &PsOptions, timesta
         .filter(|proc_info| filter_proc(proc_info, &print_params))
         .collect::<Vec<ProcInfo>>();
 
-    let mut did_print = false;
+    // Here JSON and CSV will diverge a little.  The trick is this:
+    //
+    // - first generate all output lines w/o version, timestamp, hostname, per_cpu_secs, and gpu_info
+    // - then:
+    //   - for json, create an object that has those common fields and an array of per-process data,
+    //     this object is also the heartbeat / synthetic record
+    //   - for csv:
+    //     - if there are no records and must_print is true, synthesize one
+    //     - if we want them, insert per_cpu_secs and gpu_info fields in the first record (there will be one)
+    //     - attach version, timestamp and hostname to all records (ideally we would prepend...)
+    //
+    // Then print.
+
+    let mut records: Vec<output::Object> = vec![];
     for c in candidates {
-        match print_record(
-            &mut writer,
-            &print_params,
-            &c,
-            if !did_print {
-                Some(&per_cpu_secs)
+        records.push(generate_candidate(&c));
+    }
+
+    if !opts.json {
+        let have_load_data = {
+            if print_params.opts.load {
+                !per_cpu_secs.is_empty() || gpu_info.is_some()
             } else {
-                None
-            },
-            if !did_print { Some(&gpu_info) } else { None },
-        ) {
-            Ok(did_print_one) => did_print = did_print_one || did_print,
-            Err(_) => {
-                // Discard the error: there's nothing very sensible we can do at this point if the
-                // write failed, and it will fail if we cut off a pipe, for example, see #132.  I
-                // guess one can argue whether we should try the next record, but it seems sensible
-                // to just bail out and hope for the best.
-                break;
+                false
+            }
+        };
+
+        if (must_print || have_load_data) && records.len() == 0 {
+            let mut fields = output::Object::new();
+            fields.push_s("user", "_sonar_".to_string());
+            fields.push_s("cmd", "_heartbeat_".to_string());
+            records.push(fields);
+        };
+
+        if print_params.opts.load {
+            if !per_cpu_secs.is_empty() {
+                let mut a = output::Array::from_vec(
+                    per_cpu_secs
+                        .iter()
+                        .map(|x| output::Value::U(*x))
+                        .collect::<Vec<output::Value>>(),
+                );
+                a.set_encode_nonempty_base45();
+                records[0].push_a("load", a);
+            }
+            if let Some(info) = gpu_info {
+                records[0].push_o("gpuinfo", info);
             }
         }
-    }
 
-    if !did_print && must_print {
-        // Print a synthetic record
-        let synth = ProcInfo {
-            user: "_sonar_",
-            _uid: 0,
-            command: "_heartbeat_",
-            pid: 0,
-            ppid: 0,
-            rolledup: 0,
-            is_system_job: true,
-            has_children: false,
-            job_id: 0,
-            cpu_percentage: 0.0,
-            cputime_sec: 0,
-            mem_percentage: 0.0,
-            mem_size_kib: 0,
-            rssanon_kib: 0,
-            gpu_cards: gpuset::empty_gpuset(),
-            gpu_percentage: 0.0,
-            gpu_mem_percentage: 0.0,
-            gpu_mem_size_kib: 0,
-            gpu_status: GpuStatus::Ok,
-        };
-        // Discard the error, see above.
-        let _ = print_record(
-            &mut writer,
-            &print_params,
-            &synth,
-            if !did_print {
-                Some(&per_cpu_secs)
-            } else {
-                None
-            },
-            if !did_print { Some(&gpu_info) } else { None },
-        );
-    }
+        // Historically, these three fields were always first, and we have test cases that depend on
+        // "v=" being the very first field.
+        for r in &mut records {
+            r.prepend_s("host", print_params.hostname.to_string());
+            r.prepend_s("time", print_params.timestamp.to_string());
+            r.prepend_s("v", print_params.version.to_string());
+        }
 
-    // Discard the error code, see above.
-    let _ = writer.flush();
+        for v in records {
+            output::write_csv(writer, &output::Value::O(v));
+        }
+    } else {
+        let mut datum = output::Object::new();
+        datum.push_s("v", print_params.version.to_string());
+        datum.push_s("time", print_params.timestamp.to_string());
+        datum.push_s("host", print_params.hostname.to_string());
+        if print_params.opts.load {
+            if !per_cpu_secs.is_empty() {
+                let a = output::Array::from_vec(
+                    per_cpu_secs
+                        .iter()
+                        .map(|x| output::Value::U(*x))
+                        .collect::<Vec<output::Value>>(),
+                );
+                datum.push_a("load", a);
+            }
+            if let Some(info) = gpu_info {
+                datum.push_o("gpuinfo", info);
+            }
+        }
+        let mut samples = output::Array::new();
+        for o in records {
+            samples.push_o(o);
+        }
+        datum.push_a("samples", samples);
+        output::write_json(writer, &output::Value::O(datum));
+    }
 }
 
-fn add_key(
-    mut s: String,
+fn add_key<'a>(
+    mut s: output::Object,
     key: &str,
     cards: &[gpu::CardState],
-    extract: fn(&gpu::CardState) -> String,
-) -> String {
-    let mut vs = "".to_string();
-    let mut any = false;
-    let mut first = true;
+    extract: fn(&gpu::CardState) -> output::Value,
+) -> output::Object {
+    let mut vs = output::Array::new();
+    let mut any_nonempty = false;
+    vs.set_csv_separator("|".to_string());
     for c in cards {
         let v = extract(c);
-        if !first {
-            vs += "|";
+        if let output::Value::E() = v {
+        } else {
+            any_nonempty = true;
         }
-        if !v.is_empty() {
-            any = true;
-            vs = vs + &v;
-        }
-        first = false;
+        vs.push(v);
     }
-    if any {
-        if !s.is_empty() {
-            s += ",";
-        }
-        s + key + "=" + &vs
-    } else {
-        s
+    if any_nonempty {
+        s.push(key, output::Value::A(vs));
     }
+    s
 }
 
-fn nonzero(x: i64) -> String {
+fn nonzero(x: i64) -> output::Value {
     if x == 0 {
-        "".to_string()
+        output::Value::E()
     } else {
-        format!("{:?}", x)
+        output::Value::I(x)
     }
 }
 
@@ -667,160 +698,70 @@ struct PrintParameters<'a> {
     opts: &'a PsOptions<'a>,
 }
 
-fn print_record(
-    writer: &mut dyn io::Write,
-    params: &PrintParameters,
-    proc_info: &ProcInfo,
-    per_cpu_secs: Option<&[u64]>,
-    gpu_info: Option<&str>,
-) -> Result<bool> {
-    // Mandatory fields.
+fn generate_candidate(proc_info: &ProcInfo) -> output::Object {
+    let mut fields = output::Object::new();
 
-    let mut fields = vec![
-        format!("v={}", params.version),
-        format!("time={}", params.timestamp),
-        format!("host={}", params.hostname),
-        format!("user={}", proc_info.user),
-        format!("cmd={}", proc_info.command),
-    ];
+    fields.push_s("user", proc_info.user.to_string());
+    fields.push_s("cmd", proc_info.command.to_string());
 
     // Only print optional fields whose values are not their defaults.  The defaults are defined in
     // README.md.  The values there must agree with those used by Jobanalyzer's parser.
 
     if proc_info.job_id != 0 {
-        fields.push(format!("job={}", proc_info.job_id));
+        fields.push_u("job", proc_info.job_id as u64);
     }
     if proc_info.rolledup == 0 && proc_info.pid != 0 {
         // pid must be 0 for rolledup > 0 as there is no guarantee that there is any fixed
         // representative pid for a rolled-up set of processes: the set can change from run to run,
         // and sonar has no history.
-        fields.push(format!("pid={}", proc_info.pid));
+        fields.push_u("pid", proc_info.pid as u64);
     }
     if proc_info.ppid != 0 {
-        fields.push(format!("ppid={}", proc_info.ppid));
+        fields.push_u("ppid", proc_info.ppid as u64);
     }
     if proc_info.cpu_percentage != 0.0 {
-        fields.push(format!("cpu%={}", three_places(proc_info.cpu_percentage)));
+        fields.push_f("cpu%", three_places(proc_info.cpu_percentage));
     }
     if proc_info.mem_size_kib != 0 {
-        fields.push(format!("cpukib={}", proc_info.mem_size_kib));
+        fields.push_u("cpukib", proc_info.mem_size_kib as u64);
     }
     if proc_info.rssanon_kib != 0 {
-        fields.push(format!("rssanonkib={}", proc_info.rssanon_kib));
+        fields.push_u("rssanonkib", proc_info.rssanon_kib as u64);
     }
     if let Some(ref cards) = proc_info.gpu_cards {
         if cards.is_empty() {
             // Nothing
         } else {
-            fields.push(format!(
-                "gpus={}",
+            fields.push_s(
+                "gpus",
                 cards
                     .iter()
                     .map(|&num| num.to_string())
                     .collect::<Vec<String>>()
-                    .join(",")
-            ))
+                    .join(","),
+            );
         }
     } else {
-        fields.push("gpus=unknown".to_string());
+        fields.push_s("gpus", "unknown".to_string());
     }
     if proc_info.gpu_percentage != 0.0 {
-        fields.push(format!("gpu%={}", three_places(proc_info.gpu_percentage)));
+        fields.push_f("gpu%", three_places(proc_info.gpu_percentage));
     }
     if proc_info.gpu_mem_percentage != 0.0 {
-        fields.push(format!(
-            "gpumem%={}",
-            three_places(proc_info.gpu_mem_percentage)
-        ));
+        fields.push_f("gpumem%", three_places(proc_info.gpu_mem_percentage));
     }
     if proc_info.gpu_mem_size_kib != 0 {
-        fields.push(format!("gpukib={}", proc_info.gpu_mem_size_kib));
+        fields.push_u("gpukib", proc_info.gpu_mem_size_kib as u64);
     }
     if proc_info.cputime_sec != 0 {
-        fields.push(format!("cputime_sec={}", proc_info.cputime_sec));
+        fields.push_u("cputime_sec", proc_info.cputime_sec as u64);
     }
     if proc_info.gpu_status != GpuStatus::Ok {
-        fields.push(format!("gpufail={}", proc_info.gpu_status as i32));
+        fields.push_u("gpufail", proc_info.gpu_status as u64);
     }
     if proc_info.rolledup > 0 {
-        fields.push(format!("rolledup={}", proc_info.rolledup));
-    }
-    if params.opts.load {
-        if let Some(cpu_secs) = per_cpu_secs {
-            if !cpu_secs.is_empty() {
-                fields.push(format!("load={}", encode_cpu_secs_base45el(cpu_secs)));
-            }
-        }
-        if let Some(gpu_info) = gpu_info {
-            if !gpu_info.is_empty() {
-                fields.push(format!("gpuinfo={gpu_info}"));
-            }
-        }
+        fields.push_u("rolledup", proc_info.rolledup as u64);
     }
 
-    let mut s = "".to_string();
-    for f in fields {
-        if !s.is_empty() {
-            s += ","
-        }
-        s += &csv_quote(&f);
-    }
-    s += "\n";
-
-    let _ = writer.write(s.as_bytes())?;
-
-    Ok(true)
-}
-
-// Encode a nonempty u64 array compactly.
-//
-// The output must be ASCII text (32 <= c < 128), ideally without ',' or '"' or '\' or ' ' to not
-// make it difficult for the various output formats we use.  Also avoid DEL, because it is a weird
-// control character.
-//
-// We have many encodings to choose from, see https://github.com/NordicHPC/sonar/issues/178.
-//
-// The values to be represented are always cpu seconds of active time since boot, one item per cpu,
-// and it is assumed that they are roughly in the vicinity of each other (the largest is rarely more
-// than 4x the smallest, say).  The assumption does not affect correctness, only compactness.
-//
-// The encoding first finds the minimum input value and subtracts that from all entries.  The
-// minimum value, and all the entries, are then emitted as unsigned little-endian base-45 with the
-// initial digit chosen from a different character set to indicate that it is initial.
-
-fn encode_cpu_secs_base45el(cpu_secs: &[u64]) -> String {
-    let base = *cpu_secs
-        .iter()
-        .reduce(std::cmp::min)
-        .expect("Must have a non-empty array");
-    let mut s = encode_u64_base45el(base);
-    for x in cpu_secs {
-        s += encode_u64_base45el(*x - base).as_str();
-    }
-    s
-}
-
-// The only character unused by the encoding, other than the ones we're not allowed to use, is '='.
-const BASE: u64 = 45;
-const INITIAL: &[u8] = "(){}[]<>+-abcdefghijklmnopqrstuvwxyz!@#$%^&*_".as_bytes();
-const SUBSEQUENT: &[u8] = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ~|';:.?/`".as_bytes();
-
-fn encode_u64_base45el(mut x: u64) -> String {
-    let mut s = String::from(INITIAL[(x % BASE) as usize] as char);
-    x /= BASE;
-    while x > 0 {
-        s.push(SUBSEQUENT[(x % BASE) as usize] as char);
-        x /= BASE;
-    }
-    s
-}
-
-#[test]
-pub fn test_encoding() {
-    assert!(INITIAL.len() == BASE as usize);
-    assert!(SUBSEQUENT.len() == BASE as usize);
-    // This should be *1, *0, *29, *43, 1, *11 with * denoting an INITIAL char.
-    let v = vec![1, 30, 89, 12];
-    println!("{}", encode_cpu_secs_base45el(&v));
-    assert!(encode_cpu_secs_base45el(&v) == ")(t*1b");
+    fields
 }

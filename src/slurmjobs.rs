@@ -2,8 +2,8 @@
 
 use crate::command;
 use crate::log;
+use crate::output;
 use crate::time;
-use crate::util;
 
 #[cfg(test)]
 use std::cmp::min;
@@ -19,7 +19,12 @@ const TIMEOUT_S: u64 = 180;
 // Same output format as sacctd, which uses this version number.
 const VERSION: &str = "0.1.0";
 
-pub fn show_slurm_jobs(window: &Option<u32>, span: &Option<String>) {
+pub fn show_slurm_jobs(
+    writer: &mut dyn io::Write,
+    window: &Option<u32>,
+    span: &Option<String>,
+    json: bool,
+) {
     let (job_states, field_names) = parameters();
 
     // Parse the options to compute the time range to pass to sacct.
@@ -59,9 +64,8 @@ pub fn show_slurm_jobs(window: &Option<u32>, span: &Option<String>) {
             log::error(&format!("sacct failed: {:?}", e));
         }
         Ok(sacct_output) => {
-            let mut writer = io::stdout();
             let local = time::now_local();
-            format_jobs(&mut writer, &sacct_output, &field_names, &local);
+            format_jobs(writer, &sacct_output, &field_names, &local, json);
         }
     }
 }
@@ -139,6 +143,7 @@ fn format_jobs(
     sacct_output: &str,
     field_names: &[&str],
     local: &libc::tm,
+    json: bool,
 ) {
     // Fields that are dates that may be reinterpreted before transmission.
     let date_fields = HashSet::from(["Start", "End", "Submit"]);
@@ -149,6 +154,13 @@ fn format_jobs(
     // Zero values in "controlled" fields.
     let zero_values = HashSet::from(["Unknown", "0", "00:00:00", "0:0", "0.00M"]);
 
+    // For csv, push out records individually; if we add "common" fields (such as error information)
+    // they will piggyback on the first record, as does `load` for `ps`.
+    //
+    // For json, collect records in an array and then push out an envelope containing that array, as
+    // this envelope can later be adapted to hold more fields.
+
+    let mut jobs = output::Array::new();
     for line in sacct_output.lines() {
         let mut field_store = line.split('|').collect::<Vec<&str>>();
 
@@ -160,7 +172,10 @@ fn format_jobs(
         field_store[field_names.len() - 1] = &jobname;
         let fields = &field_store[..field_names.len()];
 
-        let mut output_line = "v=".to_string() + VERSION;
+        let mut output_line = output::Object::new();
+        if !json {
+            output_line.push_s("v", VERSION.to_string());
+        }
         for (i, name) in field_names.iter().enumerate() {
             let mut val = fields[i].to_string();
             let is_zero = val.is_empty()
@@ -179,12 +194,20 @@ fn format_jobs(
                         val = time::format_iso8601(&t).to_string()
                     }
                 }
-                output_line += ",";
-                output_line += &util::csv_quote(&(name.to_string() + "=" + &val));
+                output_line.push_s(name, val);
             }
         }
-        output_line += "\n";
-        let _ = writer.write(output_line.as_bytes());
+        if json {
+            jobs.push_o(output_line);
+        } else {
+            output::write_csv(writer, &output::Value::O(output_line));
+        }
+    }
+    if json {
+        let mut envelope = output::Object::new();
+        envelope.push_s("v", VERSION.to_string());
+        envelope.push_a("jobs", jobs);
+        output::write_json(writer, &output::Value::O(envelope));
     }
 }
 
@@ -204,7 +227,7 @@ pub fn test_format_jobs() {
     // The output below depends on us being in UTC+01:00 and not in dst so mock that.
     local.tm_gmtoff = 3600;
     local.tm_isdst = 0;
-    format_jobs(&mut output, sacct_output, &field_names, &local);
+    format_jobs(&mut output, sacct_output, &field_names, &local, false);
     if output != expected.as_bytes() {
         let xs = &output;
         let ys = expected.as_bytes();
@@ -223,6 +246,12 @@ pub fn test_format_jobs() {
                 );
                 break;
             }
+        }
+        println!("{} {}", xs.len(), ys.len());
+        if xs.len() > ys.len() {
+            println!("{}", String::from_utf8_lossy(&xs[ys.len()..]));
+        } else {
+            println!("{}", String::from_utf8_lossy(&ys[xs.len()..]));
         }
         assert!(false);
     }
