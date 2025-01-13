@@ -1,4 +1,4 @@
-name: Test
+name: Test minimal Rust version
 
 on:
   push:
@@ -14,6 +14,13 @@ jobs:
     steps:
     - name: Checkout
       uses: actions/checkout@v4
+
+    - name: Install Rust and set a specific version
+      run: |
+        curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+        source $HOME/.cargo/env
+        rustup install 1.59.0
+        rustup default 1.59.0
 
     - name: Display Rust version
       run: cargo --version
