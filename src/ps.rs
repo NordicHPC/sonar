@@ -342,12 +342,12 @@ fn do_create_snapshot(jobs: &mut dyn jobs::JobManager, opts: &PsOptions, timesta
     let gpu_utilization: Vec<gpu::Process>;
     let mut gpu_info: String = "".to_string();
     match gpu::probe() {
-        None => {
-            gpu_status = GpuStatus::UnknownFailure;
-        }
+        None => {}
         Some(mut gpu) => {
             match gpu.get_card_utilization() {
-                Err(_) => {}
+                Err(_) => {
+                    gpu_status = GpuStatus::UnknownFailure;
+                }
                 Ok(ref cards) => {
                     let mut s = "".to_string();
                     s = add_key(s, "fan%", cards, |c: &gpu::CardState| {

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Primitive test runner.
+# Primitive test runner, to run locally and on CI.
 
 set -e
 
@@ -25,6 +25,7 @@ for test in amd-gpu \
                 load \
                 lockfile \
                 min-cpu-time \
+                no-gpu \
                 nvidia-gpu \
                 ps-syntax \
                 rollup \
