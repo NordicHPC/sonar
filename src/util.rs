@@ -1,6 +1,8 @@
 #![allow(unused_imports)]
 #![allow(unused_macros)]
 
+use std::ffi::CStr;
+
 // Populate a HashSet.
 #[cfg(test)]
 macro_rules! set(
@@ -34,30 +36,6 @@ pub(crate) use map;
 
 #[cfg(test)]
 pub(crate) use set;
-
-// Carve up a line of text into space-separated chunks + the start indices of the chunks.
-pub fn chunks(input: &str) -> (Vec<usize>, Vec<&str>) {
-    let mut start_indices: Vec<usize> = Vec::new();
-    let mut parts: Vec<&str> = Vec::new();
-
-    let mut last_index = 0;
-    for (index, c) in input.char_indices() {
-        if c.is_whitespace() {
-            if last_index != index {
-                start_indices.push(last_index);
-                parts.push(&input[last_index..index]);
-            }
-            last_index = index + 1;
-        }
-    }
-
-    if last_index < input.len() {
-        start_indices.push(last_index);
-        parts.push(&input[last_index..]);
-    }
-
-    (start_indices, parts)
-}
 
 // Round `n` to 3 decimal places.
 pub fn three_places(n: f64) -> f64 {
@@ -138,4 +116,13 @@ pub fn csv_quote_test() {
     assert!(&csv_quote(r#"abc,de"#) == r#""abc,de""#);
     assert!(&csv_quote(r#"abc"de"#) == r#""abc""de""#);
     assert!(&csv_quote(r#"abc""de"#) == r#""abc""""de""#);
+}
+
+// Copy a C string.
+
+pub fn cstrdup(s: &[i8]) -> String {
+    unsafe { CStr::from_ptr(s.as_ptr()) }
+        .to_str()
+        .expect("Will always be utf8")
+        .to_string()
 }

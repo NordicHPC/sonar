@@ -110,6 +110,8 @@ per `sonar ps` invocation. (v0.13.0)
 **`sonar slurm` command introduced**.  This extracts information from the Slurm database about
 completed jobs within a time window, on CSV format.
 
+**Use SMI libraries**.  Sonar will no longer run `nvidia-smi` and `rocm-smi` to obtain GPU data but
+will dynamically load the cards' SMI libraries and obtain data via them.
 
 ### Changes in v0.12.x (on `release_0_12`)
 
@@ -200,6 +202,9 @@ branch.
 - Build it: `cargo build --release`
 - The binary is then located at `target/release/sonar`
 - Copy it to where-ever it needs to be
+
+If the build results in a link error for `libsonar-<something>.a` then your binutils are too old,
+this can be a problem on eg RHEL9.  See comments in `gpuapi/Makefile` for how to resolve this.
 
 
 ## Collect processes with `sonar ps`
@@ -527,11 +532,11 @@ CPU-only compute nodes).
 The tool does **not** need root permissions.  It does not modify anything and writes output to
 stdout (and errors to stderr).
 
-On CPUs, no external commands are called by `sonar ps`.
+No external commands are called by `sonar ps` or `sonar sysinfo`: Sonar reads `/proc` and probes the
+GPUs via their manufacturers' SMI libraries to collect all data.
 
-On GPUs, `sonar ps` will attempt to use `nvidia-smi` and `rocm-smi` to record GPU utilization; the
-tool gives up and stops if the latter subprocesses do not return within a few seconds to avoid a pile-up
-of processes.
+The Slurm `sacct` command is currently run by `sonar slurm`.  A timeout mechanism is in place to
+prevent this command from hanging indefinitely.
 
 Optionally, `sonar` will use a lockfile to avoid a pile-up of processes.
 

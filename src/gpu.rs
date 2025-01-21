@@ -1,28 +1,28 @@
 use crate::amd;
+use crate::gpuset;
 use crate::nvidia;
 use crate::ps;
 
-// Per-sample process information, across cards
+// Per-sample process information, across cards.  The GPU layer can report a single datum for a
+// process across multiple cards, or multiple data breaking down the process per card even if the
+// process is running on multiple cards.
 
-#[derive(PartialEq, Default, Clone)]
+#[derive(PartialEq, Default, Clone, Debug)]
 pub struct Process {
-    pub device: Option<usize>, // Device ID
-    pub pid: usize,            // Process ID
-    pub user: String,          // User name, _zombie_PID for zombies
-    pub uid: usize,            // User ID, 666666 for zombies
-    pub gpu_pct: f64,          // Percent of GPU /for this sample/, 0.0 for zombies
-    pub mem_pct: f64,          // Percent of memory /for this sample/, 0.0 for zombies
-    pub mem_size_kib: usize,   // Memory use in KiB /for this sample/, _not_ zero for zombies
-    pub command: String,       // The command, _unknown_ for zombies, _noinfo_ if not known
+    pub devices: gpuset::GpuSet, // Device IDs
+    pub pid: usize,              // Process ID
+    pub user: String,            // User name, _zombie_PID for zombies
+    pub uid: usize,              // User ID, 666666 for zombies
+    pub gpu_pct: f64,            // Percent of GPU /for this sample/, 0.0 for zombies
+    pub mem_pct: f64,            // Percent of memory /for this sample/, 0.0 for zombies
+    pub mem_size_kib: usize,     // Memory use in KiB /for this sample/, _not_ zero for zombies
+    pub command: Option<String>, // The command, _unknown_ for zombies, _noinfo_ if not known, None
+                                 //   when the GPU layer simply can't know.
 }
-
-// Used to tag a Process entry when the uid can't be determined
-
-pub const ZOMBIE_UID: usize = 666666;
 
 // Sample-invariant card information
 
-#[derive(PartialEq, Default, Clone)]
+#[derive(PartialEq, Default, Clone, Debug)]
 pub struct Card {
     pub bus_addr: String,
     pub index: i32,       // Card index (changes at boot)
@@ -41,7 +41,7 @@ pub struct Card {
 
 // Per-sample card information, across processes
 
-#[derive(PartialEq, Default, Clone)]
+#[derive(PartialEq, Default, Clone, Debug)]
 pub struct CardState {
     pub index: i32, // Stable card identifier
     pub fan_speed_pct: f32,

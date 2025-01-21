@@ -63,7 +63,7 @@ fn do_show_system(
                 i += 1;
             }
             let memsize = if cards[first].mem_size_kib > 0 {
-                (cards[first].mem_size_kib * 1024 / GIB as i64).to_string()
+                ((cards[first].mem_size_kib as f64 * 1024.0 / GIB as f64).round() as usize).to_string()
             } else {
                 "unknown ".to_string()
             };

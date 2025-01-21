@@ -1,12 +1,15 @@
 mod amd;
+mod amd_smi;
 mod batchless;
 mod command;
 mod gpu;
+mod gpuset;
 mod hostname;
 mod interrupt;
 mod jobs;
 mod log;
 mod nvidia;
+mod nvidia_nvml;
 mod procfs;
 mod procfsapi;
 mod ps;
@@ -17,7 +20,6 @@ mod time;
 mod users;
 mod util;
 
-const TIMEOUT_SECONDS: u64 = 5; // For subprocesses
 const USAGE_ERROR: i32 = 2; // clap, Python, Go
 
 enum Commands {
