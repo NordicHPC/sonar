@@ -1,6 +1,8 @@
 /* Static-linkable wrapper around the NVIDIA NVML dynamic library with some abstractions
    for our needs.  See sonar-nvidia.h and Makefile for more.
 
+   Must be compiled with SONAR_NVIDIA_GPU, or there will be no support, only a stub library.
+
    Note you may need to `module load CUDA/11.1.1-GCC-10.2.0` or similar for access to nvml.h, it may
    not be loaded by default.
 
@@ -18,9 +20,11 @@
 #include <string.h>
 #include <time.h>
 
-#include <nvml.h>
-
 #include "sonar-nvidia.h"
+
+#ifdef SONAR_NVIDIA_GPU
+
+#include <nvml.h>
 
 static nvmlReturn_t (*xnvmlDeviceGetClockInfo)(nvmlDevice_t,nvmlClockType_t,unsigned*);
 static nvmlReturn_t (*xnvmlDeviceGetComputeMode)(nvmlDevice_t,nvmlComputeMode_t*);
@@ -104,8 +108,10 @@ static int load_nvml() {
 
     return 0;
 }
+#endif /* SONAR_NVIDIA_GPU */
 
 int nvml_device_get_count(uint32_t* count) {
+#ifdef SONAR_NVIDIA_GPU
     if (load_nvml() == -1) {
         return -1;
     }
@@ -115,8 +121,12 @@ int nvml_device_get_count(uint32_t* count) {
     }
     *count = ndev;
     return 0;
+#else
+    return -1;
+#endif /* SONAR_NVIDIA_GPU */
 }
 
+#ifdef SONAR_NVIDIA_GPU
 /* The architecture numbers are taken from the CUDA 12.3.0 nvml.h, except Blackwell is a guess. */
 static const char* const arch_names[] = {
     "(unknown)",
@@ -131,8 +141,10 @@ static const char* const arch_names[] = {
     "Hopper",
     "Blackwell",
 };
+#endif /* SONAR_NVIDIA_GPU */
 
 int nvml_device_get_card_info(uint32_t device, struct nvml_card_info* infobuf) {
+#ifdef SONAR_NVIDIA_GPU
     if (load_nvml() == -1) {
         return -1;
     }
@@ -189,9 +201,13 @@ int nvml_device_get_card_info(uint32_t device, struct nvml_card_info* infobuf) {
     }
 
     return 0;
+#else
+    return -1;
+#endif /* SONAR_NVIDIA_GPU */
 }
 
 int nvml_device_get_card_state(uint32_t device, struct nvml_card_state* infobuf) {
+#ifdef SONAR_NVIDIA_GPU
     if (load_nvml() == -1) {
         return -1;
     }
@@ -267,6 +283,9 @@ int nvml_device_get_card_state(uint32_t device, struct nvml_card_state* infobuf)
     }
 
     return 0;
+#else
+    return -1;
+#endif /* SONAR_NVIDIA_GPU */
 }
 
 /* When probing processes, run nvmlDeviceGetProcessUtilization to get a mapping from pid to compute
@@ -286,6 +305,7 @@ int nvml_device_get_card_state(uint32_t device, struct nvml_card_state* infobuf)
    should then be a MIG handle, not a device handle.
  */
 
+#ifdef SONAR_NVIDIA_GPU
 static struct nvml_gpu_process* infos;  /* NULL for no info yet */
 static unsigned info_count = 0;
 
@@ -294,8 +314,10 @@ static unsigned info_count = 0;
    sonar does not know what its own sampling window is.
 */
 #define PROBE_WINDOW_SECS 5
+#endif /* SONAR_NVIDIA_GPU */
 
 int nvml_device_probe_processes(uint32_t device, uint32_t* count) {
+#ifdef SONAR_NVIDIA_GPU
     if (infos != NULL) {
         return -1;
     }
@@ -368,9 +390,13 @@ int nvml_device_probe_processes(uint32_t device, uint32_t* count) {
 
     *count = info_count;
     return 0;
+#else
+    return -1;
+#endif /* SONAR_NVIDIA_GPU */
 }
 
 int nvml_get_process(uint32_t index, struct nvml_gpu_process* infobuf) {
+#ifdef SONAR_NVIDIA_GPU
     if (infos == NULL) {
         return -1;
     }
@@ -380,11 +406,16 @@ int nvml_get_process(uint32_t index, struct nvml_gpu_process* infobuf) {
 
     memcpy(infobuf, infos+index, sizeof(struct nvml_gpu_process));
     return 0;
+#else
+    return -1;
+#endif /* SONAR_NVIDIA_GPU */
 }
 
 void nvml_free_processes() {
+#ifdef SONAR_NVIDIA_GPU
     if (infos != NULL) {
         free(infos);
         infos = NULL;
     }
+#endif
 }

@@ -1,4 +1,6 @@
+#[cfg(feature = "amd")]
 mod amd;
+#[cfg(feature = "amd")]
 mod amd_smi;
 mod batchless;
 mod command;
@@ -8,7 +10,9 @@ mod hostname;
 mod interrupt;
 mod jobs;
 mod log;
+#[cfg(feature = "nvidia")]
 mod nvidia;
+#[cfg(feature = "nvidia")]
 mod nvidia_nvml;
 mod output;
 mod procfs;
@@ -20,6 +24,8 @@ mod sysinfo;
 mod time;
 mod users;
 mod util;
+#[cfg(feature = "xpu")]
+mod xpu;
 
 use std::io;
 

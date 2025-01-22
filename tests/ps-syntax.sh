@@ -33,7 +33,7 @@ if [[ !( $l =~ ^v=[0-9]+\.[0-9]+\.[0-9](-.+)?, ) ]]; then
     echo "CSV version missing, got $l"
     exit 1
 fi
-if [[ !( $l =~ ,user=[-a-z0-9]+, ) ]]; then
+if [[ !( $l =~ ,user=[-a-z0-9_]+, ) ]]; then
     echo "CSV user missing, got $l"
     exit 1
 fi

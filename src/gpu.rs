@@ -1,6 +1,10 @@
+#[cfg(feature = "amd")]
 use crate::amd;
 use crate::gpuset;
+#[cfg(feature = "nvidia")]
 use crate::nvidia;
+#[cfg(feature = "xpu")]
+use crate::xpu;
 use crate::ps;
 
 // Per-sample process information, across cards.  The GPU layer can report a single datum for a
@@ -79,11 +83,17 @@ pub trait GPU {
 // Probe the system for GPUs.
 
 pub fn probe() -> Option<Box<dyn GPU>> {
+    #[cfg(feature = "nvidia")]
     if let Some(nvidia) = nvidia::probe() {
-        Some(nvidia)
-    } else if let Some(amd) = amd::probe() {
-        Some(amd)
-    } else {
-        None
+        return Some(nvidia);
     }
+    #[cfg(feature = "amd")]
+    if let Some(amd) = amd::probe() {
+        return Some(amd)
+    }
+    #[cfg(feature = "xpu")]
+    if let Some(xpu) = xpu::probe() {
+        return Some(xpu)
+    }
+    return None
 }

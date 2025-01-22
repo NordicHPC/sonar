@@ -4,7 +4,7 @@
 # an orderly way with a message on stderr.
 
 set -e
-echo "This takes about 15s"
+echo " This takes about 15s"
 ( cd .. ; cargo build )
 rm -f interrupt.output.txt
 SONARTEST_WAIT_INTERRUPT=1 ../target/debug/sonar ps 2> interrupt.output.txt &
