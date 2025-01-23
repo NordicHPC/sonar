@@ -15,7 +15,7 @@ fi
 output=$(../target/debug/sonar sysinfo)
 jq . <<< $output > /dev/null
 
-echo "JSON ok"
+echo " JSON ok"
 
 # Superficial CSV check, check that the version number is there
 
@@ -25,5 +25,5 @@ if [[ ! ( $output =~ version= ) ]]; then
     exit 1
 fi
 
-echo "CSV ok"
+echo " CSV ok"
 

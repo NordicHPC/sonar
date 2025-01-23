@@ -1,7 +1,6 @@
-// Run sacct, extract output and reformat as CSV on stdout.
+// Run sacct, extract output and reformat as CSV or JSON on stdout.
 
 use crate::command;
-use crate::log;
 use crate::output;
 use crate::time;
 
@@ -23,16 +22,58 @@ pub fn show_slurm_jobs(
     writer: &mut dyn io::Write,
     window: &Option<u32>,
     span: &Option<String>,
+    timestamp: &str,
     json: bool,
 ) {
+    match collect_jobs(window, span, json) {
+        Ok(jobs) => print_jobs(writer, jobs, json),
+        Err(error) => print_error(writer, error, timestamp, json)
+    }
+}
+
+fn print_jobs(writer: &mut dyn io::Write, jobs: output::Array, json: bool) {
+    if json {
+        let mut envelope = output::Object::new();
+        envelope.push_s("v", VERSION.to_string());
+        envelope.push_a("jobs", jobs);
+        output::write_json(writer, &output::Value::O(envelope));
+    } else {
+        for i in 0..jobs.len() {
+            output::write_csv(writer, jobs.at(i));
+        }
+    }
+}
+
+// For JSON, if there's an error, it gets placed in the envelope.  But for CSV, it needs to be
+// attached to the first record.  If that record does not exist, it needs to be synthesized.  The
+// field name is "error" in either case; this does not conflict with anything from Slurm.  But on
+// the back end, the ingestor needs to deal with a possibly synthesized record that has only that
+// field, and not assume that any particular field is present.
+
+fn print_error(writer: &mut dyn io::Write, error: String, timestamp: &str, json: bool) {
+    let mut envelope = output::Object::new();
+    envelope.push_s("v", VERSION.to_string());
+    envelope.push_s("error", error);
+    envelope.push_s("timestamp", timestamp.to_string());
+    if json {
+        output::write_json(writer, &output::Value::O(envelope));
+    } else {
+        output::write_csv(writer, &output::Value::O(envelope));
+    }
+}
+
+fn collect_jobs(
+    window: &Option<u32>,
+    span: &Option<String>,
+    json: bool,
+) -> Result<output::Array, String> {
     let (job_states, field_names) = parameters();
 
     // Parse the options to compute the time range to pass to sacct.
     let (from, to) = if let Some(s) = span {
         let components = s.split(',').collect::<Vec<&str>>();
         if components.len() != 2 || !check_ymd(components[0]) || !check_ymd(components[1]) {
-            log::error(&format!("Bad --span: {}", s));
-            return;
+            return Err(format!("Bad --span: {}", s));
         }
         (components[0].to_string(), components[1].to_string())
     } else {
@@ -61,11 +102,11 @@ pub fn show_slurm_jobs(
         TIMEOUT_S,
     ) {
         Err(e) => {
-            log::error(&format!("sacct failed: {:?}", e));
+            Err(format!("sacct failed: {:?}", e))
         }
         Ok(sacct_output) => {
             let local = time::now_local();
-            format_jobs(writer, &sacct_output, &field_names, &local, json);
+            Ok(parse_jobs(&sacct_output, &field_names, &local, !json))
         }
     }
 }
@@ -138,13 +179,12 @@ fn check_ymd(s: &str) -> bool {
     k == 3
 }
 
-fn format_jobs(
-    writer: &mut dyn io::Write,
+fn parse_jobs(
     sacct_output: &str,
     field_names: &[&str],
     local: &libc::tm,
-    json: bool,
-) {
+    version_per_line: bool,
+) -> output::Array {
     // Fields that are dates that may be reinterpreted before transmission.
     let date_fields = HashSet::from(["Start", "End", "Submit"]);
 
@@ -173,7 +213,7 @@ fn format_jobs(
         let fields = &field_store[..field_names.len()];
 
         let mut output_line = output::Object::new();
-        if !json {
+        if version_per_line {
             output_line.push_s("v", VERSION.to_string());
         }
         for (i, name) in field_names.iter().enumerate() {
@@ -197,20 +237,14 @@ fn format_jobs(
                 output_line.push_s(name, val);
             }
         }
-        if json {
-            jobs.push_o(output_line);
-        } else {
-            output::write_csv(writer, &output::Value::O(output_line));
-        }
+        jobs.push_o(output_line);
     }
-    if json {
-        let mut envelope = output::Object::new();
-        envelope.push_s("v", VERSION.to_string());
-        envelope.push_a("jobs", jobs);
-        output::write_json(writer, &output::Value::O(envelope));
-    }
+    jobs
 }
 
+// There is a test case that the "error" field is generated correctly in ../tests/slurm-no-sacct.sh.
+
+// Test that known sacct output is formatted correctly.
 #[test]
 pub fn test_format_jobs() {
     let (_, field_names) = parameters();
@@ -227,7 +261,8 @@ pub fn test_format_jobs() {
     // The output below depends on us being in UTC+01:00 and not in dst so mock that.
     local.tm_gmtoff = 3600;
     local.tm_isdst = 0;
-    format_jobs(&mut output, sacct_output, &field_names, &local, false);
+    let jobs = parse_jobs(sacct_output, &field_names, &local, true);
+    print_jobs(&mut output, jobs, false);
     if output != expected.as_bytes() {
         let xs = &output;
         let ys = expected.as_bytes();
