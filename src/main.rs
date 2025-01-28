@@ -10,6 +10,7 @@ mod jobs;
 mod log;
 mod nvidia;
 mod nvidia_nvml;
+mod output;
 mod procfs;
 mod procfsapi;
 mod ps;
@@ -19,6 +20,8 @@ mod sysinfo;
 mod time;
 mod users;
 mod util;
+
+use std::io;
 
 const USAGE_ERROR: i32 = 2; // clap, Python, Go
 
@@ -59,9 +62,15 @@ enum Commands {
         /// One output record per Sonar invocation will contain a load= field with an encoding of
         /// the per-cpu usage since boot.
         load: bool,
+
+        /// Output JSON, not CSV
+        json: bool,
     },
     /// Extract system information
-    Sysinfo {},
+    Sysinfo {
+        /// Output CSV, not JSON
+        csv: bool,
+    },
     /// Extract slurm job information
     Slurmjobs {
         /// Set the sacct start time to now-`window` and the end time to now, and dump records that
@@ -72,6 +81,9 @@ enum Commands {
         /// From-to dates on the form yyyy-mm-dd,yyyy-mm-dd (with the comma); from is inclusive,
         /// to is exclusive.  Precludes -window.
         span: Option<String>,
+
+        /// Output json, not CSV
+        json: bool,
     },
     Version {},
 }
@@ -85,6 +97,9 @@ fn main() {
 
     log::init();
 
+    let mut stdout = io::stdout();
+    let writer: &mut dyn io::Write = &mut stdout;
+
     match &command_line() {
         Commands::PS {
             rollup,
@@ -97,6 +112,7 @@ fn main() {
             exclude_commands,
             lockdir,
             load,
+            json,
         } => {
             let opts = ps::PsOptions {
                 rollup: *rollup,
@@ -117,30 +133,33 @@ fn main() {
                     vec![]
                 },
                 lockdir: lockdir.clone(),
+                json: *json,
             };
             if *batchless {
                 let mut jm = batchless::BatchlessJobManager::new();
-                ps::create_snapshot(&mut jm, &opts, &timestamp);
+                ps::create_snapshot(writer, &mut jm, &opts, &timestamp);
             } else {
                 let mut jm = slurm::SlurmJobManager {};
-                ps::create_snapshot(&mut jm, &opts, &timestamp);
+                ps::create_snapshot(writer, &mut jm, &opts, &timestamp);
             }
         }
-        Commands::Sysinfo {} => {
-            sysinfo::show_system(&timestamp);
+        Commands::Sysinfo { csv } => {
+            sysinfo::show_system(writer, &timestamp, *csv);
         }
-        Commands::Slurmjobs { window, span } => {
-            slurmjobs::show_slurm_jobs(window, span);
+        Commands::Slurmjobs { window, span, json } => {
+            slurmjobs::show_slurm_jobs(writer, window, span, *json);
         }
         Commands::Version {} => {
-            show_version(&mut std::io::stdout());
+            show_version(writer);
         }
     }
+    let _ = writer.flush();
 }
 
 // For the sake of simplicity:
 //  - allow repeated options to overwrite earlier values
 //  - all error reporting is via a generic "usage" message, without specificity as to what was wrong
+//  - both --json and --csv are accepted to all commands
 
 fn command_line() -> Commands {
     let args = std::env::args().collect::<Vec<String>>();
@@ -160,6 +179,8 @@ fn command_line() -> Commands {
                 let mut exclude_commands = None;
                 let mut lockdir = None;
                 let mut load = false;
+                let mut json = false;
+                let mut csv = false;
                 while next < args.len() {
                     let arg = args[next].as_ref();
                     next += 1;
@@ -169,6 +190,10 @@ fn command_line() -> Commands {
                         (next, rollup) = (new_next, true);
                     } else if let Some(new_next) = bool_arg(arg, &args, next, "--load") {
                         (next, load) = (new_next, true);
+                    } else if let Some(new_next) = bool_arg(arg, &args, next, "--json") {
+                        (next, json) = (new_next, true);
+                    } else if let Some(new_next) = bool_arg(arg, &args, next, "--csv") {
+                        (next, csv) = (new_next, true);
                     } else if let Some(new_next) =
                         bool_arg(arg, &args, next, "--exclude-system-jobs")
                     {
@@ -212,6 +237,10 @@ fn command_line() -> Commands {
                     eprintln!("--rollup and --batchless are incompatible");
                     std::process::exit(USAGE_ERROR);
                 }
+                if json && csv {
+                    eprintln!("--csv and --json are incompatible");
+                    std::process::exit(USAGE_ERROR);
+                }
 
                 Commands::PS {
                     batchless,
@@ -224,12 +253,34 @@ fn command_line() -> Commands {
                     exclude_commands,
                     lockdir,
                     load,
+                    json,
                 }
             }
-            "sysinfo" => Commands::Sysinfo {},
+            "sysinfo" => {
+                let mut json = false;
+                let mut csv = false;
+                while next < args.len() {
+                    let arg = args[next].as_ref();
+                    next += 1;
+                    if let Some(new_next) = bool_arg(arg, &args, next, "--json") {
+                        (next, json) = (new_next, true);
+                    } else if let Some(new_next) = bool_arg(arg, &args, next, "--csv") {
+                        (next, csv) = (new_next, true);
+                    } else {
+                        usage(true);
+                    }
+                }
+                if json && csv {
+                    eprintln!("--csv and --json are incompatible");
+                    std::process::exit(USAGE_ERROR);
+                }
+                Commands::Sysinfo { csv }
+            }
             "slurm" => {
                 let mut window = None;
                 let mut span = None;
+                let mut json = false;
+                let mut csv = false;
                 while next < args.len() {
                     let arg = args[next].as_ref();
                     next += 1;
@@ -239,6 +290,10 @@ fn command_line() -> Commands {
                         (next, window) = (new_next, Some(value));
                     } else if let Some((new_next, value)) = string_arg(arg, &args, next, "--span") {
                         (next, span) = (new_next, Some(value));
+                    } else if let Some(new_next) = bool_arg(arg, &args, next, "--json") {
+                        (next, json) = (new_next, true);
+                    } else if let Some(new_next) = bool_arg(arg, &args, next, "--csv") {
+                        (next, csv) = (new_next, true);
                     } else {
                         usage(true);
                     }
@@ -246,7 +301,11 @@ fn command_line() -> Commands {
                 if window.is_some() && span.is_some() {
                     usage(true);
                 }
-                Commands::Slurmjobs { window, span }
+                if json && csv {
+                    eprintln!("--csv and --json are incompatible");
+                    std::process::exit(USAGE_ERROR);
+                }
+                Commands::Slurmjobs { window, span, json }
             }
             "version" => Commands::Version {},
             "help" => {
@@ -318,9 +377,9 @@ fn usage(is_error: bool) -> ! {
 Usage: sonar <COMMAND>
 
 Commands:
-  ps       Take a snapshot of the currently running processes
-  sysinfo  Extract system information
-  slurm    Extract slurm job information for a [start,end) time interval
+  ps       Print process and load information
+  sysinfo  Print system information
+  slurm    Print slurm job information for a [start,end) time interval
   help     Print this message
 
 Options for `ps`:
@@ -347,6 +406,10 @@ Options for `ps`:
   --lockdir directory
       Create a per-host lockfile in this directory and exit early if the file
       exists on startup [default: none]
+  --load
+      Print per-cpu and per-gpu load data
+  --json
+      Format output as JSON, not CSV
 
 Options for `slurm`:
   --window minutes
@@ -355,6 +418,8 @@ Options for `slurm`:
   --span start,end
       Both `start` and `end` are on the form yyyy-mm-dd.  Mostly useful for seeding a
       database with older data.  Precludes --window
+  --json
+      Format output as JSON, not CSV
 ",
     );
     let _ = out.flush();

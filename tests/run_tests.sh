@@ -30,6 +30,7 @@ for test in amd-gpu \
                 ps-syntax \
                 rollup \
                 rollup2 \
+                slurm-syntax \
                 sysinfo-syntax \
                 user \
             ; do

@@ -1,16 +1,15 @@
 use crate::gpu;
 use crate::hostname;
 use crate::log;
+use crate::output;
 use crate::procfs;
 use crate::procfsapi;
-use crate::util;
 
 use std::io;
 
-pub fn show_system(timestamp: &str) {
+pub fn show_system(writer: &mut dyn io::Write, timestamp: &str, csv: bool) {
     let fs = procfsapi::RealFS::new();
-    let mut writer = io::stdout();
-    match do_show_system(&mut writer, &fs, timestamp) {
+    match do_show_system(writer, &fs, timestamp, csv) {
         Ok(_) => {}
         Err(e) => {
             log::error(&format!("sysinfo failed: {e}"));
@@ -24,6 +23,7 @@ fn do_show_system(
     writer: &mut dyn io::Write,
     fs: &dyn procfsapi::ProcfsAPI,
     timestamp: &str,
+    csv: bool,
 ) -> Result<(), String> {
     let (model, sockets, cores_per_socket, threads_per_core) = procfs::get_cpu_info(fs)?;
     let mem_by = procfs::get_memtotal_kib(fs)? * 1024;
@@ -41,7 +41,9 @@ fn do_show_system(
     } else {
         ""
     };
-    let (gpu_desc, gpu_cards, gpumem_gb, gpu_info) = if !cards.is_empty() {
+
+    let mut gpu_info = output::Array::new();
+    let (gpu_desc, gpu_cards, gpumem_gb) = if !cards.is_empty() {
         // Sort cards
         cards.sort_by(|a: &gpu::Card, b: &gpu::Card| {
             if a.model == b.model {
@@ -78,11 +80,7 @@ fn do_show_system(
         }
 
         // Compute the info blobs
-        let mut gpu_info = "".to_string();
         for c in &cards {
-            if !gpu_info.is_empty() {
-                gpu_info += ","
-            }
             let gpu::Card {
                 bus_addr,
                 index,
@@ -98,56 +96,51 @@ fn do_show_system(
                 max_ce_clock_mhz,
                 max_mem_clock_mhz,
             } = c;
-            let manufacturer = util::json_quote(&manufacturer);
-            let bus_addr = util::json_quote(bus_addr);
-            let model = util::json_quote(model);
-            let arch = util::json_quote(arch);
-            let driver = util::json_quote(driver);
-            let firmware = util::json_quote(firmware);
-            gpu_info += &format!(
-                r###"
-  {{"bus_addr":"{bus_addr}", "index":{index}, "uuid":"{uuid}",
-   "manufacturer":"{manufacturer}", "model":"{model}", "arch":"{arch}", "driver":"{driver}", "firmware":"{firmware}",
-   "mem_size_kib":{mem_size_kib},
-   "power_limit_watt":{power_limit_watt}, "max_power_limit_watt":{max_power_limit_watt}, "min_power_limit_watt":{min_power_limit_watt},
-   "max_ce_clock_mhz":{max_ce_clock_mhz}, "max_mem_clock_mhz":{max_mem_clock_mhz}}}"###
-            );
+            let mut gpu = output::Object::new();
+            gpu.push_s("bus_addr", bus_addr.to_string());
+            gpu.push_i("index", *index as i64);
+            gpu.push_s("uuid", uuid.to_string());
+            gpu.push_s("manufacturer", manufacturer.clone());
+            gpu.push_s("model", model.to_string());
+            gpu.push_s("arch", arch.to_string());
+            gpu.push_s("driver", driver.to_string());
+            gpu.push_s("firmware", firmware.to_string());
+            gpu.push_i("mem_size_kib", *mem_size_kib);
+            gpu.push_i("power_limit_watt", *power_limit_watt as i64);
+            gpu.push_i("max_power_limit_watt", *max_power_limit_watt as i64);
+            gpu.push_i("min_power_limit_watt", *min_power_limit_watt as i64);
+            gpu.push_i("max_ce_clock_mhz", *max_ce_clock_mhz as i64);
+            gpu.push_i("max_mem_clock_mhz", *max_mem_clock_mhz as i64);
+            gpu_info.push_o(gpu);
         }
 
-        (gpu_desc, gpu_cards, total_mem_by / GIB as i64, gpu_info)
+        (gpu_desc, gpu_cards, total_mem_by / GIB as i64)
     } else {
-        ("".to_string(), 0, 0, "".to_string())
+        ("".to_string(), 0, 0)
     };
-    let timestamp = util::json_quote(timestamp);
-    let hostname = util::json_quote(&hostname);
-    let description = util::json_quote(&format!(
-        "{sockets}x{cores_per_socket}{ht} {model}, {mem_gib} GiB{gpu_desc}"
-    ));
     let cpu_cores = sockets * cores_per_socket * threads_per_core;
 
-    // Note the field names here are used by decoders that are developed separately, and they should
-    // be considered set in stone.
-
-    let version = util::json_quote(env!("CARGO_PKG_VERSION"));
-    let s = format!(
-        r#"{{
-  "version": "{version}",
-  "timestamp": "{timestamp}",
-  "hostname": "{hostname}",
-  "description": "{description}",
-  "cpu_cores": {cpu_cores},
-  "mem_gb": {mem_gib},
-  "gpu_cards": {gpu_cards},
-  "gpumem_gb": {gpumem_gb},
-  "gpu_info": [{gpu_info}]
-}}
-"#
+    let mut sysinfo = output::Object::new();
+    sysinfo.push_s("version", env!("CARGO_PKG_VERSION").to_string());
+    sysinfo.push_s("timestamp", timestamp.to_string());
+    sysinfo.push_s("hostname", hostname);
+    sysinfo.push_s(
+        "description",
+        format!("{sockets}x{cores_per_socket}{ht} {model}, {mem_gib} GiB{gpu_desc}"),
     );
+    sysinfo.push_i("cpu_cores", cpu_cores as i64);
+    sysinfo.push_i("mem_gb", mem_gib);
+    sysinfo.push_i("gpu_cards", gpu_cards as i64);
+    sysinfo.push_i("gpumem_gb", gpumem_gb);
+    if gpu_info.len() > 0 {
+        sysinfo.push_a("gpu_info", gpu_info);
+    }
 
-    // Ignore I/O errors.
-
-    let _ = writer.write(s.as_bytes());
-    let _ = writer.flush();
+    if csv {
+        output::write_csv(writer, &output::Value::O(sysinfo));
+    } else {
+        output::write_json(writer, &output::Value::O(sysinfo));
+    }
     Ok(())
 }
 
