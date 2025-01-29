@@ -13,11 +13,11 @@ set -e
 ( cd .. ; cargo build )
 make --quiet
 
-echo "This takes about 10s"
+echo " This takes about 10s"
 ./rollup2 3 &
 sleep 3
 output=$(SONARTEST_ROLLUP=1 ../target/debug/sonar ps --rollup --batchless --exclude-system-jobs)
 # Grep will exit with code 1 if no lines are matched
 matches1=$(grep -E ',cmd=rollupchild,.*,rolledup=4' <<< $output)
 matches2=$(grep -E ',cmd=rollupchild2,.*,rolledup=3' <<< $output)
-echo Success
+echo " OK"

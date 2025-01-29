@@ -6,7 +6,7 @@
 set -e
 logfile=lockfile.output.txt
 
-echo "This takes about 15s"
+echo " This takes about 15s"
 ( cd .. ; cargo build )
 rm -f $logfile sonar-lock.*
 SONARTEST_WAIT_LOCKFILE=1 ../target/debug/sonar ps --lockdir . > /dev/null &

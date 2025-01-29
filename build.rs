@@ -1,3 +1,6 @@
+use std::env;
+
 fn main() {
-    println!("cargo:rustc-link-search=gpuapi");
+    let arch = env::var("CARGO_CFG_TARGET_ARCH").unwrap();
+    println!("cargo:rustc-link-search=gpuapi/{arch}");
 }

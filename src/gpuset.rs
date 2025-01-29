@@ -17,6 +17,7 @@ pub fn empty_gpuset() -> GpuSet {
     Some(HashSet::new())
 }
 
+#[allow(dead_code)]
 pub fn gpuset_from_bits(maybe_devices: Option<usize>) -> GpuSet {
     if let Some(mut devs) = maybe_devices {
         let mut gpus = HashSet::new();
@@ -34,6 +35,7 @@ pub fn gpuset_from_bits(maybe_devices: Option<usize>) -> GpuSet {
     }
 }
 
+#[allow(dead_code)]
 pub fn singleton_gpuset(maybe_device: Option<usize>) -> GpuSet {
     if let Some(dev) = maybe_device {
         let mut gpus = HashSet::new();

@@ -8,8 +8,8 @@ use crate::util::cstrdup;
 ////// C library API //////////////////////////////////////////////////////////////////////////////
 
 // The data structures and signatures defined here must be exactly those defined in the header file,
-// using types from `cty`.  (We get to assume that cty::c_char==i8 when that is convenient.)  See
-// ../gpuapi/sonar-amd.h for all documentation of functionality and units.
+// using types from `cty`.  See ../gpuapi/sonar-amd.h for all documentation of functionality and
+// units.
 //
 // TODO: We should use bindgen for this but not important at the moment.
 
@@ -57,7 +57,8 @@ impl Default for AmdmlCardInfo {
 
 #[link(name = "sonar-amd", kind = "static")]
 extern "C" {
-    pub fn amdml_device_get_card_info(device: cty::uint32_t, buf: *mut AmdmlCardInfo) -> cty::c_int;
+    pub fn amdml_device_get_card_info(device: cty::uint32_t, buf: *mut AmdmlCardInfo)
+        -> cty::c_int;
 }
 
 #[repr(C)]
@@ -77,8 +78,10 @@ pub struct AmdmlCardState {
 
 #[link(name = "sonar-amd", kind = "static")]
 extern "C" {
-    pub fn amdml_device_get_card_state(device: cty::uint32_t, buf: *mut AmdmlCardState)
-        -> cty::c_int;
+    pub fn amdml_device_get_card_state(
+        device: cty::uint32_t,
+        buf: *mut AmdmlCardState,
+    ) -> cty::c_int;
 }
 
 #[repr(C)]
@@ -196,7 +199,7 @@ pub fn get_process_utilization(user_by_pid: &ps::UserTable) -> Option<Vec<gpu::P
             Some(x) => *x,
             None => ("_unknown_", 1),
         };
-        result.push(gpu::Process{
+        result.push(gpu::Process {
             devices: gpuset::gpuset_from_bits(Some(infobuf.cards as usize)),
             pid: infobuf.pid as usize,
             user: username.to_string(),

@@ -7,13 +7,20 @@
 # is built on a system with an NVIDIA GPU and toolchain.  For this reason the .a files are checked
 # into the git repo, they cannot easily be rebuilt on CI and on random developer systems.
 #
-# In practice, to prepare for building these libraries on my development systems I currently do this:
+# And of course, for each CPU architecture the build host must be of that architecture as well, and
+# the .a files are ultimately stored in architecture-specific subdirectories of this directory.
 #
-#   (nvidia)  module load CUDA/11.1.1-GCC-10.2.0
-#   (amd)     module load hipSYCL/0.9.2-GCC-11.2.0-CUDA-11.4.1
+# To support systems where we have no capability to compile with appropriate GPU SDKs, this file can
+# also be used to build libsonar-nvidia-stub.a and libsonar-amd-stub.a, which have the same
+# interface but no GPU functionality.
 #
-# The .a files must exist in this directory when `cargo build` is run, the linker will look for them
-# here.
+# On a particular build node with a particular GPU SDK (or no such SDK), we choose which library to
+# build and then build it.  The resulting .a file is then manually moved to the appropriate
+# architecture subdirectory.  If we build stub libraries, they must be renamed to their non-stub
+# names when moving them.
+#
+# In this directory are scripts to perform the build process for specific architectures and GPUs on
+# specific build nodes at specific sites (eg build-uio-nvidia-x86_64.bash).  Adapt to your needs.
 #
 # IMPORTANT:
 #
@@ -24,39 +31,53 @@
 # forces this upgrade.  For example, newer gcc come with newer binutils, so upgrading gcc upgrades
 # binutils.
 #
-# Loading the GPU modules as described above will take care of upgrading binutils appropriately on
-# the GPU systems.  To build Sonar when the libraries already exist, it is sufficient to load a
-# newer GCC on any host, no GPU toolchains are needed:
+# Loading the GPU modules as in the build scripts in this directory will take care of upgrading
+# binutils appropriately on those build nodes.  To build Sonar when the libraries already exist, it
+# is sufficient to load a newer GCC on any host, no GPU toolchains are needed:
 #
 #   (build)   module load GCC/11.3.0
-#
-# TODO:
-#
-# - There's an assumption here that there is only one architecture, this is going to become
-#   incorrect before long.  The way to fix this is *probably* to have subdirectories here for the
-#   various architectures and to store the artifacts there, and have build.rs push out the
-#   appropriate path for the appropriate architectures - however, multi-architecture artifacts may
-#   change how we think about it.
 
 CFLAGS=-g -O2 -Wall -fPIC
 
-.PHONY: default
+.PHONY: default clean realclean
 
 default:
 	@echo "Choose a specific target:"
-	@echo " libsonar-nvidia.a requires the CUDA SDK to be installed or loaded"
-	@echo " libsonar-amd.a requires the ROCM/hip SDK to be installed or loaded"
+	@echo " libsonar-nvidia.a       the CUDA SDK must be installed or loaded"
+	@echo " libsonar-nvidia-stub.a"
+	@echo " libsonar-amd.a          the ROCM/hip SDK must be installed or loaded"
+	@echo " libsonar-amd-stub.a"
 	@echo ""
 	@echo "See comments in Makefile for more information."
 
+clean:
+	rm -f *.o *.a *~
+
+realclean:
+	$(MAKE) clean
+	rm -rf x86_64 aarch64
+
 libsonar-nvidia.a: sonar-nvidia.o Makefile
-	ar rs libsonar-nvidia.a sonar-nvidia.o
+	ar rs $@ $<
 
 sonar-nvidia.o: sonar-nvidia.c sonar-nvidia.h Makefile
-	$(CC) -c $(CFLAGS) -o sonar-nvidia.o sonar-nvidia.c
+	$(CC) -c $(CFLAGS) -DSONAR_NVIDIA_GPU -o $@ $<
+
+libsonar-nvidia-stub.a: sonar-nvidia-stub.o Makefile
+	ar rs $@ $<
+
+sonar-nvidia-stub.o: sonar-nvidia.c sonar-nvidia.h Makefile
+	$(CC) -c $(CFLAGS) -o $@ $<
+
 
 libsonar-amd.a: sonar-amd.o Makefile
-	ar rs libsonar-amd.a sonar-amd.o
+	ar rs $@ $<
 
 sonar-amd.o: sonar-amd.c sonar-amd.h Makefile
-	$(CC) -c $(CFLAGS) -I/opt/rocm/include -o sonar-amd.o sonar-amd.c
+	$(CC) -c $(CFLAGS) -DSONAR_AMD_GPU -I/opt/rocm/include -o $@ $<
+
+libsonar-amd-stub.a: sonar-amd-stub.o Makefile
+	ar rs $@ $<
+
+sonar-amd-stub.o: sonar-amd.c sonar-amd.h Makefile
+	$(CC) -c $(CFLAGS) -o $@ $<

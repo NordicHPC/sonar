@@ -19,6 +19,7 @@ for test in amd-gpu \
                 exclude-commands \
                 exclude-system-jobs \
                 exclude-users \
+                features \
                 gpuinfo \
                 hostname \
                 interrupt \

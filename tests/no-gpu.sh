@@ -10,7 +10,7 @@
 # that happens.
 set -e
 if [[ -e /sys/module/amdgpu || -e /sys/module/nvidia ]]; then
-    echo "GPUs detected"
+    echo " GPUs detected"
     exit 0
 fi
 
@@ -32,4 +32,4 @@ if [[ $output =~ ,gpu[%a-z_-]+= ]]; then
     exit 1
 fi
 
-echo "OK"
+echo " OK"

@@ -14,7 +14,7 @@ set -e
 ( cd .. ; cargo build )
 make --quiet
 
-echo "This takes about 10s"
+echo " This takes about 10s"
 ./rollup 3 &
 sleep 3
 output=$(SONARTEST_ROLLUP=1 ../target/debug/sonar ps --rollup --batchless --exclude-system-jobs)
@@ -33,4 +33,4 @@ if [[ $(wc -l <<< $rolled2) != 8 ]]; then
     echo "Bad number of rolled-up lines - some have a value other than 1"
     exit 1
 fi
-echo Success
+echo " OK"

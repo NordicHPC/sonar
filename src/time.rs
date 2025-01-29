@@ -120,7 +120,7 @@ fn parse_int_err(_e: ParseIntError) -> String {
 
 pub fn format_iso8601(timebuf: &libc::tm) -> String {
     const SIZE: usize = 32; // We need 25 unless something is greatly off
-    let mut buffer = vec![0i8; SIZE];
+    let mut buffer = vec![0 as cty::c_char; SIZE];
     let s = unsafe {
         if libc::strftime(
             buffer.as_mut_ptr(),

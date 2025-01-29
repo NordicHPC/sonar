@@ -8,10 +8,11 @@
 
 set -e
 if [[ ! -e /sys/module/nvidia ]]; then
-    echo "No device"
+    echo " No device"
     exit 0
 fi
 
+# nvidia is enabled by default
 ( cd .. ; cargo build )
 
 # Test that sysinfo finds the cards.  This is also sufficient to test that the GPU SMI library has
@@ -42,4 +43,4 @@ if (( $lines != 1 )); then
     exit 1
 fi
 
-echo "OK"
+echo " OK"

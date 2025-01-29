@@ -8,8 +8,8 @@ use crate::util::cstrdup;
 ////// C library API //////////////////////////////////////////////////////////////////////////////
 
 // The data structures and signatures defined here must be exactly those defined in the header file,
-// using types from `cty`.  (We get to assume that cty::c_char==i8 when that is convenient.)  See
-// ../gpuapi/sonar-nvidia.h for all documentation of functionality and units.
+// using types from `cty`.  See ../gpuapi/sonar-nvidia.h for all documentation of functionality and
+// units.
 //
 // TODO: We should use bindgen for this but not important at the moment.
 
@@ -58,12 +58,12 @@ extern "C" {
     pub fn nvml_device_get_card_info(device: cty::uint32_t, buf: *mut NvmlCardInfo) -> cty::c_int;
 }
 
-const COMP_MODE_UNKNOWN : cty::c_int = -1;
-const COMP_MODE_DEFAULT : cty::c_int = 0;
-const COMP_MODE_PROHIBITED : cty::c_int = 1;
-const COMP_MODE_EXCLUSIVE_PROCESS : cty::c_int = 2;
+const COMP_MODE_UNKNOWN: cty::c_int = -1;
+const COMP_MODE_DEFAULT: cty::c_int = 0;
+const COMP_MODE_PROHIBITED: cty::c_int = 1;
+const COMP_MODE_EXCLUSIVE_PROCESS: cty::c_int = 2;
 
-const PERF_STATE_UNKNOWN : cty::c_int = -1;
+const PERF_STATE_UNKNOWN: cty::c_int = -1;
 
 #[repr(C)]
 #[derive(Default)]
@@ -154,11 +154,11 @@ pub fn get_card_utilization() -> Option<Vec<gpu::CardState>> {
                 COMP_MODE_DEFAULT => "Default",
                 COMP_MODE_PROHIBITED => "Prohibited",
                 COMP_MODE_EXCLUSIVE_PROCESS => "ExclusiveProcess",
-                COMP_MODE_UNKNOWN | _ => "Unknown"
+                COMP_MODE_UNKNOWN | _ => "Unknown",
             };
             let perf = match infobuf.perf_state {
                 PERF_STATE_UNKNOWN => "Unknown".to_string(),
-                x => format!("P{x}")
+                x => format!("P{x}"),
             };
             result.push(gpu::CardState {
                 index: dev as i32,
@@ -205,7 +205,7 @@ pub fn get_process_utilization(user_by_pid: &ps::UserTable) -> Option<Vec<gpu::P
                 Some(x) => *x,
                 None => ("_unknown_", 1),
             };
-            result.push(gpu::Process{
+            result.push(gpu::Process {
                 devices: gpuset::singleton_gpuset(Some(dev as usize)),
                 pid: infobuf.pid as usize,
                 user: username.to_string(),

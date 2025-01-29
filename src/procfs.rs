@@ -44,30 +44,65 @@ pub fn get_memtotal_kib(fs: &dyn procfsapi::ProcfsAPI) -> Result<usize, String> 
 }
 
 /// Read the /proc/cpuinfo file from the fs and return information about installed CPUs.
+///
+/// Fun fact: this file is very different on x86_64 and aarch64.
 
 pub fn get_cpu_info(fs: &dyn procfsapi::ProcfsAPI) -> Result<(String, i32, i32, i32), String> {
     let mut physids = HashMap::<i32, bool>::new();
+    let mut processors = HashSet::<i32>::new();
     let mut cores_per_socket = 0i32;
     let mut siblings = 0i32;
     let cpuinfo = fs.read_to_string("cpuinfo")?;
     let mut model_name = "".to_string();
+    let mut amd64 = false;
+    let mut aarch64 = false;
+    let mut model_major = 0i32;
+    let mut model_minor = 0i32;
     for l in cpuinfo.split('\n') {
-        if l.starts_with("model name") {
+        // "processor" could be either kind of CPU, so don't commit
+        if l.starts_with("processor") {
+            processors.insert(i32_field(l)?);
+        }
+        // model name, physical id, siblings, cpu cores are x86_64
+        else if l.starts_with("model name") {
+            amd64 = true;
             model_name = text_field(l)?;
         } else if l.starts_with("physical id") {
+            amd64 = true;
             physids.insert(i32_field(l)?, true);
         } else if l.starts_with("siblings") {
+            amd64 = true;
             siblings = i32_field(l)?;
         } else if l.starts_with("cpu cores") {
+            amd64 = true;
             cores_per_socket = i32_field(l)?;
         }
+        // CPU architecture, CPU variant are aarch64
+        else if l.starts_with("CPU architecture") {
+            aarch64 = true;
+            model_major = i32_field(l)?;
+        } else if l.starts_with("CPU variant") {
+            aarch64 = true;
+            model_minor = i32_field(l)?;
+        }
     }
-    let sockets = physids.len() as i32;
-    if model_name.is_empty() || sockets == 0 || siblings == 0 || cores_per_socket == 0 {
-        return Err("Incomplete information in /proc/cpuinfo".to_string());
+    if amd64 {
+        let sockets = physids.len() as i32;
+        if model_name.is_empty() || sockets == 0 || siblings == 0 || cores_per_socket == 0 {
+            return Err("Incomplete information in /proc/cpuinfo".to_string());
+        }
+        let threads_per_core = siblings / cores_per_socket;
+        Ok((model_name, sockets, cores_per_socket, threads_per_core))
+    } else if aarch64 {
+        Ok((
+            format!("ARMv{model_major}.{model_minor}"),
+            1,
+            processors.len() as i32,
+            1,
+        ))
+    } else {
+        Err("Unknown processor type in /proc/cpuinfo".to_string())
     }
-    let threads_per_core = siblings / cores_per_socket;
-    Ok((model_name, sockets, cores_per_socket, threads_per_core))
 }
 
 fn text_field(l: &str) -> Result<String, String> {
@@ -80,9 +115,16 @@ fn text_field(l: &str) -> Result<String, String> {
 
 fn i32_field(l: &str) -> Result<i32, String> {
     if let Some((_, after)) = l.split_once(':') {
-        match after.trim().parse::<i32>() {
-            Ok(n) => Ok(n),
-            Err(_) => Err(format!("Bad int field {l}")),
+        let after = after.trim();
+        match after.strip_prefix("0x") {
+            Some(s) => match i32::from_str_radix(s, 16) {
+                Ok(n) => Ok(n),
+                Err(_) => Err(format!("Bad int field {l}")),
+            },
+            None => match after.parse::<i32>() {
+                Ok(n) => Ok(n),
+                Err(_) => Err(format!("Bad int field {l}")),
+            },
         }
     } else {
         Err(format!("Missing or bad int field in {l}"))

@@ -1,6 +1,8 @@
 /* Static-linkable wrapper around the AMD SMI dynamic library with some abstractions for our
    needs.  See sonar-amd.h and Makefile for more.
 
+   Must be compiled with SONAR_AMD_GPU, or there will be no support, only a stub.
+
    There are two APIs: amdsmi.h and rocm_smi.h.  These are similar but not the same, and some
    functionality in the latter appears not to be exposed in the former, AND VICE VERSA.  It's
    anyone's guess what is going to be supported long-term, I've seen noise about rocm-smi being
@@ -27,6 +29,8 @@
 #include <string.h>
 
 #include "sonar-amd.h"
+
+#ifdef SONAR_AMD_GPU
 
 #include "rocm_smi/rocm_smi.h"
 
@@ -140,7 +144,10 @@ static int load_rsmi() {
     return 0;
 }
 
+#endif /* SONAR_AMD_GPU */
+
 int amdml_device_get_count(uint32_t* count) {
+#ifdef SONAR_AMD_GPU
     load_rsmi();
     if (num_gpus == -1) {
         return -1;
@@ -148,9 +155,13 @@ int amdml_device_get_count(uint32_t* count) {
 
     *count = (uint32_t)num_gpus;
     return 0;
+#else
+    return -1;
+#endif /* SONAR_AMD_GPU */
 }
 
 int amdml_device_get_card_info(uint32_t device, struct amdml_card_info_t* infobuf) {
+#ifdef SONAR_AMD_GPU
     load_rsmi();
     if (num_gpus == -1) {
         return -1;
@@ -205,9 +216,13 @@ int amdml_device_get_card_info(uint32_t device, struct amdml_card_info_t* infobu
     }
 
     return 0;
+#else
+    return -1;
+#endif /* SONAR_AMD_GPU */
 }
 
 int amdml_device_get_card_state(uint32_t device, struct amdml_card_state_t* infobuf) {
+#ifdef SONAR_AMD_GPU
     load_rsmi();
     if (num_gpus == -1) {
         /*printf("loaded\n");*/
@@ -284,12 +299,18 @@ int amdml_device_get_card_state(uint32_t device, struct amdml_card_state_t* info
 #endif
 
     return 0;
+#else
+    return -1;
+#endif /* SONAR_AMD_GPU */
 }
 
+#ifdef SONAR_AMD_GPU
 static struct amdml_gpu_process_t* infos;  /* NULL for no info yet */
 static uint32_t info_count;
+#endif /* SONAR_AMD_GPU */
 
 int amdml_device_probe_processes(uint32_t* count) {
+#ifdef SONAR_AMD_GPU
     load_rsmi();
     if (num_gpus == -1) {
         /*printf("loaded\n");*/
@@ -383,9 +404,13 @@ bail:
     info_count = 0;
     *count = 0;
     return -1;
+#else
+    return -1;
+#endif /* SONAR_AMD_GPU */
 }
 
 int amdml_get_process(uint32_t index, struct amdml_gpu_process_t* infobuf) {
+#ifdef SONAR_AMD_GPU
     if (infos == NULL) {
         return -1;
     }
@@ -395,11 +420,16 @@ int amdml_get_process(uint32_t index, struct amdml_gpu_process_t* infobuf) {
 
     memcpy(infobuf, infos+index, sizeof(struct amdml_gpu_process_t));
     return 0;
+#else
+    return -1;
+#endif /* SONAR_AMD_GPU */
 }
 
 void amdml_free_processes() {
+#ifdef SONAR_AMD_GPU
     if (infos != NULL) {
         free(infos);
         infos = NULL;
     }
+#endif /* SONAR_AMD_GPU */
 }
