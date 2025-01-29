@@ -80,20 +80,49 @@ pub trait GPU {
     fn get_card_utilization(&mut self) -> Result<Vec<CardState>, String>;
 }
 
-// Probe the system for GPUs.
+pub trait GpuAPI {
+    fn probe(&self) -> Option<Box<dyn GPU>>;
+}
 
-pub fn probe() -> Option<Box<dyn GPU>> {
-    #[cfg(feature = "nvidia")]
-    if let Some(nvidia) = nvidia::probe() {
-        return Some(nvidia);
+pub struct RealGpuAPI {}
+
+impl RealGpuAPI {
+    pub fn new() -> RealGpuAPI {
+        RealGpuAPI {}
     }
-    #[cfg(feature = "amd")]
-    if let Some(amd) = amd::probe() {
-        return Some(amd)
+}
+
+impl GpuAPI for RealGpuAPI {
+    fn probe(&self) -> Option<Box<dyn GPU>> {
+        #[cfg(feature = "nvidia")]
+        if let Some(nvidia) = nvidia::probe() {
+            return Some(nvidia);
+        }
+        #[cfg(feature = "amd")]
+        if let Some(amd) = amd::probe() {
+            return Some(amd)
+        }
+        #[cfg(feature = "xpu")]
+        if let Some(xpu) = xpu::probe() {
+            return Some(xpu)
+        }
+        return None
     }
-    #[cfg(feature = "xpu")]
-    if let Some(xpu) = xpu::probe() {
-        return Some(xpu)
+}
+
+#[cfg(test)]
+pub struct MockGpuAPI {}
+
+#[cfg(test)]
+impl MockGpuAPI {
+    pub fn new() -> MockGpuAPI {
+        MockGpuAPI {}
     }
-    return None
+}
+
+#[cfg(test)]
+impl GpuAPI for MockGpuAPI {
+    fn probe(&self) -> Option<Box<dyn GPU>> {
+        None
+    }
 }

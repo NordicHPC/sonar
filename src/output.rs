@@ -8,6 +8,7 @@ use crate::util;
 
 use std::io;
 
+#[derive(Debug)]
 pub enum Value {
     A(Array),
     O(Object),
@@ -18,11 +19,13 @@ pub enum Value {
     E(), // Empty array element only, never a field or toplevel value
 }
 
+#[derive(Debug)]
 struct Field {
     tag: String,
     value: Value,
 }
 
+#[derive(Debug)]
 pub struct Object {
     fields: Vec<Field>,
 }
@@ -35,6 +38,16 @@ impl Object {
 
     pub fn is_empty(&self) -> bool {
         self.fields.is_empty()
+    }
+
+    #[cfg(test)]
+    pub fn get(&self, key: &str) -> Option<&Value> {
+        for f in &self.fields {
+            if key == &f.tag {
+                return Some(&f.value);
+            }
+        }
+        None
     }
 
     pub fn push(&mut self, tag: &str, value: Value) {
@@ -83,6 +96,7 @@ impl Object {
     }
 }
 
+#[derive(Debug)]
 pub struct Array {
     elements: Vec<Value>,
     nonempty_base45: bool,
@@ -113,6 +127,10 @@ impl Array {
 
     pub fn len(&self) -> usize {
         self.elements.len()
+    }
+
+    pub fn at(&self, i: usize) -> &Value {
+        &self.elements[i]
     }
 
     pub fn push_o(&mut self, o: Object) {

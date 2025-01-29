@@ -127,6 +127,7 @@ fn add_proc_info<'a, F>(
         });
 }
 
+#[derive(Default)]
 pub struct PsOptions<'a> {
     pub rollup: bool,
     pub always_print_something: bool,
@@ -223,6 +224,14 @@ pub fn create_snapshot(
             }
         }
 
+        // These log/error messages can't sensibly be piggybacked on the normal output, since the
+        // output has been sent - it can't be delayed until this point, as the lockfile is meant to
+        // ensure that if bugs in the printing code make the program hang forever then no other
+        // sonar process is started.
+        //
+        // If the error persists then no messages will arrive at the target and an alert that
+        // triggers on the absence of traffic should alert somebody to the problem.
+
         if skip {
             // Test cases depend on this exact message.
             log::info("Lockfile present, exiting");
@@ -241,34 +250,100 @@ fn do_create_snapshot(
     opts: &PsOptions,
     timestamp: &str,
 ) {
+    let hostname = hostname::get();
+    const VERSION: &str = env!("CARGO_PKG_VERSION");
+    let print_params = PrintParameters {
+        hostname: &hostname,
+        timestamp,
+        version: VERSION,
+        flat_data: !opts.json,
+        opts,
+    };
+
+    let fs = procfsapi::RealFS::new();
+    let gpus = gpu::RealGpuAPI::new();
+    match collect_data(&fs, &gpus, jobs, &print_params) {
+        output::Value::A(elts) => {
+            for i in 0..elts.len() {
+                output::write_csv(writer, elts.at(i));
+            }
+        }
+        obj @ output::Value::O(_) => {
+            output::write_json(writer, &obj);
+        }
+        output::Value::E() => {
+            // interrupted, don't print anything
+        }
+        _ => {
+            panic!("Should not happen")
+        }
+    }
+}
+
+// If this returns an output::Value::O then that is an object to write (eg JSON), otherwise it must
+// be an output::Value::A and each should be written individually (eg CSV), or it is
+// output::Value::E, in which case we were interrupted.  The first two cases are controlled by
+// print_params.flat_data.
+
+fn collect_data(
+    fs: &dyn procfsapi::ProcfsAPI,
+    gpus: &dyn gpu::GpuAPI,
+    jobs: &mut dyn jobs::JobManager,
+    print_params: &PrintParameters,
+) -> output::Value {
+    match do_collect_data(fs, gpus, jobs, print_params) {
+        Ok(output::Value::A(mut elts)) => {
+            if elts.len() == 0 && print_params.opts.always_print_something {
+                elts.push_o(make_heartbeat(&print_params))
+            }
+            output::Value::A(elts)
+        }
+        Ok(obj @ output::Value::O(_)) => obj,
+        Ok(empty @ output::Value::E()) => empty,
+        Ok(_) => {
+            panic!("Should not happen")
+        }
+        Err(error) => {
+            let mut hb = make_heartbeat(&print_params);
+            hb.push_s("error", error);
+            if print_params.flat_data {
+                output::Value::A(output::Array::from_vec(vec![output::Value::O(hb)]))
+            } else {
+                output::Value::O(hb)
+            }
+        }
+    }
+}
+
+fn make_heartbeat(print_params: &PrintParameters) -> output::Object {
+    let mut fields = output::Object::new();
+    fields.push_s("v", print_params.version.to_string());
+    fields.push_s("time", print_params.timestamp.to_string());
+    fields.push_s("host", print_params.hostname.to_string());
+    fields.push_s("user", "_sonar_".to_string());
+    fields.push_s("cmd", "_heartbeat_".to_string());
+    fields
+}
+
+fn do_collect_data(
+    fs: &dyn procfsapi::ProcfsAPI,
+    gpus: &dyn gpu::GpuAPI,
+    jobs: &mut dyn jobs::JobManager,
+    print_params: &PrintParameters,
+) -> Result<output::Value, String> {
     let no_gpus = gpuset::empty_gpuset();
     let mut proc_by_pid = ProcTable::new();
 
     if interrupt::is_interrupted() {
-        return;
+        return Ok(output::Value::E());
     }
-
-    let fs = procfsapi::RealFS::new();
 
     // The total RAM installed is in the `MemTotal` field of /proc/meminfo.  We need this for
     // various things.  Not getting it is a hard error.
 
-    let memtotal_kib = match procfs::get_memtotal_kib(&fs) {
-        Ok(n) => n,
-        Err(e) => {
-            log::error(&format!("Could not get installed memory: {e}"));
-            return;
-        }
-    };
-
+    let memtotal_kib = procfs::get_memtotal_kib(fs)?;
     let (procinfo_output, _cpu_total_secs, per_cpu_secs) =
-        match procfs::get_process_information(&fs, memtotal_kib) {
-            Ok(result) => result,
-            Err(msg) => {
-                log::error(&format!("procfs failed: {msg}"));
-                return;
-            }
-        };
+        procfs::get_process_information(fs, memtotal_kib)?;
 
     let pprocinfo_output = &procinfo_output;
 
@@ -303,7 +378,7 @@ fn do_create_snapshot(
     }
 
     if interrupt::is_interrupted() {
-        return;
+        return Ok(output::Value::E());
     }
 
     // When a GPU fails it may be a transient error or a permanent error, but either way sonar does
@@ -315,7 +390,7 @@ fn do_create_snapshot(
 
     let gpu_utilization: Vec<gpu::Process>;
     let mut gpu_info: Option<output::Object> = None;
-    match gpu::probe() {
+    match gpus.probe() {
         None => {}
         Some(mut gpu) => {
             match gpu.get_card_utilization() {
@@ -413,7 +488,7 @@ fn do_create_snapshot(
     }
 
     if interrupt::is_interrupted() {
-        return;
+        return Ok(output::Value::E());
     }
 
     // If there was a gpu failure, signal it in all the process structures.  This is pretty
@@ -427,21 +502,10 @@ fn do_create_snapshot(
     }
 
     if interrupt::is_interrupted() {
-        return;
+        return Ok(output::Value::E());
     }
 
-    // Once we start printing we'll print everything and not check the interrupted flag any more.
-
-    let hostname = hostname::get();
-    const VERSION: &str = env!("CARGO_PKG_VERSION");
-    let print_params = PrintParameters {
-        hostname: &hostname,
-        timestamp,
-        version: VERSION,
-        opts,
-    };
-
-    let mut candidates = if opts.rollup {
+    let mut candidates = if print_params.opts.rollup {
         // This is a little complicated because processes with job_id 0 or processes that have
         // subprocesses cannot be rolled up, nor can we roll up processes with different ppid.
         //
@@ -506,47 +570,18 @@ fn do_create_snapshot(
             .collect::<Vec<ProcInfo>>()
     };
 
-    let must_print = opts.always_print_something;
     let candidates = candidates
         .drain(0..)
-        .filter(|proc_info| filter_proc(proc_info, &print_params))
+        .filter(|proc_info| filter_proc(proc_info, print_params))
         .collect::<Vec<ProcInfo>>();
-
-    // Here JSON and CSV will diverge a little.  The trick is this:
-    //
-    // - first generate all output lines w/o version, timestamp, hostname, per_cpu_secs, and gpu_info
-    // - then:
-    //   - for json, create an object that has those common fields and an array of per-process data,
-    //     this object is also the heartbeat / synthetic record
-    //   - for csv:
-    //     - if there are no records and must_print is true, synthesize one
-    //     - if we want them, insert per_cpu_secs and gpu_info fields in the first record (there will be one)
-    //     - attach version, timestamp and hostname to all records (ideally we would prepend...)
-    //
-    // Then print.
 
     let mut records: Vec<output::Object> = vec![];
     for c in candidates {
-        records.push(generate_candidate(&c));
+        records.push(generate_candidate(&c, print_params));
     }
 
-    if !opts.json {
-        let have_load_data = {
-            if print_params.opts.load {
-                !per_cpu_secs.is_empty() || gpu_info.is_some()
-            } else {
-                false
-            }
-        };
-
-        if (must_print || have_load_data) && records.len() == 0 {
-            let mut fields = output::Object::new();
-            fields.push_s("user", "_sonar_".to_string());
-            fields.push_s("cmd", "_heartbeat_".to_string());
-            records.push(fields);
-        };
-
-        if print_params.opts.load {
+    if print_params.flat_data {
+        if print_params.opts.load && records.len() > 0{
             if !per_cpu_secs.is_empty() {
                 let mut a = output::Array::from_vec(
                     per_cpu_secs
@@ -562,17 +597,11 @@ fn do_create_snapshot(
             }
         }
 
-        // Historically, these three fields were always first, and we have test cases that depend on
-        // "v=" being the very first field.
-        for r in &mut records {
-            r.prepend_s("host", print_params.hostname.to_string());
-            r.prepend_s("time", print_params.timestamp.to_string());
-            r.prepend_s("v", print_params.version.to_string());
-        }
-
+        let mut result = output::Array::new();
         for v in records {
-            output::write_csv(writer, &output::Value::O(v));
+            result.push_o(v);
         }
+        Ok(output::Value::A(result))
     } else {
         let mut datum = output::Object::new();
         datum.push_s("v", print_params.version.to_string());
@@ -597,7 +626,7 @@ fn do_create_snapshot(
             samples.push_o(o);
         }
         datum.push_a("samples", samples);
-        output::write_json(writer, &output::Value::O(datum));
+        Ok(output::Value::O(datum))
     }
 }
 
@@ -695,11 +724,18 @@ struct PrintParameters<'a> {
     hostname: &'a str,
     timestamp: &'a str,
     version: &'a str,
+    flat_data: bool,
     opts: &'a PsOptions<'a>,
 }
 
-fn generate_candidate(proc_info: &ProcInfo) -> output::Object {
+fn generate_candidate(proc_info: &ProcInfo, print_params: &PrintParameters) -> output::Object {
     let mut fields = output::Object::new();
+
+    if print_params.flat_data {
+        fields.push_s("v", print_params.version.to_string());
+        fields.push_s("time", print_params.timestamp.to_string());
+        fields.push_s("host", print_params.hostname.to_string());
+    }
 
     fields.push_s("user", proc_info.user.to_string());
     fields.push_s("cmd", proc_info.command.to_string());
@@ -764,4 +800,51 @@ fn generate_candidate(proc_info: &ProcInfo) -> output::Object {
     }
 
     fields
+}
+
+#[cfg(test)]
+pub struct MockJobManager { }
+
+#[cfg(test)]
+impl jobs::JobManager for MockJobManager {
+    fn job_id_from_pid(&mut self, pid: usize, _processes: &HashMap<usize, procfs::Process>)
+        -> usize {
+        pid
+    }
+}
+
+#[test]
+pub fn collect_data_test() {
+    let opts = Default::default();
+    let print_params = PrintParameters {
+        hostname: "hello",
+        timestamp: "2025-01-24T10:39:00+01:00",
+        version: "0.99",
+        flat_data: true,
+        opts: &opts,
+    };
+    let files = HashMap::new();
+    let pids = vec![];
+    let users = HashMap::new();
+    let now = procfsapi::unix_now();
+    let fs = procfsapi::MockFS::new(files, pids, users, now);
+    let gpus = gpu::MockGpuAPI::new();
+    let mut jobs = MockJobManager {};
+    match collect_data(&fs, &gpus, &mut jobs, &print_params) {
+        // flat_data, so should be array
+        output::Value::A(a) => {
+            // No data, so this should be length 1
+            assert!(a.len() == 1);
+            // Mock APIs, so we should have a heartbeat and an error
+            match a.at(0) {
+                output::Value::O(obj) => {
+                    assert!(obj.get("error").is_some())
+                },
+                _ => { assert!(false) }
+            }
+        },
+        _ => {
+            assert!(false);
+        }
+    }
 }

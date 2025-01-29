@@ -1,41 +1,47 @@
 use crate::gpu;
 use crate::hostname;
-use crate::log;
 use crate::output;
 use crate::procfs;
 use crate::procfsapi;
 
 use std::io;
+#[cfg(test)]
+use std::collections::HashMap;
 
 pub fn show_system(writer: &mut dyn io::Write, timestamp: &str, csv: bool) {
-    let fs = procfsapi::RealFS::new();
-    match do_show_system(writer, &fs, timestamp, csv) {
-        Ok(_) => {}
-        Err(e) => {
-            log::error(&format!("sysinfo failed: {e}"));
-        }
+    let sysinfo = compute_sysinfo(&procfsapi::RealFS::new(), &gpu::RealGpuAPI::new(), timestamp);
+    if csv {
+        output::write_csv(writer, &output::Value::O(sysinfo));
+    } else {
+        output::write_json(writer, &output::Value::O(sysinfo));
     }
+}
+
+// The packet always has "version", "timestamp", and "hostname", and then it has either an "error"
+// field or the sysinfo fields ("cpu_cores", etc) for the node.  Fields that have default values (0,
+// "", []) may be omitted.
+
+fn compute_sysinfo(fs: &dyn procfsapi::ProcfsAPI, gpus: &dyn gpu::GpuAPI, timestamp: &str) -> output::Object {
+    try_compute_sysinfo(fs, gpus, timestamp).unwrap_or_else(|e: String| error_packet(timestamp, e))
 }
 
 const GIB: usize = 1024 * 1024 * 1024;
 
-fn do_show_system(
-    writer: &mut dyn io::Write,
+fn try_compute_sysinfo(
     fs: &dyn procfsapi::ProcfsAPI,
+    gpus: &dyn gpu::GpuAPI,
     timestamp: &str,
-    csv: bool,
-) -> Result<(), String> {
+) -> Result<output::Object, String> {
     let (model, sockets, cores_per_socket, threads_per_core) = procfs::get_cpu_info(fs)?;
     let mem_by = procfs::get_memtotal_kib(fs)? * 1024;
     let mem_gib = (mem_by as f64 / GIB as f64).round() as i64;
-    let (mut cards, manufacturer) = match gpu::probe() {
+    let (mut cards, manufacturer) = match gpus.probe() {
         Some(mut device) => (
             device.get_card_configuration().unwrap_or_default(),
             device.get_manufacturer(),
         ),
         None => (vec![], "UNKNOWN".to_string()),
     };
-    let hostname = hostname::get();
     let ht = if threads_per_core > 1 {
         " (hyperthreaded)"
     } else {
@@ -121,30 +127,57 @@ fn do_show_system(
     };
     let cpu_cores = sockets * cores_per_socket * threads_per_core;
 
-    let mut sysinfo = output::Object::new();
-    sysinfo.push_s("version", env!("CARGO_PKG_VERSION").to_string());
-    sysinfo.push_s("timestamp", timestamp.to_string());
-    sysinfo.push_s("hostname", hostname);
+    let mut sysinfo = new_sysinfo(timestamp);
     sysinfo.push_s(
         "description",
         format!("{sockets}x{cores_per_socket}{ht} {model}, {mem_gib} GiB{gpu_desc}"),
     );
     sysinfo.push_i("cpu_cores", cpu_cores as i64);
     sysinfo.push_i("mem_gb", mem_gib);
-    sysinfo.push_i("gpu_cards", gpu_cards as i64);
-    sysinfo.push_i("gpumem_gb", gpumem_gb);
-    if gpu_info.len() > 0 {
-        sysinfo.push_a("gpu_info", gpu_info);
+    if gpu_cards != 0 {
+        sysinfo.push_i("gpu_cards", gpu_cards as i64);
+        if gpumem_gb != 0 {
+            sysinfo.push_i("gpumem_gb", gpumem_gb);
+        }
+        if gpu_info.len() > 0 {
+            sysinfo.push_a("gpu_info", gpu_info);
+        }
     }
 
-    if csv {
-        output::write_csv(writer, &output::Value::O(sysinfo));
-    } else {
-        output::write_json(writer, &output::Value::O(sysinfo));
-    }
-    Ok(())
+    Ok(sysinfo)
 }
 
-// Currently the test for do_show_system() is black-box, see ../tests.  The reason for this is partly
+fn error_packet(timestamp: &str, error: String) -> output::Object {
+    let mut sysinfo = new_sysinfo(timestamp);
+    sysinfo.push_s("error", error);
+    sysinfo
+}
+
+fn new_sysinfo(timestamp: &str) -> output::Object {
+    let mut sysinfo = output::Object::new();
+    sysinfo.push_s("version", env!("CARGO_PKG_VERSION").to_string());
+    sysinfo.push_s("timestamp", timestamp.to_string());
+    sysinfo.push_s("hostname", hostname::get());
+    return sysinfo;
+}
+
+// The end-to-end test for show_system() is black-box, see ../tests.  The reason for this is partly
 // that not all the system interfaces used by that function are virtualized at this time, and partly
 // that we only care that the output syntax looks right.
+
+// Test that an error field is added correctly if we fail to obtain information we must have.
+
+#[test]
+pub fn sysinfo_error_test() {
+    let files = HashMap::new();
+    let pids = vec![];
+    let users = HashMap::new();
+    let now = procfsapi::unix_now();
+    // Empty API should cause get_cpu_info to fail and there should be an error field.
+    let sysinfo = compute_sysinfo(
+        &procfsapi::MockFS::new(files, pids, users, now),
+        &gpu::MockGpuAPI::new(),
+        "2025-01-24 09:19:00+01:00",
+    );
+    assert!(sysinfo.get("error").is_some());
+}

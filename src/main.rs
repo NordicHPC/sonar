@@ -153,7 +153,7 @@ fn main() {
             sysinfo::show_system(writer, &timestamp, *csv);
         }
         Commands::Slurmjobs { window, span, json } => {
-            slurmjobs::show_slurm_jobs(writer, window, span, *json);
+            slurmjobs::show_slurm_jobs(writer, window, span, &timestamp, *json);
         }
         Commands::Version {} => {
             show_version(writer);
