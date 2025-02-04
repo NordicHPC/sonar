@@ -89,3 +89,6 @@ sonar-amd-stub.o: sonar-amd.c sonar-amd.h Makefile
 
 nvidia-shell: nvidia-shell.c sonar-nvidia.c sonar-nvidia.h
 	$(CC) $(CFLAGS) -DSONAR_NVIDIA_GPU -DLOGGING -o nvidia-shell nvidia-shell.c sonar-nvidia.c -ldl
+
+amd-shell: amd-shell.c sonar-amd.c sonar-amd.h
+	$(CC) $(CFLAGS) -DSONAR_AMD_GPU -DLOGGING -I/opt/rocm/include -o amd-shell amd-shell.c sonar-amd.c -ldl
