@@ -81,3 +81,11 @@ libsonar-amd-stub.a: sonar-amd-stub.o Makefile
 
 sonar-amd-stub.o: sonar-amd.c sonar-amd.h Makefile
 	$(CC) -c $(CFLAGS) -o $@ $<
+
+# Various test code.
+#
+# Remember that it may be necessary to `module load` things first, see the build-*.bash scripts in
+# this directory.
+
+nvidia-shell: nvidia-shell.c sonar-nvidia.c sonar-nvidia.h
+	$(CC) $(CFLAGS) -DSONAR_NVIDIA_GPU -DLOGGING -o nvidia-shell nvidia-shell.c sonar-nvidia.c -ldl
