@@ -51,7 +51,7 @@ default:
 	@echo "See comments in Makefile for more information."
 
 clean:
-	rm -f *.o *.a *~
+	rm -f *.o *.a *~ nvidia-shell amd-shell
 
 realclean:
 	$(MAKE) clean
