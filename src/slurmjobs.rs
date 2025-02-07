@@ -1,7 +1,7 @@
 // Run sacct, extract output and reformat as CSV or JSON on stdout.
 
-use crate::command;
 use crate::output;
+use crate::systemapi;
 use crate::time;
 
 #[cfg(test)]
@@ -12,9 +12,6 @@ use std::io;
 // Default sacct reporting window.  Note this value is baked into the help message in main.rs too.
 const DEFAULT_WINDOW: u32 = 90;
 
-// 3 minutes ought to be enough for anyone.
-const TIMEOUT_S: u64 = 180;
-
 // Same output format as sacctd, which uses this version number.
 const VERSION: &str = "0.1.0";
 
@@ -22,12 +19,12 @@ pub fn show_slurm_jobs(
     writer: &mut dyn io::Write,
     window: &Option<u32>,
     span: &Option<String>,
-    timestamp: &str,
+    system: &dyn systemapi::SystemAPI,
     json: bool,
 ) {
-    match collect_jobs(window, span, json) {
+    match collect_jobs(system, window, span, json) {
         Ok(jobs) => print_jobs(writer, jobs, json),
-        Err(error) => print_error(writer, error, timestamp, json)
+        Err(error) => print_error(writer, error, system, json),
     }
 }
 
@@ -50,11 +47,16 @@ fn print_jobs(writer: &mut dyn io::Write, jobs: output::Array, json: bool) {
 // the back end, the ingestor needs to deal with a possibly synthesized record that has only that
 // field, and not assume that any particular field is present.
 
-fn print_error(writer: &mut dyn io::Write, error: String, timestamp: &str, json: bool) {
+fn print_error(
+    writer: &mut dyn io::Write,
+    error: String,
+    system: &dyn systemapi::SystemAPI,
+    json: bool,
+) {
     let mut envelope = output::Object::new();
     envelope.push_s("v", VERSION.to_string());
     envelope.push_s("error", error);
-    envelope.push_s("timestamp", timestamp.to_string());
+    envelope.push_s("timestamp", system.get_timestamp());
     if json {
         output::write_json(writer, &output::Value::O(envelope));
     } else {
@@ -63,6 +65,7 @@ fn print_error(writer: &mut dyn io::Write, error: String, timestamp: &str, json:
 }
 
 fn collect_jobs(
+    system: &dyn systemapi::SystemAPI,
     window: &Option<u32>,
     span: &Option<String>,
     json: bool,
@@ -85,29 +88,12 @@ fn collect_jobs(
     };
 
     // Run sacct and parse the output.
-    match command::safe_command(
-        "sacct",
-        &[
-            "-aP",
-            "-s",
-            &job_states.join(","),
-            "--noheader",
-            "-o",
-            &field_names.join(","),
-            "-S",
-            &from,
-            "-E",
-            &to,
-        ],
-        TIMEOUT_S,
-    ) {
-        Err(e) => {
-            Err(format!("sacct failed: {:?}", e))
-        }
+    match system.run_sacct(&job_states, &field_names, &from, &to) {
         Ok(sacct_output) => {
             let local = time::now_local();
             Ok(parse_jobs(&sacct_output, &field_names, &local, !json))
         }
+        Err(s) => Err(s),
     }
 }
 

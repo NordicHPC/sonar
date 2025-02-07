@@ -1,16 +1,12 @@
-// Get info about AMD graphics cards by parsing the output of rocm-smi.
-//
-// This is pretty hacky!  Something better than this is likely needed and hopefully possible.
-
 use crate::amd_smi;
-use crate::gpu;
+use crate::gpuapi;
 use crate::ps;
 
 use std::path::Path;
 
 pub struct AmdGPU {}
 
-pub fn probe() -> Option<Box<dyn gpu::GPU>> {
+pub fn probe() -> Option<Box<dyn gpuapi::GPU>> {
     if amd_present() {
         Some(Box::new(AmdGPU {}))
     } else {
@@ -18,12 +14,12 @@ pub fn probe() -> Option<Box<dyn gpu::GPU>> {
     }
 }
 
-impl gpu::GPU for AmdGPU {
+impl gpuapi::GPU for AmdGPU {
     fn get_manufacturer(&mut self) -> String {
         "AMD".to_string()
     }
 
-    fn get_card_configuration(&mut self) -> Result<Vec<gpu::Card>, String> {
+    fn get_card_configuration(&mut self) -> Result<Vec<gpuapi::Card>, String> {
         if let Some(info) = amd_smi::get_card_configuration() {
             Ok(info)
         } else {
@@ -34,7 +30,7 @@ impl gpu::GPU for AmdGPU {
     fn get_process_utilization(
         &mut self,
         user_by_pid: &ps::UserTable,
-    ) -> Result<Vec<gpu::Process>, String> {
+    ) -> Result<Vec<gpuapi::Process>, String> {
         if let Some(info) = amd_smi::get_process_utilization(user_by_pid) {
             Ok(info)
         } else {
@@ -42,7 +38,7 @@ impl gpu::GPU for AmdGPU {
         }
     }
 
-    fn get_card_utilization(&mut self) -> Result<Vec<gpu::CardState>, String> {
+    fn get_card_utilization(&mut self) -> Result<Vec<gpuapi::CardState>, String> {
         if let Some(info) = amd_smi::get_card_utilization() {
             Ok(info)
         } else {

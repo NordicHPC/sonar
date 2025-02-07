@@ -1,5 +1,11 @@
 /// Collect CPU process information without GPU information, from files in /proc.
-use crate::procfsapi::{self, parse_usize_field};
+
+#[cfg(test)]
+use crate::mocksystem;
+use crate::procfsapi;
+use crate::systemapi;
+#[cfg(test)]
+use crate::systemapi::SystemAPI;
 
 use std::collections::{HashMap, HashSet};
 
@@ -138,21 +144,20 @@ fn i32_field(l: &str) -> Result<i32, String> {
 ///
 /// This function uniformly uses /proc, even though in some cases there are system calls that
 /// provide the same information.
-///
-/// The underlying computing system -- /proc, system tables, and clock -- is virtualized through the
-/// ProcfsAPI instance.
 
 pub fn get_process_information(
-    fs: &dyn procfsapi::ProcfsAPI,
+    system: &dyn systemapi::SystemAPI,
     memtotal_kib: usize,
 ) -> Result<(HashMap<usize, Process>, u64, Vec<u64>), String> {
     // We need this for a lot of things.  On x86 and x64 this is always 100 but in principle it
     // might be something else, so read the true value.
 
-    let ticks_per_sec = fs.clock_ticks_per_sec() as u64;
+    let ticks_per_sec = system.get_clock_ticks_per_sec() as u64;
     if ticks_per_sec == 0 {
         return Err("Could not get a sensible CLK_TCK".to_string());
     }
+
+    let fs = system.get_procfs();
 
     // Extract system data from /proc/stat.  https://man7.org/linux/man-pages/man5/procfs.5.html.
     //
@@ -215,7 +220,7 @@ pub fn get_process_information(
 
     // Collect remaining system data from /proc/{pid}/stat for the enumerated pids.
 
-    let kib_per_page = fs.page_size_in_kib();
+    let kib_per_page = system.get_page_size_in_kib();
     let mut result = HashMap::<usize, Process>::new();
     let mut ppids = HashSet::<usize>::new();
     let mut user_table = UserTable::new();
@@ -324,7 +329,7 @@ pub fn get_process_information(
             // boot_time and the current time are both time_t, ie, a 31-bit quantity in 2023 and a
             // 32-bit quantity before 2038.  clock_ticks_per_sec is on the order of 100.  Ergo
             // boot_ticks and now_ticks can be represented in about 32+7=39 bits, fine for an f64.
-            let now_ticks = fs.now_in_secs_since_epoch() as f64 * clock_ticks_per_sec;
+            let now_ticks = system.get_now_in_secs_since_epoch() as f64 * clock_ticks_per_sec;
             let boot_ticks = boot_time as f64 * clock_ticks_per_sec;
 
             // start_time_ticks should be on the order of a few years, there is no risk of overflow
@@ -443,7 +448,7 @@ pub fn get_process_information(
                 ppid,
                 pgrp,
                 uid: uid as usize,
-                user: user_table.lookup(fs, uid),
+                user: user_table.lookup(system, uid),
                 cpu_pct: pcpu_formatted,
                 mem_pct: pmem,
                 cputime_sec,
@@ -464,6 +469,37 @@ pub fn get_process_information(
     Ok((result, cpu_total_secs, per_cpu_secs))
 }
 
+fn parse_usize_field(
+    fields: &[&str],
+    ix: usize,
+    line: &str,
+    file: &str,
+    pid: usize,
+    fieldname: &str,
+) -> Result<usize, String> {
+    if ix >= fields.len() {
+        if pid == 0 {
+            return Err(format!("Index out of range for /proc/{file}: {ix}: {line}"));
+        } else {
+            return Err(format!(
+                "Index out of range for /proc/{pid}/{file}: {ix}: {line}"
+            ));
+        }
+    }
+    if let Ok(n) = fields[ix].parse::<usize>() {
+        return Ok(n);
+    }
+    if pid == 0 {
+        Err(format!(
+            "Could not parse {fieldname} in /proc/{file}: {line}"
+        ))
+    } else {
+        Err(format!(
+            "Could not parse {fieldname} from /proc/{pid}/{file}: {line}"
+        ))
+    }
+}
+
 // The UserTable optimizes uid -> name lookup.
 
 struct UserTable {
@@ -475,10 +511,10 @@ impl UserTable {
         UserTable { ht: HashMap::new() }
     }
 
-    fn lookup(&mut self, fs: &dyn procfsapi::ProcfsAPI, uid: u32) -> String {
+    fn lookup(&mut self, system: &dyn systemapi::SystemAPI, uid: u32) -> String {
         if let Some(name) = self.ht.get(&uid) {
             name.clone()
-        } else if let Some(name) = fs.user_by_uid(uid) {
+        } else if let Some(name) = system.user_by_uid(uid) {
             self.ht.insert(uid, name.clone());
             name
         } else {
@@ -602,10 +638,16 @@ DirectMap1G:    11534336 kB
         + (stime_ticks / ticks_per_sec)
         + 2000.0) as u64;
 
-    let fs = procfsapi::MockFS::new(files, pids, users, now);
-    let memtotal_kib = get_memtotal_kib(&fs).expect("Test: Must have data");
+    let system = mocksystem::MockSystem::new()
+        .with_files(files)
+        .with_pids(pids)
+        .with_users(users)
+        .with_now(now)
+        .freeze();
+    let fs = system.get_procfs();
+    let memtotal_kib = get_memtotal_kib(fs).expect("Test: Must have data");
     let (mut info, total_secs, per_cpu_secs) =
-        get_process_information(&fs, memtotal_kib).expect("Test: Must have data");
+        get_process_information(&system, memtotal_kib).expect("Test: Must have data");
     assert!(info.len() == 1);
     let mut xs = info.drain();
     let p = xs.next().expect("Test: Should have data").1;
@@ -675,10 +717,14 @@ pub fn procfs_dead_and_undead_test() {
     files.insert("4019/status".to_string(), "RssAnon: 12345 kB".to_string());
     files.insert("4020/status".to_string(), "RssAnon: 12345 kB".to_string());
 
-    let fs = procfsapi::MockFS::new(files, pids, users, procfsapi::unix_now());
-    let memtotal_kib = get_memtotal_kib(&fs).expect("Test: Must have data");
-    let (mut info, _, _) =
-        get_process_information(&fs, memtotal_kib).expect("Test: Must have data");
+    let system = mocksystem::MockSystem::new()
+        .with_files(files)
+        .with_pids(pids)
+        .with_users(users)
+        .freeze();
+    let fs = system.get_procfs();
+    let memtotal_kib = get_memtotal_kib(fs).expect("Test: Must have data");
+    let (mut info, _, _) = get_process_information(&system, memtotal_kib).expect("Test: Must have data");
 
     // 4020 should be dropped - it's dead
     assert!(info.len() == 2);
@@ -1148,10 +1194,9 @@ address sizes	: 46 bits physical, 48 bits virtual
 power management:
 
 "#.to_string());
-    let pids = vec![];
-    let users = HashMap::new();
-    let fs = procfsapi::MockFS::new(files, pids, users, procfsapi::unix_now());
-    let (model, sockets, cores, threads) = get_cpu_info(&fs).expect("Test: Must have data");
+    let system = mocksystem::MockSystem::new().with_files(files).freeze();
+    let (model, sockets, cores, threads) =
+        get_cpu_info(system.get_procfs()).expect("Test: Must have data");
     assert!(model.find("E5-2637").is_some());
     assert!(sockets == 2);
     assert!(cores == 4);

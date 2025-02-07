@@ -1,10 +1,4 @@
-#[cfg(feature = "amd")]
-use crate::amd;
 use crate::gpuset;
-#[cfg(feature = "nvidia")]
-use crate::nvidia;
-#[cfg(feature = "xpu")]
-use crate::xpu;
 use crate::ps;
 
 // Per-sample process information, across cards.  The GPU layer can report a single datum for a
@@ -82,47 +76,4 @@ pub trait GPU {
 
 pub trait GpuAPI {
     fn probe(&self) -> Option<Box<dyn GPU>>;
-}
-
-pub struct RealGpuAPI {}
-
-impl RealGpuAPI {
-    pub fn new() -> RealGpuAPI {
-        RealGpuAPI {}
-    }
-}
-
-impl GpuAPI for RealGpuAPI {
-    fn probe(&self) -> Option<Box<dyn GPU>> {
-        #[cfg(feature = "nvidia")]
-        if let Some(nvidia) = nvidia::probe() {
-            return Some(nvidia);
-        }
-        #[cfg(feature = "amd")]
-        if let Some(amd) = amd::probe() {
-            return Some(amd)
-        }
-        #[cfg(feature = "xpu")]
-        if let Some(xpu) = xpu::probe() {
-            return Some(xpu)
-        }
-        return None
-    }
-}
-
-#[cfg(test)]
-pub struct MockGpuAPI {}
-
-#[cfg(test)]
-impl MockGpuAPI {
-    pub fn new() -> MockGpuAPI {
-        MockGpuAPI {}
-    }
-}
-
-#[cfg(test)]
-impl GpuAPI for MockGpuAPI {
-    fn probe(&self) -> Option<Box<dyn GPU>> {
-        None
-    }
 }
