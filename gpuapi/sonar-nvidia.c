@@ -52,6 +52,12 @@ static nvmlReturn_t (*xnvmlInit)();
 static nvmlReturn_t (*xnvmlSystemGetDriverVersion)(char*,unsigned);
 static nvmlReturn_t (*xnvmlSystemGetCudaDriverVersion)(int*);
 
+#ifdef LOGGING
+#  define LOGIT(s) puts(s)
+#else
+#  define LOGIT(s) do {} while(0)
+#endif
+
 static int load_nvml() {
     static void* lib;
 
@@ -64,6 +70,7 @@ static int load_nvml() {
     /* TBD is Saga, Betzy GPU nodes. */
     lib = dlopen("/usr/lib64/libnvidia-ml.so", RTLD_NOW);
     if (lib == NULL) {
+        LOGIT("Failed to load library");
         return -1;
     }
 
@@ -71,8 +78,9 @@ static int load_nvml() {
        nvml.h introduces #defines of some of the names we want to use. */
 
 #define DLSYM(var, str) \
+    LOGIT(str);                                 \
     if ((var = dlsym(lib, str)) == NULL) {      \
-        /* puts(str); */                        \
+        LOGIT(" ** Symbol failed");             \
         lib = NULL;                             \
         return -1;                              \
     }
@@ -335,7 +343,7 @@ int nvml_device_probe_processes(uint32_t device, uint32_t* count) {
 
     nvmlProcessInfo_t *running_procs = NULL;
     if (running_procs_count > 0) {
-        running_procs = malloc(sizeof(nvmlProcessInfo_t)*running_procs_count);
+        running_procs = calloc(running_procs_count, sizeof(nvmlProcessInfo_t));
         if (running_procs == NULL) {
             return -1;
         }
@@ -349,7 +357,7 @@ int nvml_device_probe_processes(uint32_t device, uint32_t* count) {
 
     nvmlProcessUtilizationSample_t* utilized_procs = NULL;
     if (utilized_procs_count > 0) {
-        utilized_procs = malloc(sizeof(nvmlProcessUtilizationSample_t)*utilized_procs_count);
+        utilized_procs = calloc(utilized_procs_count, sizeof(nvmlProcessUtilizationSample_t));
         if (utilized_procs == NULL) {
             free(running_procs);
             return -1;
@@ -361,7 +369,7 @@ int nvml_device_probe_processes(uint32_t device, uint32_t* count) {
     xnvmlDeviceGetMemoryInfo(dev, &mem);
 
     info_count = 0;
-    infos = malloc(sizeof(struct nvml_gpu_process)*(running_procs_count+utilized_procs_count));
+    infos = calloc(running_procs_count+utilized_procs_count, sizeof(struct nvml_gpu_process));
     if (infos == NULL) {
         free(running_procs);
         free(utilized_procs);

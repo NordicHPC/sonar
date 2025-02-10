@@ -51,7 +51,7 @@ default:
 	@echo "See comments in Makefile for more information."
 
 clean:
-	rm -f *.o *.a *~
+	rm -f *.o *.a *~ nvidia-shell amd-shell
 
 realclean:
 	$(MAKE) clean
@@ -81,3 +81,14 @@ libsonar-amd-stub.a: sonar-amd-stub.o Makefile
 
 sonar-amd-stub.o: sonar-amd.c sonar-amd.h Makefile
 	$(CC) -c $(CFLAGS) -o $@ $<
+
+# Various test code.
+#
+# Remember that it may be necessary to `module load` things first, see the build-*.bash scripts in
+# this directory.
+
+nvidia-shell: nvidia-shell.c sonar-nvidia.c sonar-nvidia.h
+	$(CC) $(CFLAGS) -DSONAR_NVIDIA_GPU -DLOGGING -o nvidia-shell nvidia-shell.c sonar-nvidia.c -ldl
+
+amd-shell: amd-shell.c sonar-amd.c sonar-amd.h
+	$(CC) $(CFLAGS) -DSONAR_AMD_GPU -DLOGGING -I/opt/rocm/include -o amd-shell amd-shell.c sonar-amd.c -ldl
