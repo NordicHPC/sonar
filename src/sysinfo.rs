@@ -1,6 +1,4 @@
 use crate::gpuapi;
-#[cfg(test)]
-use crate::mocksystem;
 use crate::output;
 use crate::procfs;
 use crate::systemapi;
@@ -20,7 +18,7 @@ pub fn show_system(writer: &mut dyn io::Write, system: &dyn systemapi::SystemAPI
 // field or the sysinfo fields ("cpu_cores", etc) for the node.  Fields that have default values (0,
 // "", []) may be omitted.
 
-fn compute_sysinfo(system: &dyn systemapi::SystemAPI) -> output::Object {
+pub fn compute_sysinfo(system: &dyn systemapi::SystemAPI) -> output::Object {
     try_compute_sysinfo(system).unwrap_or_else(|e: String| error_packet(system, e))
 }
 
@@ -156,17 +154,4 @@ fn new_sysinfo(system: &dyn systemapi::SystemAPI) -> output::Object {
     sysinfo.push_s("timestamp", system.get_timestamp());
     sysinfo.push_s("hostname", system.get_hostname());
     return sysinfo;
-}
-
-// The end-to-end test for show_system() is black-box, see ../tests.  The reason for this is partly
-// that not all the system interfaces used by that function are virtualized at this time, and partly
-// that we only care that the output syntax looks right.
-
-// Test that an error field is added correctly if we fail to obtain information we must have.
-
-#[test]
-pub fn sysinfo_error_test() {
-    // Empty API should cause get_cpu_info to fail and there should be an error field.
-    let sysinfo = compute_sysinfo(&mocksystem::MockSystem::new().freeze());
-    assert!(sysinfo.get("error").is_some());
 }

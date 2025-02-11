@@ -26,12 +26,16 @@ mod output;
 mod procfs;
 mod procfsapi;
 mod ps;
+#[cfg(test)]
+mod ps_test;
 mod realgpu;
 mod realprocfs;
 mod realsystem;
 mod slurm;
 mod slurmjobs;
 mod sysinfo;
+#[cfg(test)]
+mod sysinfo_test;
 mod systemapi;
 mod time;
 mod users;

@@ -5,8 +5,6 @@ use crate::gpuapi;
 use crate::gpuset;
 use crate::log;
 #[cfg(test)]
-use crate::mockjobs;
-#[cfg(test)]
 use crate::mocksystem;
 use crate::output;
 use crate::procfs;
@@ -803,9 +801,7 @@ pub fn collect_data_test() {
         flat_data: true,
         opts: &opts,
     };
-    let system = mocksystem::MockSystem::new()
-        .with_jobmanager(Box::new(mockjobs::MockJobManager {}))
-        .freeze();
+    let system = mocksystem::MockSystem::new().freeze();
     match collect_data(&system, &print_params) {
         // flat_data, so should be array
         output::Value::A(a) => {
