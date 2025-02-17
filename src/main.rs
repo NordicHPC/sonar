@@ -4,12 +4,20 @@ mod amd;
 mod amd_smi;
 mod batchless;
 mod command;
-mod gpu;
+mod gpuapi;
 mod gpuset;
 mod hostname;
 mod interrupt;
-mod jobs;
+mod jobsapi;
 mod log;
+#[cfg(test)]
+mod mockfs;
+#[cfg(test)]
+mod mockgpu;
+#[cfg(test)]
+mod mockjobs;
+#[cfg(test)]
+mod mocksystem;
 #[cfg(feature = "nvidia")]
 mod nvidia;
 #[cfg(feature = "nvidia")]
@@ -18,9 +26,17 @@ mod output;
 mod procfs;
 mod procfsapi;
 mod ps;
+#[cfg(test)]
+mod ps_test;
+mod realgpu;
+mod realprocfs;
+mod realsystem;
 mod slurm;
 mod slurmjobs;
 mod sysinfo;
+#[cfg(test)]
+mod sysinfo_test;
+mod systemapi;
 mod time;
 mod users;
 mod util;
@@ -95,16 +111,11 @@ enum Commands {
 }
 
 fn main() {
-    // Obtain the time stamp early so that it more properly reflects the time the sample was
-    // obtained, not the time when reporting was allowed to run.  The latter is subject to greater
-    // system effects, and using that timestamp increases the risk that the samples' timestamp order
-    // improperly reflects the true order in which they were obtained.  See #100.
-    let timestamp = time::now_iso8601();
-
     log::init();
 
     let mut stdout = io::stdout();
     let writer: &mut dyn io::Write = &mut stdout;
+    let system = realsystem::RealSystem::new();
 
     match &command_line() {
         Commands::PS {
@@ -141,19 +152,18 @@ fn main() {
                 lockdir: lockdir.clone(),
                 json: *json,
             };
-            if *batchless {
-                let mut jm = batchless::BatchlessJobManager::new();
-                ps::create_snapshot(writer, &mut jm, &opts, &timestamp);
+            let system = if *batchless {
+                system.with_jobmanager(Box::new(batchless::BatchlessJobManager::new()))
             } else {
-                let mut jm = slurm::SlurmJobManager {};
-                ps::create_snapshot(writer, &mut jm, &opts, &timestamp);
-            }
+                system.with_jobmanager(Box::new(slurm::SlurmJobManager {}))
+            };
+            ps::create_snapshot(writer, &system.freeze(), &opts);
         }
         Commands::Sysinfo { csv } => {
-            sysinfo::show_system(writer, &timestamp, *csv);
+            sysinfo::show_system(writer, &system.freeze(), *csv);
         }
         Commands::Slurmjobs { window, span, json } => {
-            slurmjobs::show_slurm_jobs(writer, window, span, &timestamp, *json);
+            slurmjobs::show_slurm_jobs(writer, window, span, &system.freeze(), *json);
         }
         Commands::Version {} => {
             show_version(writer);
@@ -432,6 +442,7 @@ Options for `slurm`:
     std::process::exit(if is_error { USAGE_ERROR } else { 0 });
 }
 
+// Print the true version, not something parameterized by the systemapi object.
 fn show_version(out: &mut dyn std::io::Write) {
     let _ = out.write(b"sonar version ");
     let _ = out.write(env!("CARGO_PKG_VERSION").as_bytes());

@@ -1,6 +1,6 @@
 // Rust wrapper around ../gpuapi/sonar-nvidia.{c,h}.
 
-use crate::gpu;
+use crate::gpuapi;
 use crate::gpuset;
 use crate::ps;
 use crate::util::cstrdup;
@@ -109,7 +109,7 @@ extern "C" {
 
 ////// End C library API //////////////////////////////////////////////////////////////////////////
 
-pub fn get_card_configuration() -> Option<Vec<gpu::Card>> {
+pub fn get_card_configuration() -> Option<Vec<gpuapi::Card>> {
     let mut num_devices: cty::uint32_t = 0;
     if unsafe { nvml_device_get_count(&mut num_devices) } != 0 {
         return None;
@@ -119,7 +119,7 @@ pub fn get_card_configuration() -> Option<Vec<gpu::Card>> {
     let mut infobuf: NvmlCardInfo = Default::default();
     for dev in 0..num_devices {
         if unsafe { nvml_device_get_card_info(dev, &mut infobuf) } == 0 {
-            result.push(gpu::Card {
+            result.push(gpuapi::Card {
                 bus_addr: cstrdup(&infobuf.bus_addr),
                 index: dev as i32,
                 model: cstrdup(&infobuf.model),
@@ -140,7 +140,7 @@ pub fn get_card_configuration() -> Option<Vec<gpu::Card>> {
     Some(result)
 }
 
-pub fn get_card_utilization() -> Option<Vec<gpu::CardState>> {
+pub fn get_card_utilization() -> Option<Vec<gpuapi::CardState>> {
     let mut num_devices: cty::uint32_t = 0;
     if unsafe { nvml_device_get_count(&mut num_devices) } != 0 {
         return None;
@@ -160,7 +160,7 @@ pub fn get_card_utilization() -> Option<Vec<gpu::CardState>> {
                 PERF_STATE_UNKNOWN => "Unknown".to_string(),
                 x => format!("P{x}"),
             };
-            result.push(gpu::CardState {
+            result.push(gpuapi::CardState {
                 index: dev as i32,
                 fan_speed_pct: infobuf.fan_speed as f32,
                 compute_mode: mode.to_string(),
@@ -181,7 +181,7 @@ pub fn get_card_utilization() -> Option<Vec<gpu::CardState>> {
     Some(result)
 }
 
-pub fn get_process_utilization(user_by_pid: &ps::UserTable) -> Option<Vec<gpu::Process>> {
+pub fn get_process_utilization(user_by_pid: &ps::UserTable) -> Option<Vec<gpuapi::Process>> {
     let mut result = vec![];
 
     let mut num_devices: cty::uint32_t = 0;
@@ -205,7 +205,7 @@ pub fn get_process_utilization(user_by_pid: &ps::UserTable) -> Option<Vec<gpu::P
                 Some(x) => *x,
                 None => ("_unknown_", 1),
             };
-            result.push(gpu::Process {
+            result.push(gpuapi::Process {
                 devices: gpuset::singleton_gpuset(Some(dev as usize)),
                 pid: infobuf.pid as usize,
                 user: username.to_string(),

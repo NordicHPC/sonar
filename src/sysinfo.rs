@@ -1,15 +1,12 @@
-use crate::gpu;
-use crate::hostname;
+use crate::gpuapi;
 use crate::output;
 use crate::procfs;
-use crate::procfsapi;
+use crate::systemapi;
 
 use std::io;
-#[cfg(test)]
-use std::collections::HashMap;
 
-pub fn show_system(writer: &mut dyn io::Write, timestamp: &str, csv: bool) {
-    let sysinfo = compute_sysinfo(&procfsapi::RealFS::new(), &gpu::RealGpuAPI::new(), timestamp);
+pub fn show_system(writer: &mut dyn io::Write, system: &dyn systemapi::SystemAPI, csv: bool) {
+    let sysinfo = compute_sysinfo(system);
     if csv {
         output::write_csv(writer, &output::Value::O(sysinfo));
     } else {
@@ -21,17 +18,15 @@ pub fn show_system(writer: &mut dyn io::Write, timestamp: &str, csv: bool) {
 // field or the sysinfo fields ("cpu_cores", etc) for the node.  Fields that have default values (0,
 // "", []) may be omitted.
 
-fn compute_sysinfo(fs: &dyn procfsapi::ProcfsAPI, gpus: &dyn gpu::GpuAPI, timestamp: &str) -> output::Object {
-    try_compute_sysinfo(fs, gpus, timestamp).unwrap_or_else(|e: String| error_packet(timestamp, e))
+pub fn compute_sysinfo(system: &dyn systemapi::SystemAPI) -> output::Object {
+    try_compute_sysinfo(system).unwrap_or_else(|e: String| error_packet(system, e))
 }
 
 const GIB: usize = 1024 * 1024 * 1024;
 
-fn try_compute_sysinfo(
-    fs: &dyn procfsapi::ProcfsAPI,
-    gpus: &dyn gpu::GpuAPI,
-    timestamp: &str,
-) -> Result<output::Object, String> {
+fn try_compute_sysinfo(system: &dyn systemapi::SystemAPI) -> Result<output::Object, String> {
+    let fs = system.get_procfs();
+    let gpus = system.get_gpus();
     let (model, sockets, cores_per_socket, threads_per_core) = procfs::get_cpu_info(fs)?;
     let mem_by = procfs::get_memtotal_kib(fs)? * 1024;
     let mem_gib = (mem_by as f64 / GIB as f64).round() as i64;
@@ -51,7 +46,7 @@ fn try_compute_sysinfo(
     let mut gpu_info = output::Array::new();
     let (gpu_desc, gpu_cards, gpumem_gb) = if !cards.is_empty() {
         // Sort cards
-        cards.sort_by(|a: &gpu::Card, b: &gpu::Card| {
+        cards.sort_by(|a: &gpuapi::Card, b: &gpuapi::Card| {
             if a.model == b.model {
                 a.mem_size_kib.cmp(&b.mem_size_kib)
             } else {
@@ -88,7 +83,7 @@ fn try_compute_sysinfo(
 
         // Compute the info blobs
         for c in &cards {
-            let gpu::Card {
+            let gpuapi::Card {
                 bus_addr,
                 index,
                 model,
@@ -127,7 +122,7 @@ fn try_compute_sysinfo(
     };
     let cpu_cores = sockets * cores_per_socket * threads_per_core;
 
-    let mut sysinfo = new_sysinfo(timestamp);
+    let mut sysinfo = new_sysinfo(system);
     sysinfo.push_s(
         "description",
         format!("{sockets}x{cores_per_socket}{ht} {model}, {mem_gib} GiB{gpu_desc}"),
@@ -147,37 +142,16 @@ fn try_compute_sysinfo(
     Ok(sysinfo)
 }
 
-fn error_packet(timestamp: &str, error: String) -> output::Object {
-    let mut sysinfo = new_sysinfo(timestamp);
+fn error_packet(system: &dyn systemapi::SystemAPI, error: String) -> output::Object {
+    let mut sysinfo = new_sysinfo(system);
     sysinfo.push_s("error", error);
     sysinfo
 }
 
-fn new_sysinfo(timestamp: &str) -> output::Object {
+fn new_sysinfo(system: &dyn systemapi::SystemAPI) -> output::Object {
     let mut sysinfo = output::Object::new();
-    sysinfo.push_s("version", env!("CARGO_PKG_VERSION").to_string());
-    sysinfo.push_s("timestamp", timestamp.to_string());
-    sysinfo.push_s("hostname", hostname::get());
+    sysinfo.push_s("version", system.get_version());
+    sysinfo.push_s("timestamp", system.get_timestamp());
+    sysinfo.push_s("hostname", system.get_hostname());
     return sysinfo;
-}
-
-// The end-to-end test for show_system() is black-box, see ../tests.  The reason for this is partly
-// that not all the system interfaces used by that function are virtualized at this time, and partly
-// that we only care that the output syntax looks right.
-
-// Test that an error field is added correctly if we fail to obtain information we must have.
-
-#[test]
-pub fn sysinfo_error_test() {
-    let files = HashMap::new();
-    let pids = vec![];
-    let users = HashMap::new();
-    let now = procfsapi::unix_now();
-    // Empty API should cause get_cpu_info to fail and there should be an error field.
-    let sysinfo = compute_sysinfo(
-        &procfsapi::MockFS::new(files, pids, users, now),
-        &gpu::MockGpuAPI::new(),
-        "2025-01-24 09:19:00+01:00",
-    );
-    assert!(sysinfo.get("error").is_some());
 }

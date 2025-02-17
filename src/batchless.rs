@@ -1,11 +1,11 @@
-// jobs::JobManager for systems without a batch job queue.
+// jobsapi::JobManager for systems without a batch job queue.
 //
 // Since 4.3BSD it's been the case that "job" === "a process group", and POSIX defines it thus.
 // Hence the process group ID of a process is its job ID, in the absence of other information.
 
-use crate::jobs;
+use crate::jobsapi;
 #[cfg(test)]
-use crate::jobs::JobManager;
+use crate::jobsapi::JobManager;
 use crate::procfs;
 use std::collections::HashMap;
 
@@ -17,9 +17,9 @@ impl BatchlessJobManager {
     }
 }
 
-impl jobs::JobManager for BatchlessJobManager {
+impl jobsapi::JobManager for BatchlessJobManager {
     fn job_id_from_pid(
-        &mut self,
+        &self,
         proc_pid: usize,
         processes: &HashMap<usize, procfs::Process>,
     ) -> usize {
@@ -34,7 +34,7 @@ impl jobs::JobManager for BatchlessJobManager {
 
 #[test]
 fn test_batchless_jobs() {
-    let mut jm = BatchlessJobManager::new();
+    let jm = BatchlessJobManager::new();
     let procs = parsed_full_test_output();
     assert!(jm.job_id_from_pid(205415, &procs) == 205408);
     assert!(jm.job_id_from_pid(200, &procs) == 0); // lost process

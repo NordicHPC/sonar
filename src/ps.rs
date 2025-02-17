@@ -1,15 +1,14 @@
 #![allow(clippy::type_complexity)]
 #![allow(clippy::too_many_arguments)]
 
-use crate::gpu;
+use crate::gpuapi;
 use crate::gpuset;
-use crate::hostname;
-use crate::interrupt;
-use crate::jobs;
 use crate::log;
+#[cfg(test)]
+use crate::mocksystem;
 use crate::output;
 use crate::procfs;
-use crate::procfsapi;
+use crate::systemapi;
 use crate::util::three_places;
 
 use std::collections::HashMap;
@@ -144,9 +143,8 @@ pub struct PsOptions<'a> {
 
 pub fn create_snapshot(
     writer: &mut dyn io::Write,
-    jobs: &mut dyn jobs::JobManager,
+    system: &dyn systemapi::SystemAPI,
     opts: &PsOptions,
-    timestamp: &str,
 ) {
     // If a lock file was requested, create one before the operation, exit early if it already
     // exists, and if we performed the operation, remove the file afterwards.  Otherwise, just
@@ -163,32 +161,28 @@ pub fn create_snapshot(
     // Finally, there's no reason to limit the signal handler to the case when we have a lock file,
     // the same logic can apply to both paths.
 
-    interrupt::handle_interruptions();
+    system.handle_interruptions();
 
     if let Some(ref dirname) = opts.lockdir {
         let mut created = false;
         let mut failed = false;
         let mut skip = false;
-        let hostname = hostname::get();
+        let hostname = system.get_hostname();
 
         let mut p = PathBuf::new();
         p.push(dirname);
         p.push("sonar-lock.".to_string() + &hostname);
 
-        if interrupt::is_interrupted() {
+        if system.is_interrupted() {
             return;
         }
 
         // create_new() requests atomic creation, if the file exists we'll error out.
-        match std::fs::File::options()
-            .write(true)
-            .create_new(true)
-            .open(&p)
-        {
+        match system.create_lock_file(&p) {
             Ok(mut f) => {
                 created = true;
-                let pid = std::process::id();
-                match f.write(format!("{}", pid).as_bytes()) {
+                let pid = system.get_pid();
+                match f.write(format!("{pid}").as_bytes()) {
                     Ok(_) => {}
                     Err(_) => {
                         failed = true;
@@ -204,7 +198,7 @@ pub fn create_snapshot(
         }
 
         if !failed && !skip {
-            do_create_snapshot(writer, jobs, opts, timestamp);
+            do_create_snapshot(writer, system, opts);
 
             // Testing code: If we got the lockfile and produced a report, wait 10s after producing
             // it while holding onto the lockfile.  It is then possible to run sonar in that window
@@ -216,7 +210,7 @@ pub fn create_snapshot(
         }
 
         if created {
-            match std::fs::remove_file(p) {
+            match system.remove_lock_file(p) {
                 Ok(_) => {}
                 Err(_) => {
                     failed = true;
@@ -240,29 +234,25 @@ pub fn create_snapshot(
             log::error("Unable to properly manage or delete lockfile");
         }
     } else {
-        do_create_snapshot(writer, jobs, opts, timestamp);
+        do_create_snapshot(writer, system, opts);
     }
 }
 
 fn do_create_snapshot(
     writer: &mut dyn io::Write,
-    jobs: &mut dyn jobs::JobManager,
+    system: &dyn systemapi::SystemAPI,
     opts: &PsOptions,
-    timestamp: &str,
 ) {
-    let hostname = hostname::get();
-    const VERSION: &str = env!("CARGO_PKG_VERSION");
+    let hostname = system.get_hostname();
     let print_params = PrintParameters {
         hostname: &hostname,
-        timestamp,
-        version: VERSION,
+        timestamp: &system.get_timestamp(),
+        version: &system.get_version(),
         flat_data: !opts.json,
         opts,
     };
 
-    let fs = procfsapi::RealFS::new();
-    let gpus = gpu::RealGpuAPI::new();
-    match collect_data(&fs, &gpus, jobs, &print_params) {
+    match collect_data(system, &print_params) {
         output::Value::A(elts) => {
             for i in 0..elts.len() {
                 output::write_csv(writer, elts.at(i));
@@ -286,12 +276,10 @@ fn do_create_snapshot(
 // print_params.flat_data.
 
 fn collect_data(
-    fs: &dyn procfsapi::ProcfsAPI,
-    gpus: &dyn gpu::GpuAPI,
-    jobs: &mut dyn jobs::JobManager,
+    system: &dyn systemapi::SystemAPI,
     print_params: &PrintParameters,
 ) -> output::Value {
-    match do_collect_data(fs, gpus, jobs, print_params) {
+    match do_collect_data(system, print_params) {
         Ok(output::Value::A(mut elts)) => {
             if elts.len() == 0 && print_params.opts.always_print_something {
                 elts.push_o(make_heartbeat(&print_params))
@@ -325,16 +313,17 @@ fn make_heartbeat(print_params: &PrintParameters) -> output::Object {
     fields
 }
 
-fn do_collect_data(
-    fs: &dyn procfsapi::ProcfsAPI,
-    gpus: &dyn gpu::GpuAPI,
-    jobs: &mut dyn jobs::JobManager,
+fn do_collect_data<'a>(
+    system: &dyn systemapi::SystemAPI,
     print_params: &PrintParameters,
 ) -> Result<output::Value, String> {
+    let fs = system.get_procfs();
+    let gpus = system.get_gpus();
+
     let no_gpus = gpuset::empty_gpuset();
     let mut proc_by_pid = ProcTable::new();
 
-    if interrupt::is_interrupted() {
+    if system.is_interrupted() {
         return Ok(output::Value::E());
     }
 
@@ -343,7 +332,7 @@ fn do_collect_data(
 
     let memtotal_kib = procfs::get_memtotal_kib(fs)?;
     let (procinfo_output, _cpu_total_secs, per_cpu_secs) =
-        procfs::get_process_information(fs, memtotal_kib)?;
+        procfs::get_process_information(system, memtotal_kib)?;
 
     let pprocinfo_output = &procinfo_output;
 
@@ -353,7 +342,7 @@ fn do_collect_data(
         user_by_pid.insert(proc.pid, (&proc.user, proc.uid));
     }
 
-    let mut lookup_job_by_pid = |pid: Pid| jobs.job_id_from_pid(pid, pprocinfo_output);
+    let mut lookup_job_by_pid = |pid: Pid| system.get_jobs().job_id_from_pid(pid, pprocinfo_output);
 
     for proc in pprocinfo_output.values() {
         add_proc_info(
@@ -377,7 +366,7 @@ fn do_collect_data(
         ); // gpu_mem_size_kib
     }
 
-    if interrupt::is_interrupted() {
+    if system.is_interrupted() {
         return Ok(output::Value::E());
     }
 
@@ -388,7 +377,7 @@ fn do_collect_data(
     // normal circumstances.
     let mut gpu_status = GpuStatus::Ok;
 
-    let gpu_utilization: Vec<gpu::Process>;
+    let gpu_utilization: Vec<gpuapi::Process>;
     let mut gpu_info: Option<output::Object> = None;
     match gpus.probe() {
         None => {}
@@ -399,44 +388,44 @@ fn do_collect_data(
                 }
                 Ok(ref cards) => {
                     let mut s = output::Object::new();
-                    s = add_key(s, "fan%", cards, |c: &gpu::CardState| {
+                    s = add_key(s, "fan%", cards, |c: &gpuapi::CardState| {
                         nonzero(c.fan_speed_pct as i64)
                     });
-                    s = add_key(s, "mode", cards, |c: &gpu::CardState| {
+                    s = add_key(s, "mode", cards, |c: &gpuapi::CardState| {
                         if c.compute_mode == "Default" {
                             output::Value::E()
                         } else {
                             output::Value::S(c.compute_mode.clone())
                         }
                     });
-                    s = add_key(s, "perf", cards, |c: &gpu::CardState| {
+                    s = add_key(s, "perf", cards, |c: &gpuapi::CardState| {
                         output::Value::S(c.perf_state.clone())
                     });
                     // Reserved memory is really not interesting, it's possible it would have been
                     // interesting as part of the card configuration.
-                    //s = add_key(s, "mreskib", cards, |c: &gpu::CardState| nonzero(c.mem_reserved_kib));
-                    s = add_key(s, "musekib", cards, |c: &gpu::CardState| {
+                    //s = add_key(s, "mreskib", cards, |c: &gpuapi::CardState| nonzero(c.mem_reserved_kib));
+                    s = add_key(s, "musekib", cards, |c: &gpuapi::CardState| {
                         nonzero(c.mem_used_kib)
                     });
-                    s = add_key(s, "cutil%", cards, |c: &gpu::CardState| {
+                    s = add_key(s, "cutil%", cards, |c: &gpuapi::CardState| {
                         nonzero(c.gpu_utilization_pct as i64)
                     });
-                    s = add_key(s, "mutil%", cards, |c: &gpu::CardState| {
+                    s = add_key(s, "mutil%", cards, |c: &gpuapi::CardState| {
                         nonzero(c.mem_utilization_pct as i64)
                     });
-                    s = add_key(s, "tempc", cards, |c: &gpu::CardState| {
+                    s = add_key(s, "tempc", cards, |c: &gpuapi::CardState| {
                         nonzero(c.temp_c.into())
                     });
-                    s = add_key(s, "poww", cards, |c: &gpu::CardState| {
+                    s = add_key(s, "poww", cards, |c: &gpuapi::CardState| {
                         nonzero(c.power_watt.into())
                     });
-                    s = add_key(s, "powlimw", cards, |c: &gpu::CardState| {
+                    s = add_key(s, "powlimw", cards, |c: &gpuapi::CardState| {
                         nonzero(c.power_limit_watt.into())
                     });
-                    s = add_key(s, "cez", cards, |c: &gpu::CardState| {
+                    s = add_key(s, "cez", cards, |c: &gpuapi::CardState| {
                         nonzero(c.ce_clock_mhz.into())
                     });
-                    s = add_key(s, "memz", cards, |c: &gpu::CardState| {
+                    s = add_key(s, "memz", cards, |c: &gpuapi::CardState| {
                         nonzero(c.mem_clock_mhz.into())
                     });
                     if !s.is_empty() {
@@ -487,7 +476,7 @@ fn do_collect_data(
         }
     }
 
-    if interrupt::is_interrupted() {
+    if system.is_interrupted() {
         return Ok(output::Value::E());
     }
 
@@ -501,7 +490,7 @@ fn do_collect_data(
         }
     }
 
-    if interrupt::is_interrupted() {
+    if system.is_interrupted() {
         return Ok(output::Value::E());
     }
 
@@ -581,7 +570,7 @@ fn do_collect_data(
     }
 
     if print_params.flat_data {
-        if print_params.opts.load && records.len() > 0{
+        if print_params.opts.load && records.len() > 0 {
             if !per_cpu_secs.is_empty() {
                 let mut a = output::Array::from_vec(
                     per_cpu_secs
@@ -633,8 +622,8 @@ fn do_collect_data(
 fn add_key<'a>(
     mut s: output::Object,
     key: &str,
-    cards: &[gpu::CardState],
-    extract: fn(&gpu::CardState) -> output::Value,
+    cards: &[gpuapi::CardState],
+    extract: fn(&gpuapi::CardState) -> output::Value,
 ) -> output::Object {
     let mut vs = output::Array::new();
     let mut any_nonempty = false;
@@ -802,17 +791,6 @@ fn generate_candidate(proc_info: &ProcInfo, print_params: &PrintParameters) -> o
     fields
 }
 
-#[cfg(test)]
-pub struct MockJobManager { }
-
-#[cfg(test)]
-impl jobs::JobManager for MockJobManager {
-    fn job_id_from_pid(&mut self, pid: usize, _processes: &HashMap<usize, procfs::Process>)
-        -> usize {
-        pid
-    }
-}
-
 #[test]
 pub fn collect_data_test() {
     let opts = Default::default();
@@ -823,14 +801,8 @@ pub fn collect_data_test() {
         flat_data: true,
         opts: &opts,
     };
-    let files = HashMap::new();
-    let pids = vec![];
-    let users = HashMap::new();
-    let now = procfsapi::unix_now();
-    let fs = procfsapi::MockFS::new(files, pids, users, now);
-    let gpus = gpu::MockGpuAPI::new();
-    let mut jobs = MockJobManager {};
-    match collect_data(&fs, &gpus, &mut jobs, &print_params) {
+    let system = mocksystem::MockSystem::new().freeze();
+    match collect_data(&system, &print_params) {
         // flat_data, so should be array
         output::Value::A(a) => {
             // No data, so this should be length 1
@@ -839,10 +811,12 @@ pub fn collect_data_test() {
             match a.at(0) {
                 output::Value::O(obj) => {
                     assert!(obj.get("error").is_some())
-                },
-                _ => { assert!(false) }
+                }
+                _ => {
+                    assert!(false)
+                }
             }
-        },
+        }
         _ => {
             assert!(false);
         }

@@ -8,6 +8,14 @@
 use crate::util::cstrdup;
 use std::ffi::CStr;
 use std::num::ParseIntError;
+use std::time::{SystemTime, UNIX_EPOCH};
+
+pub fn unix_now() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("System time precedes epoch")
+        .as_secs()
+}
 
 // Get current time as an ISO time stamp: yyyy-mm-ddThh:mm:ss+hh:mm
 //
