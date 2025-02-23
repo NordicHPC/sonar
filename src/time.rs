@@ -161,6 +161,67 @@ pub fn format_iso8601(timebuf: &libc::tm) -> String {
     }
 }
 
+// Taken from StackOverflow, converted to Rust, simplified.  The values returned are year, month,
+// day, hour, minute, second, where month, day, hour, minute, second are all zero-based (normally in
+// Unix timestamps, day and month are both 1-based).
+//
+// This iterates up from 1970 and is slowish.  For speed, we'd have a precomputed table of starting
+// values for select years.
+
+#[cfg(any(feature = "daemon", test))]
+pub fn unix_time_components(t: u64) -> (u64, u64, u64, u64, u64, u64) {
+    const SECONDS_PER_MINUTE: u64 = 60;
+    const SECONDS_PER_HOUR: u64 = 60 * SECONDS_PER_MINUTE;
+    const SECONDS_PER_DAY: u64 = 24 * SECONDS_PER_HOUR;
+
+    let mut days = t / SECONDS_PER_DAY;
+    let mut year = 1970;
+    loop {
+        let n = if is_leap_year(year) { 366 } else { 365 };
+        if days < n {
+            break;
+        }
+        days -= n;
+        year += 1;
+    }
+
+    let days_per_month = vec![
+        31,
+        if is_leap_year(year) { 29 } else { 28 },
+        31,
+        30,
+        31,
+        30,
+        31,
+        31,
+        30,
+        31,
+        30,
+        31,
+    ];
+    let mut month = 0;
+    loop {
+        let n = days_per_month[month as usize];
+        if days < n {
+            break;
+        }
+        days -= n;
+        month += 1;
+    }
+
+    let seconds_remaining = t % SECONDS_PER_DAY;
+    let hour = seconds_remaining / SECONDS_PER_HOUR;
+    let minute = seconds_remaining / SECONDS_PER_MINUTE % SECONDS_PER_MINUTE;
+    let second = seconds_remaining % SECONDS_PER_MINUTE;
+
+    (year, month, days, hour, minute, second)
+}
+
+#[cfg(any(feature = "daemon", test))]
+fn is_leap_year(year: u64) -> bool {
+    year % 400 == 0 || (year % 4 == 0 && year % 100 != 0)
+}
+
 // This also tests now_local() and format_iso8601
 #[test]
 pub fn test_now_iso8601() {
@@ -200,4 +261,40 @@ pub fn test_parse_date_and_time_no_tzo() {
     assert!(parse_date_and_time_no_tzo("2022-07-01T23:5914").is_err());
     assert!(parse_date_and_time_no_tzo("2022-07-01T2359").is_err());
     assert!(parse_date_and_time_no_tzo("2022-07-01T23:59+03:30").is_err());
+}
+
+#[test]
+pub fn test_unix_time_components() {
+    // Test case from StackOverflow
+    // 08/18/2016 @ 2:41am (UTC)
+    let t = 1471488076;
+    let (year, month, day, hour, minute, second) = unix_time_components(t);
+    assert!(year == 2016);
+    assert!(month == 7);
+    assert!(day == 17);
+    assert!(hour == 2);
+    assert!(minute == 41);
+    assert!(second == 16);
+
+    // Sanity
+    let (year, month, day, hour, minute, second) = unix_time_components(0);
+    assert!(year == 1970);
+    assert!(month == 0);
+    assert!(day == 0);
+    assert!(hour == 0);
+    assert!(minute == 0);
+    assert!(second == 0);
+
+    // Generate test cases with `date -u +%s-%FT%T` - this yields both the
+    // second count and the date/time.
+
+    // 1740568588-2025-02-26T11:16:28
+    let t = 1740568588;
+    let (year, month, day, hour, minute, second) = unix_time_components(t);
+    assert!(year == 2025);
+    assert!(month == 1);
+    assert!(day == 25);
+    assert!(hour == 11);
+    assert!(minute == 16);
+    assert!(second == 28);
 }
