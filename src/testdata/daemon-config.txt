@@ -1,0 +1,21 @@
+# This is a valid test configuration.  Some of the spacing is wonky in order to test
+# space stripping.
+
+[global]
+cluster = mlx.hpc.uio.no
+role=node
+  
+ [kafka] 
+broker-address = naic-monitor.uio.no:12345
+
+[sample]
+cadence =5m
+  batchless = true
+load = false  
+
+[sysinfo]
+cadence = 24h
+
+[slurm]
+cadence = 1h
+window = 90m

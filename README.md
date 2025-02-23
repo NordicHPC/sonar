@@ -55,7 +55,14 @@ It's sensible to run `sonar ps` every 5 minutes on every compute node.
 $ sonar ps --help
 Take a snapshot of the currently running processes
 
-Usage: sonar ps [OPTIONS]
+Usage: sonar <COMMAND>
+
+Commands:
+  ps       Take a snapshot of the currently running processes
+  sysinfo  Extract system information
+  slurm    Extract slurm information
+  daemon   TODO!
+  help     Print this message or the help of the given subcommand(s)
 
 Options:
       --batchless
@@ -204,7 +211,8 @@ With the branches come some additional rules for how to move patches around:
 
 At the time of writing we require:
 - 2021 edition of Rust
-- Rust 1.59.0, released 2022-02-24 (can be found with `cargo msrv find`)
+- Rust 1.67.0, released 2023-01-26 (can be found with `cargo msrv find`).  Probably 1.67.1 is the
+  wise choice.
 
 Policy for changing the minimum Rust version:
 - Open a GitHub issue and motivate the change
