@@ -1,0 +1,27 @@
+{
+  "version": "0.13.100",
+  "timestamp": "2025-03-01T00:00:01+01:00",
+  "hostname": "ml1.hpc.uio.no",
+  "description": "2x14 (hyperthreaded) Intel(R) Xeon(R) Gold 5120 CPU @ 2.20GHz, 125 GiB, 3x NVIDIA GeForce RTX 2080 Ti @ 11GiB",
+  "cpu_cores": 56,
+  "mem_gb": 125,
+  "gpu_cards": 3,
+  "gpumem_gb": 33,
+  "gpu_info": [
+  {"bus_addr":"00000000:18:00.0", "index":0, "uuid":"GPU-35080357-601c-7113-ec05-f6ca1e58a91e",
+   "manufacturer":"NVIDIA", "model":"NVIDIA GeForce RTX 2080 Ti", "arch":"Turing", "driver":"550.127.08", "firmware":"12.4",
+   "mem_size_kib":11534336,
+   "power_limit_watt":250, "max_power_limit_watt":280, "min_power_limit_watt":100,
+   "max_ce_clock_mhz":2100, "max_mem_clock_mhz":7000},
+  {"bus_addr":"00000000:3B:00.0", "index":1, "uuid":"GPU-be013a01-364d-ca23-f871-206fe3f259ba",
+   "manufacturer":"NVIDIA", "model":"NVIDIA GeForce RTX 2080 Ti", "arch":"Turing", "driver":"550.127.08", "firmware":"12.4",
+   "mem_size_kib":11534336,
+   "power_limit_watt":250, "max_power_limit_watt":280, "min_power_limit_watt":100,
+   "max_ce_clock_mhz":2100, "max_mem_clock_mhz":7000},
+  {"bus_addr":"00000000:86:00.0", "index":2, "uuid":"GPU-daa9f6ac-c8bf-87be-8adc-89b1e7d3f38a",
+   "manufacturer":"NVIDIA", "model":"NVIDIA GeForce RTX 2080 Ti", "arch":"Turing", "driver":"550.127.08", "firmware":"12.4",
+   "mem_size_kib":11534336,
+   "power_limit_watt":250, "max_power_limit_watt":280, "min_power_limit_watt":100,
+   "max_ce_clock_mhz":2100, "max_mem_clock_mhz":7000}]
+}
+{"version":"0.13.200","timestamp":"2025-02-28T00:00:01+01:00","hostname":"c1-6.fox","description":"2x64 AMD EPYC 7702 64-Core Processor, 503 GiB","cpu_cores":128,"mem_gb":503}
