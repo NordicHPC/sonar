@@ -2,6 +2,7 @@ use crate::gpuapi;
 use crate::jobsapi;
 use crate::mockfs;
 use crate::mockgpu;
+use crate::ps;
 use crate::procfsapi;
 use crate::systemapi;
 use crate::time;
@@ -18,6 +19,7 @@ pub struct MockSystemBuilder {
     pids: Option<Vec<(usize, u32)>>,
     users: Option<HashMap<u32, String>>,
     now: Option<u64>,
+    boot_time: Option<u64>,
     timestamp: Option<String>,
     hostname: Option<String>,
     version: Option<String>,
@@ -88,6 +90,13 @@ impl MockSystemBuilder {
         self
     }
 
+    pub fn with_boot_time(self, boot_time: u64) -> MockSystemBuilder {
+        MockSystemBuilder {
+            boot_time: Some(boot_time),
+            ..self
+        }
+    }
+
     pub fn freeze(self) -> MockSystem {
         MockSystem {
             version: if let Some(x) = self.version {
@@ -124,6 +133,11 @@ impl MockSystemBuilder {
             } else {
                 time::unix_now()
             },
+            boot_time: if let Some(x) = self.boot_time {
+                x
+            } else {
+                ps::EPOCH_TIME_BASE + 1
+            },
             gpus: mockgpu::MockGpuAPI::new(self.cards.take()),
             pid: 1337,
             ticks_per_sec: 100,
@@ -149,6 +163,7 @@ pub struct MockSystem {
     ticks_per_sec: usize,
     pagesz: usize,
     now: u64,
+    boot_time: u64,
 }
 
 impl MockSystem {
@@ -198,6 +213,10 @@ impl systemapi::SystemAPI for MockSystem {
 
     fn get_now_in_secs_since_epoch(&self) -> u64 {
         self.now
+    }
+
+    fn get_boot_time(&self) -> u64 {
+        self.boot_time
     }
 
     fn user_by_uid(&self, uid: u32) -> Option<String> {

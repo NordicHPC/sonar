@@ -3,6 +3,7 @@ use crate::gpuapi;
 use crate::hostname;
 use crate::interrupt;
 use crate::jobsapi;
+use crate::procfs;
 use crate::procfsapi;
 use crate::realgpu;
 use crate::realprocfs;
@@ -29,8 +30,10 @@ impl RealSystemBuilder {
         }
     }
 
-    pub fn freeze(self) -> RealSystem {
-        RealSystem {
+    pub fn freeze(self) -> Result<RealSystem, String> {
+        let fs = realprocfs::RealProcFS::new();
+        let boot_time = procfs::get_boot_time(&fs)?;
+        Ok(RealSystem {
             timestamp: time::now_iso8601(),
             hostname: hostname::get(),
             jm: if let Some(x) = self.jm {
@@ -38,10 +41,11 @@ impl RealSystemBuilder {
             } else {
                 Box::new(jobsapi::NoJobManager::new())
             },
-            fs: realprocfs::RealProcFS::new(),
+            fs,
             gpus: realgpu::RealGpu::new(),
             now: time::unix_now(),
-        }
+            boot_time,
+        })
     }
 }
 
@@ -52,6 +56,7 @@ pub struct RealSystem {
     gpus: realgpu::RealGpu,
     jm: Box<dyn jobsapi::JobManager>,
     now: u64,
+    boot_time: u64,
 }
 
 impl RealSystem {
@@ -87,6 +92,10 @@ impl systemapi::SystemAPI for RealSystem {
 
     fn get_pid(&self) -> u32 {
         std::process::id()
+    }
+
+    fn get_boot_time(&self) -> u64 {
+        self.boot_time
     }
 
     fn get_clock_ticks_per_sec(&self) -> usize {

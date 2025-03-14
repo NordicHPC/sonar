@@ -34,6 +34,7 @@ struct ProcInfo<'a> {
     is_system_job: bool,
     has_children: bool,
     job_id: usize,
+    is_slurm: bool,
     cpu_percentage: f64,
     cputime_sec: usize,
     mem_percentage: f64,
@@ -85,7 +86,7 @@ fn add_proc_info<'a, F>(
     gpu_mem_percentage: f64,
     gpu_mem_size_kib: usize,
 ) where
-    F: FnMut(Pid) -> JobID,
+    F: FnMut(Pid) -> (JobID,bool),
 {
     proc_by_pid
         .entry(pid)
@@ -103,26 +104,30 @@ fn add_proc_info<'a, F>(
             assert!(has_children == e.has_children);
             assert!(ppid == e.ppid);
         })
-        .or_insert(ProcInfo {
-            user,
-            _uid: uid,
-            command,
-            pid,
-            ppid,
-            rolledup: 0,
-            is_system_job: uid < 1000,
-            has_children,
-            job_id: lookup_job_by_pid(pid),
-            cpu_percentage,
-            cputime_sec,
-            mem_percentage,
-            mem_size_kib,
-            rssanon_kib,
-            gpu_cards: gpu_cards.clone(),
-            gpu_percentage,
-            gpu_mem_percentage,
-            gpu_mem_size_kib,
-            gpu_status: GpuStatus::Ok,
+        .or_insert_with(|| {
+            let (job_id, is_slurm) = lookup_job_by_pid(pid);
+            ProcInfo {
+                user,
+                _uid: uid,
+                command,
+                pid,
+                ppid,
+                rolledup: 0,
+                is_system_job: uid < 1000,
+                has_children,
+                job_id,
+                is_slurm,
+                cpu_percentage,
+                cputime_sec,
+                mem_percentage,
+                mem_size_kib,
+                rssanon_kib,
+                gpu_cards: gpu_cards.clone(),
+                gpu_percentage,
+                gpu_mem_percentage,
+                gpu_mem_size_kib,
+                gpu_status: GpuStatus::Ok,
+            }
         });
 }
 
@@ -238,6 +243,8 @@ pub fn create_snapshot(
     }
 }
 
+pub const EPOCH_TIME_BASE : u64 = 1577836800; // 2020-01-01T00:00:00Z
+
 fn do_create_snapshot(
     writer: &mut dyn io::Write,
     system: &dyn systemapi::SystemAPI,
@@ -249,6 +256,7 @@ fn do_create_snapshot(
         timestamp: &system.get_timestamp(),
         version: &system.get_version(),
         flat_data: !opts.json,
+        epoch: system.get_boot_time() - EPOCH_TIME_BASE,
         opts,
     };
 
@@ -342,7 +350,7 @@ fn do_collect_data<'a>(
         user_by_pid.insert(proc.pid, (&proc.user, proc.uid));
     }
 
-    let mut lookup_job_by_pid = |pid: Pid| system.get_jobs().job_id_from_pid(pid, pprocinfo_output);
+    let mut lookup_job_by_pid = |pid: Pid| system.get_jobs().job_id_from_pid(system, pid, pprocinfo_output);
 
     for proc in pprocinfo_output.values() {
         add_proc_info(
@@ -496,14 +504,15 @@ fn do_collect_data<'a>(
 
     let mut candidates = if print_params.opts.rollup {
         // This is a little complicated because processes with job_id 0 or processes that have
-        // subprocesses cannot be rolled up, nor can we roll up processes with different ppid.
+        // subprocesses or processes that do not belong to Slurm jobs cannot be rolled up, nor can
+        // we roll up processes with different ppid.
         //
         // The reason we cannot roll up processes with job_id 0 is that we don't know that they are
         // related at all - 0 means "no information".
         //
-        // The reason we cannot roll up processes with children or processes with different ppids is
-        // that this would break subsequent processing - it would make it impossible to build a
-        // sensible process tree from the sample data.
+        // The reason we cannot roll up processes with children or processes with different ppids or
+        // non-slurm processes is that this would break subsequent processing - it would make it
+        // impossible to build a sensible process tree from the sample data.
         //
         // - There is an array `rolledup` of ProcInfo nodes that represent rolled-up data
         //
@@ -525,7 +534,7 @@ fn do_collect_data<'a>(
         let mut rolledup = vec![];
         let mut index = HashMap::<(JobID, Pid, &str), usize>::new();
         for proc_info in proc_by_pid.values() {
-            if proc_info.job_id == 0 || proc_info.has_children {
+            if proc_info.job_id == 0 || proc_info.has_children || !proc_info.is_slurm {
                 rolledup.push(proc_info.clone());
             } else {
                 let key = (proc_info.job_id, proc_info.ppid, proc_info.command);
@@ -714,6 +723,7 @@ struct PrintParameters<'a> {
     timestamp: &'a str,
     version: &'a str,
     flat_data: bool,
+    epoch: u64,
     opts: &'a PsOptions<'a>,
 }
 
@@ -734,6 +744,9 @@ fn generate_candidate(proc_info: &ProcInfo, print_params: &PrintParameters) -> o
 
     if proc_info.job_id != 0 {
         fields.push_u("job", proc_info.job_id as u64);
+    }
+    if !proc_info.is_slurm {
+        fields.push_u("epoch", print_params.epoch);
     }
     if proc_info.rolledup == 0 && proc_info.pid != 0 {
         // pid must be 0 for rolledup > 0 as there is no guarantee that there is any fixed
@@ -799,6 +812,7 @@ pub fn collect_data_test() {
         timestamp: "2025-01-24T10:39:00+01:00",
         version: "0.99",
         flat_data: true,
+        epoch: 1,
         opts: &opts,
     };
     let system = mocksystem::MockSystem::new().freeze();

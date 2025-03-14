@@ -9,9 +9,8 @@ set -e
 ../target/debug/sonar ps --exclude-users=root,$LOGNAME > /dev/null
 ../target/debug/sonar ps --exclude-users root,$LOGNAME > /dev/null
 
-# Test all arguments in combination with --batchless
+# Test all arguments in combination without --rollup
 ../target/debug/sonar ps \
-                      --batchless \
                       --min-cpu-percent 0.5 \
                       --min-mem-percent 1.8 \
                       --min-cpu-time 10 \

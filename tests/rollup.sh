@@ -4,7 +4,7 @@
 #  - only leaf processes are rolled up
 #  - only siblings of the same parent are rolled up
 #
-# To do this on a non-slurm system we run --rollup --batchless with an override to allow that.
+# We use an override to flag jobs as roll-uppable.
 #
 # This requires a (probably) 1.6x or later Rust/Cargo toolchain to build Sonar and `make` + any C89
 # or later C compiler to build the C code.
@@ -17,7 +17,7 @@ make --quiet
 echo " This takes about 10s"
 ./rollup 3 &
 sleep 3
-output=$(SONARTEST_ROLLUP=1 ../target/debug/sonar ps --rollup --batchless --exclude-system-jobs)
+output=$(SONARTEST_ROLLUP=1 ../target/debug/sonar ps --rollup --exclude-system-jobs)
 matches=$(grep ,cmd=rollup, <<< $output)
 rolled=$(grep ,rolledup=1 <<< $matches)
 rolled2=$(grep ,rolledup= <<< $matches)

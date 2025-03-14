@@ -2,7 +2,6 @@
 mod amd;
 #[cfg(feature = "amd")]
 mod amd_smi;
-mod batchless;
 mod command;
 mod gpuapi;
 mod gpuset;
@@ -50,9 +49,6 @@ const USAGE_ERROR: i32 = 2; // clap, Python, Go
 enum Commands {
     /// Take a snapshot of the currently running processes
     PS {
-        /// Synthesize a job ID from the process tree in which a process finds itself
-        batchless: bool,
-
         /// Merge process records that have the same job ID and command name
         rollup: bool,
 
@@ -120,7 +116,6 @@ fn main() {
     match &command_line() {
         Commands::PS {
             rollup,
-            batchless,
             min_cpu_percent,
             min_mem_percent,
             min_cpu_time,
@@ -152,18 +147,21 @@ fn main() {
                 lockdir: lockdir.clone(),
                 json: *json,
             };
-            let system = if *batchless {
-                system.with_jobmanager(Box::new(batchless::BatchlessJobManager::new()))
-            } else {
-                system.with_jobmanager(Box::new(slurm::SlurmJobManager {}))
-            };
-            ps::create_snapshot(writer, &system.freeze(), &opts);
+
+            #[cfg(debug_assertions)]
+            let force_slurm = std::env::var("SONARTEST_ROLLUP").is_ok();
+
+            #[cfg(not(debug_assertions))]
+            let force_slurm = false;
+
+            let system = system.with_jobmanager(Box::new(jobsapi::AnyJobManager::new(force_slurm)));
+            ps::create_snapshot(writer, &system.freeze().expect("System initialization"), &opts);
         }
         Commands::Sysinfo { csv } => {
-            sysinfo::show_system(writer, &system.freeze(), *csv);
+            sysinfo::show_system(writer, &system.freeze().expect("System initialization"), *csv);
         }
         Commands::Slurmjobs { window, span, json } => {
-            slurmjobs::show_slurm_jobs(writer, window, span, &system.freeze(), *json);
+            slurmjobs::show_slurm_jobs(writer, window, span, &system.freeze().expect("System initialization"), *json);
         }
         Commands::Version {} => {
             show_version(writer);
@@ -185,7 +183,6 @@ fn command_line() -> Commands {
         next += 1;
         match command {
             "ps" => {
-                let mut batchless = false;
                 let mut rollup = false;
                 let mut min_cpu_percent = None;
                 let mut min_mem_percent = None;
@@ -201,7 +198,8 @@ fn command_line() -> Commands {
                     let arg = args[next].as_ref();
                     next += 1;
                     if let Some(new_next) = bool_arg(arg, &args, next, "--batchless") {
-                        (next, batchless) = (new_next, true);
+                        // Old argument that has no effect, will remove later
+                        next = new_next;
                     } else if let Some(new_next) = bool_arg(arg, &args, next, "--rollup") {
                         (next, rollup) = (new_next, true);
                     } else if let Some(new_next) = bool_arg(arg, &args, next, "--load") {
@@ -243,23 +241,12 @@ fn command_line() -> Commands {
                     }
                 }
 
-                #[cfg(debug_assertions)]
-                let allow_incompatible = std::env::var("SONARTEST_ROLLUP").is_ok();
-
-                #[cfg(not(debug_assertions))]
-                let allow_incompatible = false;
-
-                if rollup && batchless && !allow_incompatible {
-                    eprintln!("--rollup and --batchless are incompatible");
-                    std::process::exit(USAGE_ERROR);
-                }
                 if json && csv {
                     eprintln!("--csv and --json are incompatible");
                     std::process::exit(USAGE_ERROR);
                 }
 
                 Commands::PS {
-                    batchless,
                     rollup,
                     min_cpu_percent,
                     min_mem_percent,
@@ -399,11 +386,9 @@ Commands:
   help     Print this message
 
 Options for `ps`:
-  --batchless
-      Synthesize a job ID from the process tree in which a process finds itself
   --rollup
-      Merge process records that have the same job ID and command name (not
-      compatible with --batchless)
+      Merge process records that have the same job ID and command name (on systems
+      with stable job IDs only)
   --min-cpu-percent percentage
       Include records for jobs that have on average used at least this
       percentage of CPU, note this is nonmonotonic [default: none]

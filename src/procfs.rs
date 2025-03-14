@@ -137,6 +137,17 @@ fn i32_field(l: &str) -> Result<i32, String> {
     }
 }
 
+pub fn get_boot_time(fs: &dyn procfsapi::ProcfsAPI) -> Result<u64, String> {
+    let stat_s = fs.read_to_string("stat")?;
+    for l in stat_s.split('\n') {
+        if l.starts_with("btime ") {
+            let fields = l.split_ascii_whitespace().collect::<Vec<&str>>();
+            return Ok(parse_usize_field(&fields, 1, l, "stat", 0, "btime")? as u64);
+        }
+    }
+    Err(format!("Could not find btime in /proc/stat: {stat_s}"))
+}
+
 /// Obtain process information via /proc and return a hashmap of structures with all the information
 /// we need, keyed by pid.  Pids uniquely tag the records.
 ///

@@ -15,6 +15,7 @@ pub trait SystemAPI {
     fn get_page_size_in_kib(&self) -> usize;
     fn get_now_in_secs_since_epoch(&self) -> u64;
     fn get_pid(&self) -> u32;
+    fn get_boot_time(&self) -> u64;
     fn get_procfs(&self) -> &dyn procfsapi::ProcfsAPI;
     fn get_gpus(&self) -> &dyn gpuapi::GpuAPI;
     fn get_jobs(&self) -> &dyn jobsapi::JobManager;

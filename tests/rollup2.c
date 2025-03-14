@@ -1,4 +1,4 @@
-/* Run this with SONARTEST_ROLLUP=1 and --rollup --batchless.
+/* Run this with SONARTEST_ROLLUP=1 and --rollup.
 
    This will fork off a 9 child processes (rollupchild x 5 and rollupchild2 x 4) that are the
    same except for the name, all of which will wait 10s.  Sonar, run meanwhile, should rollup

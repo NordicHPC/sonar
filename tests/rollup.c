@@ -1,4 +1,4 @@
-/* Run this with SONARTEST_ROLLUP=1 and --rollup --batchless.
+/* Run this with SONARTEST_ROLLUP=1 and --rollup.
    If you grep the sonar output for ',cmd=rollup,' there should be 23 lines.
    Of those, there should be eight that have ',rolledup=1' and none that have any other rollup fields.
 
