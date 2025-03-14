@@ -2,3 +2,5 @@ target/
 *~
 *.rej
 *.orig
+util/ingest-files/ingest-files
+util/ingest-kafka/ingest-kafka
