@@ -1,7 +1,11 @@
+#[allow(unused_imports)]
 use crate::sysinfo;
+#[allow(unused_imports)]
 use crate::mocksystem;
+#[allow(unused_imports)]
 use crate::gpuapi;
 
+#[allow(unused_imports)]
 use std::collections::HashMap;
 
 // Test that an error field is added correctly if we fail to obtain information we must have.
@@ -15,10 +19,11 @@ pub fn sysinfo_error_test() {
 
 // Test that the output is the expected output
 
+#[cfg(target_arch = "x86_64")]  // the mock cpuinfo files are x86_64-specific
 #[test]
 pub fn sysinfo_output_test() {
     let mut files = HashMap::new();
-    files.insert("cpuinfo".to_string(), std::include_str!("testdata/cpuinfo.txt").to_string());
+    files.insert("cpuinfo".to_string(), std::include_str!("testdata/cpuinfo-x86_64.txt").to_string());
     files.insert(
         "meminfo".to_string(),
         "MemTotal:       16093776 kB".to_string(),

@@ -67,66 +67,129 @@ pub fn get_memory(fs: &dyn procfsapi::ProcfsAPI) -> Result<Memory, String> {
 
 /// Read the /proc/cpuinfo file from the fs and return information about installed CPUs.
 ///
-/// Fun fact: this file is very different on x86_64 and aarch64.
+/// Fun fact: this file is very different on x86_64 and aarch64 and requires custom parsing for
+/// each.
 
-pub fn get_cpu_info(fs: &dyn procfsapi::ProcfsAPI) -> Result<(String, i32, i32, i32), String> {
-    let mut physids = HashMap::<i32, bool>::new();
-    let mut processors = HashSet::<i32>::new();
+pub struct CpuInfo {
+    pub sockets: i32,
+    pub cores_per_socket: i32,
+    pub threads_per_core: i32,
+    pub cores: Vec<CoreInfo>,
+}
+
+#[allow(dead_code)]
+pub struct CoreInfo {
+    pub model_name: String,
+    pub logical_index: i32,
+    pub physical_index: i32,
+}
+
+#[cfg(target_arch = "x86_64")]
+pub fn get_cpu_info(fs: &dyn procfsapi::ProcfsAPI) -> Result<CpuInfo, String> {
+    get_cpu_info_x86_64(fs)
+}
+
+#[cfg(target_arch = "aarch64")]
+pub fn get_cpu_info(fs: &dyn procfsapi::ProcfsAPI) -> Result<CpuInfo, String> {
+    get_cpu_info_aarch64(fs)
+}
+
+// Otherwise, get_cpu_info() will be undefined and we'll get a compile error; rustc is good about
+// notifying the user that there are ifdef'd cases that are inactive.
+
+#[cfg(any(target_arch = "x86_64", test))]
+pub fn get_cpu_info_x86_64(fs: &dyn procfsapi::ProcfsAPI) -> Result<CpuInfo, String> {
+    let mut physids = HashSet::new();
+    let mut cores = vec![];
+    let mut model_name = None;
+    let mut physical_index = 0i32;
+    let mut logical_index = 0i32;
     let mut cores_per_socket = 0i32;
     let mut siblings = 0i32;
+    let mut sockets = 0i32;
+
+    // On x86_64, the first line of every blob is "processor", which carries the logical index, and
+    // all other lines relate to that.  Probably in principle, the "siblings" and "cpu cores" fields
+    // could be different among sockets but we ignore that.
+
     let cpuinfo = fs.read_to_string("cpuinfo")?;
-    let mut model_name = "".to_string();
-    let mut amd64 = false;
-    let mut aarch64 = false;
-    let mut model_major = 0i32;
-    let mut model_minor = 0i32;
     for l in cpuinfo.split('\n') {
-        // "processor" could be either kind of CPU, so don't commit
         if l.starts_with("processor") {
-            processors.insert(i32_field(l)?);
-        }
-        // model name, physical id, siblings, cpu cores are x86_64
-        else if l.starts_with("model name") {
-            amd64 = true;
-            model_name = text_field(l)?;
+            if let Some(model_name) = model_name {
+                cores.push(CoreInfo {
+                    model_name,
+                    physical_index,
+                    logical_index,
+                })
+            }
+            model_name = None;
+            logical_index = i32_field(l)?;
+            physical_index = 0i32;
+        } else if l.starts_with("model name") {
+            model_name = Some(text_field(l)?);
         } else if l.starts_with("physical id") {
-            amd64 = true;
-            physids.insert(i32_field(l)?, true);
+            physical_index = i32_field(l)?;
+            if !physids.contains(&physical_index) {
+                physids.insert(physical_index);
+                sockets += 1;
+            }
         } else if l.starts_with("siblings") {
-            amd64 = true;
             siblings = i32_field(l)?;
         } else if l.starts_with("cpu cores") {
-            amd64 = true;
             cores_per_socket = i32_field(l)?;
         }
-        // CPU architecture, CPU variant are aarch64
-        else if l.starts_with("CPU architecture") {
-            aarch64 = true;
+    }
+    if let Some(model_name) = model_name {
+        cores.push(CoreInfo {
+            model_name,
+            physical_index,
+            logical_index,
+        })
+    }
+    if cores.len() == 0 || sockets == 0 || siblings == 0 || cores_per_socket == 0 {
+        return Err("Incomplete information in /proc/cpuinfo".to_string());
+    }
+    let threads_per_core = siblings / cores_per_socket;
+    Ok(CpuInfo { sockets, cores_per_socket, threads_per_core, cores })
+}
+
+#[cfg(any(target_arch = "aarch64", test))]
+pub fn get_cpu_info_aarch64(fs: &dyn procfsapi::ProcfsAPI) -> Result<CpuInfo, String> {
+    let mut processors = HashSet::<i32>::new();
+    let mut model_major = 0i32;
+    let mut model_minor = 0i32;
+
+    // Tested on UiO "freebio3" node.  The first line of every blob is `processor`, which carries
+    // the logical index.  There is no separate physical index.  Indeed the values on freebio3 seem
+    // to be pretty borked, e.g. BogoMIPS = 50.00 is nuts.
+
+    let cpuinfo = fs.read_to_string("cpuinfo")?;
+    for l in cpuinfo.split('\n') {
+        if l.starts_with("processor") {
+            processors.insert(i32_field(l)?);
+        } else if l.starts_with("CPU architecture") {
             model_major = i32_field(l)?;
         } else if l.starts_with("CPU variant") {
-            aarch64 = true;
             model_minor = i32_field(l)?;
         }
     }
-    if amd64 {
-        let sockets = physids.len() as i32;
-        if model_name.is_empty() || sockets == 0 || siblings == 0 || cores_per_socket == 0 {
-            return Err("Incomplete information in /proc/cpuinfo".to_string());
-        }
-        let threads_per_core = siblings / cores_per_socket;
-        Ok((model_name, sockets, cores_per_socket, threads_per_core))
-    } else if aarch64 {
-        Ok((
-            format!("ARMv{model_major}.{model_minor}"),
-            1,
-            processors.len() as i32,
-            1,
-        ))
-    } else {
-        Err("Unknown processor type in /proc/cpuinfo".to_string())
+
+    let cores_per_socket = processors.len() as i32;
+    let threads_per_core = 1;
+    let sockets = 1;
+    let model_name = format!("ARMv{model_major}.{model_minor}");
+    let mut cores = vec![];
+    for core in 0..sockets*cores_per_socket {
+        cores.push(CoreInfo {
+            logical_index: core,
+            physical_index: 0,
+            model_name: model_name.clone(),
+        })
     }
+    Ok(CpuInfo { sockets, cores_per_socket, threads_per_core, cores })
 }
 
+#[cfg(any(target_arch = "x86_64", test))]
 fn text_field(l: &str) -> Result<String, String> {
     if let Some((_, after)) = l.split_once(':') {
         Ok(after.trim().to_string())
@@ -696,14 +759,27 @@ pub fn procfs_dead_and_undead_test() {
 }
 
 #[test]
-pub fn procfs_cpuinfo_test() {
+pub fn procfs_cpuinfo_test_x86_64() {
     let mut files = HashMap::new();
-    files.insert("cpuinfo".to_string(), std::include_str!("testdata/cpuinfo.txt").to_string());
+    files.insert("cpuinfo".to_string(), std::include_str!("testdata/cpuinfo-x86_64.txt").to_string());
     let system = mocksystem::MockSystem::new().with_files(files).freeze();
-    let (model, sockets, cores, threads) =
-        get_cpu_info(system.get_procfs()).expect("Test: Must have data");
-    assert!(model.find("E5-2637").is_some());
+    let CpuInfo { sockets, cores_per_socket, threads_per_core, cores } =
+        get_cpu_info_x86_64(system.get_procfs()).expect("Test: Must have data");
+    assert!(cores[0].model_name.find("E5-2637").is_some());
     assert!(sockets == 2);
-    assert!(cores == 4);
-    assert!(threads == 2);
+    assert!(cores_per_socket == 4);
+    assert!(threads_per_core == 2);
+}
+
+#[test]
+pub fn procfs_cpuinfo_test_aarch64() {
+    let mut files = HashMap::new();
+    files.insert("cpuinfo".to_string(), std::include_str!("testdata/cpuinfo-aarch64.txt").to_string());
+    let system = mocksystem::MockSystem::new().with_files(files).freeze();
+    let CpuInfo { sockets, cores_per_socket, threads_per_core, cores } =
+        get_cpu_info_aarch64(system.get_procfs()).expect("Test: Must have data");
+    assert!(cores[0].model_name.find("ARMv8.3").is_some());
+    assert!(sockets == 1);
+    assert!(cores_per_socket == 96);
+    assert!(threads_per_core == 1);
 }

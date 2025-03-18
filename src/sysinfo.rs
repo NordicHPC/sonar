@@ -27,7 +27,9 @@ const GIB: usize = 1024 * 1024 * 1024;
 fn try_compute_sysinfo(system: &dyn systemapi::SystemAPI) -> Result<output::Object, String> {
     let fs = system.get_procfs();
     let gpus = system.get_gpus();
-    let (model, sockets, cores_per_socket, threads_per_core) = procfs::get_cpu_info(fs)?;
+    let procfs::CpuInfo { cores, sockets, cores_per_socket, threads_per_core } =
+        procfs::get_cpu_info(fs)?;
+    let model = &cores[0].model_name; // expedient: normally all cores are the same
     let mem_by = procfs::get_memtotal_kib(fs)? * 1024;
     let mem_gib = (mem_by as f64 / GIB as f64).round() as i64;
     let (mut cards, manufacturer) = match gpus.probe() {
