@@ -1,0 +1,89 @@
+{
+    "meta":{"producer":"sonar","version":"0.13.0"},
+    "data":{
+        "type":"sysinfo",
+        "attributes":{
+            "time":"2025-03-01T00:00:01+01:00",
+            "cluster":"mlx.hpc.uio.no",
+            "node":"ml1.hpc.uio.no",
+            "os_name":"Linux",
+            "os_release":"4.18.0-553.30.1.el8_10.x86_64",
+            "sockets":2,
+            "cores_per_socket":3,
+            "threads_per_core":5,
+            "cpu_model":"yoyodyne-3",
+            "memory":131072000,
+            "cards":[
+                {"index":0,
+                 "uuid":"GPU-35080357-601c-7113-ec05-f6ca1e58a91e",
+                 "address":"00000000:18:00.0",
+                 "manufacturer":"NVIDIA",
+                 "model":"NVIDIA GeForce RTX 2080 Ti",
+                 "architecture":"Turing",
+                 "driver":"550.127.08",
+                 "firmware":"12.4",
+                 "memory":11534336,
+                 "power_limit":250,
+                 "max_power_limit":280,
+                 "min_power_limit":100,
+                 "max_ce_clock":2100,
+                 "max_memory_clock":7000
+                },
+                {"index":1,
+                 "uuid":"GPU-be013a01-364d-ca23-f871-206fe3f259ba",
+                 "address":"00000000:3B:00.0",
+                 "manufacturer":"NVIDIA",
+                 "model":"NVIDIA GeForce RTX 2080 Ti",
+                 "architecture":"Turing",
+                 "driver":"550.127.08",
+                 "firmware":"12.4",
+                 "memory":11534336,
+                 "power_limit":250,
+                 "max_power_limit":280,
+                 "min_power_limit":100,
+                 "max_ce_clock":2100,
+                 "max_memory_clock":7000
+                },
+                {"index":2,
+                 "uuid":"GPU-daa9f6ac-c8bf-87be-8adc-89b1e7d3f38a",
+                 "address":"00000000:86:00.0",
+                 "manufacturer":"NVIDIA",
+                 "model":"NVIDIA GeForce RTX 2080 Ti",
+                 "architecture":"Turing",
+                 "driver":"550.127.08",
+                 "firmware":"12.4",
+                 "memory":11534336,
+                 "power_limit":250,
+                 "max_power_limit":280,
+                 "min_power_limit":100,
+                 "max_ce_clock":2100,
+                 "max_memory_clock":7000
+                }
+            ],
+            "software":[ ]
+        }
+    }
+}
+{
+    "meta":{"producer":"sonar","version":"0.13.0"},
+    "data":{
+        "type":"sysinfo",
+        "attributes":{
+            "time":"2025-02-28T00:00:01+01:00",
+            "cluster":"fox.educloud.no",
+            "node":"c1-6.fox",
+            "os":"Linux",
+            "os-version":"5.14.0-427.37.1.el9_4.x86_64",
+            "sockets":8,
+            "cores_per_socket":8,
+            "threads_per_core":2,
+            "cpu_model":"AMD EPYC 7702 64-Core Processor",
+            "memory":527433728,
+            "cards":[ ]
+        }
+    }
+}
+{
+    "meta":{"producer":"sonar","version":"0.13.0"},
+    "errors":[{"detail":"Node not cooperating"}]
+}

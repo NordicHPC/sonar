@@ -1,11 +1,11 @@
 package formats
 
 import (
-       "testing"
+	"testing"
 )
 
 func assert(t *testing.T, c bool, msg string) {
-       if !c {
-               t.Fatal(msg)
-       }
+	if !c {
+		t.Fatal(msg)
+	}
 }

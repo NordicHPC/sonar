@@ -1,0 +1,62 @@
+{
+    "meta":{"producer":"sonar","version":"1.2.3"},
+    "data":{
+        "type":"jobs",
+        "attributes":{
+            "time":"2025-03-11T09:31:00+01:00",
+            "cluster":"fox.educloud.no",
+            "slurm_jobs":[
+                {
+                    "job_id":1,
+                    "job_step":"0",
+                    "job_name":"zappa",
+                    "job_state":"COMPLETED",
+                    "user_name":"moonunit",
+                    "account":"ec666",
+                    "submit_time":"2025-03-08T13:49:06+01:00",
+                    "time_limit":100,
+                    "partition":"normal",
+                    "reservation":"big-cheese",
+                    "nodes":["c1-[10-20]","bigmem-1"],
+                    "priority":1001,
+                    "distribution":"cyclic",
+                    "gres_detail":[],
+                    "requested_cpus":22,
+                    "requested_memory_per_node":12345678,
+                    "requested_node_count":11,
+                    "minimum_cpus_per_node":2,
+                    "start_time":"2025-03-08T18:11:02+01:00",
+                    "suspend_time":37,
+                    "end_time":"2025-03-10T01:35:24+01:00",
+                    "exit_code":1,
+                    "sacct":{
+                        "AllocTRES":"billing=128,cpu=128,energy=52238802,mem=472.50G,node=1",
+                        "AveCPU":5,
+                        "AveDiskRead":2000000,
+                        "AveDiskWrite":900000,
+                        "AveRSS":64400000,
+                        "ElapsedRaw":113062,
+                        "ReqCPUS":128,
+                        "ReqMem":472000000,
+                        "ReqNodes":1,
+                        "SystemCPU":12345,
+                        "UserCPU":11111111,
+                        "MaxRSS":6444000,
+                        "MaxVMSize":8000000,
+                        "MinCPU":5
+                    }
+                }]
+        }
+    }
+}
+{
+    "meta":{"producer":"sonar","version":"1.2.3"},
+    "errors":[
+        {
+            "detail":"No can do",
+            "time":"2025-03-11T09:31:00+01:00",
+            "cluster":"fox.educloud.no",
+            "node":"c1-26.fox"
+        }
+    ]
+}
