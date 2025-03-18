@@ -18,7 +18,7 @@ if [[ $(command -v sacct) != "" ]]; then
 fi
 
 output=$(../target/debug/sonar slurm --json)
-error=$(jq .error <<< $output)
+error=$(jq .errors <<< $output)
 if [[ ! ( $error =~ "sacct failed" ) ]]; then
     echo "Expected specific error string, got '$error'"
     exit 1

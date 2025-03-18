@@ -114,6 +114,9 @@ enum Commands {
         /// Output new json, not CSV
         json: bool,
 
+        /// Include PENDING and RUNNING jobs
+        deluge: bool,
+
         /// Cluster name
         cluster: Option<String>,
     },
@@ -185,13 +188,13 @@ fn main() {
             };
             sysinfo::show_system(writer, &system.freeze().expect("System initialization"), *csv, *json);
         }
-        Commands::Slurmjobs { window, span, json, cluster } => {
+        Commands::Slurmjobs { window, span, json, deluge, cluster } => {
             let system = if cluster.is_some() {
                 system.with_cluster(cluster.as_ref().unwrap())
             } else {
                 system
             };
-            slurmjobs::show_slurm_jobs(writer, window, span, &system.freeze().expect("System initialization"), *json);
+            slurmjobs::show_slurm_jobs(writer, window, span, *deluge, &system.freeze().expect("System initialization"), *json);
         }
         Commands::Version {} => {
             show_version(writer);
@@ -328,6 +331,7 @@ fn command_line() -> Commands {
                 let mut span = None;
                 let mut json = false;
                 let mut csv = false;
+                let mut deluge = false;
                 let mut cluster = None;
                 while next < args.len() {
                     let arg = args[next].as_ref();
@@ -342,6 +346,8 @@ fn command_line() -> Commands {
                         (next, json) = (new_next, true);
                     } else if let Some(new_next) = bool_arg(arg, &args, next, "--csv") {
                         (next, csv) = (new_next, true);
+                    } else if let Some(new_next) = bool_arg(arg, &args, next, "--deluge") {
+                        (next, deluge) = (new_next, true);
                     } else if let Some((new_next, value)) =
                         string_arg(arg, &args, next, "--cluster")
                     {
@@ -357,7 +363,7 @@ fn command_line() -> Commands {
                     eprintln!("--csv and --json are incompatible");
                     std::process::exit(USAGE_ERROR);
                 }
-                Commands::Slurmjobs { window, span, json, cluster }
+                Commands::Slurmjobs { window, span, json, cluster, deluge }
             }
             "version" => Commands::Version {},
             "help" => {
@@ -478,6 +484,8 @@ Options for `slurm`:
   --span start,end
       Both `start` and `end` are on the form yyyy-mm-dd.  Mostly useful for seeding a
       database with older data.  Precludes --window
+  --deluge
+      Include PENDING and RUNNING jobs in the output, not just completed jobs.
   --json
       Format output as new JSON, not CSV
   --cluster name

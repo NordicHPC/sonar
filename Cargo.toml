@@ -14,5 +14,6 @@ default = [ "nvidia", "amd" ]
 
 [dependencies]
 cty = "0.2.2"
+lazy_static = "1.5.0"
 libc = "0.2"
 subprocess = { version = "= 0.2.9" }
