@@ -10,6 +10,7 @@ use crate::realprocfs;
 use crate::systemapi;
 use crate::time;
 use crate::users;
+use crate::util;
 
 use std::fs;
 use std::io;
@@ -20,9 +21,18 @@ const SACCT_TIMEOUT_S: u64 = 180;
 
 pub struct RealSystemBuilder {
     jm: Option<Box<dyn jobsapi::JobManager>>,
+    cluster: String,
 }
 
 impl RealSystemBuilder {
+    #[allow(dead_code)]
+    pub fn with_cluster(self, cluster: &str) -> RealSystemBuilder {
+        RealSystemBuilder {
+            cluster: cluster.to_string(),
+            ..self
+        }
+    }
+
     pub fn with_jobmanager(self, jm: Box<dyn jobsapi::JobManager>) -> RealSystemBuilder {
         RealSystemBuilder {
             jm: Some(jm),
@@ -36,6 +46,7 @@ impl RealSystemBuilder {
         Ok(RealSystem {
             timestamp: time::now_iso8601(),
             hostname: hostname::get(),
+            cluster: self.cluster,
             jm: if let Some(x) = self.jm {
                 x
             } else {
@@ -52,6 +63,7 @@ impl RealSystemBuilder {
 pub struct RealSystem {
     timestamp: String,
     hostname: String,
+    cluster: String,
     fs: realprocfs::RealProcFS,
     gpus: realgpu::RealGpu,
     jm: Box<dyn jobsapi::JobManager>,
@@ -61,7 +73,7 @@ pub struct RealSystem {
 
 impl RealSystem {
     pub fn new() -> RealSystemBuilder {
-        RealSystemBuilder { jm: None }
+        RealSystemBuilder { jm: None, cluster: "".to_string() }
     }
 }
 
@@ -74,8 +86,32 @@ impl systemapi::SystemAPI for RealSystem {
         self.timestamp.clone()
     }
 
+    fn get_cluster(&self) -> String {
+        self.cluster.clone()
+    }
+
     fn get_hostname(&self) -> String {
         self.hostname.clone()
+    }
+
+    fn get_os_name(&self) -> String {
+        unsafe {
+            let mut utsname: libc::utsname = std::mem::zeroed();
+            if libc::uname(&mut utsname) != 0 {
+                return "".to_string();
+            }
+            util::cstrdup(&utsname.sysname)
+        }
+    }
+
+    fn get_os_release(&self) -> String {
+        unsafe {
+            let mut utsname: libc::utsname = std::mem::zeroed();
+            if libc::uname(&mut utsname) != 0 {
+                return "".to_string();
+            }
+            util::cstrdup(&utsname.release)
+        }
     }
 
     fn get_procfs(&self) -> &dyn procfsapi::ProcfsAPI {

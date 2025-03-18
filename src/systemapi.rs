@@ -10,7 +10,10 @@ pub trait SystemAPI {
     // The `get_` methods always return the same values for every call.
     fn get_version(&self) -> String;
     fn get_timestamp(&self) -> String;
+    fn get_cluster(&self) -> String;
     fn get_hostname(&self) -> String;
+    fn get_os_name(&self) -> String;
+    fn get_os_release(&self) -> String;
     fn get_clock_ticks_per_sec(&self) -> usize;
     fn get_page_size_in_kib(&self) -> usize;
     fn get_now_in_secs_since_epoch(&self) -> u64;

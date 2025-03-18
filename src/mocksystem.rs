@@ -22,7 +22,10 @@ pub struct MockSystemBuilder {
     boot_time: Option<u64>,
     timestamp: Option<String>,
     hostname: Option<String>,
+    cluster: Option<String>,
     version: Option<String>,
+    os_name: Option<String>,
+    os_release: Option<String>,
     jm: Option<Box<dyn jobsapi::JobManager>>,
     cards: cell::RefCell<Vec<gpuapi::Card>>,
 }
@@ -67,6 +70,21 @@ impl MockSystemBuilder {
     pub fn with_hostname(self, hostname: &str) -> MockSystemBuilder {
         MockSystemBuilder {
             hostname: Some(hostname.to_string()),
+            ..self
+        }
+    }
+
+    pub fn with_cluster(self, cluster: &str) -> MockSystemBuilder {
+        MockSystemBuilder {
+            cluster: Some(cluster.to_string()),
+            ..self
+        }
+    }
+
+    pub fn with_os(self, name: &str, release: &str) -> MockSystemBuilder {
+        MockSystemBuilder {
+            os_name: Some(name.to_string()),
+            os_release: Some(release.to_string()),
             ..self
         }
     }
@@ -119,6 +137,21 @@ impl MockSystemBuilder {
             } else {
                 "no.host.com".to_string()
             },
+            cluster: if let Some(x) = self.cluster {
+                x
+            } else {
+                "no.cluster.com".to_string()
+            },
+            os_name: if let Some(x) = self.os_name {
+                x
+            } else {
+                "unknown-os".to_string()
+            },
+            os_release: if let Some(x) = self.os_release {
+                x
+            } else {
+                "unknown-release".to_string()
+            },
             fs: {
                 let files = if let Some(x) = self.files {
                     x
@@ -155,6 +188,9 @@ pub struct MockSystem {
     timestamp: String,
     jm: Box<dyn jobsapi::JobManager>,
     hostname: String,
+    cluster: String,
+    os_name: String,
+    os_release: String,
     fs: mockfs::MockFS,
     gpus: mockgpu::MockGpuAPI,
     users: HashMap<u32, String>,
@@ -185,6 +221,18 @@ impl systemapi::SystemAPI for MockSystem {
 
     fn get_hostname(&self) -> String {
         self.hostname.clone()
+    }
+
+    fn get_cluster(&self) -> String {
+        self.cluster.clone()
+    }
+
+    fn get_os_name(&self) -> String {
+        self.os_name.clone()
+    }
+
+    fn get_os_release(&self) -> String {
+        self.os_release.clone()
     }
 
     fn get_procfs(&self) -> &dyn procfsapi::ProcfsAPI {

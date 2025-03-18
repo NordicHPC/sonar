@@ -132,15 +132,15 @@ fn add_proc_info<'a, F>(
 }
 
 #[derive(Default)]
-pub struct PsOptions<'a> {
+pub struct PsOptions {
     pub rollup: bool,
     pub always_print_something: bool,
     pub min_cpu_percent: Option<f64>,
     pub min_mem_percent: Option<f64>,
     pub min_cpu_time: Option<usize>,
     pub exclude_system_jobs: bool,
-    pub exclude_users: Vec<&'a str>,
-    pub exclude_commands: Vec<&'a str>,
+    pub exclude_users: Vec<String>,
+    pub exclude_commands: Vec<String>,
     pub lockdir: Option<String>,
     pub load: bool,
     pub json: bool,
@@ -730,7 +730,7 @@ struct PrintParameters<'a> {
     version: &'a str,
     flat_data: bool,
     epoch: u64,
-    opts: &'a PsOptions<'a>,
+    opts: &'a PsOptions,
 }
 
 fn generate_candidate(proc_info: &ProcInfo, print_params: &PrintParameters) -> output::Object {
