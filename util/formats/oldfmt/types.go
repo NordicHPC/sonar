@@ -6,8 +6,8 @@
 
 package oldfmt
 
-// CSV decoding not implemented (was never used in the field) but is easy to create.  JSON
-// representation can be read with ConsumeJSONSysinfo().
+// CSV decoding not implemented for Sysinfo (was never used in the field) but is easy to create.
+// JSON representation can be read with ConsumeJSONSysinfo().
 
 type SysinfoEnvelope struct {
 	Version     string       `json:"version"`

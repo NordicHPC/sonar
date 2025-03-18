@@ -121,6 +121,12 @@ impl Array {
         }
     }
 
+    pub fn take(&mut self) -> Vec<Value> {
+        let mut n = vec![];
+        std::mem::swap(&mut n, &mut self.elements);
+        n
+    }
+
     pub fn push(&mut self, value: Value) {
         self.elements.push(value)
     }
@@ -184,7 +190,7 @@ fn write_chars(writer: &mut dyn io::Write, s: &str) {
 
 pub fn write_json(writer: &mut dyn io::Write, v: &Value) {
     write_json_int(writer, v);
-    let _ = writer.write(&[b'\n']);
+    let _ = writer.write(b"\n");
 }
 
 fn write_json_int(writer: &mut dyn io::Write, v: &Value) {
@@ -216,37 +222,37 @@ fn write_json_array(writer: &mut dyn io::Write, a: &Array) {
         return;
     }
 
-    let _ = writer.write(&[b'[']);
+    let _ = writer.write(b"[");
     let mut first = true;
     for elt in &a.elements {
         if !first {
-            let _ = writer.write(&[b',']);
+            let _ = writer.write(b",");
         }
         write_json_int(writer, elt);
         first = false;
     }
-    let _ = writer.write(&[b']']);
+    let _ = writer.write(b"]");
 }
 
 fn write_json_object(writer: &mut dyn io::Write, o: &Object) {
-    let _ = writer.write(&[b'{']);
+    let _ = writer.write(b"{");
     let mut first = true;
     for fld in &o.fields {
         if !first {
-            let _ = writer.write(&[b',']);
+            let _ = writer.write(b",");
         }
         write_json_string(writer, &fld.tag);
-        let _ = writer.write(&[b':']);
+        let _ = writer.write(b":");
         write_json_int(writer, &fld.value);
         first = false;
     }
-    let _ = writer.write(&[b'}']);
+    let _ = writer.write(b"}");
 }
 
 fn write_json_string(writer: &mut dyn io::Write, s: &String) {
-    let _ = writer.write(&[b'"']);
-    write_chars(writer, &util::json_quote(&s));
-    let _ = writer.write(&[b'"']);
+    let _ = writer.write(b"\"");
+    write_chars(writer, &util::json_quote(s));
+    let _ = writer.write(b"\"");
 }
 
 #[test]
@@ -293,7 +299,7 @@ pub fn test_json() {
 
 pub fn write_csv(writer: &mut dyn io::Write, v: &Value) {
     write_chars(writer, &format_csv_value(v));
-    let _ = writer.write(&[b'\n']);
+    let _ = writer.write(b"\n");
 }
 
 pub fn format_csv_value(v: &Value) -> String {
@@ -321,7 +327,7 @@ fn format_csv_object(o: &Object) -> String {
         s += &util::csv_quote(&tmp);
         first = false;
     }
-    return s;
+    s
 }
 
 fn format_csv_array(a: &Array) -> String {
@@ -348,7 +354,7 @@ fn format_csv_array(a: &Array) -> String {
         s += &util::csv_quote(&format_csv_value(elt));
         first = false;
     }
-    return s;
+    s
 }
 
 #[test]
