@@ -143,7 +143,7 @@ pub struct PsOptions {
     pub exclude_commands: Vec<String>,
     pub lockdir: Option<String>,
     pub load: bool,
-    pub json: bool,
+    pub new_json: bool,
 }
 
 pub fn create_snapshot(
@@ -255,7 +255,7 @@ fn do_create_snapshot(
         hostname: &hostname,
         timestamp: &system.get_timestamp(),
         version: &system.get_version(),
-        flat_data: !opts.json,
+        flat_data: !opts.new_json,
         epoch: system.get_boot_time() - EPOCH_TIME_BASE,
         opts,
     };

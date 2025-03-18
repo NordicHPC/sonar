@@ -4,6 +4,7 @@
 //
 // Adding eg a compact binary serialization form would be very simple.
 
+use crate::systemapi;
 use crate::util;
 
 use std::io;
@@ -255,29 +256,6 @@ fn write_json_string(writer: &mut dyn io::Write, s: &String) {
     let _ = writer.write(b"\"");
 }
 
-#[test]
-pub fn test_json() {
-    let mut a = Array::new();
-    let mut o = Object::new();
-    o.push_o("o", Object::new());
-    o.push_a("a", Array::new());
-    o.push_s("s", r#"hello, "sir""#.to_string());
-    o.push_u("u", 123);
-    o.push_i("i", -12);
-    o.push_f("f", 12.5);
-    a.push_o(o);
-    a.push_e();
-    a.push_s(r#"stri\ng"#.to_string());
-    let expect = concat!(
-        r#"[{"o":{},"a":[],"s":"hello, \"sir\"","u":123,"i":-12,"f":12.5},,"stri\\ng"]"#,
-        "\n",
-    );
-    let mut output = Vec::new();
-    write_json(&mut output, &Value::A(a));
-    let got = String::from_utf8_lossy(&output);
-    assert!(expect == got);
-}
-
 // CSV:
 //
 // - an object is a comma-separated list of FIELDs
@@ -357,38 +335,6 @@ fn format_csv_array(a: &Array) -> String {
     s
 }
 
-#[test]
-pub fn test_csv() {
-    // The common (really only truly supported) case for CSV is that there's an object outermost.
-    let mut o = Object::new();
-    o.push_o("o", Object::new());
-    let mut aa = Array::new();
-    aa.push_i(1);
-    aa.push_e();
-    aa.push_i(2);
-    aa.set_csv_separator("|".to_string());
-    o.push_a("a", aa);
-    o.push_s("s", r#"hello, "sir""#.to_string());
-    o.push_u("u", 123);
-    o.push_i("i", -12);
-    o.push_f("f", 12.5);
-    let mut ab = Array::new();
-    ab.set_encode_nonempty_base45();
-    // See the encoding test further down for an explanation of the encoded value.
-    for x in vec![1, 30, 89, 12] {
-        ab.push_u(x);
-    }
-    o.push_a("x", ab);
-    let expect = concat!(
-        r#"o=,a=1||2,"s=hello, ""sir""",u=123,i=-12,f=12.5,x=)(t*1b"#,
-        "\n"
-    );
-    let mut output = Vec::new();
-    write_csv(&mut output, &Value::O(o));
-    let got = String::from_utf8_lossy(&output);
-    assert!(expect == got);
-}
-
 // Encode a nonempty u64 array compactly.
 //
 // The output must be ASCII text (32 <= c < 128), ideally without ',' or '"' or '\' or ' ' to not
@@ -440,4 +386,56 @@ pub fn test_encoding() {
     let v = vec![1, 30, 89, 12];
     println!("{}", encode_cpu_secs_base45el(&v));
     assert!(encode_cpu_secs_base45el(&v) == ")(t*1b");
+}
+
+// Utilities
+
+pub struct AttrVal {
+    pub key: String,
+    pub value: String,
+}
+
+pub fn newfmt_envelope(
+    system: &dyn systemapi::SystemAPI,
+    attrs: &[AttrVal],
+) -> Object {
+    let mut envelope = Object::new();
+    let mut meta = Object::new();
+    meta.push_s("producer","sonar".to_string());
+    meta.push_s("version", system.get_version());
+    // meta.push_u("format", 1) // 1 is the default
+    // meta.push_s("token") // FIXME
+    if attrs.len() > 0 {
+        let mut attrvals = Array::new();
+        for AttrVal { key, value } in attrs {
+            let mut pair = Object::new();
+            pair.push_s("key", key.clone());
+            pair.push_s("value", value.clone());
+            attrvals.push_o(pair);
+        }
+        meta.push_a("attrs", attrvals);
+    }
+    envelope.push_o("meta", meta);
+    envelope
+}
+
+pub fn newfmt_data(system: &dyn systemapi::SystemAPI, ty: &str) -> (Object, Object) {
+    let mut data = Object::new();
+    data.push_s("type",ty.to_string());
+    let mut attrs = Object::new();
+    attrs.push_s("time", system.get_timestamp());
+    let c = system.get_cluster();
+    if c != "" {
+        attrs.push_s("cluster", c);
+    }
+    (data, attrs)
+}
+
+pub fn newfmt_one_error(system: &dyn systemapi::SystemAPI, error: String) -> Array {
+    let mut err0 = Object::new();
+    err0.push_s("detail", error);
+    err0.push_s("time", system.get_timestamp());
+    let mut errors = Array::new();
+    errors.push_o(err0);
+    errors
 }

@@ -22,6 +22,8 @@ mod nvidia;
 #[cfg(feature = "nvidia")]
 mod nvidia_nvml;
 mod output;
+#[cfg(test)]
+mod output_test;
 mod procfs;
 mod procfsapi;
 mod ps;
@@ -81,7 +83,7 @@ enum Commands {
         /// the per-cpu usage since boot.
         load: bool,
 
-        /// Output JSON, not CSV
+        /// Output new JSON, not CSV
         json: bool,
 
         /// Cluster name
@@ -89,8 +91,11 @@ enum Commands {
     },
     /// Extract system information
     Sysinfo {
-        /// Output CSV, not JSON
+        /// Output CSV, not old JSON
         csv: bool,
+
+        /// Output new JSON, not old JSON
+        json: bool,
 
         /// Cluster name
         cluster: Option<String>,
@@ -106,7 +111,7 @@ enum Commands {
         /// to is exclusive.  Precludes -window.
         span: Option<String>,
 
-        /// Output json, not CSV
+        /// Output new json, not CSV
         json: bool,
 
         /// Cluster name
@@ -155,7 +160,7 @@ fn main() {
                     vec![]
                 },
                 lockdir: lockdir.clone(),
-                json: *json,
+                new_json: *json,
             };
 
             #[cfg(debug_assertions)]
@@ -172,13 +177,13 @@ fn main() {
             };
             ps::create_snapshot(writer, &system.freeze().expect("System initialization"), &opts);
         }
-        Commands::Sysinfo { csv, cluster } => {
+        Commands::Sysinfo { csv, json, cluster } => {
             let system = if cluster.is_some() {
                 system.with_cluster(cluster.as_ref().unwrap())
             } else {
                 system
             };
-            sysinfo::show_system(writer, &system.freeze().expect("System initialization"), *csv);
+            sysinfo::show_system(writer, &system.freeze().expect("System initialization"), *csv, *json);
         }
         Commands::Slurmjobs { window, span, json, cluster } => {
             let system = if cluster.is_some() {
@@ -199,6 +204,9 @@ fn main() {
 //  - allow repeated options to overwrite earlier values
 //  - all error reporting is via a generic "usage" message, without specificity as to what was wrong
 //  - both --json and --csv are accepted to all commands
+//
+// Note that --json means "new json" everywhere, so --json for `sonar sysinfo` changes the output
+// format from the default old JSON encoding.
 
 fn command_line() -> Commands {
     let args = std::env::args().collect::<Vec<String>>();
@@ -313,7 +321,7 @@ fn command_line() -> Commands {
                     eprintln!("--csv and --json are incompatible");
                     std::process::exit(USAGE_ERROR);
                 }
-                Commands::Sysinfo { csv, cluster }
+                Commands::Sysinfo { csv, json, cluster }
             }
             "slurm" => {
                 let mut window = None;
@@ -451,13 +459,15 @@ Options for `ps`:
   --load
       Print per-cpu and per-gpu load data
   --json
-      Format output as JSON, not CSV
+      Format output as new JSON, not CSV
   --cluster name
       Optional cluster name with which to tag output
 
 Options for `sysinfo`:
   --csv
       Format output as CSV, not JSON
+  --json
+      Format output as new JSON, not the old JSON
   --cluster name
       Optional cluster name with which to tag output
 
@@ -469,7 +479,7 @@ Options for `slurm`:
       Both `start` and `end` are on the form yyyy-mm-dd.  Mostly useful for seeding a
       database with older data.  Precludes --window
   --json
-      Format output as JSON, not CSV
+      Format output as new JSON, not CSV
   --cluster name
       Optional cluster name with which to tag output
 ",

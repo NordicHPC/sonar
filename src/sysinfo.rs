@@ -5,7 +5,7 @@ use crate::systemapi;
 
 use std::io;
 
-pub fn show_system(writer: &mut dyn io::Write, system: &dyn systemapi::SystemAPI, csv: bool) {
+pub fn show_system(writer: &mut dyn io::Write, system: &dyn systemapi::SystemAPI, csv: bool, _new_json: bool) {
     let sysinfo = compute_sysinfo(system);
     if csv {
         output::write_csv(writer, &output::Value::O(sysinfo));
