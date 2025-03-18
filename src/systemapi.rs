@@ -14,6 +14,7 @@ pub trait SystemAPI {
     fn get_hostname(&self) -> String;
     fn get_os_name(&self) -> String;
     fn get_os_release(&self) -> String;
+    fn get_architecture(&self) -> String;
     fn get_clock_ticks_per_sec(&self) -> usize;
     fn get_page_size_in_kib(&self) -> usize;
     fn get_now_in_secs_since_epoch(&self) -> u64;

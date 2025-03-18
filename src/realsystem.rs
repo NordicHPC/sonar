@@ -60,6 +60,15 @@ impl RealSystemBuilder {
     }
 }
 
+#[cfg(target_arch = "x86_64")]
+const ARCHITECTURE: &'static str = "x86_64";
+
+#[cfg(target_arch = "aarch64")]
+const ARCHITECTURE: &'static str = "aarch64";
+
+// Otherwise, `ARCHITECTURE` will be undefined and we'll get a compile error; rustc is good about
+// notifying the user that there are ifdef'd cases that are inactive.
+
 pub struct RealSystem {
     timestamp: String,
     hostname: String,
@@ -112,6 +121,10 @@ impl systemapi::SystemAPI for RealSystem {
             }
             util::cstrdup(&utsname.release)
         }
+    }
+
+    fn get_architecture(&self) -> String {
+        ARCHITECTURE.to_string()
     }
 
     fn get_procfs(&self) -> &dyn procfsapi::ProcfsAPI {

@@ -26,6 +26,7 @@ pub struct MockSystemBuilder {
     version: Option<String>,
     os_name: Option<String>,
     os_release: Option<String>,
+    architecture: Option<String>,
     jm: Option<Box<dyn jobsapi::JobManager>>,
     cards: cell::RefCell<Vec<gpuapi::Card>>,
 }
@@ -85,6 +86,13 @@ impl MockSystemBuilder {
         MockSystemBuilder {
             os_name: Some(name.to_string()),
             os_release: Some(release.to_string()),
+            ..self
+        }
+    }
+
+    pub fn with_architecture(self, architecture: &str) -> MockSystemBuilder {
+        MockSystemBuilder {
+            architecture: Some(architecture.to_string()),
             ..self
         }
     }
@@ -152,6 +160,11 @@ impl MockSystemBuilder {
             } else {
                 "unknown-release".to_string()
             },
+            architecture: if let Some(x) = self.architecture {
+                x
+            } else {
+                "unknown-architecture".to_string()
+            },
             fs: {
                 let files = if let Some(x) = self.files {
                     x
@@ -191,6 +204,7 @@ pub struct MockSystem {
     cluster: String,
     os_name: String,
     os_release: String,
+    architecture: String,
     fs: mockfs::MockFS,
     gpus: mockgpu::MockGpuAPI,
     users: HashMap<u32, String>,
@@ -233,6 +247,10 @@ impl systemapi::SystemAPI for MockSystem {
 
     fn get_os_release(&self) -> String {
         self.os_release.clone()
+    }
+
+    fn get_architecture(&self) -> String {
+        self.architecture.clone()
     }
 
     fn get_procfs(&self) -> &dyn procfsapi::ProcfsAPI {
