@@ -29,9 +29,9 @@ impl gpuapi::GPU for NvidiaGPU {
 
     fn get_process_utilization(
         &self,
-        user_by_pid: &ps::UserTable,
+        ptable: &ps::ProcessTable,
     ) -> Result<Vec<gpuapi::Process>, String> {
-        if let Some(info) = nvidia_nvml::get_process_utilization(user_by_pid) {
+        if let Some(info) = nvidia_nvml::get_process_utilization(ptable) {
             Ok(info)
         } else {
             Ok(vec![])

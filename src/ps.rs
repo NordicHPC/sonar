@@ -1,140 +1,18 @@
-#![allow(clippy::type_complexity)]
-#![allow(clippy::too_many_arguments)]
-
 use crate::gpuapi;
-use crate::gpuset;
 use crate::log;
-#[cfg(test)]
-use crate::mocksystem;
 use crate::output;
 use crate::procfs;
+use crate::ps_newfmt::format_newfmt;
+use crate::ps_oldfmt::{format_oldfmt, make_oldfmt_heartbeat};
 use crate::systemapi;
-use crate::util::three_places;
 
 use std::collections::HashMap;
 use std::io::{self, Write};
 use std::path::PathBuf;
 
-type Pid = usize;
-type JobID = usize;
-
-// ProcInfo holds per-process information gathered from multiple sources and tagged with a job ID.
-// No processes are merged!  The job ID "0" means "unique job with no job ID".  That is, no consumer
-// of this data, internal or external to the program, may treat separate processes with job ID "0"
-// as part of the same job.
-
-#[derive(Clone)]
-struct ProcInfo<'a> {
-    user: &'a str,
-    _uid: usize,
-    command: &'a str,
-    pid: Pid,
-    ppid: Pid,
-    rolledup: usize,
-    is_system_job: bool,
-    has_children: bool,
-    job_id: usize,
-    is_slurm: bool,
-    cpu_percentage: f64,
-    cputime_sec: usize,
-    mem_percentage: f64,
-    mem_size_kib: usize,
-    rssanon_kib: usize,
-    gpu_cards: gpuset::GpuSet,
-    gpu_percentage: f64,
-    gpu_mem_percentage: f64,
-    gpu_mem_size_kib: usize,
-    gpu_status: GpuStatus,
-}
-
-#[derive(Copy, Clone, PartialEq, Eq)]
-enum GpuStatus {
-    Ok = 0,
-    UnknownFailure = 1,
-    // More here, by and by: it's possible to parse the output of the error and
-    // be specific
-}
-
-type ProcTable<'a> = HashMap<Pid, ProcInfo<'a>>;
-
-// The table mapping a Pid to user name / Uid is used by the GPU subsystems to provide information
-// about users for the processes on the GPUS.
-
-pub type Uid = usize;
-pub type UserTable<'a> = HashMap<Pid, (&'a str, Uid)>;
-
-// Add information about the process to the table `proc_by_pid`.  Here, `lookup_job_by_pid`, `user`,
-// `command`, and `pid` must be provided while the subsequent fields are all optional and must be
-// zero / empty if there's no information.
-
-fn add_proc_info<'a, F>(
-    proc_by_pid: &mut ProcTable<'a>,
-    lookup_job_by_pid: &mut F,
-    user: &'a str,
-    uid: usize,
-    command: &'a str,
-    pid: Pid,
-    ppid: Pid,
-    has_children: bool,
-    cpu_percentage: f64,
-    cputime_sec: usize,
-    mem_percentage: f64,
-    mem_size_kib: usize,
-    rssanon_kib: usize,
-    gpu_cards: &gpuset::GpuSet,
-    gpu_percentage: f64,
-    gpu_mem_percentage: f64,
-    gpu_mem_size_kib: usize,
-) where
-    F: FnMut(Pid) -> (JobID,bool),
-{
-    proc_by_pid
-        .entry(pid)
-        .and_modify(|e| {
-            // Already has user, command, pid, job_id
-            e.cpu_percentage += cpu_percentage;
-            e.cputime_sec += cputime_sec;
-            e.mem_percentage += mem_percentage;
-            e.mem_size_kib += mem_size_kib;
-            e.rssanon_kib += rssanon_kib;
-            gpuset::union_gpuset(&mut e.gpu_cards, gpu_cards);
-            e.gpu_percentage += gpu_percentage;
-            e.gpu_mem_percentage += gpu_mem_percentage;
-            e.gpu_mem_size_kib += gpu_mem_size_kib;
-            assert!(has_children == e.has_children);
-            assert!(ppid == e.ppid);
-        })
-        .or_insert_with(|| {
-            let (job_id, is_slurm) = lookup_job_by_pid(pid);
-            ProcInfo {
-                user,
-                _uid: uid,
-                command,
-                pid,
-                ppid,
-                rolledup: 0,
-                is_system_job: uid < 1000,
-                has_children,
-                job_id,
-                is_slurm,
-                cpu_percentage,
-                cputime_sec,
-                mem_percentage,
-                mem_size_kib,
-                rssanon_kib,
-                gpu_cards: gpu_cards.clone(),
-                gpu_percentage,
-                gpu_mem_percentage,
-                gpu_mem_size_kib,
-                gpu_status: GpuStatus::Ok,
-            }
-        });
-}
-
 #[derive(Default)]
 pub struct PsOptions {
     pub rollup: bool,
-    pub always_print_something: bool,
     pub min_cpu_percent: Option<f64>,
     pub min_mem_percent: Option<f64>,
     pub min_cpu_time: Option<usize>,
@@ -250,422 +128,452 @@ fn do_create_snapshot(
     system: &dyn systemapi::SystemAPI,
     opts: &PsOptions,
 ) {
-    let hostname = system.get_hostname();
-    let print_params = PrintParameters {
-        hostname: &hostname,
-        timestamp: &system.get_timestamp(),
-        version: &system.get_version(),
-        flat_data: !opts.new_json,
-        epoch: system.get_boot_time() - EPOCH_TIME_BASE,
-        opts,
-    };
-
-    match collect_data(system, &print_params) {
-        output::Value::A(elts) => {
-            for i in 0..elts.len() {
-                output::write_csv(writer, elts.at(i));
+    match collect_sample_data(system, opts) {
+        Ok(Some(sample_data)) => {
+            if opts.new_json {
+                let o = output::Value::O(format_newfmt(&sample_data, system, opts));
+                output::write_json(writer, &o);
+            } else {
+                let mut elements = format_oldfmt(&sample_data, system, opts).take();
+                if elements.len() == 0 {
+                    elements.push(output::Value::O(make_oldfmt_heartbeat(system)))
+                }
+                for e in &elements {
+                    output::write_csv(writer, e);
+                }
             }
         }
-        obj @ output::Value::O(_) => {
-            output::write_json(writer, &obj);
-        }
-        output::Value::E() => {
-            // interrupted, don't print anything
-        }
-        _ => {
-            panic!("Should not happen")
-        }
-    }
-}
-
-// If this returns an output::Value::O then that is an object to write (eg JSON), otherwise it must
-// be an output::Value::A and each should be written individually (eg CSV), or it is
-// output::Value::E, in which case we were interrupted.  The first two cases are controlled by
-// print_params.flat_data.
-
-fn collect_data(
-    system: &dyn systemapi::SystemAPI,
-    print_params: &PrintParameters,
-) -> output::Value {
-    match do_collect_data(system, print_params) {
-        Ok(output::Value::A(mut elts)) => {
-            if elts.len() == 0 && print_params.opts.always_print_something {
-                elts.push_o(make_heartbeat(&print_params))
-            }
-            output::Value::A(elts)
-        }
-        Ok(obj @ output::Value::O(_)) => obj,
-        Ok(empty @ output::Value::E()) => empty,
-        Ok(_) => {
-            panic!("Should not happen")
+        Ok(None) => {
+            // Interrupted, do not print anything
         }
         Err(error) => {
-            let mut hb = make_heartbeat(&print_params);
-            hb.push_s("error", error);
-            if print_params.flat_data {
-                output::Value::A(output::Array::from_vec(vec![output::Value::O(hb)]))
+            if opts.new_json {
+                let mut envelope = output::newfmt_envelope(system, &vec![]);
+                envelope.push_a("errors", output::newfmt_one_error(system, error));
+                output::write_json(writer, &output::Value::O(envelope));
             } else {
-                output::Value::O(hb)
+                let mut hb = make_oldfmt_heartbeat(system);
+                //+oldnames
+                hb.push_s("error", error);
+                //-oldnames
+                output::write_csv(writer, &output::Value::O(hb))
             }
         }
     }
 }
 
-fn make_heartbeat(print_params: &PrintParameters) -> output::Object {
-    let mut fields = output::Object::new();
-    fields.push_s("v", print_params.version.to_string());
-    fields.push_s("time", print_params.timestamp.to_string());
-    fields.push_s("host", print_params.hostname.to_string());
-    fields.push_s("user", "_sonar_".to_string());
-    fields.push_s("cmd", "_heartbeat_".to_string());
-    fields
+///////////////////////////////////////////////////////////////////////////////////////////////////
+//
+// Data collection code
+
+// Some basic types, just for clarity.
+
+pub type Pid = usize;
+pub type JobID = usize;
+pub type Uid = usize;
+
+// The table mapping a Pid to user name / Uid is used by the GPU subsystems to provide information
+// about users for the processes on the GPUS.
+
+#[allow(dead_code)]
+pub struct ProcessTable {
+    by_pid: HashMap<Pid, (String, Uid)>,
 }
 
-fn do_collect_data<'a>(
+impl ProcessTable {
+    pub fn from_processes<T>(procs: &HashMap<T,procfs::Process>) -> ProcessTable {
+        let mut by_pid = HashMap::new();
+        for proc in procs.values() {
+            by_pid.insert(proc.pid, (proc.user.clone(), proc.uid));
+        }
+        ProcessTable { by_pid }
+    }
+
+    #[allow(dead_code)]
+    pub fn lookup(&self, pid: Pid) -> (String, Uid) {
+        match self.by_pid.get(&pid) {
+            Some((name, uid)) => (name.to_string(), *uid),
+            None => ("_user_unknown".to_string(), 1),
+        }
+    }
+}
+
+// ProcInfo holds per-process information gathered from multiple sources and tagged with a job ID.
+// No processes are merged!  The job ID "0" means "unique job with no job ID".  That is, no consumer
+// of this data, internal or external to the program, may treat separate processes with job ID "0"
+// as part of the same job.
+
+pub type ProcInfoTable = HashMap<Pid, ProcInfo>;
+
+#[derive(Clone, Default)]
+pub struct ProcInfo {
+    pub user: String,
+    pub command: String,
+    pub pid: Pid,
+    pub ppid: Pid,
+    pub rolledup: usize,
+    pub is_system_job: bool,
+    pub has_children: bool,
+    pub job_id: usize,
+    pub is_slurm: bool,
+    pub cpu_percentage: f64,
+    pub cpu_util: f64,
+    pub cputime_sec: usize,
+    pub mem_percentage: f64,
+    pub mem_size_kib: usize,
+    pub rssanon_kib: usize,
+    pub gpus: GpuProcInfos,
+    pub gpu_percentage: f64,
+    pub gpu_mem_percentage: f64,
+    pub gpu_mem_size_kib: usize,
+    pub gpu_status: GpuStatus,
+}
+
+pub type GpuProcInfos = HashMap<gpuapi::GpuName, GpuProcInfo>;
+
+#[derive(Clone, Default)]
+pub struct GpuProcInfo {
+    pub device: gpuapi::GpuName,
+    pub gpu_util: u32,
+    pub gpu_mem: u64,
+    pub gpu_mem_util: u32,
+}
+
+#[derive(Copy, Clone, PartialEq, Eq)]
+pub enum GpuStatus {
+    Ok = 0,
+    UnknownFailure = 1,
+}
+
+impl Default for GpuStatus {
+    fn default() -> GpuStatus {
+        GpuStatus::Ok
+    }
+}
+
+pub struct SampleData {
+    pub process_samples: Vec<ProcInfo>,
+    pub gpu_samples: Option<Vec<gpuapi::CardState>>,
+    pub cpu_samples: Vec<u64>,
+    pub used_memory: u64,
+}
+
+fn collect_sample_data(
     system: &dyn systemapi::SystemAPI,
-    print_params: &PrintParameters,
-) -> Result<output::Value, String> {
-    let fs = system.get_procfs();
-    let gpus = system.get_gpus();
-
-    let no_gpus = gpuset::empty_gpuset();
-    let mut proc_by_pid = ProcTable::new();
+    opts: &PsOptions,
+) -> Result<Option<SampleData>, String> {
+    let mut procinfo_by_pid = ProcInfoTable::new();
 
     if system.is_interrupted() {
-        return Ok(output::Value::E());
+        return Ok(None);
     }
 
-    // The total RAM installed is in the `MemTotal` field of /proc/meminfo.  We need this for
-    // various things.  Not getting it is a hard error.
+    let memory = procfs::get_memory(system.get_procfs())?;
+    let (processes, _cpu_total_secs, per_cpu_secs) = {
+        procfs::get_process_information(system, memory.total as usize)?
+    };
 
-    let memtotal_kib = procfs::get_memtotal_kib(fs)?;
-    let (procinfo_output, _cpu_total_secs, per_cpu_secs) =
-        procfs::get_process_information(system, memtotal_kib)?;
-
-    let pprocinfo_output = &procinfo_output;
-
-    // The table of users is needed to get GPU information, see comments at UserTable.
-    let mut user_by_pid = UserTable::new();
-    for proc in pprocinfo_output.values() {
-        user_by_pid.insert(proc.pid, (&proc.user, proc.uid));
-    }
-
-    let mut lookup_job_by_pid = |pid: Pid| system.get_jobs().job_id_from_pid(system, pid, pprocinfo_output);
-
-    for proc in pprocinfo_output.values() {
-        add_proc_info(
-            &mut proc_by_pid,
-            &mut lookup_job_by_pid,
-            &proc.user,
-            proc.uid,
-            &proc.command,
-            proc.pid,
-            proc.ppid,
-            proc.has_children,
-            proc.cpu_pct,
-            proc.cputime_sec,
-            proc.mem_pct,
-            proc.mem_size_kib,
-            proc.rssanon_kib,
-            &no_gpus, // gpu_cards
-            0.0,      // gpu_percentage
-            0.0,      // gpu_mem_percentage
-            0,
-        ); // gpu_mem_size_kib
-    }
+    procinfo_by_pid = add_cpu_info(procinfo_by_pid, system, &processes);
 
     if system.is_interrupted() {
-        return Ok(output::Value::E());
+        return Ok(None);
     }
 
-    // When a GPU fails it may be a transient error or a permanent error, but either way sonar does
-    // not know.  We just record the failure.
-    //
-    // This is a soft failure, surfaced through dashboards; we do not want mail about it under
-    // normal circumstances.
-    let mut gpu_status = GpuStatus::Ok;
-
-    let gpu_utilization: Vec<gpuapi::Process>;
-    let mut gpu_info: Option<output::Object> = None;
-    match gpus.probe() {
-        None => {}
-        Some(gpu) => {
-            match gpu.get_card_utilization() {
-                Err(_) => {
-                    gpu_status = GpuStatus::UnknownFailure;
-                }
-                Ok(ref cards) => {
-                    let mut s = output::Object::new();
-                    s = add_key(s, "fan%", cards, |c: &gpuapi::CardState| {
-                        nonzero(c.fan_speed_pct as i64)
-                    });
-                    s = add_key(s, "mode", cards, |c: &gpuapi::CardState| {
-                        if c.compute_mode == "" {
-                            output::Value::E()
-                        } else {
-                            output::Value::S(c.compute_mode.clone())
-                        }
-                    });
-                    s = add_key(s, "perf", cards, |c: &gpuapi::CardState| {
-                        output::Value::S(
-                            if c.perf_state == -1 {
-                                "".to_string()
-                            } else {
-                                format!("P{}", c.perf_state)
-                            }
-                        )
-                    });
-                    // Reserved memory is really not interesting, it's possible it would have been
-                    // interesting as part of the card configuration.
-                    //s = add_key(s, "mreskib", cards, |c: &gpuapi::CardState| nonzero(c.mem_reserved_kib));
-                    s = add_key(s, "musekib", cards, |c: &gpuapi::CardState| {
-                        nonzero(c.mem_used_kib)
-                    });
-                    s = add_key(s, "cutil%", cards, |c: &gpuapi::CardState| {
-                        nonzero(c.gpu_utilization_pct as i64)
-                    });
-                    s = add_key(s, "mutil%", cards, |c: &gpuapi::CardState| {
-                        nonzero(c.mem_utilization_pct as i64)
-                    });
-                    s = add_key(s, "tempc", cards, |c: &gpuapi::CardState| {
-                        nonzero(c.temp_c.into())
-                    });
-                    s = add_key(s, "poww", cards, |c: &gpuapi::CardState| {
-                        nonzero(c.power_watt.into())
-                    });
-                    s = add_key(s, "powlimw", cards, |c: &gpuapi::CardState| {
-                        nonzero(c.power_limit_watt.into())
-                    });
-                    s = add_key(s, "cez", cards, |c: &gpuapi::CardState| {
-                        nonzero(c.ce_clock_mhz.into())
-                    });
-                    s = add_key(s, "memz", cards, |c: &gpuapi::CardState| {
-                        nonzero(c.mem_clock_mhz.into())
-                    });
-                    if !s.is_empty() {
-                        gpu_info = Some(s);
-                    }
-                }
-            }
-            match gpu.get_process_utilization(&user_by_pid) {
-                Err(_e) => {
-                    gpu_status = GpuStatus::UnknownFailure;
-                }
-                Ok(conf) => {
-                    gpu_utilization = conf;
-                    for proc in &gpu_utilization {
-                        let (ppid, has_children) =
-                            if let Some(process) = pprocinfo_output.get(&proc.pid) {
-                                (process.ppid, process.has_children)
-                            } else {
-                                (1, true)
-                            };
-                        // FIXME: This is not what we want, we can do better.
-                        let command = match &proc.command {
-                            Some(cmd) => cmd,
-                            _ => "_unknown_",
-                        };
-                        add_proc_info(
-                            &mut proc_by_pid,
-                            &mut lookup_job_by_pid,
-                            &proc.user,
-                            proc.uid,
-                            command,
-                            proc.pid,
-                            ppid,
-                            has_children,
-                            0.0, // cpu_percentage
-                            0,   // cputime_sec
-                            0.0, // mem_percentage
-                            0,   // mem_size_kib
-                            0,   // rssanon_kib
-                            &gpuset::gpuset_from_names(&proc.devices),
-                            proc.gpu_pct,
-                            proc.mem_pct,
-                            proc.mem_size_kib,
-                        );
-                    }
-                }
-            }
-        }
-    }
+    let gpu_info: Option<Vec<gpuapi::CardState>>;
+    (procinfo_by_pid, gpu_info) = add_gpu_info(procinfo_by_pid, system, &processes);
 
     if system.is_interrupted() {
-        return Ok(output::Value::E());
+        return Ok(None);
     }
 
-    // If there was a gpu failure, signal it in all the process structures.  This is pretty
-    // conservative and increases data volume, but it means that the information is not lost so long
-    // as not all records from this sonar run are filtered out by the front end.
-
-    if gpu_status != GpuStatus::Ok {
-        for proc_info in proc_by_pid.values_mut() {
-            proc_info.gpu_status = gpu_status;
-        }
-    }
-
-    if system.is_interrupted() {
-        return Ok(output::Value::E());
-    }
-
-    let mut candidates = if print_params.opts.rollup {
-        // This is a little complicated because processes with job_id 0 or processes that have
-        // subprocesses or processes that do not belong to Slurm jobs cannot be rolled up, nor can
-        // we roll up processes with different ppid.
-        //
-        // The reason we cannot roll up processes with job_id 0 is that we don't know that they are
-        // related at all - 0 means "no information".
-        //
-        // The reason we cannot roll up processes with children or processes with different ppids or
-        // non-slurm processes is that this would break subsequent processing - it would make it
-        // impossible to build a sensible process tree from the sample data.
-        //
-        // - There is an array `rolledup` of ProcInfo nodes that represent rolled-up data
-        //
-        // - When the job ID of a process in `proc_by_pid` is zero, or a process has children, the
-        //   entry in `rolledup` is a copy of that job
-        //
-        // - Otherwise, the entry in `rolledup` represent rolled-up information for a
-        //   (jobid,ppid,command) triple
-        //
-        // - There is a hash table `index` that maps the (jobid,ppid,command) triple to the entry in
-        //   `rolledup`, if any
-        //
-        // - When we're done rolling up, we print the `rolledup` table.
-        //
-        // Filtering is performed after rolling up, so if a rolled-up job has a bunch of dinky
-        // processes that together push it over the filtering limit then it will be printed.  This
-        // is probably the right thing.
-
-        let mut rolledup = vec![];
-        let mut index = HashMap::<(JobID, Pid, &str), usize>::new();
-        for proc_info in proc_by_pid.values() {
-            if proc_info.job_id == 0 || proc_info.has_children || !proc_info.is_slurm {
-                rolledup.push(proc_info.clone());
-            } else {
-                let key = (proc_info.job_id, proc_info.ppid, proc_info.command);
-                if let Some(x) = index.get(&key) {
-                    let p = &mut rolledup[*x];
-                    p.cpu_percentage += proc_info.cpu_percentage;
-                    p.cputime_sec += proc_info.cputime_sec;
-                    p.mem_percentage += proc_info.mem_percentage;
-                    p.mem_size_kib += proc_info.mem_size_kib;
-                    p.rssanon_kib += proc_info.rssanon_kib;
-                    gpuset::union_gpuset(&mut p.gpu_cards, &proc_info.gpu_cards);
-                    p.gpu_percentage += proc_info.gpu_percentage;
-                    p.gpu_mem_percentage += proc_info.gpu_mem_percentage;
-                    p.gpu_mem_size_kib += proc_info.gpu_mem_size_kib;
-                    p.rolledup += 1;
-                } else {
-                    let x = rolledup.len();
-                    index.insert(key, x);
-                    rolledup.push(proc_info.clone());
-                    // We do not increment the clone's `rolledup` counter here because that counter
-                    // counts how many *other* records have been rolled into the canonical one, 0
-                    // means "no interesting information" and need not be printed.
-                }
-            }
-        }
-        rolledup
+    let mut candidates = if opts.rollup {
+        rollup_processes(procinfo_by_pid)
     } else {
-        proc_by_pid
-            .drain()
-            .map(|(_, v)| v)
-            .collect::<Vec<ProcInfo>>()
+        procinfo_by_pid.drain().map(|(_,v)| v).collect::<Vec<ProcInfo>>()
     };
 
     let candidates = candidates
         .drain(0..)
-        .filter(|proc_info| filter_proc(proc_info, print_params))
+        .filter(|proc_info| filter_proc(proc_info, opts))
         .collect::<Vec<ProcInfo>>();
 
-    let mut records: Vec<output::Object> = vec![];
-    for c in candidates {
-        records.push(generate_candidate(&c, print_params));
+    Ok(Some(SampleData {
+        process_samples: candidates,
+        gpu_samples: gpu_info,
+        cpu_samples: per_cpu_secs,
+        used_memory: memory.total - memory.available,
+    }))
+}
+
+fn add_cpu_info(
+    mut procinfo_by_pid: ProcInfoTable,
+    system: &dyn systemapi::SystemAPI,
+    processes: &HashMap<usize, procfs::Process>,
+) -> ProcInfoTable {
+    for proc in processes.values() {
+        procinfo_by_pid
+            .entry(proc.pid)
+            .and_modify(|e| {
+                e.cpu_percentage += proc.cpu_pct;
+                e.cpu_util += proc.cpu_util;
+                e.cputime_sec += proc.cputime_sec;
+                e.mem_percentage += proc.mem_pct;
+                e.mem_size_kib += proc.mem_size_kib;
+                e.rssanon_kib += proc.rssanon_kib;
+                assert!(proc.has_children == e.has_children);
+                assert!(proc.ppid == e.ppid);
+            })
+            .or_insert_with(|| {
+                let (job_id, is_slurm) = system.get_jobs().job_id_from_pid(system, proc.pid, processes);
+                ProcInfo {
+                    user: proc.user.to_string(),
+                    command: proc.command.to_string(),
+                    pid: proc.pid,
+                    ppid: proc.ppid,
+                    is_system_job: proc.uid < 1000,
+                    has_children: proc.has_children,
+                    job_id,
+                    is_slurm,
+                    cpu_percentage: proc.cpu_pct,
+                    cpu_util: proc.cpu_util,
+                    cputime_sec: proc.cputime_sec,
+                    mem_percentage: proc.mem_pct,
+                    mem_size_kib: proc.mem_size_kib,
+                    rssanon_kib: proc.rssanon_kib,
+                    ..Default::default()
+                }
+            });
+
+    }
+    procinfo_by_pid
+}
+
+fn add_gpu_info(
+    mut procinfo_by_pid: ProcInfoTable,
+    system: &dyn systemapi::SystemAPI,
+    processes: &HashMap<usize, procfs::Process>,
+) -> (ProcInfoTable, Option<Vec<gpuapi::CardState>>) {
+    // When a GPU fails it may be a transient error or a permanent error, but either way sonar does
+    // not know.  We just record the failure.  This is a soft failure, surfaced through dashboards;
+    // we do not want mail about it under normal circumstances.
+    //
+    // gpu_status is only used by the old format.  For the new format, every CardState carries
+    // better error information.
+
+    let mut gpu_status = GpuStatus::Ok;
+    let mut gpu_info: Option<Vec<gpuapi::CardState>> = None;
+
+    if let Some(gpu) = system.get_gpus().probe() {
+        match gpu.get_card_utilization() {
+            Ok(cards) => {
+                gpu_info = Some(cards);
+            }
+            Err(_) => {
+                gpu_status = GpuStatus::UnknownFailure;
+            }
+        }
+
+        match gpu.get_process_utilization(&ProcessTable::from_processes(processes)) {
+            Ok(mut gpu_utilization) => {
+                // Tweak gpu_utilization: If any entry used more than 1 GPU we split the entry into
+                // one per GPU, with data divided by the number of GPUs.
+                let mut additional = vec![];
+                for proc in &mut gpu_utilization {
+                    let l = proc.devices.len();
+                    if l > 1 {
+                        let mut devices = vec![proc.devices[0].clone()];
+                        std::mem::swap(&mut proc.devices, &mut devices);
+                        proc.mem_size_kib /= l;
+                        proc.gpu_pct /= l as f64;
+                        proc.mem_pct /= l as f64;
+                        for d in devices.drain(1..) {
+                            let mut c = proc.clone();
+                            c.devices[0] = d;
+                            additional.push(c)
+                        }
+                    }
+                }
+                gpu_utilization.extend(additional);
+
+                for proc in &gpu_utilization {
+                    assert!(proc.devices.len() == 1);
+                    let (ppid, has_children) =
+                        processes.get(&proc.pid).map_or((1, true), |p| (p.ppid, p.has_children));
+                    // TODO: This is not what we want, we can do better.  (Should specify how.)
+                    let command = match &proc.command {
+                        Some(cmd) => cmd.clone(),
+                        _ => "_unknown_".to_string(),
+                    };
+                    procinfo_by_pid
+                        .entry(proc.pid)
+                        .and_modify(|e| {
+                            aggregate_gpu(&mut e.gpus,
+                                          &proc.devices[0],
+                                          proc.gpu_pct as u32,
+                                          proc.mem_pct as u32,
+                                          proc.mem_size_kib as u64);
+                            e.gpu_percentage += proc.gpu_pct;
+                            e.gpu_mem_percentage += proc.mem_pct;
+                            e.gpu_mem_size_kib += proc.mem_size_kib;
+                        })
+                        .or_insert_with(|| {
+                            let (job_id, is_slurm) =
+                                system.get_jobs().job_id_from_pid(system, proc.pid, processes);
+                            ProcInfo {
+                                user: proc.user.to_string(),
+                                command,
+                                pid: proc.pid,
+                                ppid,
+                                is_system_job: proc.uid < 1000,
+                                has_children,
+                                job_id,
+                                is_slurm,
+                                gpus: singleton_gpu(&proc.devices[0],
+                                                    proc.gpu_pct as u32,
+                                                    proc.mem_pct as u32,
+                                                    proc.mem_size_kib as u64),
+                                gpu_percentage: proc.gpu_pct,
+                                gpu_mem_percentage: proc.mem_pct,
+                                gpu_mem_size_kib: proc.mem_size_kib,
+                                ..Default::default()
+                            }
+                        });
+                }
+            }
+            Err(_e) => {
+                gpu_status = GpuStatus::UnknownFailure;
+            }
+        }
     }
 
-    if print_params.flat_data {
-        if print_params.opts.load && records.len() > 0 {
-            if !per_cpu_secs.is_empty() {
-                let mut a = output::Array::from_vec(
-                    per_cpu_secs
-                        .iter()
-                        .map(|x| output::Value::U(*x))
-                        .collect::<Vec<output::Value>>(),
-                );
-                a.set_encode_nonempty_base45();
-                records[0].push_a("load", a);
-            }
-            if let Some(info) = gpu_info {
-                records[0].push_o("gpuinfo", info);
-            }
-        }
+    // If there was a gpu failure, signal it in all the process structures.  This is pretty
+    // conservative and increases output data volume, but it means that the information is not lost
+    // so long as not all records from this sonar run are filtered out by the front end.
 
-        let mut result = output::Array::new();
-        for v in records {
-            result.push_o(v);
+    if gpu_status != GpuStatus::Ok {
+        for proc_info in procinfo_by_pid.values_mut() {
+            proc_info.gpu_status = gpu_status;
         }
-        Ok(output::Value::A(result))
-    } else {
-        let mut datum = output::Object::new();
-        datum.push_s("v", print_params.version.to_string());
-        datum.push_s("time", print_params.timestamp.to_string());
-        datum.push_s("host", print_params.hostname.to_string());
-        if print_params.opts.load {
-            if !per_cpu_secs.is_empty() {
-                let a = output::Array::from_vec(
-                    per_cpu_secs
-                        .iter()
-                        .map(|x| output::Value::U(*x))
-                        .collect::<Vec<output::Value>>(),
-                );
-                datum.push_a("load", a);
-            }
-            if let Some(info) = gpu_info {
-                datum.push_o("gpuinfo", info);
-            }
-        }
-        let mut samples = output::Array::new();
-        for o in records {
-            samples.push_o(o);
-        }
-        datum.push_a("samples", samples);
-        Ok(output::Value::O(datum))
+    }
+
+    (procinfo_by_pid, gpu_info)
+}
+
+fn singleton_gpu(
+    device: &gpuapi::GpuName,
+    gpu_util: u32,
+    mem_util: u32,
+    mem_size: u64,
+) -> GpuProcInfos {
+    let mut h = HashMap::new();
+    h.insert(device.clone(), GpuProcInfo{
+        device: device.clone(),
+        gpu_util,
+        gpu_mem: mem_size,
+        gpu_mem_util: mem_util,
+    });
+    h
+}
+
+fn aggregate_gpu(
+    gpus: &mut GpuProcInfos,
+    device: &gpuapi::GpuName,
+    gpu_util: u32,
+    mem_util: u32,
+    mem_size: u64,
+) {
+    gpus.entry(device.clone())
+        .and_modify(|e| {
+            e.gpu_util += gpu_util;
+            e.gpu_mem_util += mem_util;
+            e.gpu_mem += mem_size;
+        })
+        .or_insert(GpuProcInfo {
+            device: device.clone(),
+            gpu_util,
+            gpu_mem_util: mem_util,
+            gpu_mem: mem_size,
+        });
+}
+
+fn aggregate_gpus(
+    gpus: &mut GpuProcInfos,
+    others: &GpuProcInfos,
+) {
+    for (name, info) in others {
+        aggregate_gpu(gpus,
+                      name,
+                      info.gpu_util,
+                      info.gpu_mem_util,
+                      info.gpu_mem);
     }
 }
 
-fn add_key<'a>(
-    mut s: output::Object,
-    key: &str,
-    cards: &[gpuapi::CardState],
-    extract: fn(&gpuapi::CardState) -> output::Value,
-) -> output::Object {
-    let mut vs = output::Array::new();
-    let mut any_nonempty = false;
-    vs.set_csv_separator("|".to_string());
-    for c in cards {
-        let v = extract(c);
-        if let output::Value::E() = v {
+fn rollup_processes(
+    procinfo_by_pid: ProcInfoTable,
+) -> Vec<ProcInfo> {
+    // This is a little complicated because processes with job_id 0 or processes that have
+    // subprocesses or processes that do not belong to Slurm jobs cannot be rolled up, nor can
+    // we roll up processes with different ppid.
+    //
+    // The reason we cannot roll up processes with job_id 0 is that we don't know that they are
+    // related at all - 0 means "no information".
+    //
+    // The reason we cannot roll up processes with children or processes with different ppids or
+    // non-slurm processes is that this would break subsequent processing - it would make it
+    // impossible to build a sensible process tree from the sample data.
+    //
+    // - There is an array `rolledup` of ProcInfo nodes that represent rolled-up data
+    //
+    // - When the job ID of a process in `procinfo_by_pid` is zero, or a process has children, the
+    //   entry in `rolledup` is a copy of that job
+    //
+    // - Otherwise, the entry in `rolledup` represent rolled-up information for a
+    //   (jobid,ppid,command) triple
+    //
+    // - There is a hash table `index` that maps the (jobid,ppid,command) triple to the entry in
+    //   `rolledup`, if any
+    //
+    // - When we're done rolling up, we print the `rolledup` table.
+    //
+    // Filtering is performed after rolling up, so if a rolled-up job has a bunch of dinky
+    // processes that together push it over the filtering limit then it will be printed.  This
+    // is probably the right thing.
+
+    let mut rolledup = vec![];
+    let mut index = HashMap::<(JobID, Pid, &str), usize>::new();
+    for proc_info in procinfo_by_pid.values() {
+        if proc_info.job_id == 0 || proc_info.has_children || !proc_info.is_slurm {
+            rolledup.push(proc_info.clone());
         } else {
-            any_nonempty = true;
+            let key = (proc_info.job_id, proc_info.ppid, proc_info.command.as_str());
+            if let Some(x) = index.get(&key) {
+                let p = &mut rolledup[*x];
+                p.cpu_percentage += proc_info.cpu_percentage;
+                p.cpu_util += proc_info.cpu_util;
+                p.cputime_sec += proc_info.cputime_sec;
+                p.mem_percentage += proc_info.mem_percentage;
+                p.mem_size_kib += proc_info.mem_size_kib;
+                p.rssanon_kib += proc_info.rssanon_kib;
+                aggregate_gpus(&mut p.gpus, &proc_info.gpus);
+                p.gpu_percentage += proc_info.gpu_percentage;
+                p.gpu_mem_percentage += proc_info.gpu_mem_percentage;
+                p.gpu_mem_size_kib += proc_info.gpu_mem_size_kib;
+                p.rolledup += 1;
+            } else {
+                let x = rolledup.len();
+                index.insert(key, x);
+                rolledup.push(proc_info.clone());
+                // We do not increment the clone's `rolledup` counter here because that counter
+                // counts how many *other* records have been rolled into the canonical one, 0
+                // means "no interesting information" and need not be printed.
+            }
         }
-        vs.push(v);
     }
-    if any_nonempty {
-        s.push(key, output::Value::A(vs));
-    }
-    s
+    rolledup
 }
 
-fn nonzero(x: i64) -> output::Value {
-    if x == 0 {
-        output::Value::E()
-    } else {
-        output::Value::I(x)
-    }
-}
-
-fn filter_proc(proc_info: &ProcInfo, params: &PrintParameters) -> bool {
+fn filter_proc(proc_info: &ProcInfo, opts: &PsOptions) -> bool {
     let mut included = false;
 
     // The logic here is that if any of the inclusion filters are provided, then the set of those
@@ -673,21 +581,21 @@ fn filter_proc(proc_info: &ProcInfo, params: &PrintParameters) -> bool {
     // one of those to be included.  Otherwise, when none of the filters are provided then the
     // record is included by default.
 
-    if params.opts.min_cpu_percent.is_some()
-        || params.opts.min_mem_percent.is_some()
-        || params.opts.min_cpu_time.is_some()
+    if opts.min_cpu_percent.is_some()
+        || opts.min_mem_percent.is_some()
+        || opts.min_cpu_time.is_some()
     {
-        if let Some(cpu_cutoff_percent) = params.opts.min_cpu_percent {
+        if let Some(cpu_cutoff_percent) = opts.min_cpu_percent {
             if proc_info.cpu_percentage >= cpu_cutoff_percent {
                 included = true;
             }
         }
-        if let Some(mem_cutoff_percent) = params.opts.min_mem_percent {
+        if let Some(mem_cutoff_percent) = opts.min_mem_percent {
             if proc_info.mem_percentage >= mem_cutoff_percent {
                 included = true;
             }
         }
-        if let Some(cpu_cutoff_time) = params.opts.min_cpu_time {
+        if let Some(cpu_cutoff_time) = opts.min_cpu_time {
             if proc_info.cputime_sec >= cpu_cutoff_time {
                 included = true;
             }
@@ -699,21 +607,19 @@ fn filter_proc(proc_info: &ProcInfo, params: &PrintParameters) -> bool {
     // The exclusion filters apply after the inclusion filters and the record must pass all of the
     // ones that are provided.
 
-    if params.opts.exclude_system_jobs && proc_info.is_system_job {
+    if opts.exclude_system_jobs && proc_info.is_system_job {
         included = false;
     }
-    if !params.opts.exclude_users.is_empty()
-        && params
-            .opts
+    if !opts.exclude_users.is_empty()
+        && opts
             .exclude_users
             .iter()
             .any(|x| *x == proc_info.user)
     {
         included = false;
     }
-    if !params.opts.exclude_commands.is_empty()
-        && params
-            .opts
+    if !opts.exclude_commands.is_empty()
+        && opts
             .exclude_commands
             .iter()
             .any(|x| proc_info.command.starts_with(x))
@@ -722,123 +628,4 @@ fn filter_proc(proc_info: &ProcInfo, params: &PrintParameters) -> bool {
     }
 
     included
-}
-
-struct PrintParameters<'a> {
-    hostname: &'a str,
-    timestamp: &'a str,
-    version: &'a str,
-    flat_data: bool,
-    epoch: u64,
-    opts: &'a PsOptions,
-}
-
-fn generate_candidate(proc_info: &ProcInfo, print_params: &PrintParameters) -> output::Object {
-    let mut fields = output::Object::new();
-
-    if print_params.flat_data {
-        fields.push_s("v", print_params.version.to_string());
-        fields.push_s("time", print_params.timestamp.to_string());
-        fields.push_s("host", print_params.hostname.to_string());
-    }
-
-    fields.push_s("user", proc_info.user.to_string());
-    fields.push_s("cmd", proc_info.command.to_string());
-
-    // Only print optional fields whose values are not their defaults.  The defaults are defined in
-    // README.md.  The values there must agree with those used by Jobanalyzer's parser.
-
-    if proc_info.job_id != 0 {
-        fields.push_u("job", proc_info.job_id as u64);
-    }
-    if !proc_info.is_slurm {
-        fields.push_u("epoch", print_params.epoch);
-    }
-    if proc_info.rolledup == 0 && proc_info.pid != 0 {
-        // pid must be 0 for rolledup > 0 as there is no guarantee that there is any fixed
-        // representative pid for a rolled-up set of processes: the set can change from run to run,
-        // and sonar has no history.
-        fields.push_u("pid", proc_info.pid as u64);
-    }
-    if proc_info.ppid != 0 {
-        fields.push_u("ppid", proc_info.ppid as u64);
-    }
-    if proc_info.cpu_percentage != 0.0 {
-        fields.push_f("cpu%", three_places(proc_info.cpu_percentage));
-    }
-    if proc_info.mem_size_kib != 0 {
-        fields.push_u("cpukib", proc_info.mem_size_kib as u64);
-    }
-    if proc_info.rssanon_kib != 0 {
-        fields.push_u("rssanonkib", proc_info.rssanon_kib as u64);
-    }
-    if let Some(ref cards) = proc_info.gpu_cards {
-        if cards.is_empty() {
-            // Nothing
-        } else {
-            fields.push_s(
-                "gpus",
-                cards
-                    .iter()
-                    .map(|&num| num.to_string())
-                    .collect::<Vec<String>>()
-                    .join(","),
-            );
-        }
-    } else {
-        fields.push_s("gpus", "unknown".to_string());
-    }
-    if proc_info.gpu_percentage != 0.0 {
-        fields.push_f("gpu%", three_places(proc_info.gpu_percentage));
-    }
-    if proc_info.gpu_mem_percentage != 0.0 {
-        fields.push_f("gpumem%", three_places(proc_info.gpu_mem_percentage));
-    }
-    if proc_info.gpu_mem_size_kib != 0 {
-        fields.push_u("gpukib", proc_info.gpu_mem_size_kib as u64);
-    }
-    if proc_info.cputime_sec != 0 {
-        fields.push_u("cputime_sec", proc_info.cputime_sec as u64);
-    }
-    if proc_info.gpu_status != GpuStatus::Ok {
-        fields.push_u("gpufail", proc_info.gpu_status as u64);
-    }
-    if proc_info.rolledup > 0 {
-        fields.push_u("rolledup", proc_info.rolledup as u64);
-    }
-
-    fields
-}
-
-#[test]
-pub fn collect_data_test() {
-    let opts = Default::default();
-    let print_params = PrintParameters {
-        hostname: "hello",
-        timestamp: "2025-01-24T10:39:00+01:00",
-        version: "0.99",
-        flat_data: true,
-        epoch: 1,
-        opts: &opts,
-    };
-    let system = mocksystem::MockSystem::new().freeze();
-    match collect_data(&system, &print_params) {
-        // flat_data, so should be array
-        output::Value::A(a) => {
-            // No data, so this should be length 1
-            assert!(a.len() == 1);
-            // Mock APIs, so we should have a heartbeat and an error
-            match a.at(0) {
-                output::Value::O(obj) => {
-                    assert!(obj.get("error").is_some())
-                }
-                _ => {
-                    assert!(false)
-                }
-            }
-        }
-        _ => {
-            assert!(false);
-        }
-    }
 }

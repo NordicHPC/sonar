@@ -11,13 +11,18 @@ pub fn test_ps_no_meminfo() {
 
     let mut output = Vec::new();
     let options = ps::PsOptions {
-        always_print_something: true,
         new_json: true,
         ..Default::default()
     };
     ps::create_snapshot(&mut output, &system, &options);
     let info = String::from_utf8_lossy(&output);
-    let expect = r#"{"v":"1.2.3","time":"2025-02-17T12:54:12+01:00","host":"yes.no","user":"_sonar_","cmd":"_heartbeat_","error":"Unable to read /proc/meminfo"}
+    let expect = r#"
+{
+"meta":{"producer":"sonar","version":"1.2.3"},
+"errors":[{"detail":"Unable to read /proc/meminfo","time":"2025-02-17T12:54:12+01:00"}]
+}
 "#;
-    assert!(info == expect);
+    //println!("{}", info.replace('\n',""));
+    //println!("{}", expect.replace('\n',""));
+    assert!(info.replace('\n',"") == expect.replace('\n',""));
 }

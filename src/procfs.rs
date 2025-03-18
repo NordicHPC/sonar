@@ -608,7 +608,7 @@ impl UserTable {
             self.ht.insert(uid, name.clone());
             name
         } else {
-            format!("_noinfo_{uid}")
+            format!("_user_{uid}")
         }
     }
 }

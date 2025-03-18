@@ -1,6 +1,6 @@
 // Low-level but common API to performance data for cards installed on the node.
 
-use crate::ps::UserTable;
+use crate::ps;
 
 // The card index is zero-based and cards are densely packed in the index space.
 //
@@ -33,13 +33,12 @@ pub struct GpuName {
 pub struct Process {
     pub devices: Vec<GpuName>,   // Names are distinct
     pub pid: usize,              // Process ID
-    pub user: String,            // User name, _zombie_PID for zombies
-    pub uid: usize,              // User ID, 666666 for zombies
-    pub gpu_pct: f64,            // Percent of GPU /for this sample/, 0.0 for zombies
-    pub mem_pct: f64,            // Percent of memory /for this sample/, 0.0 for zombies
-    pub mem_size_kib: usize,     // Memory use in KiB /for this sample/, _not_ zero for zombies
-    pub command: Option<String>, // The command, _unknown_ for zombies, _noinfo_ if not known, None
-                                 //   when the GPU layer simply can't know.
+    pub user: String,            // User name
+    pub uid: usize,              // User ID
+    pub gpu_pct: f64,            // Percent of GPU /for this sample/
+    pub mem_pct: f64,            // Percent of memory /for this sample/
+    pub mem_size_kib: usize,     // Memory use in KiB /for this sample/
+    pub command: Option<String>, // The command, or None when the GPU layer can't know
 }
 
 // Static (sample-invariant) card information.  The power limit is not static but in practice
@@ -107,7 +106,7 @@ pub trait GPU {
     // The returned vector is unsorted.
     fn get_process_utilization(
         &self,
-        user_by_pid: &UserTable,
+        user_by_pid: &ps::ProcessTable,
     ) -> Result<Vec<Process>, String>;
 
     // Get dynamic per-card information about the installed cards.

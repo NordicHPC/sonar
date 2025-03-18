@@ -59,41 +59,66 @@ output=$(../target/debug/sonar ps --load --exclude-system-jobs --json)
 jq . <<< $output > /dev/null
 
 # Check that the envelope has required fields
-version=$(jq .v <<< $output)
+version=$(jq .meta.version <<< $output)
 if [[ !( $version =~ [0-9]+\.[0-9]+\.[0-9](-.+)? ) ]]; then
     echo "JSON version bad, got $version"
     exit 1
 fi
-x=$(jq .time <<< $output)
+x=$(jq .meta.producer <<< $output)
+if [[ $x != '"sonar"' ]]; then
+    echo "JSON producer wrong, got $x"
+    exit 1
+fi
+# Check that the type is right
+x=$(jq .data.type <<< $output)
+if [[ $x != '"sample"' ]]; then
+    echo "JSON type wrong, got $x"
+    exit 1
+fi
+# Check that data envelope has some required fields
+x=$(jq .data.attributes.time <<< $output)
 if [[ $x == "null" ]]; then
     echo "JSON time missing"
     exit 1
 fi
-x=$(jq .host <<< $output)
+x=$(jq .data.attributes.node <<< $output)
 if [[ $x == "null" ]]; then
-    echo "JSON host missing"
+    echo "JSON node missing"
     exit 1
 fi
-x=$(jq .samples <<< $output)
+x=$(jq .data.attributes.jobs <<< $output)
 if [[ $x == "null" ]]; then
-    echo "JSON samples missing"
+    echo "JSON jobs missing"
+    exit 1
+fi
+x=$(jq .data.attributes.system <<< $output)
+if [[ $x == "null" ]]; then
+    echo "JSON system missing"
     exit 1
 fi
 
 # If there's at least one sample, check that it has at least user and cmd, which are required.
 
-first=$(jq '.samples[0]' <<< $output)
+first=$(jq '.data.attributes.jobs[0]' <<< $output)
 if [[ $first != "null" ]]; then
     user=$(jq .user <<< $first)
     if [[ $user == "null" ]]; then
         echo "JSON user missing"
         exit 1
     fi
-    cmd=$(jq .cmd <<< $first)
+    cmd=$(jq .processes[0].cmd <<< $first)
     if [[ $cmd == "null" ]]; then
         echo "JSON cmd missing"
         exit 1
     fi
+fi
+
+# Since we specified --load there should be a cpus field in the system object.
+
+x=$(jq .data.attributes.system.cpus <<< $output)
+if [[ $x == "null" ]]; then
+    echo "JSON system.cpus missing"
+    exit 1
 fi
 
 echo "JSON ok"

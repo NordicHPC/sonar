@@ -34,7 +34,7 @@ impl GPU for MockGpus {
 
     fn get_process_utilization(
         &self,
-        _user_by_pid: &ps::UserTable,
+        _ptable: &ps::ProcessTable,
     ) -> Result<Vec<Process>, String> {
         Err("No processes yet".to_string())
     }

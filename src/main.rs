@@ -4,7 +4,6 @@ mod amd;
 mod amd_smi;
 mod command;
 mod gpuapi;
-mod gpuset;
 mod hostname;
 mod interrupt;
 mod jobsapi;
@@ -27,6 +26,8 @@ mod output_test;
 mod procfs;
 mod procfsapi;
 mod ps;
+mod ps_newfmt;
+mod ps_oldfmt;
 #[cfg(test)]
 mod ps_test;
 mod realgpu;
@@ -146,7 +147,6 @@ fn main() {
         } => {
             let opts = ps::PsOptions {
                 rollup: *rollup,
-                always_print_something: true,
                 min_cpu_percent: *min_cpu_percent,
                 min_mem_percent: *min_mem_percent,
                 min_cpu_time: *min_cpu_time,

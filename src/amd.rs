@@ -29,9 +29,9 @@ impl gpuapi::GPU for AmdGPU {
 
     fn get_process_utilization(
         &self,
-        user_by_pid: &ps::UserTable,
+        ptable: &ps::ProcessTable,
     ) -> Result<Vec<gpuapi::Process>, String> {
-        if let Some(info) = amd_smi::get_process_utilization(user_by_pid) {
+        if let Some(info) = amd_smi::get_process_utilization(ptable) {
             Ok(info)
         } else {
             Ok(vec![])

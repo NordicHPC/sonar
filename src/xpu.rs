@@ -29,7 +29,7 @@ impl gpuapi::GPU for XpuGPU {
 
     fn get_process_utilization(
         &mut self,
-        _user_by_pid: &ps::UserTable,
+        _ptable: &ps::ProcessTable,
     ) -> Result<Vec<gpuapi::Process>, String> {
         Ok(vec![])
     }

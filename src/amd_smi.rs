@@ -190,7 +190,7 @@ pub fn get_card_utilization() -> Option<Vec<gpuapi::CardState>> {
     Some(result)
 }
 
-pub fn get_process_utilization(user_by_pid: &ps::UserTable) -> Option<Vec<gpuapi::Process>> {
+pub fn get_process_utilization(ptable: &ps::ProcessTable) -> Option<Vec<gpuapi::Process>> {
     let mut result = vec![];
 
     let mut num_devices: cty::uint32_t = 0;
@@ -209,10 +209,7 @@ pub fn get_process_utilization(user_by_pid: &ps::UserTable) -> Option<Vec<gpuapi
             continue;
         }
 
-        let (username, uid) = match user_by_pid.get(&(infobuf.pid as usize)) {
-            Some((name, uid)) => (name.to_string(), *uid),
-            None => ("_unknown_".to_string(), 1),
-        };
+        let (username, uid) = ptable.lookup(infobuf.pid as ps::Pid);
         let mut indices = infobuf.cards as usize;
         let mut k = 0u32;
         let mut devices = vec![];
