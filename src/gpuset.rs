@@ -1,3 +1,5 @@
+use crate::gpuapi;
+
 use std::collections::HashSet;
 
 // The GpuSet has three states:
@@ -33,6 +35,14 @@ pub fn gpuset_from_bits(maybe_devices: Option<usize>) -> GpuSet {
     } else {
         None
     }
+}
+
+pub fn gpuset_from_names(devices: &[gpuapi::GpuName]) -> GpuSet {
+    let mut gpus = HashSet::new();
+    for d in devices {
+        gpus.insert(d.index as usize);
+    }
+    Some(gpus)
 }
 
 #[allow(dead_code)]

@@ -389,7 +389,7 @@ fn do_collect_data<'a>(
     let mut gpu_info: Option<output::Object> = None;
     match gpus.probe() {
         None => {}
-        Some(mut gpu) => {
+        Some(gpu) => {
             match gpu.get_card_utilization() {
                 Err(_) => {
                     gpu_status = GpuStatus::UnknownFailure;
@@ -400,14 +400,20 @@ fn do_collect_data<'a>(
                         nonzero(c.fan_speed_pct as i64)
                     });
                     s = add_key(s, "mode", cards, |c: &gpuapi::CardState| {
-                        if c.compute_mode == "Default" {
+                        if c.compute_mode == "" {
                             output::Value::E()
                         } else {
                             output::Value::S(c.compute_mode.clone())
                         }
                     });
                     s = add_key(s, "perf", cards, |c: &gpuapi::CardState| {
-                        output::Value::S(c.perf_state.clone())
+                        output::Value::S(
+                            if c.perf_state == -1 {
+                                "".to_string()
+                            } else {
+                                format!("P{}", c.perf_state)
+                            }
+                        )
                     });
                     // Reserved memory is really not interesting, it's possible it would have been
                     // interesting as part of the card configuration.
@@ -473,7 +479,7 @@ fn do_collect_data<'a>(
                             0.0, // mem_percentage
                             0,   // mem_size_kib
                             0,   // rssanon_kib
-                            &proc.devices,
+                            &gpuset::gpuset_from_names(&proc.devices),
                             proc.gpu_pct,
                             proc.mem_pct,
                             proc.mem_size_kib,

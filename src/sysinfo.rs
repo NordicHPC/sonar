@@ -31,7 +31,7 @@ fn try_compute_sysinfo(system: &dyn systemapi::SystemAPI) -> Result<output::Obje
     let mem_by = procfs::get_memtotal_kib(fs)? * 1024;
     let mem_gib = (mem_by as f64 / GIB as f64).round() as i64;
     let (mut cards, manufacturer) = match gpus.probe() {
-        Some(mut device) => (
+        Some(device) => (
             device.get_card_configuration().unwrap_or_default(),
             device.get_manufacturer(),
         ),
@@ -85,12 +85,11 @@ fn try_compute_sysinfo(system: &dyn systemapi::SystemAPI) -> Result<output::Obje
         for c in &cards {
             let gpuapi::Card {
                 bus_addr,
-                index,
+                device,
                 model,
                 arch,
                 driver,
                 firmware,
-                uuid,
                 mem_size_kib,
                 power_limit_watt,
                 max_power_limit_watt,
@@ -100,8 +99,8 @@ fn try_compute_sysinfo(system: &dyn systemapi::SystemAPI) -> Result<output::Obje
             } = c;
             let mut gpu = output::Object::new();
             gpu.push_s("bus_addr", bus_addr.to_string());
-            gpu.push_i("index", *index as i64);
-            gpu.push_s("uuid", uuid.to_string());
+            gpu.push_i("index", device.index as i64);
+            gpu.push_s("uuid", device.uuid.to_string());
             gpu.push_s("manufacturer", manufacturer.clone());
             gpu.push_s("model", model.to_string());
             gpu.push_s("arch", arch.to_string());

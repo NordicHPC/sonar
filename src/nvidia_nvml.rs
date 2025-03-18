@@ -1,7 +1,6 @@
 // Rust wrapper around ../gpuapi/sonar-nvidia.{c,h}.
 
 use crate::gpuapi;
-use crate::gpuset;
 use crate::ps;
 use crate::util::cstrdup;
 
@@ -121,12 +120,14 @@ pub fn get_card_configuration() -> Option<Vec<gpuapi::Card>> {
         if unsafe { nvml_device_get_card_info(dev, &mut infobuf) } == 0 {
             result.push(gpuapi::Card {
                 bus_addr: cstrdup(&infobuf.bus_addr),
-                index: dev as i32,
+                device: gpuapi::GpuName{
+                    index: dev as i32,
+                    uuid: cstrdup(&infobuf.uuid),
+                },
                 model: cstrdup(&infobuf.model),
                 arch: cstrdup(&infobuf.architecture),
                 driver: cstrdup(&infobuf.driver),
                 firmware: cstrdup(&infobuf.firmware),
-                uuid: cstrdup(&infobuf.uuid),
                 mem_size_kib: (infobuf.mem_total / 1024) as i64,
                 power_limit_watt: (infobuf.power_limit / 1000) as i32,
                 max_power_limit_watt: (infobuf.min_power_limit / 1000) as i32,
@@ -151,20 +152,24 @@ pub fn get_card_utilization() -> Option<Vec<gpuapi::CardState>> {
     for dev in 0..num_devices {
         if unsafe { nvml_device_get_card_state(dev, &mut infobuf) } == 0 {
             let mode = match infobuf.compute_mode {
-                COMP_MODE_DEFAULT => "Default",
+                COMP_MODE_DEFAULT => "",
                 COMP_MODE_PROHIBITED => "Prohibited",
                 COMP_MODE_EXCLUSIVE_PROCESS => "ExclusiveProcess",
                 COMP_MODE_UNKNOWN | _ => "Unknown",
             };
             let perf = match infobuf.perf_state {
-                PERF_STATE_UNKNOWN => "Unknown".to_string(),
-                x => format!("P{x}"),
+                PERF_STATE_UNKNOWN => -1,
+                x => x,
             };
             result.push(gpuapi::CardState {
-                index: dev as i32,
+                device: gpuapi::GpuName{
+                    index: dev as i32,
+                    uuid: get_card_uuid(dev),
+                },
+                failing: 0,
                 fan_speed_pct: infobuf.fan_speed as f32,
                 compute_mode: mode.to_string(),
-                perf_state: perf,
+                perf_state: perf as i64,
                 mem_reserved_kib: (infobuf.mem_reserved / 1024) as i64,
                 mem_used_kib: (infobuf.mem_used / 1024) as i64,
                 gpu_utilization_pct: infobuf.gpu_util,
@@ -174,6 +179,15 @@ pub fn get_card_utilization() -> Option<Vec<gpuapi::CardState>> {
                 power_limit_watt: (infobuf.power_limit / 1000) as i32,
                 ce_clock_mhz: infobuf.ce_clock as i32,
                 mem_clock_mhz: infobuf.mem_clock as i32,
+            })
+        } else {
+            result.push(gpuapi::CardState {
+                device: gpuapi::GpuName{
+                    index: dev as i32,
+                    uuid: get_card_uuid(dev),
+                },
+                failing: gpuapi::GENERIC_FAILURE,
+                ..Default::default()
             })
         }
     }
@@ -202,11 +216,14 @@ pub fn get_process_utilization(user_by_pid: &ps::UserTable) -> Option<Vec<gpuapi
             }
 
             let (username, uid) = match user_by_pid.get(&(infobuf.pid as usize)) {
-                Some(x) => *x,
-                None => ("_unknown_", 1),
+                Some((name, uid)) => (name.to_string(), *uid),
+                None => ("_unknown_".to_string(), 1),
             };
             result.push(gpuapi::Process {
-                devices: gpuset::singleton_gpuset(Some(dev as usize)),
+                devices: vec![gpuapi::GpuName{
+                    index: dev as i32,
+                    uuid: get_card_uuid(dev),
+                }],
                 pid: infobuf.pid as usize,
                 user: username.to_string(),
                 uid: uid,
@@ -221,4 +238,14 @@ pub fn get_process_utilization(user_by_pid: &ps::UserTable) -> Option<Vec<gpuapi
     }
 
     Some(result)
+}
+
+pub fn get_card_uuid(dev: u32) -> String {
+    // TODO: Not the most efficient way to do it, but OK for now?
+    let mut infobuf: NvmlCardInfo = Default::default();
+    if unsafe { nvml_device_get_card_info(dev, &mut infobuf) } == 0 {
+        cstrdup(&infobuf.uuid)
+    } else {
+        "".to_string()
+    }
 }

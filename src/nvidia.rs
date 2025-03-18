@@ -15,11 +15,11 @@ pub fn probe() -> Option<Box<dyn gpuapi::GPU>> {
 }
 
 impl gpuapi::GPU for NvidiaGPU {
-    fn get_manufacturer(&mut self) -> String {
+    fn get_manufacturer(&self) -> String {
         "NVIDIA".to_string()
     }
 
-    fn get_card_configuration(&mut self) -> Result<Vec<gpuapi::Card>, String> {
+    fn get_card_configuration(&self) -> Result<Vec<gpuapi::Card>, String> {
         if let Some(info) = nvidia_nvml::get_card_configuration() {
             Ok(info)
         } else {
@@ -28,7 +28,7 @@ impl gpuapi::GPU for NvidiaGPU {
     }
 
     fn get_process_utilization(
-        &mut self,
+        &self,
         user_by_pid: &ps::UserTable,
     ) -> Result<Vec<gpuapi::Process>, String> {
         if let Some(info) = nvidia_nvml::get_process_utilization(user_by_pid) {
@@ -38,7 +38,7 @@ impl gpuapi::GPU for NvidiaGPU {
         }
     }
 
-    fn get_card_utilization(&mut self) -> Result<Vec<gpuapi::CardState>, String> {
+    fn get_card_utilization(&self) -> Result<Vec<gpuapi::CardState>, String> {
         if let Some(info) = nvidia_nvml::get_card_utilization() {
             Ok(info)
         } else {

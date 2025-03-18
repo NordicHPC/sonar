@@ -1,7 +1,6 @@
 // Rust wrapper around ../gpuapi/sonar-amd.{c,h}.
 
 use crate::gpuapi;
-use crate::gpuset;
 use crate::ps;
 use crate::util::cstrdup;
 
@@ -126,12 +125,14 @@ pub fn get_card_configuration() -> Option<Vec<gpuapi::Card>> {
             }
             result.push(gpuapi::Card {
                 bus_addr: cstrdup(&infobuf.bus_addr),
-                index: dev as i32,
+                device: gpuapi::GpuName{
+                    index: dev as i32,
+                    uuid: cstrdup(&infobuf.uuid),
+                },
                 model: model,
                 arch: arch,
                 driver: cstrdup(&infobuf.driver),
                 firmware: cstrdup(&infobuf.firmware),
-                uuid: cstrdup(&infobuf.uuid),
                 mem_size_kib: (infobuf.mem_total / 1024) as i64,
                 power_limit_watt: (infobuf.power_limit / 1000) as i32,
                 max_power_limit_watt: (infobuf.min_power_limit / 1000) as i32,
@@ -156,10 +157,14 @@ pub fn get_card_utilization() -> Option<Vec<gpuapi::CardState>> {
     for dev in 0..num_devices {
         if unsafe { amdml_device_get_card_state(dev, &mut infobuf) } == 0 {
             result.push(gpuapi::CardState {
-                index: dev as i32,
+                device: gpuapi::GpuName{
+                    index: dev as i32,
+                    uuid: get_card_uuid(dev),
+                },
+                failing: 0,
                 fan_speed_pct: infobuf.fan_speed_pct,
                 compute_mode: "".to_string(),
-                perf_state: format!("{}", infobuf.perf_level),
+                perf_state: infobuf.perf_level as i64,
                 mem_reserved_kib: 0,
                 mem_used_kib: (infobuf.mem_used / 1024) as i64,
                 gpu_utilization_pct: infobuf.gpu_util,
@@ -169,6 +174,15 @@ pub fn get_card_utilization() -> Option<Vec<gpuapi::CardState>> {
                 power_limit_watt: (infobuf.power_limit / 1000) as i32,
                 ce_clock_mhz: infobuf.ce_clock as i32,
                 mem_clock_mhz: infobuf.mem_clock as i32,
+            })
+        } else {
+            result.push(gpuapi::CardState {
+                device: gpuapi::GpuName{
+                    index: dev as i32,
+                    uuid: get_card_uuid(dev),
+                },
+                failing: gpuapi::GENERIC_FAILURE,
+                ..Default::default()
             })
         }
     }
@@ -196,13 +210,26 @@ pub fn get_process_utilization(user_by_pid: &ps::UserTable) -> Option<Vec<gpuapi
         }
 
         let (username, uid) = match user_by_pid.get(&(infobuf.pid as usize)) {
-            Some(x) => *x,
-            None => ("_unknown_", 1),
+            Some((name, uid)) => (name.to_string(), *uid),
+            None => ("_unknown_".to_string(), 1),
         };
+        let mut indices = infobuf.cards as usize;
+        let mut k = 0u32;
+        let mut devices = vec![];
+        while indices != 0 {
+            if (indices & 1) == 1 {
+                devices.push(gpuapi::GpuName{
+                    index: k as i32,
+                    uuid: get_card_uuid(k),
+                });
+            }
+            indices >>= 1;
+            k += 1;
+        }
         result.push(gpuapi::Process {
-            devices: gpuset::gpuset_from_bits(Some(infobuf.cards as usize)),
+            devices,
             pid: infobuf.pid as usize,
-            user: username.to_string(),
+            user: username,
             uid: uid,
             mem_pct: infobuf.mem_util as f64,
             gpu_pct: infobuf.gpu_util as f64,
@@ -214,4 +241,14 @@ pub fn get_process_utilization(user_by_pid: &ps::UserTable) -> Option<Vec<gpuapi
     unsafe { amdml_free_processes() };
 
     Some(result)
+}
+
+fn get_card_uuid(dev: u32) -> String {
+    // TODO: Not the most efficient way to do it, but OK for now?
+    let mut infobuf: AmdmlCardInfo = Default::default();
+    if unsafe { amdml_device_get_card_info(dev, &mut infobuf) } == 0 {
+        cstrdup(&infobuf.uuid)
+    } else {
+        "".to_string()
+    }
 }

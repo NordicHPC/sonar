@@ -30,9 +30,11 @@ pub fn sysinfo_output_test() {
         .with_files(files)
         .with_card(gpuapi::Card{
             bus_addr: "12:14:16".to_string(),
-            index: 0,
+            device: gpuapi::GpuName {
+                index: 0,
+                uuid: "1234.5678".to_string(),
+            },
             model: "Yoyodyne 1".to_string(),
-            uuid: "1234.5678".to_string(),
             mem_size_kib: 1024*1024,
             power_limit_watt: 2000,
             max_power_limit_watt: 3000,

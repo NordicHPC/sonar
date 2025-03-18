@@ -25,28 +25,44 @@ pub struct Process {
     pub has_children: bool,
 }
 
-/// Read the /proc/meminfo file from the fs and return the value for total installed memory.
+// All figures in KB, as reported by OS in /proc/meminfo.
 
-pub fn get_memtotal_kib(fs: &dyn procfsapi::ProcfsAPI) -> Result<usize, String> {
-    let mut memtotal_kib = 0;
+pub struct Memory {
+    pub total: u64,
+    pub available: u64,
+}
+
+// Read the /proc/meminfo file from the fs and return the value for total installed memory.
+
+pub fn get_memory(fs: &dyn procfsapi::ProcfsAPI) -> Result<Memory, String> {
+    let mut memory = Memory { total: 0, available: 0 };
     let meminfo_s = fs.read_to_string("meminfo")?;
-    for l in meminfo_s.split('\n') {
-        if l.starts_with("MemTotal: ") {
-            // We expect "MemTotal:\s+(\d+)\s+kB", roughly
+    {
+        let total = &mut memory.total;
+        let available = &mut memory.available;
+        for l in meminfo_s.split('\n') {
+            let ptr : &mut u64;
+            if l.starts_with("MemTotal: ") {
+                ptr = total;
+            } else if l.starts_with("MemAvailable: ") {
+                ptr = available;
+            } else {
+                continue;
+            }
+            // We expect "tag:\s+(\d+)\s+kB", roughly
             let fields = l.split_ascii_whitespace().collect::<Vec<&str>>();
             if fields.len() != 3 || fields[2] != "kB" {
-                return Err(format!("Unexpected MemTotal in /proc/meminfo: {l}"));
+                return Err(format!("Unexpected {} in /proc/meminfo: {l}", fields[0]));
             }
-            memtotal_kib = parse_usize_field(&fields, 1, l, "meminfo", 0, "MemTotal")?;
-            break;
+            *ptr = parse_usize_field(&fields, 1, l, "meminfo", 0, fields[0])? as u64;
         }
     }
-    if memtotal_kib == 0 {
+    if memory.total == 0 {
         return Err(format!(
             "Could not find MemTotal in /proc/meminfo: {meminfo_s}"
         ));
     }
-    Ok(memtotal_kib)
+    Ok(memory)
 }
 
 /// Read the /proc/cpuinfo file from the fs and return information about installed CPUs.
@@ -581,9 +597,11 @@ pub fn procfs_parse_test() {
         .with_now(now)
         .freeze();
     let fs = system.get_procfs();
-    let memtotal_kib = get_memtotal_kib(fs).expect("Test: Must have data");
+    let memory = get_memory(fs).expect("Test: Must have data");
+    assert!(memory.total == 16093776);
+    assert!(memory.available == 8162068);
     let (mut info, total_secs, per_cpu_secs) =
-        get_process_information(&system, memtotal_kib).expect("Test: Must have data");
+        get_process_information(&system, memory.total as usize).expect("Test: Must have data");
     assert!(info.len() == 1);
     let mut xs = info.drain();
     let p = xs.next().expect("Test: Should have data").1;
@@ -659,8 +677,8 @@ pub fn procfs_dead_and_undead_test() {
         .with_users(users)
         .freeze();
     let fs = system.get_procfs();
-    let memtotal_kib = get_memtotal_kib(fs).expect("Test: Must have data");
-    let (mut info, _, _) = get_process_information(&system, memtotal_kib).expect("Test: Must have data");
+    let memory = get_memory(fs).expect("Test: Must have data");
+    let (mut info, _, _) = get_process_information(&system, memory.total as usize).expect("Test: Must have data");
 
     // 4020 should be dropped - it's dead
     assert!(info.len() == 2);
