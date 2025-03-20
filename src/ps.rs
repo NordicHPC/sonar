@@ -268,10 +268,9 @@ fn collect_sample_data(
         return Ok(None);
     }
 
+    let (_cpu_total_secs, per_cpu_secs) = procfs::get_node_information(system)?;
     let memory = procfs::get_memory(system.get_procfs())?;
-    let (processes, _cpu_total_secs, per_cpu_secs) = {
-        procfs::get_process_information(system, memory.total as usize)?
-    };
+    let processes = procfs::get_process_information(system, memory.total as usize)?;
 
     procinfo_by_pid = add_cpu_info(procinfo_by_pid, system, &processes);
 

@@ -19,7 +19,7 @@ pub fn test_ps_no_meminfo() {
     let expect = r#"
 {
 "meta":{"producer":"sonar","version":"1.2.3"},
-"errors":[{"detail":"Unable to read /proc/meminfo","time":"2025-02-17T12:54:12+01:00"}]
+"errors":[{"detail":"Unable to read /proc/stat","time":"2025-02-17T12:54:12+01:00"}]
 }
 "#;
     //println!("{}", info.replace('\n',""));

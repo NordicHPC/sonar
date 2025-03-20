@@ -1,4 +1,4 @@
-/// Collect CPU process information without GPU information, from files in /proc.
+// Collect CPU process information without GPU information, from files in /proc.
 
 #[cfg(test)]
 use crate::mocksystem;
@@ -8,22 +8,6 @@ use crate::systemapi;
 use crate::systemapi::SystemAPI;
 
 use std::collections::{HashMap, HashSet};
-
-#[derive(PartialEq, Debug)]
-pub struct Process {
-    pub pid: usize,
-    pub ppid: usize,
-    pub pgrp: usize,
-    pub uid: usize,
-    pub user: String, // _noinfo_<uid> if name unobtainable
-    pub cpu_pct: f64,
-    pub mem_pct: f64,
-    pub cputime_sec: usize,
-    pub mem_size_kib: usize,
-    pub rssanon_kib: usize,
-    pub command: String,
-    pub has_children: bool,
-}
 
 // All figures in KB, as reported by OS in /proc/meminfo.
 
@@ -65,10 +49,10 @@ pub fn get_memory(fs: &dyn procfsapi::ProcfsAPI) -> Result<Memory, String> {
     Ok(memory)
 }
 
-/// Read the /proc/cpuinfo file from the fs and return information about installed CPUs.
-///
-/// Fun fact: this file is very different on x86_64 and aarch64 and requires custom parsing for
-/// each.
+// Read the /proc/cpuinfo file from the fs and return information about installed CPUs.
+//
+// Fun fact: this file is very different on x86_64 and aarch64 and requires custom parsing for
+// each.
 
 pub struct CpuInfo {
     pub sockets: i32,
@@ -123,20 +107,20 @@ pub fn get_cpu_info_x86_64(fs: &dyn procfsapi::ProcfsAPI) -> Result<CpuInfo, Str
                 })
             }
             model_name = None;
-            logical_index = i32_field(l)?;
+            logical_index = parse_i32_field(l)?;
             physical_index = 0i32;
         } else if l.starts_with("model name") {
-            model_name = Some(text_field(l)?);
+            model_name = Some(parse_text_field(l)?);
         } else if l.starts_with("physical id") {
-            physical_index = i32_field(l)?;
+            physical_index = parse_i32_field(l)?;
             if !physids.contains(&physical_index) {
                 physids.insert(physical_index);
                 sockets += 1;
             }
         } else if l.starts_with("siblings") {
-            siblings = i32_field(l)?;
+            siblings = parse_i32_field(l)?;
         } else if l.starts_with("cpu cores") {
-            cores_per_socket = i32_field(l)?;
+            cores_per_socket = parse_i32_field(l)?;
         }
     }
     if let Some(model_name) = model_name {
@@ -166,11 +150,11 @@ pub fn get_cpu_info_aarch64(fs: &dyn procfsapi::ProcfsAPI) -> Result<CpuInfo, St
     let cpuinfo = fs.read_to_string("cpuinfo")?;
     for l in cpuinfo.split('\n') {
         if l.starts_with("processor") {
-            processors.insert(i32_field(l)?);
+            processors.insert(parse_i32_field(l)?);
         } else if l.starts_with("CPU architecture") {
-            model_major = i32_field(l)?;
+            model_major = parse_i32_field(l)?;
         } else if l.starts_with("CPU variant") {
-            model_minor = i32_field(l)?;
+            model_minor = parse_i32_field(l)?;
         }
     }
 
@@ -189,32 +173,9 @@ pub fn get_cpu_info_aarch64(fs: &dyn procfsapi::ProcfsAPI) -> Result<CpuInfo, St
     Ok(CpuInfo { sockets, cores_per_socket, threads_per_core, cores })
 }
 
-#[cfg(any(target_arch = "x86_64", test))]
-fn text_field(l: &str) -> Result<String, String> {
-    if let Some((_, after)) = l.split_once(':') {
-        Ok(after.trim().to_string())
-    } else {
-        Err(format!("Missing text field in {l}"))
-    }
-}
-
-fn i32_field(l: &str) -> Result<i32, String> {
-    if let Some((_, after)) = l.split_once(':') {
-        let after = after.trim();
-        match after.strip_prefix("0x") {
-            Some(s) => match i32::from_str_radix(s, 16) {
-                Ok(n) => Ok(n),
-                Err(_) => Err(format!("Bad int field {l}")),
-            },
-            None => match after.parse::<i32>() {
-                Ok(n) => Ok(n),
-                Err(_) => Err(format!("Bad int field {l}")),
-            },
-        }
-    } else {
-        Err(format!("Missing or bad int field in {l}"))
-    }
-}
+// The boot time is first field of the `btime` line of /proc/stat.  It is measured in seconds since
+// epoch.  We need this to compute the process's real time, which we need to compute ps-compatible
+// cpu utilization.
 
 pub fn get_boot_time(fs: &dyn procfsapi::ProcfsAPI) -> Result<u64, String> {
     let stat_s = fs.read_to_string("stat")?;
@@ -227,21 +188,13 @@ pub fn get_boot_time(fs: &dyn procfsapi::ProcfsAPI) -> Result<u64, String> {
     Err(format!("Could not find btime in /proc/stat: {stat_s}"))
 }
 
-/// Obtain process information via /proc and return a hashmap of structures with all the information
-/// we need, keyed by pid.  Pids uniquely tag the records.
-///
-/// This returns Ok(data) on success, otherwise Err(msg).
-///
-/// This function uniformly uses /proc, even though in some cases there are system calls that
-/// provide the same information.
+// Extract system data from /proc/stat.  https://man7.org/linux/man-pages/man5/procfs.5.html.
+//
+// The per-CPU usage is the sum of some fields of the `cpuN` lines.  These are in ticks since
+// boot.  In addition there is an across-the-system line called simply `cpu` with the same
+// format.  These data are useful for analyzing core bindings.
 
-pub fn get_process_information(
-    system: &dyn systemapi::SystemAPI,
-    memtotal_kib: usize,
-) -> Result<(HashMap<usize, Process>, u64, Vec<u64>), String> {
-    // We need this for a lot of things.  On x86 and x64 this is always 100 but in principle it
-    // might be something else, so read the true value.
-
+pub fn get_node_information(system: &dyn systemapi::SystemAPI) -> Result<(u64, Vec<u64>), String> {
     let ticks_per_sec = system.get_clock_ticks_per_sec() as u64;
     if ticks_per_sec == 0 {
         return Err("Could not get a sensible CLK_TCK".to_string());
@@ -249,17 +202,6 @@ pub fn get_process_information(
 
     let fs = system.get_procfs();
 
-    // Extract system data from /proc/stat.  https://man7.org/linux/man-pages/man5/procfs.5.html.
-    //
-    // The per-CPU usage is the sum of some fields of the `cpuN` lines.  These are in ticks since
-    // boot.  In addition there is an across-the-system line called simply `cpu` with the same
-    // format.  These data are useful for analyzing core bindings.
-    //
-    // The boot time is first field of the `btime` line of /proc/stat.  It is measured in seconds
-    // since epoch.  We need this to compute the process's real time, which we need to compute
-    // ps-compatible cpu utilization.
-
-    let mut boot_time = 0;
     let mut cpu_total_secs = 0;
     let mut per_cpu_secs = vec![];
     let stat_s = fs.read_to_string("stat")?;
@@ -288,14 +230,50 @@ pub fn get_process_information(
                 }
                 per_cpu_secs[cpu_no] = sum / ticks_per_sec;
             }
-        } else if l.starts_with("btime ") {
-            let fields = l.split_ascii_whitespace().collect::<Vec<&str>>();
-            boot_time = parse_usize_field(&fields, 1, l, "stat", 0, "btime")? as u64;
         }
     }
-    if boot_time == 0 {
-        return Err(format!("Could not find btime in /proc/stat: {stat_s}"));
+    Ok((cpu_total_secs, per_cpu_secs))
+}
+
+#[derive(PartialEq, Debug)]
+pub struct Process {
+    pub pid: usize,
+    pub ppid: usize,
+    pub pgrp: usize,
+    pub uid: usize,
+    pub user: String, // _noinfo_<uid> if name unobtainable
+    pub cpu_pct: f64, // Cumulative, not very useful but sonalyze uses it
+    pub mem_pct: f64,
+    pub cpu_util: f64, // Sample (over a short time period), slurm-monitor uses it
+    pub cputime_sec: usize,
+    pub mem_size_kib: usize,
+    pub rssanon_kib: usize,
+    pub command: String,
+    pub has_children: bool,
+}
+
+// Obtain process information via /proc and return a hashmap of structures with all the information
+// we need, keyed by pid.  Pids uniquely tag the records.
+//
+// This returns Ok(data) on success, otherwise Err(msg).
+//
+// This function uniformly uses /proc, even though in some cases there are system calls that
+// provide the same information.
+
+pub fn get_process_information(
+    system: &dyn systemapi::SystemAPI,
+    memtotal_kib: usize,
+) -> Result<HashMap<usize, Process>, String> {
+    // We need this for a lot of things.  On x86 and x64 this is always 100 but in principle it
+    // might be something else, so read the true value.
+
+    let ticks_per_sec = system.get_clock_ticks_per_sec() as u64;
+    if ticks_per_sec == 0 {
+        return Err("Could not get a sensible CLK_TCK".to_string());
     }
+
+    let fs = system.get_procfs();
+    let boot_time = get_boot_time(fs)?;
 
     // Enumerate all pids, and collect the uids while we're here.
     //
@@ -541,6 +519,7 @@ pub fn get_process_information(
                 user: user_table.lookup(system, uid),
                 cpu_pct: pcpu_formatted,
                 mem_pct: pmem,
+                cpu_util: 0.0,    // FIXME
                 cputime_sec,
                 mem_size_kib: size_kib,
                 rssanon_kib,
@@ -556,7 +535,34 @@ pub fn get_process_information(
         p.has_children = ppids.contains(&p.pid);
     }
 
-    Ok((result, cpu_total_secs, per_cpu_secs))
+    Ok(result)
+}
+
+#[cfg(any(target_arch = "x86_64", test))]
+fn parse_text_field(l: &str) -> Result<String, String> {
+    if let Some((_, after)) = l.split_once(':') {
+        Ok(after.trim().to_string())
+    } else {
+        Err(format!("Missing text field in {l}"))
+    }
+}
+
+fn parse_i32_field(l: &str) -> Result<i32, String> {
+    if let Some((_, after)) = l.split_once(':') {
+        let after = after.trim();
+        match after.strip_prefix("0x") {
+            Some(s) => match i32::from_str_radix(s, 16) {
+                Ok(n) => Ok(n),
+                Err(_) => Err(format!("Bad int field {l}")),
+            },
+            None => match after.parse::<i32>() {
+                Ok(n) => Ok(n),
+                Err(_) => Err(format!("Bad int field {l}")),
+            },
+        }
+    } else {
+        Err(format!("Missing or bad int field in {l}"))
+    }
 }
 
 fn parse_usize_field(
@@ -663,8 +669,8 @@ pub fn procfs_parse_test() {
     let memory = get_memory(fs).expect("Test: Must have data");
     assert!(memory.total == 16093776);
     assert!(memory.available == 8162068);
-    let (mut info, total_secs, per_cpu_secs) =
-        get_process_information(&system, memory.total as usize).expect("Test: Must have data");
+    let (total_secs, per_cpu_secs) = get_node_information(&system).expect("Test: Must have data");
+    let mut info = get_process_information(&system, memory.total as usize).expect("Test: Must have data");
     assert!(info.len() == 1);
     let mut xs = info.drain();
     let p = xs.next().expect("Test: Should have data").1;
@@ -741,7 +747,7 @@ pub fn procfs_dead_and_undead_test() {
         .freeze();
     let fs = system.get_procfs();
     let memory = get_memory(fs).expect("Test: Must have data");
-    let (mut info, _, _) = get_process_information(&system, memory.total as usize).expect("Test: Must have data");
+    let mut info = get_process_information(&system, memory.total as usize).expect("Test: Must have data");
 
     // 4020 should be dropped - it's dead
     assert!(info.len() == 2);
