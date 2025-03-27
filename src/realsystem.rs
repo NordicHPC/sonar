@@ -19,6 +19,9 @@ use std::path;
 // 3 minutes ought to be enough for anyone.
 const SACCT_TIMEOUT_S: u64 = 180;
 
+// sinfo will normally be very quick
+const SINFO_TIMEOUT_S: u64 = 10;
+
 pub struct RealSystemBuilder {
     jm: Option<Box<dyn jobsapi::JobManager>>,
     cluster: String,
@@ -180,7 +183,7 @@ impl systemapi::SystemAPI for RealSystem {
         from: &str,
         to: &str,
     ) -> Result<String, String> {
-        match command::safe_command(
+        runit(
             "sacct",
             &[
                 "-aP",
@@ -195,10 +198,15 @@ impl systemapi::SystemAPI for RealSystem {
                 to,
             ],
             SACCT_TIMEOUT_S,
-        ) {
-            Err(e) => Err(format!("sacct failed: {:?}", e)),
-            Ok(sacct_output) => Ok(sacct_output),
-        }
+        )
+    }
+
+    fn run_sinfo_partitions(&self) -> Result<Vec<(String,String)>, String> {
+	twofields(runit("sinfo", &["-h", "-a", "-O", "Partition:|,NodeList:|"], SINFO_TIMEOUT_S)?)
+    }
+
+    fn run_sinfo_nodes(&self) -> Result<Vec<(String,String)>, String> {
+        twofields(runit("sinfo", &["-h", "-a", "-e", "-O", "NodeList:|,StateComplete:|"], SINFO_TIMEOUT_S)?)
     }
 
     fn handle_interruptions(&self) {
@@ -208,4 +216,25 @@ impl systemapi::SystemAPI for RealSystem {
     fn is_interrupted(&self) -> bool {
         interrupt::is_interrupted()
     }
+}
+
+fn runit(cmd: &str, args: &[&str], timeout: u64) -> Result<String, String> {
+    match command::safe_command(cmd, args, timeout) {
+        Ok(s) => Ok(s),
+        Err(command::CmdError::CouldNotStart(e)) => Err(e),
+        Err(command::CmdError::Failed(e)) => Err(e),
+        Err(command::CmdError::Hung(e)) => Err(e),
+        Err(command::CmdError::InternalError(e)) => Err(e),
+    }
+}
+
+fn twofields(text: String) -> Result<Vec<(String,String)>, String> {
+    let mut v = vec![];
+    for l in text.lines() {
+        let mut fields = l.split('|');
+        let a = fields.next().ok_or("Bad sinfo output")?;
+        let b = fields.next().ok_or("Bad sinfo output")?;
+        v.push((a.to_string(),b.to_string()));
+    }
+    Ok(v)
 }

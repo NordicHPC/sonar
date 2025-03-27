@@ -1,6 +1,6 @@
 // Run sacct, extract output and reformat as CSV or JSON on stdout.
 
-use crate::cluster;
+use crate::nodelist;
 use crate::output;
 use crate::systemapi;
 use crate::time;
@@ -346,7 +346,7 @@ fn parse_sacct_jobs_newfmt(
                 }
                 "NodeList" => {
                     if fieldvals[i] != "" {
-                        if let Ok(nodes) = cluster::render_nodelist(&fieldvals[i]) {
+                        if let Ok(nodes) = nodelist::parse_and_render(&fieldvals[i]) {
                             output_line.push_a("nodes", nodes);
                         }
                     }

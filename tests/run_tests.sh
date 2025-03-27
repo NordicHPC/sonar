@@ -15,6 +15,8 @@ fi
 # later we could just iterate over all scripts that end with .sh
 # and are not this script
 for test in amd-gpu \
+                cluster-no-sinfo \
+                cluster-syntax \
                 command-line \
                 exclude-commands \
                 exclude-system-jobs \

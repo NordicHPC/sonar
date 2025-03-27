@@ -2,6 +2,7 @@
 mod amd;
 #[cfg(feature = "amd")]
 mod amd_smi;
+mod cluster;
 mod command;
 mod gpuapi;
 mod hostname;
@@ -16,6 +17,7 @@ mod mockgpu;
 mod mockjobs;
 #[cfg(test)]
 mod mocksystem;
+mod nodelist;
 #[cfg(feature = "nvidia")]
 mod nvidia;
 #[cfg(feature = "nvidia")]
@@ -90,7 +92,12 @@ enum Commands {
         /// Cluster name
         cluster: Option<String>,
     },
-    /// Extract system information
+    /// Extract cluster information
+    Cluster {
+        /// Cluster name
+        cluster: Option<String>,
+    },
+    /// Extract node information
     Sysinfo {
         /// Output CSV, not old JSON
         csv: bool,
@@ -195,6 +202,14 @@ fn main() {
                 system
             };
             slurmjobs::show_slurm_jobs(writer, window, span, *deluge, &system.freeze().expect("System initialization"), *json);
+        }
+        Commands::Cluster { cluster } => {
+            let system = if cluster.is_some() {
+                system.with_cluster(cluster.as_ref().unwrap())
+            } else {
+                system
+            };
+            cluster::show_cluster(writer, &system.freeze().expect("System initialization"));
         }
         Commands::Version {} => {
             show_version(writer);
@@ -365,6 +380,23 @@ fn command_line() -> Commands {
                 }
                 Commands::Slurmjobs { window, span, json, cluster, deluge }
             }
+            "cluster" => {
+                let mut cluster = None;
+                while next < args.len() {
+                    let arg = args[next].as_ref();
+                    next += 1;
+                    if let Some(new_next) = bool_arg(arg, &args, next, "--json") {
+                        next = new_next;
+                    } else if let Some((new_next, value)) =
+                        string_arg(arg, &args, next, "--cluster")
+                    {
+                        (next, cluster) = (new_next, Some(value));
+                    } else {
+                        usage(true);
+                    }
+                }
+                Commands::Cluster { cluster }
+            }
             "version" => Commands::Version {},
             "help" => {
                 usage(false);
@@ -437,19 +469,14 @@ Usage: sonar <COMMAND>
 Commands:
   ps       Print process and load information
   sysinfo  Print system information
-  slurm    Print slurm job information for a [start,end) time interval
+  slurm    Print Slurm job information for a [start,end) time interval
+  cluster  Print current Slurm partition information and node status
   help     Print this message
 
 Options for `ps`:
   --rollup
       Merge process records that have the same job ID and command name (on systems
       with stable job IDs only)
-  --min-cpu-percent percentage
-      Include records for jobs that have on average used at least this
-      percentage of CPU, note this is nonmonotonic [default: none]
-  --min-mem-percent percentage
-      Include records for jobs that presently use at least this percentage of
-      real memory, note this is nonmonotonic [default: none]
   --min-cpu-time seconds
       Include records for jobs that have used at least this much CPU time
       [default: none]
@@ -459,6 +486,12 @@ Options for `ps`:
       Exclude records whose users match these names [default: none]
   --exclude-commands command,command,...
       Exclude records whose commands start with these names [default: none]
+  --min-cpu-percent percentage
+      Include records for jobs that have on average used at least this
+      percentage of CPU, NOTE THIS IS NONMONOTONIC [default: none]
+  --min-mem-percent percentage
+      Include records for jobs that presently use at least this percentage of
+      real memory, NOTE THIS IS NONMONOTONIC [default: none]
   --lockdir directory
       Create a per-host lockfile in this directory and exit early if the file
       exists on startup [default: none]
@@ -488,6 +521,10 @@ Options for `slurm`:
       Include PENDING and RUNNING jobs in the output, not just completed jobs.
   --json
       Format output as new JSON, not CSV
+  --cluster name
+      Optional cluster name with which to tag output
+
+Options for `cluster`:
   --cluster name
       Optional cluster name with which to tag output
 ",

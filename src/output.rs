@@ -17,6 +17,7 @@ pub enum Value {
     U(u64),
     I(i64),
     F(f64),
+    B(bool),
     E(), // Empty array element only, never a field or toplevel value
 }
 
@@ -94,6 +95,10 @@ impl Object {
 
     pub fn push_f(&mut self, tag: &str, f: f64) {
         self.push(tag, Value::F(f));
+    }
+
+    pub fn push_b(&mut self, tag: &str, b: bool) {
+        self.push(tag, Value::B(b));
     }
 }
 
@@ -202,6 +207,7 @@ fn write_json_int(writer: &mut dyn io::Write, v: &Value) {
         Value::U(u) => write_chars(writer, &format!("{u}")),
         Value::I(i) => write_chars(writer, &format!("{i}")),
         Value::F(f) => write_chars(writer, &format!("{f}")),
+        Value::B(b) => write_chars(writer, &format!("{b}")),
         Value::E() => {}
     }
 }
@@ -288,6 +294,7 @@ pub fn format_csv_value(v: &Value) -> String {
         Value::U(u) => format!("{u}"),
         Value::I(i) => format!("{i}"),
         Value::F(f) => format!("{f}"),
+        Value::B(b) => format!("{b}"),
         Value::E() => "".to_string(),
     }
 }
