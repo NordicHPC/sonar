@@ -296,12 +296,14 @@ fn command_line() -> Commands {
                         usage(true);
                     }
                 }
-
                 if json && csv {
                     eprintln!("--csv and --json are incompatible");
                     std::process::exit(USAGE_ERROR);
                 }
-
+                if json && cluster.is_none() {
+                    eprintln!("--json requires --cluster");
+                    std::process::exit(USAGE_ERROR);
+                }
                 Commands::PS {
                     rollup,
                     min_cpu_percent,
@@ -337,6 +339,10 @@ fn command_line() -> Commands {
                 }
                 if json && csv {
                     eprintln!("--csv and --json are incompatible");
+                    std::process::exit(USAGE_ERROR);
+                }
+                if json && cluster.is_none() {
+                    eprintln!("--json requires --cluster");
                     std::process::exit(USAGE_ERROR);
                 }
                 Commands::Sysinfo { csv, json, cluster }
@@ -378,6 +384,10 @@ fn command_line() -> Commands {
                     eprintln!("--csv and --json are incompatible");
                     std::process::exit(USAGE_ERROR);
                 }
+                if json && cluster.is_none() {
+                    eprintln!("--json requires --cluster");
+                    std::process::exit(USAGE_ERROR);
+                }
                 Commands::Slurmjobs { window, span, json, cluster, deluge }
             }
             "cluster" => {
@@ -394,6 +404,11 @@ fn command_line() -> Commands {
                     } else {
                         usage(true);
                     }
+                }
+                // The only output format supported is "new JSON", so require `--cluster` always
+                if cluster.is_none() {
+                    eprintln!("The `cluster` command requires --cluster");
+                    std::process::exit(USAGE_ERROR);
                 }
                 Commands::Cluster { cluster }
             }
@@ -500,7 +515,7 @@ Options for `ps`:
   --json
       Format output as new JSON, not CSV
   --cluster name
-      Optional cluster name with which to tag output
+      Optional cluster name (required for --json) with which to tag output
 
 Options for `sysinfo`:
   --csv
@@ -508,7 +523,7 @@ Options for `sysinfo`:
   --json
       Format output as new JSON, not the old JSON
   --cluster name
-      Optional cluster name with which to tag output
+      Optional cluster name (required for --json) with which to tag output
 
 Options for `slurm`:
   --window minutes
@@ -522,11 +537,11 @@ Options for `slurm`:
   --json
       Format output as new JSON, not CSV
   --cluster name
-      Optional cluster name with which to tag output
+      Optional cluster name (required for --json) with which to tag output
 
 Options for `cluster`:
   --cluster name
-      Optional cluster name with which to tag output
+      Mandatory cluster name with which to tag output
 ",
     );
     let _ = out.flush();

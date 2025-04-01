@@ -55,7 +55,7 @@ echo "CSV ok"
 
 # Check that it is syntactically sane
 
-output=$(../target/debug/sonar ps --load --exclude-system-jobs --json)
+output=$(../target/debug/sonar ps --load --exclude-system-jobs --cluster x --json)
 jq . <<< $output > /dev/null
 
 # Check that the envelope has required fields
