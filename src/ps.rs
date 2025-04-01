@@ -9,6 +9,8 @@ use crate::systemapi;
 use std::collections::HashMap;
 use std::io::{self, Write};
 use std::path::PathBuf;
+use std::time;
+use std::thread;
 
 #[derive(Default)]
 pub struct PsOptions {
@@ -22,6 +24,7 @@ pub struct PsOptions {
     pub lockdir: Option<String>,
     pub load: bool,
     pub new_json: bool,
+    pub cpu_util: bool,
 }
 
 pub fn create_snapshot(
@@ -88,7 +91,7 @@ pub fn create_snapshot(
             // while the lockfile is being held, to ensure the second process exits immediately.
             #[cfg(debug_assertions)]
             if std::env::var("SONARTEST_WAIT_LOCKFILE").is_ok() {
-                std::thread::sleep(std::time::Duration::new(10, 0));
+                thread::sleep(time::Duration::new(10, 0));
             }
         }
 
@@ -270,7 +273,20 @@ fn collect_sample_data(
 
     let (_cpu_total_secs, per_cpu_secs) = procfs::get_node_information(system)?;
     let memory = procfs::get_memory(system.get_procfs())?;
-    let processes = procfs::get_process_information(system, memory.total as usize)?;
+    let (mut processes, per_pid_cpu_ticks) = procfs::get_process_information(system, memory.total as usize)?;
+
+    if opts.cpu_util {
+        let utils = procfs::get_cpu_utilization(system, &per_pid_cpu_ticks, 100)?;
+        for (pid, cpu_util) in utils.iter() {
+            processes
+                .entry(*pid)
+                .and_modify(|e| {
+                    e.cpu_util = *cpu_util;
+                });
+            // There is no or_insert case.  It may be that a process has gone away, and there's no
+            // data for it, but not that a process has appeared during the utilization computation.
+        }
+    }
 
     procinfo_by_pid = add_cpu_info(procinfo_by_pid, system, &processes);
 

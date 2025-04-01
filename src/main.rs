@@ -171,6 +171,7 @@ fn main() {
                 },
                 lockdir: lockdir.clone(),
                 new_json: *json,
+                cpu_util: true,
             };
 
             #[cfg(debug_assertions)]

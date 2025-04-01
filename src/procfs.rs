@@ -8,6 +8,8 @@ use crate::systemapi;
 use crate::systemapi::SystemAPI;
 
 use std::collections::{HashMap, HashSet};
+use std::thread;
+use std::time;
 
 // All figures in KB, as reported by OS in /proc/meminfo.
 
@@ -255,6 +257,9 @@ pub struct Process {
 // Obtain process information via /proc and return a hashmap of structures with all the information
 // we need, keyed by pid.  Pids uniquely tag the records.
 //
+// Also return a vector mapping pid to total cpu ticks for the process.  This will be used to
+// compute per-process CPU utilization in get_cpu_utilization(), below.
+//
 // This returns Ok(data) on success, otherwise Err(msg).
 //
 // This function uniformly uses /proc, even though in some cases there are system calls that
@@ -263,7 +268,7 @@ pub struct Process {
 pub fn get_process_information(
     system: &dyn systemapi::SystemAPI,
     memtotal_kib: usize,
-) -> Result<HashMap<usize, Process>, String> {
+) -> Result<(HashMap<usize, Process>, Vec<(usize, u64)>), String> {
     // We need this for a lot of things.  On x86 and x64 this is always 100 but in principle it
     // might be something else, so read the true value.
 
@@ -292,8 +297,8 @@ pub fn get_process_information(
     let mut result = HashMap::<usize, Process>::new();
     let mut ppids = HashSet::<usize>::new();
     let mut user_table = UserTable::new();
-    let clock_ticks_per_sec = ticks_per_sec as f64;
 
+    let mut per_pid_cpu_ticks = vec![];
     for (pid, uid) in pids {
         // Basic system variables.  Intermediate time values are represented in ticks to prevent
         // various roundoff artifacts resulting in NaN or Infinity.
@@ -386,28 +391,28 @@ pub fn get_process_information(
             // has no history, and has no notion of a job or process being "gone".  Instead, enough
             // data must be emitted by Sonar for a postprocessor of the data to reconstruct the job
             // tree and correct the data, if necessary.
-            utime_ticks = parse_usize_field(&fields, 11, &line, "stat", pid, "utime")? as f64;
-            stime_ticks = parse_usize_field(&fields, 12, &line, "stat", pid, "stime")? as f64;
-            let cutime_ticks = parse_usize_field(&fields, 13, &line, "stat", pid, "cutime")? as f64;
-            let cstime_ticks = parse_usize_field(&fields, 14, &line, "stat", pid, "cstime")? as f64;
+            utime_ticks = parse_usize_field(&fields, 11, &line, "stat", pid, "utime")? as u64;
+            stime_ticks = parse_usize_field(&fields, 12, &line, "stat", pid, "stime")? as u64;
+            let cutime_ticks = parse_usize_field(&fields, 13, &line, "stat", pid, "cutime")? as u64;
+            let cstime_ticks = parse_usize_field(&fields, 14, &line, "stat", pid, "cstime")? as u64;
             bsdtime_ticks = utime_ticks + stime_ticks + cutime_ticks + cstime_ticks;
             let start_time_ticks =
-                parse_usize_field(&fields, 19, &line, "stat", pid, "starttime")? as f64;
+                parse_usize_field(&fields, 19, &line, "stat", pid, "starttime")? as u64;
 
             // boot_time and the current time are both time_t, ie, a 31-bit quantity in 2023 and a
             // 32-bit quantity before 2038.  clock_ticks_per_sec is on the order of 100.  Ergo
             // boot_ticks and now_ticks can be represented in about 32+7=39 bits, fine for an f64.
-            let now_ticks = system.get_now_in_secs_since_epoch() as f64 * clock_ticks_per_sec;
-            let boot_ticks = boot_time as f64 * clock_ticks_per_sec;
+            let now_ticks = system.get_now_in_secs_since_epoch() as u64 * ticks_per_sec;
+            let boot_ticks = boot_time as u64 * ticks_per_sec;
 
             // start_time_ticks should be on the order of a few years, there is no risk of overflow
             // here, and in any case boot_ticks + start_time_ticks <= now_ticks, and by the above
             // reasoning now_ticks fits in an f64, ergo the sum does too.
             //
             // Take the max with 1 here to ensure realtime_ticks is not zero.
-            realtime_ticks = now_ticks - (boot_ticks + start_time_ticks);
-            if realtime_ticks < 1.0 {
-                realtime_ticks = 1.0;
+            realtime_ticks = now_ticks as i64 - (boot_ticks + start_time_ticks) as i64;
+            if realtime_ticks < 1 {
+                realtime_ticks = 1;
             }
         } else {
             // This is *usually* benign - the process may have gone away since we enumerated the
@@ -494,12 +499,13 @@ pub fn get_process_information(
         // floor() or ceil() is the most correct, but it's unlikely to matter much.
 
         // realtime_ticks is nonzero, so this division will not produce NaN or Infinity
-        let pcpu_value = (utime_ticks + stime_ticks) / realtime_ticks;
+        let pcpu_value = (utime_ticks + stime_ticks) as f64 / realtime_ticks as f64;
         let pcpu_formatted = (pcpu_value * 1000.0).round() / 10.0;
 
-        // clock_ticks_per_sec is nonzero, so this division will not produce NaN or Infinity.  See
-        // block comment earlier about why bsdtime_ticks is the best base value here.
-        let cputime_sec = (bsdtime_ticks / clock_ticks_per_sec).round() as usize;
+        // ticks_per_sec is nonzero, so this division will not fail.  See block comment earlier
+        // about why bsdtime_ticks is the best base value here.  We round, as that yields the most
+        // natural result.
+        let cputime_sec = (bsdtime_ticks + (ticks_per_sec / 2)) / ticks_per_sec;
 
         // Note ps uses rss not size here.  Also, ps doesn't trust rss to be <= 100% of memory, so
         // let's not trust it either.  memtotal_kib is nonzero, so this division will not produce
@@ -509,6 +515,7 @@ pub fn get_process_information(
             99.9,
         );
 
+        per_pid_cpu_ticks.push((pid, bsdtime_ticks));
         result.insert(
             pid,
             Process {
@@ -520,7 +527,7 @@ pub fn get_process_information(
                 cpu_pct: pcpu_formatted,
                 mem_pct: pmem,
                 cpu_util: 0.0,    // FIXME
-                cputime_sec,
+                cputime_sec: cputime_sec as usize,
                 mem_size_kib: size_kib,
                 rssanon_kib,
                 command: comm,
@@ -535,6 +542,58 @@ pub fn get_process_information(
         p.has_children = ppids.contains(&p.pid);
     }
 
+    Ok((result, per_pid_cpu_ticks))
+}
+
+// Given the per-process CPU time computed by get_process_information, and a time to wait, wait for
+// that time and then read the CPU time again.  The sampled process CPU utilization is the delta of
+// CPU time divided by the delta of time.
+
+pub fn get_cpu_utilization(
+    system: &dyn systemapi::SystemAPI,
+    per_pid_cpu_ticks: &[(usize, u64)],
+    wait_time_ms: usize,
+) -> Result<Vec<(usize, f64)>, String> {
+    let ticks_per_sec = system.get_clock_ticks_per_sec() as u64;
+    let fs = system.get_procfs();
+
+    // This is somewhat dodgy.  It may wait more than 100ms.  It may be that the previous
+    // information was not obtained just before sleeping, but sometime prior to that.
+    thread::sleep(time::Duration::from_millis(100));
+
+    let mut result = vec![];
+    for (pid, prev_cputime_ticks) in per_pid_cpu_ticks {
+        let bsdtime_ticks;
+        match fs.read_to_string(&format!("{pid}/stat")) {
+            Err(_) => {
+                continue;
+            }
+            Ok(line) => {
+                let field_storage: String;
+                let fields: Vec<&str>;
+                match line.rfind(')') {
+                    None => {
+                        continue;
+                    }
+                    Some(commend) => {
+                        field_storage = line[commend + 1..].trim().to_string();
+                        fields = field_storage
+                            .split_ascii_whitespace()
+                            .collect::<Vec<&str>>();
+                    }
+                }
+                let utime_ticks = parse_usize_field(&fields, 11, &line, "stat", *pid, "utime")? as u64;
+                let stime_ticks = parse_usize_field(&fields, 12, &line, "stat", *pid, "stime")? as u64;
+                let cutime_ticks = parse_usize_field(&fields, 13, &line, "stat", *pid, "cutime")? as u64;
+                let cstime_ticks = parse_usize_field(&fields, 14, &line, "stat", *pid, "cstime")? as u64;
+                bsdtime_ticks = utime_ticks + stime_ticks + cutime_ticks + cstime_ticks;
+            }
+        }
+        let utilization = (bsdtime_ticks - prev_cputime_ticks) as f64 *
+            (1000.0 / wait_time_ms as f64) /
+            ticks_per_sec as f64;
+        result.push((*pid, utilization));
+    }
     Ok(result)
 }
 
@@ -670,7 +729,7 @@ pub fn procfs_parse_test() {
     assert!(memory.total == 16093776);
     assert!(memory.available == 8162068);
     let (total_secs, per_cpu_secs) = get_node_information(&system).expect("Test: Must have data");
-    let mut info = get_process_information(&system, memory.total as usize).expect("Test: Must have data");
+    let (mut info, _) = get_process_information(&system, memory.total as usize).expect("Test: Must have data");
     assert!(info.len() == 1);
     let mut xs = info.drain();
     let p = xs.next().expect("Test: Should have data").1;
@@ -747,7 +806,7 @@ pub fn procfs_dead_and_undead_test() {
         .freeze();
     let fs = system.get_procfs();
     let memory = get_memory(fs).expect("Test: Must have data");
-    let mut info = get_process_information(&system, memory.total as usize).expect("Test: Must have data");
+    let (mut info, _) = get_process_information(&system, memory.total as usize).expect("Test: Must have data");
 
     // 4020 should be dropped - it's dead
     assert!(info.len() == 2);
