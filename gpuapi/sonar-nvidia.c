@@ -15,10 +15,11 @@
 #include <dlfcn.h>
 #include <inttypes.h>
 #include <stddef.h>
-#include <stdio.h> /* snprintf, we can fix this if we don't want the baggage */
+#include <stdio.h> /* snprintf(), we can fix this if we don't want the baggage */
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include <sys/utsname.h>
 
 #include "sonar-nvidia.h"
 
@@ -60,22 +61,57 @@ static nvmlReturn_t (*xnvmlSystemGetCudaDriverVersion)(int*);
 
 static int load_nvml() {
     static void* lib;
+    char pathbuf[128];          /* Less than 64 is really enough, barring problems */
+    struct utsname sysinfo;
 
     if (lib != NULL) {
         return 0;
     }
 
-    /* This is the location of the library on all the UiO ML nodes and on the Fox GPU nodes. */
-    /* The Web also seems to think this is the right spot. */
-    /* TBD is Saga, Betzy GPU nodes. */
-    lib = dlopen("/usr/lib64/libnvidia-ml.so", RTLD_NOW);
+    if (uname(&sysinfo) != 0) {
+        LOGIT("Failed to get sysinfo");
+        return -1;
+    }
+
+    /* /usr/lib64 is the location of the CUDA SMI library on all the UiO ML nodes and on the Fox GPU
+       nodes (RHEL9).  The Web also seems to think this is the right spot.  However older CUDA
+       libraries (eg, for CUDA 430 on SRL login3, Ubuntu 18) have been found in other locations.
+
+       According to the Filesystem Hierarchy Standard, we're going to be looking at /lib, /usr/lib,
+       /lib64, and /usr/lib64.  But in practice things are also found in /lib/<arch>-linux-gnu and
+       /usr/lib/<arch>-linux-gnu where <arch> is as in `uname -m`.
+
+       Instead of being clever, just try one after the other.
+    */
+    if (sizeof(void*) == 8) {
+        if (lib == NULL) {
+            lib = dlopen("/usr/lib64/libnvidia-ml.so", RTLD_NOW);
+        }
+        if (lib == NULL) {
+            lib = dlopen("/lib64/libnvidia-ml.so", RTLD_NOW);
+        }
+    }
+    if (lib == NULL) {
+        lib = dlopen("/usr/lib/libnvidia-ml.so", RTLD_NOW);
+    }
+    if (lib == NULL) {
+        lib = dlopen("/lib/libnvidia-ml.so", RTLD_NOW);
+    }
+    if (lib == NULL) {
+        snprintf(pathbuf, sizeof(pathbuf), "/usr/lib/%s-linux-gnu/libnvidia-ml.so", sysinfo.machine);
+        lib = dlopen(pathbuf, RTLD_NOW);
+    }
+    if (lib == NULL) {
+        snprintf(pathbuf, sizeof(pathbuf), "/lib/%s-linux-gnu/libnvidia-ml.so", sysinfo.machine);
+        lib = dlopen(pathbuf, RTLD_NOW);
+    }
     if (lib == NULL) {
         LOGIT("Failed to load library");
         return -1;
     }
 
-    /* You'll be tempted to try some magic here with # and ## but it won't work because sometimes
-       nvml.h introduces #defines of some of the names we want to use. */
+    /* You'll be tempted to try some magic here with # and ## but it won't always work because
+       sometimes nvml.h introduces #defines of some of the names we want to use. */
 
 #define DLSYM(var, str) \
     LOGIT(str);                                 \
