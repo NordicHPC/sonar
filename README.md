@@ -7,9 +7,9 @@
 Tool to profile usage of HPC resources by regularly probing processes.
 
 Sonar examines `/proc` and runs some diagnostic programs and filters and groups the output and
-prints it to stdout.  The output format is defined in detail in
-[doc/DATA-FORMAT.md](doc/DATA-FORMAT.md).  Sonar can also probe the system and reports on its
-overall configuration.
+prints it to stdout.  There are two output formats, [the old format](doc/OLD-FORMAT.md) and [the new
+format](doc/NEW-FORMAT.md), currently coexisting but the old format will be phased out.  Sonar can
+also probe the system and reports on its overall configuration.
 
 ![image of a fish swarm](img/sonar-small.png)
 
@@ -147,8 +147,8 @@ Sonar data are used by two other tools:
 
 ## Output formats
 
-See [doc/DATA-FORMAT.md](doc/DATA-FORMAT.md) for a specification of the output data formats and the
-semantics of individual fields.
+See [doc/OLD-FORMAT.md](doc/OLD-FORMAT.md) and [doc/NEW-FORMAT.md](doc/NEW-FORMAT.md) for
+specifications of the output data formats and the semantics of individual fields.
 
 
 ## Versions and release procedures

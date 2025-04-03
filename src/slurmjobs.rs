@@ -4,6 +4,7 @@ use crate::nodelist;
 use crate::output;
 use crate::systemapi;
 use crate::time;
+use crate::json_tags::*;
 
 use lazy_static::lazy_static;
 
@@ -84,17 +85,18 @@ pub fn show_slurm_jobs(
     span: &Option<String>,
     deluge: bool,
     system: &dyn systemapi::SystemAPI,
+    token: String,
     new_json: bool,
 ) {
     let embed_envelope = !new_json;
     match collect_sacct_jobs(system, window, span, deluge, embed_envelope) {
         Ok(jobs) => {
             if new_json {
-                let mut envelope = output::newfmt_envelope(system, &vec![]);
-                let (mut data, mut attrs) = output::newfmt_data(system, "slurm_jobs");
-                attrs.push_a("slurm_jobs", jobs);
-                data.push_o("attributes", attrs);
-                envelope.push_o("data", data);
+                let mut envelope = output::newfmt_envelope(system, token, &vec![]);
+                let (mut data, mut attrs) = output::newfmt_data(system, DATA_TAG_JOBS);
+                attrs.push_a(JOBS_ATTRIBUTES_SLURM_JOBS, jobs);
+                data.push_o(JOBS_DATA_ATTRIBUTES, attrs);
+                envelope.push_o(JOBS_ENVELOPE_DATA, data);
                 output::write_json(writer, &output::Value::O(envelope));
             } else {
                 for i in 0..jobs.len() {
@@ -104,17 +106,17 @@ pub fn show_slurm_jobs(
         }
         Err(error) => {
             if new_json {
-                let mut envelope = output::newfmt_envelope(system, &vec![]);
-                envelope.push_a("errors", output::newfmt_one_error(system, error));
+                let mut envelope = output::newfmt_envelope(system, token, &vec![]);
+                envelope.push_a(JOBS_ENVELOPE_ERRORS, output::newfmt_one_error(system, error));
                 output::write_json(writer, &output::Value::O(envelope));
             } else {
-                //+oldnames
+                //+ignore-strings
                 let mut envelope = output::Object::new();
                 envelope.push_s("v", VERSION.to_string());
                 envelope.push_s("error", error);
                 envelope.push_s("timestamp", system.get_timestamp());
                 output::write_csv(writer, &output::Value::O(envelope));
-                //-oldnames
+                //-ignore-strings
             }
         }
     }
@@ -192,7 +194,7 @@ fn compute_field_values(line: &str) -> Vec<String> {
     field_store[..n].iter().map(|x| x.to_string()).collect::<Vec<String>>()
 }
 
-//+oldnames
+//+ignore-strings
 fn parse_sacct_jobs_oldfmt(
     sacct_output: &str,
     local: &libc::tm,
@@ -241,7 +243,7 @@ fn parse_sacct_jobs_oldfmt(
     }
     jobs
 }
-//-oldnames
+//-ignore-strings
 
 fn parse_sacct_jobs_newfmt(
     sacct_output: &str,
@@ -263,130 +265,146 @@ fn parse_sacct_jobs_newfmt(
                     // separator gives us the job type and if not a normal job gives us the array or
                     // het job ID and task or offset values.
                     if let Some((id, task)) = fieldvals[i].split_once('_') {
-                        push_uint(&mut output_line, "array_job_id", id);
+                        push_uint(&mut output_line, SLURM_JOB_ARRAY_JOB_ID, id);
                         let task =
                             if let Some((task_id, _)) = task.split_once('.') {
                                 task_id
                             } else {
                                 task
                             };
-                        push_uint(&mut output_line, "array_task_id", task);
+                        push_uint(&mut output_line, SLURM_JOB_ARRAY_TASK_ID, task);
                     } else if let Some((id, offset)) = fieldvals[i].split_once('+') {
-                        push_uint(&mut output_line, "het_job_id", id);
+                        push_uint(&mut output_line, SLURM_JOB_HET_JOB_ID, id);
                         let offset =
                             if let Some((offset_id, _)) = offset.split_once('.') {
                                 offset_id
                             } else {
                                 offset
                             };
-                        push_uint(&mut output_line, "het_job_offset", offset);
+                        push_uint(&mut output_line, SLURM_JOB_HET_JOB_OFFSET, offset);
                     }
                 }
                 "JobIDRaw" => {
                     if let Some((id, step)) = fieldvals[i].split_once('.') {
-                        push_uint(&mut output_line, "job_id", id);
-                        push_string(&mut output_line, "job_step", step);
+                        push_uint(&mut output_line, SLURM_JOB_JOB_ID, id);
+                        push_string(&mut output_line, SLURM_JOB_JOB_STEP, step);
                     } else {
-                        push_uint(&mut output_line, "job_id", &fieldvals[i]);
+                        push_uint(&mut output_line, SLURM_JOB_JOB_ID, &fieldvals[i]);
                     }
                 }
                 "User" => {
                     // User is empty for administrative records
-                    push_string(&mut output_line, "user_name", &fieldvals[i]);
+                    push_string(&mut output_line, SLURM_JOB_USER_NAME, &fieldvals[i]);
                 }
                 "Account" => {
-                    output_line.push_s("account", fieldvals[i].clone());
+                    output_line.push_s(SLURM_JOB_ACCOUNT, fieldvals[i].clone());
                 }
                 "State" => {
-                    output_line.push_s("job_state", fieldvals[i].clone());
+                    output_line.push_s(SLURM_JOB_JOB_STATE, fieldvals[i].clone());
                 }
                 "Start" => {
-                    push_date(&mut output_line, "start_time", &fieldvals[i], local);
+                    push_date(&mut output_line, SLURM_JOB_START, &fieldvals[i], local);
                 }
                 "End" => {
-                    push_date(&mut output_line, "end_time", &fieldvals[i], local);
+                    push_date(&mut output_line, SLURM_JOB_END, &fieldvals[i], local);
                 }
                 "ExitCode" => {
                     if fieldvals[i] != "" {
                         // The format is code:signal
                         if let Some((code,_signal)) = fieldvals[i].split_once(':') {
-                            push_uint(&mut output_line, "exit_code", code);
+                            push_uint(&mut output_line, SLURM_JOB_EXIT_CODE, code);
                         }
                     }
                 }
                 "Layout" => {
-                    push_string(&mut output_line, "distribution", &fieldvals[i]);
+                    push_string(&mut output_line, SLURM_JOB_LAYOUT, &fieldvals[i]);
                 }
                 "ReqCPUS" => {
-                    push_uint(&mut output_line, "requested_cpus", &fieldvals[i]);
+                    push_uint(&mut output_line, SLURM_JOB_REQ_CPUS, &fieldvals[i]);
                 }
                 "ReqMem" => {
-                    push_uint(&mut output_line, "requested_memory_per_node", &fieldvals[i]);
+                    push_uint(&mut output_line, SLURM_JOB_REQ_MEMORY_PER_NODE, &fieldvals[i]);
                 }
                 "ReqNodes" => {
-                    push_uint(&mut output_line, "requested_node_count", &fieldvals[i]);
+                    push_uint(&mut output_line, SLURM_JOB_REQ_NODES, &fieldvals[i]);
                 }
                 "Reservation" => {
                     if fieldvals[i] != "" {
-                        output_line.push_s("reservation", fieldvals[i].clone());
+                        output_line.push_s(SLURM_JOB_RESERVATION, fieldvals[i].clone());
                     }
                 }
                 "Submit" => {
-                    push_date(&mut output_line, "submit_time", &fieldvals[i], local);
+                    push_date(&mut output_line, SLURM_JOB_SUBMIT_TIME, &fieldvals[i], local);
                 }
                 "Suspended" => {
-                    push_duration(&mut output_line, "suspend_time", &fieldvals[i]);
+                    push_duration(&mut output_line, SLURM_JOB_SUSPENDED, &fieldvals[i]);
                 }
                 "TimelimitRaw" => {
+                    // Just make sure this name is referenced
+                    assert!(EXTENDED_UINT_UNSET == 0);
                     if fieldvals[i] == "UNLIMITED" {
-                        output_line.push_i("time_limit", -1); // "Infinite"
+                        output_line.push_u(SLURM_JOB_TIMELIMIT, EXTENDED_UINT_INFINITE);
                     } else if fieldvals[i] != "Partition_limit" {
-                        push_uint_full(&mut output_line, "time_limit", &fieldvals[i], 60, 1, false);
+                        push_uint_full(&mut output_line, SLURM_JOB_TIMELIMIT, &fieldvals[i], 60, EXTENDED_UINT_BASE, false);
                     }
                 }
                 "NodeList" => {
                     if fieldvals[i] != "" {
                         if let Ok(nodes) = nodelist::parse_and_render(&fieldvals[i]) {
-                            output_line.push_a("nodes", nodes);
+                            output_line.push_a(SLURM_JOB_NODE_LIST, nodes);
                         }
                     }
                 }
                 "Partition" => {
-                    push_string(&mut output_line, "partition", &fieldvals[i]);
+                    push_string(&mut output_line, SLURM_JOB_PARTITION, &fieldvals[i]);
                 }
                 "Priority" => {
-                    push_uint_full(&mut output_line, "priority", &fieldvals[i], 1, 1, false);
+                    push_uint_full(&mut output_line, SLURM_JOB_PRIORITY, &fieldvals[i], 1, EXTENDED_UINT_BASE, false);
                 }
                 "JobName" => {
-                    output_line.push_s("job_name", fieldvals[i].clone());
+                    output_line.push_s(SLURM_JOB_JOB_NAME, fieldvals[i].clone());
                 }
 
                 // Sacct fields
-                //+implicit-use
                 "AveDiskRead" | "AveDiskWrite" | "AveRSS" | "AveVMSize" | "MaxRSS" | "MaxVMSize" => {
+                    // NOTE - tags are the same as the fields
+                    assert!(SACCT_DATA_AVE_DISK_READ == "AveDiskRead");
+                    assert!(SACCT_DATA_AVE_DISK_WRITE == "AveDiskWrite");
+                    assert!(SACCT_DATA_AVE_RSS == "AveRSS");
+                    assert!(SACCT_DATA_AVE_VMSIZE == "AveVMSize");
+                    assert!(SACCT_DATA_MAX_RSS == "MaxRSS");
+                    assert!(SACCT_DATA_MAX_VMSIZE == "MaxVMSize");
                     push_volume(&mut sacct, *field, &fieldvals[i]);
                 }
                 "AveCPU" | "MinCPU" | "UserCPU" | "SystemCPU" => {
+                    // NOTE - tags are the same as the fields
+                    assert!(SACCT_DATA_AVE_CPU == "AveCPU");
+                    assert!(SACCT_DATA_MIN_CPU == "MinCPU");
+                    assert!(SACCT_DATA_USER_CPU == "UserCPU");
+                    assert!(SACCT_DATA_SYSTEM_CPU == "SystemCPU");
                     push_duration(&mut sacct, *field, &fieldvals[i]);
                 }
                 "ElapsedRaw" => {
+                    // NOTE - tags are the same as the fields
+                    assert!(SACCT_DATA_ELAPSED_RAW == "ElapsedRaw");
                     push_uint(&mut sacct, *field, &fieldvals[i]);
                 }
                 "AllocTRES" => {
+                    // NOTE - tags are the same as the fields
+                    assert!(SACCT_DATA_ALLOC_TRES == "AllocTRES");
                     push_string(&mut sacct, *field, &fieldvals[i]);
                 }
-                //-implicit-use
-
-                // push_s("gres_detail", _)
-                // push_s("minimum_cpus_per_node", _)
 
                 _ => {
+                    // A hack to make sure these names are used
+                    assert!(SLURM_JOB_GRESDETAIL != "zappa");
+                    assert!(SLURM_JOB_MIN_CPUSPER_NODE != "zappa");
                     panic!("Bad field name");
                 }
             }
         }
         if !sacct.is_empty() {
-            output_line.push_o("sacct", sacct);
+            output_line.push_o(SLURM_JOB_SACCT, sacct);
         }
         jobs.push_o(output_line);
     }

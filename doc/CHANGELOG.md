@@ -2,6 +2,15 @@
 
 ## Changes in v0.13.x-devel (on `main`)
 
+**New JSON format**.  The new format is obtained using `--json` for all command and is a clean
+format described in prose in [doc/NEW-FORMAT.md](NEW-FORMAT.md) and in executable form in
+[util/formats/newfmt/types.go](../util/formats/newfmt/types.go).
+
+**New cluster command introduced**.  For clusters under Slurm control, this will produce data about
+the cluster configuration (partitions, nodes).
+
+**Many new data fields in the new data format**.  Too many to summarize here.
+
 **All commands can emit JSON or CSV under a command-line switch**.  The defaults remain the same for now:
 CSV for `ps` and `slurm`, JSON for `sysinfo`.  (v0.13.0)
 

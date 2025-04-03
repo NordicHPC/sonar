@@ -1,5 +1,11 @@
 # Sonar output data formats
 
+This file describes the "old" data format, a mix of CSV and somewhat unstructured JSON.  Eventually
+this will be superseded entirely by the "new" format, a structured JSON format described in
+NEW-FORMAT.md.
+
+The documentation below is probably not complete.
+
 ## Preliminaries
 
 ### History

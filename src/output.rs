@@ -6,6 +6,7 @@
 
 use crate::systemapi;
 use crate::util;
+use crate::json_tags::*;
 
 use std::io;
 
@@ -131,6 +132,10 @@ impl Array {
         let mut n = vec![];
         std::mem::swap(&mut n, &mut self.elements);
         n
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.elements.len() == 0
     }
 
     pub fn push(&mut self, value: Value) {
@@ -404,44 +409,74 @@ pub struct AttrVal {
 
 pub fn newfmt_envelope(
     system: &dyn systemapi::SystemAPI,
+    token: String,
     attrs: &[AttrVal],
 ) -> Object {
     let mut envelope = Object::new();
     let mut meta = Object::new();
-    meta.push_s("producer","sonar".to_string());
-    meta.push_s("version", system.get_version());
-    // meta.push_u("format", 1) // 1 is the default
-    // meta.push_s("token") // FIXME
+    let sonar = "sonar".to_string();
+    meta.push_s(METADATA_OBJECT_PRODUCER, sonar);
+    meta.push_s(METADATA_OBJECT_VERSION, system.get_version());
+    if crate::OUTPUT_FORMAT != 0 {
+        meta.push_u(METADATA_OBJECT_FORMAT, crate::OUTPUT_FORMAT)
+    }
+    if token != "" {
+        meta.push_s(METADATA_OBJECT_TOKEN, token)
+    }
     if attrs.len() > 0 {
         let mut attrvals = Array::new();
         for AttrVal { key, value } in attrs {
             let mut pair = Object::new();
-            pair.push_s("key", key.clone());
-            pair.push_s("value", value.clone());
+            pair.push_s(KVPAIR_KEY, key.clone());
+            pair.push_s(KVPAIR_VALUE, value.clone());
             attrvals.push_o(pair);
         }
-        meta.push_a("attrs", attrvals);
+        meta.push_a(METADATA_OBJECT_ATTRS, attrvals);
     }
-    envelope.push_o("meta", meta);
+    // NOTE - tag not specific to sysinfo
+    envelope.push_o(SYSINFO_ENVELOPE_META, meta);
+    assert!(CLUSTER_ENVELOPE_META == SYSINFO_ENVELOPE_META);
+    assert!(SAMPLE_ENVELOPE_META == SYSINFO_ENVELOPE_META);
+    assert!(JOBS_ENVELOPE_META == SYSINFO_ENVELOPE_META);
     envelope
 }
 
 pub fn newfmt_data(system: &dyn systemapi::SystemAPI, ty: &str) -> (Object, Object) {
     let mut data = Object::new();
-    data.push_s("type",ty.to_string());
+    data.push_s(SYSINFO_DATA_TYPE,ty.to_string());
+    // NOTE - tag not specific to sysinfo
+    assert!(CLUSTER_DATA_TYPE == SYSINFO_DATA_TYPE);
+    assert!(SAMPLE_DATA_TYPE == SYSINFO_DATA_TYPE);
+    assert!(JOBS_DATA_TYPE == SYSINFO_DATA_TYPE);
     let mut attrs = Object::new();
-    attrs.push_s("time", system.get_timestamp());
+    attrs.push_s(SYSINFO_ATTRIBUTES_TIME, system.get_timestamp());
+    // NOTE - tag not specific to sysinfo
+    assert!(CLUSTER_ATTRIBUTES_TIME == SYSINFO_ATTRIBUTES_TIME);
+    assert!(SAMPLE_ATTRIBUTES_TIME == SYSINFO_ATTRIBUTES_TIME);
+    assert!(JOBS_ATTRIBUTES_TIME == SYSINFO_ATTRIBUTES_TIME);
     let c = system.get_cluster();
     if c != "" {
-        attrs.push_s("cluster", c);
+        attrs.push_s(SYSINFO_ATTRIBUTES_CLUSTER, c);
+        // NOTE - tag not specific to sysinfo
+        assert!(CLUSTER_ATTRIBUTES_CLUSTER == SYSINFO_ATTRIBUTES_CLUSTER);
+        assert!(SAMPLE_ATTRIBUTES_CLUSTER == SYSINFO_ATTRIBUTES_CLUSTER);
+        assert!(JOBS_ATTRIBUTES_CLUSTER == SYSINFO_ATTRIBUTES_CLUSTER);
     }
     (data, attrs)
 }
 
 pub fn newfmt_one_error(system: &dyn systemapi::SystemAPI, error: String) -> Array {
     let mut err0 = Object::new();
-    err0.push_s("detail", error);
-    err0.push_s("time", system.get_timestamp());
+    err0.push_s(ERROR_OBJECT_DETAIL, error);
+    err0.push_s(ERROR_OBJECT_TIME, system.get_timestamp());
+    let cluster = system.get_cluster();
+    if cluster != "" {
+        err0.push_s(ERROR_OBJECT_CLUSTER, cluster);
+    }
+    let node = system.get_hostname();
+    if node != "" {
+        err0.push_s(ERROR_OBJECT_NODE, node);
+    }
     let mut errors = Array::new();
     errors.push_o(err0);
     errors

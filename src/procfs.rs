@@ -526,7 +526,7 @@ pub fn get_process_information(
                 user: user_table.lookup(system, uid),
                 cpu_pct: pcpu_formatted,
                 mem_pct: pmem,
-                cpu_util: 0.0,    // FIXME
+                cpu_util: 0.0,
                 cputime_sec: cputime_sec as usize,
                 mem_size_kib: size_kib,
                 rssanon_kib,

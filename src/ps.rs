@@ -5,11 +5,14 @@ use crate::procfs;
 use crate::ps_newfmt::format_newfmt;
 use crate::ps_oldfmt::{format_oldfmt, make_oldfmt_heartbeat};
 use crate::systemapi;
+use crate::json_tags::*;
 
 use std::collections::HashMap;
 use std::io::{self, Write};
 use std::path::PathBuf;
+#[cfg(debug_assertions)]
 use std::time;
+#[cfg(debug_assertions)]
 use std::thread;
 
 #[derive(Default)]
@@ -22,6 +25,7 @@ pub struct PsOptions {
     pub exclude_users: Vec<String>,
     pub exclude_commands: Vec<String>,
     pub lockdir: Option<String>,
+    pub token: String,
     pub load: bool,
     pub new_json: bool,
     pub cpu_util: bool,
@@ -134,7 +138,8 @@ fn do_create_snapshot(
     match collect_sample_data(system, opts) {
         Ok(Some(sample_data)) => {
             if opts.new_json {
-                let o = output::Value::O(format_newfmt(&sample_data, system, opts));
+                let recoverable_errors = output::Array::new();
+                let o = output::Value::O(format_newfmt(&sample_data, system, opts, recoverable_errors));
                 output::write_json(writer, &o);
             } else {
                 let mut elements = format_oldfmt(&sample_data, system, opts).take();
@@ -151,14 +156,14 @@ fn do_create_snapshot(
         }
         Err(error) => {
             if opts.new_json {
-                let mut envelope = output::newfmt_envelope(system, &vec![]);
-                envelope.push_a("errors", output::newfmt_one_error(system, error));
+                let mut envelope = output::newfmt_envelope(system, opts.token.clone(), &vec![]);
+                envelope.push_a(SAMPLE_ENVELOPE_ERRORS, output::newfmt_one_error(system, error));
                 output::write_json(writer, &output::Value::O(envelope));
             } else {
                 let mut hb = make_oldfmt_heartbeat(system);
-                //+oldnames
+                //+ignore-strings
                 hb.push_s("error", error);
-                //-oldnames
+                //-ignore-strings
                 output::write_csv(writer, &output::Value::O(hb))
             }
         }
