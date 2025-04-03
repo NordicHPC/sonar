@@ -15,29 +15,75 @@
 #include <dlfcn.h>
 #include <inttypes.h>
 #include <stddef.h>
-#include <stdio.h> /* snprintf, we can fix this if we don't want the baggage */
+#include <stdio.h> /* snprintf(), we can fix this if we don't want the baggage */
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include <sys/utsname.h>
 
 #include "sonar-nvidia.h"
 
 #ifdef SONAR_NVIDIA_GPU
 
+#define NVML_NO_UNVERSIONED_FUNCTION_DEFS
 #include <nvml.h>
+
+#if NVML_API_VERSION < 10
+/* Haven't seen older */
+# error "NVML API VERSION 10 or greater required"
+#endif
+
+#if NVML_API_VERSION == 10
+#define nvmlProcessInfo_v1_t nvmlProcessInfo_t
+#endif
+
+#if NVML_API_VERSION == 11
+/* In API 11 (based on nvml.h 11.3.1) there is nvmlProcessInfo_t which is actually
+   nvmlProcessInfo_v2_t, and in API 12 the structure is present under both of those names.  This
+   structure has four fields.
+
+   However, this is not the type accepted by nvmlDeviceGetComputeRunningProcesses_v1() aka
+   nvmlDeviceGetComputeRunningProcesses().  It accepts a structure with only the first two fields.
+   This structure is defined in nvmlh 12.3.0, at least, as nvmlProcessInfo_v1_t, and in nvml
+   10.1.243 as nvmlProcessInfo_t.
+
+   In order to work around this sensibly, define the v1 structure here, as it is found in the API 12
+   header files. */
+
+typedef struct {
+    unsigned int       pid;
+    unsigned long long usedGpuMemory;
+} nvmlProcessInfo_v1_t;
+
+#define nvmlProcessInfo_v2_t nvmlProcessInfo_t
+#endif
 
 static nvmlReturn_t (*xnvmlDeviceGetClockInfo)(nvmlDevice_t,nvmlClockType_t,unsigned*);
 static nvmlReturn_t (*xnvmlDeviceGetComputeMode)(nvmlDevice_t,nvmlComputeMode_t*);
+#if NVML_API_VERSION >= 12
 static nvmlReturn_t (*xnvmlDeviceGetComputeRunningProcesses_v3)(
-    nvmlDevice_t,unsigned*,nvmlProcessInfo_t*);
+    nvmlDevice_t,unsigned*,nvmlProcessInfo_v2_t*);
+#endif
+#if NVML_API_VERSION >= 11
+static nvmlReturn_t (*xnvmlDeviceGetComputeRunningProcesses_v2)(
+    nvmlDevice_t,unsigned*,nvmlProcessInfo_v2_t*);
+#endif
+static nvmlReturn_t (*xnvmlDeviceGetComputeRunningProcesses_v1)(
+    nvmlDevice_t,unsigned*,nvmlProcessInfo_v1_t*);
 static nvmlReturn_t (*xnvmlDeviceGetCount_v2)(unsigned*);
+static nvmlReturn_t (*xnvmlDeviceGetCount_v1)(unsigned*);
 static nvmlReturn_t (*xnvmlDeviceGetHandleByIndex_v2)(int index, nvmlDevice_t* dev);
+static nvmlReturn_t (*xnvmlDeviceGetHandleByIndex_v1)(int index, nvmlDevice_t* dev);
+#if NVML_API_VERSION >= 11
 static nvmlReturn_t (*xnvmlDeviceGetArchitecture)(nvmlDevice_t, nvmlDeviceArchitecture_t*);
+#endif
 static nvmlReturn_t (*xnvmlDeviceGetFanSpeed)(nvmlDevice_t,unsigned*);
 static nvmlReturn_t (*xnvmlDeviceGetMemoryInfo)(nvmlDevice_t, nvmlMemory_t*);
 static nvmlReturn_t (*xnvmlDeviceGetMaxClockInfo)(nvmlDevice_t,nvmlClockType_t,unsigned*);
 static nvmlReturn_t (*xnvmlDeviceGetName)(nvmlDevice_t,char*,unsigned);
 static nvmlReturn_t (*xnvmlDeviceGetPciInfo_v3)(nvmlDevice_t,nvmlPciInfo_t*);
+static nvmlReturn_t (*xnvmlDeviceGetPciInfo_v2)(nvmlDevice_t,nvmlPciInfo_t*);
+static nvmlReturn_t (*xnvmlDeviceGetPciInfo_v1)(nvmlDevice_t,nvmlPciInfo_t*);
 static nvmlReturn_t (*xnvmlDeviceGetPerformanceState)(nvmlDevice_t,nvmlPstates_t*);
 static nvmlReturn_t (*xnvmlDeviceGetPowerManagementLimitConstraints)(
     nvmlDevice_t,unsigned*,unsigned*);
@@ -60,22 +106,58 @@ static nvmlReturn_t (*xnvmlSystemGetCudaDriverVersion)(int*);
 
 static int load_nvml() {
     static void* lib;
+    char pathbuf[128];          /* Less than 64 is really enough, barring problems */
+    struct utsname sysinfo;
 
     if (lib != NULL) {
         return 0;
     }
 
-    /* This is the location of the library on all the UiO ML nodes and on the Fox GPU nodes. */
-    /* The Web also seems to think this is the right spot. */
-    /* TBD is Saga, Betzy GPU nodes. */
-    lib = dlopen("/usr/lib64/libnvidia-ml.so", RTLD_NOW);
+    if (uname(&sysinfo) != 0) {
+        LOGIT("Failed to get sysinfo");
+        return -1;
+    }
+
+    /* /usr/lib64 is the location of the CUDA SMI library on all the UiO ML nodes and on the Fox GPU
+       nodes (RHEL9).  The Web also seems to think this is the right spot.  However older CUDA
+       libraries (eg, for CUDA 430 on SRL login3, Ubuntu 18) have been found in other locations.
+
+       According to the Filesystem Hierarchy Standard, we're going to be looking at /lib, /usr/lib,
+       /lib64, and /usr/lib64.  But in practice things are also found in /lib/<arch>-linux-gnu and
+       /usr/lib/<arch>-linux-gnu where <arch> is as in `uname -m`.
+
+       Instead of being clever, just try one after the other.
+    */
+    if (sizeof(void*) == 8) {
+        if (lib == NULL) {
+            lib = dlopen("/usr/lib64/libnvidia-ml.so", RTLD_NOW);
+        }
+        if (lib == NULL) {
+            lib = dlopen("/lib64/libnvidia-ml.so", RTLD_NOW);
+        }
+    }
+    if (lib == NULL) {
+        lib = dlopen("/usr/lib/libnvidia-ml.so", RTLD_NOW);
+    }
+    if (lib == NULL) {
+        lib = dlopen("/lib/libnvidia-ml.so", RTLD_NOW);
+    }
+    if (lib == NULL) {
+        snprintf(pathbuf, sizeof(pathbuf), "/usr/lib/%s-linux-gnu/libnvidia-ml.so",
+                 sysinfo.machine);
+        lib = dlopen(pathbuf, RTLD_NOW);
+    }
+    if (lib == NULL) {
+        snprintf(pathbuf, sizeof(pathbuf), "/lib/%s-linux-gnu/libnvidia-ml.so", sysinfo.machine);
+        lib = dlopen(pathbuf, RTLD_NOW);
+    }
     if (lib == NULL) {
         LOGIT("Failed to load library");
         return -1;
     }
 
-    /* You'll be tempted to try some magic here with # and ## but it won't work because sometimes
-       nvml.h introduces #defines of some of the names we want to use. */
+    /* You'll be tempted to try some magic here with # and ## but it won't always work because
+       sometimes nvml.h introduces #defines of some of the names we want to use. */
 
 #define DLSYM(var, str) \
     LOGIT(str);                                 \
@@ -85,17 +167,37 @@ static int load_nvml() {
         return -1;                              \
     }
 
+#define DLSYM_CANFAIL(var, str) \
+    LOGIT(str);                                 \
+    if ((var = dlsym(lib, str)) == NULL) {      \
+        LOGIT(" ** Symbol failed");             \
+    }
+
     DLSYM(xnvmlDeviceGetClockInfo, "nvmlDeviceGetClockInfo");
     DLSYM(xnvmlDeviceGetComputeMode, "nvmlDeviceGetComputeMode");
-    DLSYM(xnvmlDeviceGetComputeRunningProcesses_v3, "nvmlDeviceGetComputeRunningProcesses_v3");
-    DLSYM(xnvmlDeviceGetCount_v2, "nvmlDeviceGetCount_v2");
-    DLSYM(xnvmlDeviceGetHandleByIndex_v2, "nvmlDeviceGetHandleByIndex_v2");
+#if NVML_API_VERSION >= 12
+    DLSYM_CANFAIL(xnvmlDeviceGetComputeRunningProcesses_v3,
+                  "nvmlDeviceGetComputeRunningProcesses_v3");
+#endif
+#if NVML_API_VERSION >= 11
+    DLSYM_CANFAIL(xnvmlDeviceGetComputeRunningProcesses_v2,
+                  "nvmlDeviceGetComputeRunningProcesses_v2");
+#endif
+    DLSYM(xnvmlDeviceGetComputeRunningProcesses_v1, "nvmlDeviceGetComputeRunningProcesses");
+    DLSYM_CANFAIL(xnvmlDeviceGetCount_v2, "nvmlDeviceGetCount_v2");
+    DLSYM(xnvmlDeviceGetCount_v1, "nvmlDeviceGetCount");
+    DLSYM_CANFAIL(xnvmlDeviceGetHandleByIndex_v2, "nvmlDeviceGetHandleByIndex_v2");
+    DLSYM(xnvmlDeviceGetHandleByIndex_v1, "nvmlDeviceGetHandleByIndex");
+#if NVML_API_VERSION >= 11
     DLSYM(xnvmlDeviceGetArchitecture, "nvmlDeviceGetArchitecture");
+#endif
     DLSYM(xnvmlDeviceGetFanSpeed, "nvmlDeviceGetFanSpeed");
     DLSYM(xnvmlDeviceGetMemoryInfo, "nvmlDeviceGetMemoryInfo");
     DLSYM(xnvmlDeviceGetMaxClockInfo, "nvmlDeviceGetMaxClockInfo");
     DLSYM(xnvmlDeviceGetName, "nvmlDeviceGetName");
-    DLSYM(xnvmlDeviceGetPciInfo_v3, "nvmlDeviceGetPciInfo_v3");
+    DLSYM_CANFAIL(xnvmlDeviceGetPciInfo_v3, "nvmlDeviceGetPciInfo_v3");
+    DLSYM_CANFAIL(xnvmlDeviceGetPciInfo_v2, "nvmlDeviceGetPciInfo_v2");
+    DLSYM(xnvmlDeviceGetPciInfo_v1, "nvmlDeviceGetPciInfo");
     DLSYM(xnvmlDeviceGetPerformanceState, "nvmlDeviceGetPerformanceState");
     DLSYM(xnvmlDeviceGetPowerManagementLimitConstraints,
           "nvmlDeviceGetPowerManagementLimitConstraints");
@@ -116,6 +218,115 @@ static int load_nvml() {
 
     return 0;
 }
+
+static int deviceGetCount(unsigned* ndev) {
+    if (xnvmlDeviceGetCount_v2 != NULL) {
+        return xnvmlDeviceGetCount_v2(ndev);
+    }
+    return xnvmlDeviceGetCount_v1(ndev);
+}
+
+static int deviceGetHandleByIndex(uint32_t device, nvmlDevice_t* dev) {
+    if (xnvmlDeviceGetHandleByIndex_v2 != NULL) {
+        return xnvmlDeviceGetHandleByIndex_v2(device, dev);
+    }
+    return xnvmlDeviceGetHandleByIndex_v1(device, dev);
+}
+
+static int deviceGetPciInfo(nvmlDevice_t device, nvmlPciInfo_t* pci) {
+    if (xnvmlDeviceGetPciInfo_v3 != NULL) {
+        return xnvmlDeviceGetPciInfo_v3(device, pci);
+    }
+    if (xnvmlDeviceGetPciInfo_v2 != NULL) {
+        return xnvmlDeviceGetPciInfo_v2(device, pci);
+    }
+    return xnvmlDeviceGetPciInfo_v1(device, pci);
+}
+
+typedef struct processInfo_t {
+    /* These are the types used in the NVIDIA structures */
+    unsigned int        pid;
+    unsigned long long  usedGpuMemory;
+} processInfo_t;
+
+static int deviceGetComputeRunningProcesses(nvmlDevice_t dev,
+                                            unsigned* count,
+                                            processInfo_t* infos) {
+    if (infos == NULL) {
+#if NVML_API_VERSION >= 12
+        if (xnvmlDeviceGetComputeRunningProcesses_v3 != NULL) {
+            return xnvmlDeviceGetComputeRunningProcesses_v3(dev, count, NULL);
+        }
+#endif
+#if NVML_API_VERSION >= 11
+        if (xnvmlDeviceGetComputeRunningProcesses_v2 != NULL) {
+            return xnvmlDeviceGetComputeRunningProcesses_v2(dev, count, NULL);
+        }
+#endif
+        return xnvmlDeviceGetComputeRunningProcesses_v1(dev, count, NULL);
+    }
+
+    if (*count == 0) {
+        return 0;
+    }
+
+    /* v2 and v3 use the same data type, nvmlProcessInfo_v2_t. */
+#if NVML_API_VERSION >= 11
+    int v2 = xnvmlDeviceGetComputeRunningProcesses_v2 != NULL;
+    int v3 = 0;
+# if NVML_API_VERSION >= 12
+    v3 = xnvmlDeviceGetComputeRunningProcesses_v3 != NULL;
+# endif
+    if (v2 || v3)
+    {
+        nvmlProcessInfo_v2_t *running_procs = calloc(*count,
+                                                     sizeof(nvmlProcessInfo_v2_t));
+        int r;
+        if (running_procs == NULL) {
+            return -1;
+        }
+# if NVML_API_VERSION >= 12
+        if (xnvmlDeviceGetComputeRunningProcesses_v3) {
+            if ((r = xnvmlDeviceGetComputeRunningProcesses_v3(dev,
+                                                              count,
+                                                              running_procs)) != 0)
+            {
+                free(running_procs);
+                return r;
+            }
+        }
+# endif
+        if ((r = xnvmlDeviceGetComputeRunningProcesses_v2(dev,
+                                                          count,
+                                                          running_procs)) != 0)
+        {
+            free(running_procs);
+            return r;
+        }
+        for ( unsigned i = 0 ; i < *count ; i++ ) {
+            infos[i].pid = running_procs[i].pid;
+            infos[i].usedGpuMemory = running_procs[i].usedGpuMemory;
+        }
+        free(running_procs);
+        return 0;
+    }
+#endif /* v2 || v3 */
+
+    nvmlProcessInfo_v1_t *running_procs = calloc(*count, sizeof(nvmlProcessInfo_v1_t));
+    if (running_procs == NULL) {
+        return -1;
+    }
+    if (xnvmlDeviceGetComputeRunningProcesses_v1(dev, count, running_procs) != 0) {
+        free(running_procs);
+        return -1;
+    }
+    for ( unsigned i = 0 ; i < *count ; i++ ) {
+        infos[i].pid = running_procs[i].pid;
+        infos[i].usedGpuMemory = running_procs[i].usedGpuMemory;
+    }
+    free(running_procs);
+    return 0;
+}
 #endif /* SONAR_NVIDIA_GPU */
 
 int nvml_device_get_count(uint32_t* count) {
@@ -124,7 +335,7 @@ int nvml_device_get_count(uint32_t* count) {
         return -1;
     }
     unsigned ndev;
-    if (xnvmlDeviceGetCount_v2(&ndev) != 0) {
+    if (deviceGetCount(&ndev) != 0) {
         return -1;
     }
     *count = ndev;
@@ -134,7 +345,7 @@ int nvml_device_get_count(uint32_t* count) {
 #endif /* SONAR_NVIDIA_GPU */
 }
 
-#ifdef SONAR_NVIDIA_GPU
+#if defined(SONAR_NVIDIA_GPU) && NVML_API_VERSION >= 11
 /* The architecture numbers are taken from the CUDA 12.3.0 nvml.h, except Blackwell is a guess. */
 static const char* const arch_names[] = {
     "(unknown)",
@@ -149,7 +360,7 @@ static const char* const arch_names[] = {
     "Hopper",
     "Blackwell",
 };
-#endif /* SONAR_NVIDIA_GPU */
+#endif /* SONAR_NVIDIA_GPU && API >= 11 */
 
 int nvml_device_get_card_info(uint32_t device, struct nvml_card_info* infobuf) {
 #ifdef SONAR_NVIDIA_GPU
@@ -157,7 +368,7 @@ int nvml_device_get_card_info(uint32_t device, struct nvml_card_info* infobuf) {
         return -1;
     }
     nvmlDevice_t dev;
-    if (xnvmlDeviceGetHandleByIndex_v2(device, &dev) != 0) {
+    if (deviceGetHandleByIndex(device, &dev) != 0) {
         return -1;
     }
     memset(infobuf, 0, sizeof(*infobuf));
@@ -175,6 +386,7 @@ int nvml_device_get_card_info(uint32_t device, struct nvml_card_info* infobuf) {
                  NVML_CUDA_DRIVER_VERSION_MINOR(cuda));
     }
 
+#if NVML_API_VERSION >= 11
     nvmlDeviceArchitecture_t n_arch;
     if (xnvmlDeviceGetArchitecture(dev, &n_arch) == 0) {
         const char* archname = "(unknown)";
@@ -183,6 +395,7 @@ int nvml_device_get_card_info(uint32_t device, struct nvml_card_info* infobuf) {
         }
         strcpy(infobuf->architecture, archname);
     }
+#endif
 
     nvmlMemory_t mem;
     if (xnvmlDeviceGetMemoryInfo(dev, &mem) == 0) {
@@ -203,7 +416,7 @@ int nvml_device_get_card_info(uint32_t device, struct nvml_card_info* infobuf) {
     }
 
     nvmlPciInfo_t pci;
-    if (xnvmlDeviceGetPciInfo_v3(dev, &pci) == 0) {
+    if (deviceGetPciInfo(dev, &pci) == 0) {
         strncpy(infobuf->bus_addr, pci.busId, sizeof(infobuf->bus_addr));
         infobuf->bus_addr[sizeof(infobuf->bus_addr)-1] = 0;
     }
@@ -220,7 +433,7 @@ int nvml_device_get_card_state(uint32_t device, struct nvml_card_state* infobuf)
         return -1;
     }
     nvmlDevice_t dev;
-    if (xnvmlDeviceGetHandleByIndex_v2(device, &dev) != 0) {
+    if (deviceGetHandleByIndex(device, &dev) != 0) {
         return -1;
     }
     memset(infobuf, 0, sizeof(*infobuf));
@@ -334,20 +547,20 @@ int nvml_device_probe_processes(uint32_t device, uint32_t* count) {
     }
 
     nvmlDevice_t dev;
-    if (xnvmlDeviceGetHandleByIndex_v2(device, &dev) != 0) {
+    if (deviceGetHandleByIndex(device, &dev) != 0) {
         return -1;
     }
 
     unsigned running_procs_count = 0;
-    xnvmlDeviceGetComputeRunningProcesses_v3(dev, &running_procs_count, NULL);
+    deviceGetComputeRunningProcesses(dev, &running_procs_count, NULL);
 
-    nvmlProcessInfo_t *running_procs = NULL;
+    processInfo_t *running_procs = NULL;
     if (running_procs_count > 0) {
-        running_procs = calloc(running_procs_count, sizeof(nvmlProcessInfo_t));
+        running_procs = calloc(running_procs_count, sizeof(processInfo_t));
         if (running_procs == NULL) {
             return -1;
         }
-        xnvmlDeviceGetComputeRunningProcesses_v3(dev, &running_procs_count, running_procs);
+        deviceGetComputeRunningProcesses(dev, &running_procs_count, running_procs);
     }
 
     unsigned long long t = (unsigned long long)(time(NULL) - PROBE_WINDOW_SECS) * 1000000;

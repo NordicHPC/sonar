@@ -7,7 +7,10 @@ if [[ ! ( $(hostname) =~ ml[1-3,5-9]\.hpc\.uio\.no ) ]]; then
     echo "Wrong host!"
     exit 1
 fi
-module load CUDA/11.1.1-GCC-10.2.0
+# Build against API 12 to get the maximal API surface.  Use a recent GCC.
+module purge
+module load CUDA/12.3.0 GCC/11.3.0
+module list
 make libsonar-nvidia.a
 mkdir -p x86_64
 mv libsonar-nvidia.a x86_64
