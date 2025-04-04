@@ -1,15 +1,19 @@
 // TODO in this file, all marked:
 //
-//  - implementation of deluge filtering logic (medium pri)
-//  - the alarm threads should be more careful about re-syncing with the proper points on the
-//    clock to avoid drift (medium pri, postprocessing will want this)
-//  - lock file (low pri)
-//  - signal handling to deal properly with with lock file (low pri)
-//  - reload config under signal + remote control (low pri, exiting and restarting via systemd is
-//    just fine for now)
-//  - maybe pause / restart remote control (low pri)
-//  - more flexible cadence computation (low pri)
-//  - more test cases for the cadence computation (low pri)
+// Medium pri
+//  - implementation of deluge filtering logic
+//  - the alarm threads must be more careful about re-syncing with the proper points on the
+//    clock to avoid drift
+//  - api token handling
+//
+// Low pri
+//  - lock file
+//  - signal handling to deal properly with with lock file
+//  - reload config under signal + remote control (exiting and restarting via systemd is
+//    just fine for starters)
+//  - maybe pause / restart remote control
+//  - more flexible cadence computation
+//  - more test cases for the cadence computation
 
 // In the "daemon mode", Sonar stays memory-resident and pushes data to a network sink.  In this
 // mode, the only command line parameter is the name of a config file.
@@ -58,6 +62,7 @@
 //
 //   remote-host = <hostname and port>
 //   poll-interval = <duration value>                # default 5m
+//   api-token-file = <path>
 //   cert-file = <path>
 //   key-file = <path>
 //   ca-file = <path>
@@ -65,6 +70,9 @@
 //
 //   The remote-host is required.  For Kafka it's usually host:port, eg localhost:9092 for a local
 //   broker on the standard port.
+//
+//   The API token, if present, is embedded in the data (in Meta.Token) and is specific to the
+//   cluster that is reporting.  The token can be used without TLS, though it's rarely a good idea.
 //
 //   cert-file, key-file and ca-file have to be used together and if present will force a TLS
 //   connection.  password-file is the password for the user identity on the form user:password, and
@@ -180,6 +188,7 @@ pub struct GlobalIni {
 pub struct KafkaIni {
     pub remote_host: String,
     pub poll_interval: Dur,
+    pub api_token_file: Option<String>,
     pub cert_file: Option<String>,
     pub key_file: Option<String>,
     pub ca_file: Option<String>,
@@ -383,6 +392,13 @@ pub fn daemon_mode(
         println!("Initialization succeeded");
     }
 
+    let w = if let Some(c) = ini.jobs.window {
+        Some(c.to_seconds() as u32)
+    } else {
+        None
+    };
+    let mut slurmjobber = slurmjobs::Jobber::new(&w, &None, ini.jobs.incomplete, &system);
+
     let mut dump = ini.debug.dump; // For testing
     let mut fatal_msg = "".to_string();
     'messageloop: loop {
@@ -414,18 +430,7 @@ pub fn daemon_mode(
                 if ini.debug.verbose {
                     println!("Jobs");
                 }
-                let w = if let Some(c) = ini.jobs.window {
-                    Some(c.to_seconds() as u32)
-                } else {
-                    None
-                };
-                // FIXME: deluge / incomplete
-                //
-                // When set, we want to include PENDING / RUNNING in the set of states *but* we want
-                // to filter the output so that redundant information is not sent.  Probably there is
-                // a filter object or filter function passed here to use in that case, and the flag
-                // goes from false/true to None/Some(filter).
-                slurmjobs::show_slurm_jobs(&mut output, &w, &None, false, &system, true);
+                slurmjobber.show_jobs(&mut output);
                 // FIXME: I may have changed this, need to check
                 topic = "jobs";
             }
@@ -681,6 +686,7 @@ fn parse_config(config_file: &str) -> Result<Ini, String> {
         kafka: KafkaIni {
             remote_host: "".to_string(),
             poll_interval: Dur::Minutes(5),
+            api_token_file: None,
             cert_file: None,
             key_file: None,
             ca_file: None,
@@ -803,6 +809,9 @@ fn parse_config(config_file: &str) -> Result<Ini, String> {
                 }
                 "poll-interval" => {
                     ini.kafka.poll_interval = parse_duration(&value, false)?;
+                }
+                "api-token-file" => {
+                    ini.kafka.api_token_file = Some(value);
                 }
                 "cert-file" => {
                     ini.kafka.cert_file = Some(value);
