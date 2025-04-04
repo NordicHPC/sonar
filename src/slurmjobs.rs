@@ -1,109 +1,23 @@
 // Run sacct, extract output and reformat as CSV or JSON on stdout.
 
+use crate::nodelist;
 use crate::output;
 use crate::systemapi;
 use crate::time;
+
+use lazy_static::lazy_static;
 
 #[cfg(test)]
 use std::cmp::min;
 use std::collections::HashSet;
 use std::io;
 
-// Default sacct reporting window.  Note this value is baked into the help message in main.rs too.
-const DEFAULT_WINDOW: u32 = 90;
+lazy_static! {
+    // The job states we are interested in collecting information about, notably PENDING and RUNNING
+    // are not here by default but will be added if the --deluge option is given.
 
-// Same output format as sacctd, which uses this version number.
-const VERSION: &str = "0.1.0";
-
-pub fn show_slurm_jobs(
-    writer: &mut dyn io::Write,
-    window: &Option<u32>,
-    span: &Option<String>,
-    system: &dyn systemapi::SystemAPI,
-    json: bool,
-) {
-    match collect_jobs(system, window, span, json) {
-        Ok(jobs) => print_jobs(writer, jobs, json),
-        Err(error) => print_error(writer, error, system, json),
-    }
-}
-
-fn print_jobs(writer: &mut dyn io::Write, jobs: output::Array, json: bool) {
-    if json {
-        let mut envelope = output::Object::new();
-        envelope.push_s("v", VERSION.to_string());
-        envelope.push_a("jobs", jobs);
-        output::write_json(writer, &output::Value::O(envelope));
-    } else {
-        for i in 0..jobs.len() {
-            output::write_csv(writer, jobs.at(i));
-        }
-    }
-}
-
-// For JSON, if there's an error, it gets placed in the envelope.  But for CSV, it needs to be
-// attached to the first record.  If that record does not exist, it needs to be synthesized.  The
-// field name is "error" in either case; this does not conflict with anything from Slurm.  But on
-// the back end, the ingestor needs to deal with a possibly synthesized record that has only that
-// field, and not assume that any particular field is present.
-
-fn print_error(
-    writer: &mut dyn io::Write,
-    error: String,
-    system: &dyn systemapi::SystemAPI,
-    json: bool,
-) {
-    let mut envelope = output::Object::new();
-    envelope.push_s("v", VERSION.to_string());
-    envelope.push_s("error", error);
-    envelope.push_s("timestamp", system.get_timestamp());
-    if json {
-        output::write_json(writer, &output::Value::O(envelope));
-    } else {
-        output::write_csv(writer, &output::Value::O(envelope));
-    }
-}
-
-fn collect_jobs(
-    system: &dyn systemapi::SystemAPI,
-    window: &Option<u32>,
-    span: &Option<String>,
-    json: bool,
-) -> Result<output::Array, String> {
-    let (job_states, field_names) = parameters();
-
-    // Parse the options to compute the time range to pass to sacct.
-    let (from, to) = if let Some(s) = span {
-        let components = s.split(',').collect::<Vec<&str>>();
-        if components.len() != 2 || !check_ymd(components[0]) || !check_ymd(components[1]) {
-            return Err(format!("Bad --span: {}", s));
-        }
-        (components[0].to_string(), components[1].to_string())
-    } else {
-        let mut minutes = DEFAULT_WINDOW;
-        if let Some(w) = window {
-            minutes = *w;
-        }
-        (format!("now-{minutes}minutes"), "now".to_string())
-    };
-
-    // Run sacct and parse the output.
-    match system.run_sacct(&job_states, &field_names, &from, &to) {
-        Ok(sacct_output) => {
-            let local = time::now_local();
-            Ok(parse_jobs(&sacct_output, &field_names, &local, !json))
-        }
-        Err(s) => Err(s),
-    }
-}
-
-// This is a dumb hack.  These arrays are global and shared between production and testing code, but
-// we don't want to depend on lazy_static.
-
-fn parameters() -> (Vec<&'static str>, Vec<&'static str>) {
-    // The job states we are interested in collecting information about, notably RUNNING is not
-    // here.
-    let job_states = vec![
+    //+ignore-strings
+    static ref SACCT_STATES : Vec<&'static str> = vec![
         "CANCELLED",
         "COMPLETED",
         "DEADLINE",
@@ -111,11 +25,16 @@ fn parameters() -> (Vec<&'static str>, Vec<&'static str>) {
         "OUT_OF_MEMORY",
         "TIMEOUT",
     ];
+    //-ignore-strings
 
     // The fields we want to extract.  We can just pile it on here, but it's unlikely that
     // everything is of interest, hence we select.  The capitalization shall be exactly as it is in
     // the sacct man page, even though sacct appears to ignore capitalization.
-    let field_names = vec![
+    //
+    // The order here MUST NOT change without updating both new and old formats and test cases.
+
+    //+ignore-strings
+    static ref SACCT_FIELDS : Vec<&'static str> = vec![
         "JobID",
         "JobIDRaw",
         "User",
@@ -147,11 +66,106 @@ fn parameters() -> (Vec<&'static str>, Vec<&'static str>) {
         "Partition",
         "AllocTRES",
         "Priority",
-        // JobName must be last in case it contains `|`, code below will clean that up.
+        // JobName must be last in case it contains `|`.
         "JobName",
     ];
+    //-ignore-strings
+}
 
-    (job_states, field_names)
+// Default sacct reporting window.  Note this value is baked into the help message in main.rs too.
+const DEFAULT_WINDOW: u32 = 90;
+
+// Same output format as sacctd, which uses this version number.
+const VERSION: &str = "0.1.0";
+
+pub fn show_slurm_jobs(
+    writer: &mut dyn io::Write,
+    window: &Option<u32>,
+    span: &Option<String>,
+    deluge: bool,
+    system: &dyn systemapi::SystemAPI,
+    new_json: bool,
+) {
+    let embed_envelope = !new_json;
+    match collect_sacct_jobs(system, window, span, deluge, embed_envelope) {
+        Ok(jobs) => {
+            if new_json {
+                let mut envelope = output::newfmt_envelope(system, &vec![]);
+                let (mut data, mut attrs) = output::newfmt_data(system, "slurm_jobs");
+                attrs.push_a("slurm_jobs", jobs);
+                data.push_o("attributes", attrs);
+                envelope.push_o("data", data);
+                output::write_json(writer, &output::Value::O(envelope));
+            } else {
+                for i in 0..jobs.len() {
+                    output::write_csv(writer, jobs.at(i));
+                }
+            }
+        }
+        Err(error) => {
+            if new_json {
+                let mut envelope = output::newfmt_envelope(system, &vec![]);
+                envelope.push_a("errors", output::newfmt_one_error(system, error));
+                output::write_json(writer, &output::Value::O(envelope));
+            } else {
+                //+oldnames
+                let mut envelope = output::Object::new();
+                envelope.push_s("v", VERSION.to_string());
+                envelope.push_s("error", error);
+                envelope.push_s("timestamp", system.get_timestamp());
+                output::write_csv(writer, &output::Value::O(envelope));
+                //-oldnames
+            }
+        }
+    }
+}
+
+// Run sacct, parse and collect data, and place in an array of jobs for output - it's the same array
+// for the old and new formats.
+//
+// However, in the old "flat" CSV format, the "envelope" data (version, timestamp, error) are
+// embedded in each record.  In collect_jobs() we only insert non-exceptional data, any errors are
+// inserted into the first record before formatting, if they occur.
+
+fn collect_sacct_jobs(
+    system: &dyn systemapi::SystemAPI,
+    window: &Option<u32>,
+    span: &Option<String>,
+    deluge: bool,
+    embed_envelope: bool,
+) -> Result<output::Array, String> {
+    // Parse the options to compute the time range to pass to sacct.
+    let (from, to) = if let Some(s) = span {
+        let components = s.split(',').collect::<Vec<&str>>();
+        if components.len() != 2 || !check_ymd(components[0]) || !check_ymd(components[1]) {
+            return Err(format!("Bad --span: {}", s));
+        }
+        (components[0].to_string(), components[1].to_string())
+    } else {
+        let mut minutes = DEFAULT_WINDOW;
+        if let Some(w) = window {
+            minutes = *w;
+        }
+        (format!("now-{minutes}minutes"), "now".to_string())
+    };
+
+    // Run sacct and parse the output.
+    let mut states = SACCT_STATES.clone();
+    if deluge {
+        states.push("PENDING");
+        states.push("RUNNING");
+    }
+    match system.run_sacct(&states, &SACCT_FIELDS, &from, &to) {
+        Ok(sacct_output) => {
+            let local = time::now_local();
+            if embed_envelope {
+                Ok(parse_sacct_jobs_oldfmt(&sacct_output, &local))
+            } else {
+                Ok(parse_sacct_jobs_newfmt(&sacct_output, &local))
+            }
+        }
+        Err(s) => Err(s),
+    }
 }
 
 fn check_ymd(s: &str) -> bool {
@@ -165,11 +179,23 @@ fn check_ymd(s: &str) -> bool {
     k == 3
 }
 
-fn parse_jobs(
+fn compute_field_values(line: &str) -> Vec<String> {
+    let mut field_store = line.split('|').collect::<Vec<&str>>();
+
+    // If there are more fields than field names then that's because the job name
+    // contains `|`.  The JobName field always comes last.  Catenate excess fields until
+    // we have the same number of fields and names.  (Could just ignore excess fields
+    // instead.)
+    let n = SACCT_FIELDS.len();
+    let jobname = field_store[n-1..].join("");
+    field_store[n-1] = &jobname;
+    field_store[..n].iter().map(|x| x.to_string()).collect::<Vec<String>>()
+}
+
+//+oldnames
+fn parse_sacct_jobs_oldfmt(
     sacct_output: &str,
-    field_names: &[&str],
     local: &libc::tm,
-    version_per_line: bool,
 ) -> output::Array {
     // Fields that are dates that may be reinterpreted before transmission.
     let date_fields = HashSet::from(["Start", "End", "Submit"]);
@@ -182,27 +208,15 @@ fn parse_jobs(
 
     // For csv, push out records individually; if we add "common" fields (such as error information)
     // they will piggyback on the first record, as does `load` for `ps`.
-    //
-    // For json, collect records in an array and then push out an envelope containing that array, as
-    // this envelope can later be adapted to hold more fields.
 
     let mut jobs = output::Array::new();
     for line in sacct_output.lines() {
-        let mut field_store = line.split('|').collect::<Vec<&str>>();
-
-        // If there are more fields than field names then that's because the job name
-        // contains `|`.  The JobName field always comes last.  Catenate excess fields until
-        // we have the same number of fields and names.  (Could just ignore excess fields
-        // instead.)
-        let jobname = field_store[field_names.len() - 1..].join("");
-        field_store[field_names.len() - 1] = &jobname;
-        let fields = &field_store[..field_names.len()];
+        let fields = compute_field_values(line);
 
         let mut output_line = output::Object::new();
-        if version_per_line {
-            output_line.push_s("v", VERSION.to_string());
-        }
-        for (i, name) in field_names.iter().enumerate() {
+        output_line.push_s("v", VERSION.to_string());
+
+        for (i, name) in SACCT_FIELDS.iter().enumerate() {
             let mut val = fields[i].to_string();
             let is_zero = val.is_empty()
                 || (!uncontrolled_fields.contains(name) && zero_values.contains(val.as_str()));
@@ -227,14 +241,264 @@ fn parse_jobs(
     }
     jobs
 }
+//-oldnames
+
+fn parse_sacct_jobs_newfmt(
+    sacct_output: &str,
+    local: &libc::tm,
+) -> output::Array {
+    let mut jobs = output::Array::new();
+    for line in sacct_output.lines() {
+        // There are ways of making this table-driven but none that are not complicated.
+        let fieldvals = compute_field_values(line);
+        let mut output_line = output::Object::new();
+        let mut sacct = output::Object::new();
+        for (i, field) in SACCT_FIELDS.iter().enumerate() {
+            // Ideally keep these in the order of the SACCT_FIELDS array, but I've pushed all the
+            // cases for the sacct object to the end.
+            match *field {
+                "JobID" => {
+                    // The format here is (\d+)(?:([.+])(\d+)(?:\.(.*)) where $1 is the job ID, $2
+                    // is the separator, $3 is the task/offset ID, and $4 is the step name.  The
+                    // separator gives us the job type and if not a normal job gives us the array or
+                    // het job ID and task or offset values.
+                    if let Some((id, task)) = fieldvals[i].split_once('_') {
+                        push_uint(&mut output_line, "array_job_id", id);
+                        let task =
+                            if let Some((task_id, _)) = task.split_once('.') {
+                                task_id
+                            } else {
+                                task
+                            };
+                        push_uint(&mut output_line, "array_task_id", task);
+                    } else if let Some((id, offset)) = fieldvals[i].split_once('+') {
+                        push_uint(&mut output_line, "het_job_id", id);
+                        let offset =
+                            if let Some((offset_id, _)) = offset.split_once('.') {
+                                offset_id
+                            } else {
+                                offset
+                            };
+                        push_uint(&mut output_line, "het_job_offset", offset);
+                    }
+                }
+                "JobIDRaw" => {
+                    if let Some((id, step)) = fieldvals[i].split_once('.') {
+                        push_uint(&mut output_line, "job_id", id);
+                        push_string(&mut output_line, "job_step", step);
+                    } else {
+                        push_uint(&mut output_line, "job_id", &fieldvals[i]);
+                    }
+                }
+                "User" => {
+                    // User is empty for administrative records
+                    push_string(&mut output_line, "user_name", &fieldvals[i]);
+                }
+                "Account" => {
+                    output_line.push_s("account", fieldvals[i].clone());
+                }
+                "State" => {
+                    output_line.push_s("job_state", fieldvals[i].clone());
+                }
+                "Start" => {
+                    push_date(&mut output_line, "start_time", &fieldvals[i], local);
+                }
+                "End" => {
+                    push_date(&mut output_line, "end_time", &fieldvals[i], local);
+                }
+                "ExitCode" => {
+                    if fieldvals[i] != "" {
+                        // The format is code:signal
+                        if let Some((code,_signal)) = fieldvals[i].split_once(':') {
+                            push_uint(&mut output_line, "exit_code", code);
+                        }
+                    }
+                }
+                "Layout" => {
+                    push_string(&mut output_line, "distribution", &fieldvals[i]);
+                }
+                "ReqCPUS" => {
+                    push_uint(&mut output_line, "requested_cpus", &fieldvals[i]);
+                }
+                "ReqMem" => {
+                    push_uint(&mut output_line, "requested_memory_per_node", &fieldvals[i]);
+                }
+                "ReqNodes" => {
+                    push_uint(&mut output_line, "requested_node_count", &fieldvals[i]);
+                }
+                "Reservation" => {
+                    if fieldvals[i] != "" {
+                        output_line.push_s("reservation", fieldvals[i].clone());
+                    }
+                }
+                "Submit" => {
+                    push_date(&mut output_line, "submit_time", &fieldvals[i], local);
+                }
+                "Suspended" => {
+                    push_duration(&mut output_line, "suspend_time", &fieldvals[i]);
+                }
+                "TimelimitRaw" => {
+                    if fieldvals[i] == "UNLIMITED" {
+                        output_line.push_i("time_limit", -1); // "Infinite"
+                    } else if fieldvals[i] != "Partition_limit" {
+                        push_uint_full(&mut output_line, "time_limit", &fieldvals[i], 60, 1, false);
+                    }
+                }
+                "NodeList" => {
+                    if fieldvals[i] != "" {
+                        if let Ok(nodes) = nodelist::parse_and_render(&fieldvals[i]) {
+                            output_line.push_a("nodes", nodes);
+                        }
+                    }
+                }
+                "Partition" => {
+                    push_string(&mut output_line, "partition", &fieldvals[i]);
+                }
+                "Priority" => {
+                    push_uint_full(&mut output_line, "priority", &fieldvals[i], 1, 1, false);
+                }
+                "JobName" => {
+                    output_line.push_s("job_name", fieldvals[i].clone());
+                }
+
+                // Sacct fields
+                //+implicit-use
+                "AveDiskRead" | "AveDiskWrite" | "AveRSS" | "AveVMSize" | "MaxRSS" | "MaxVMSize" => {
+                    push_volume(&mut sacct, *field, &fieldvals[i]);
+                }
+                "AveCPU" | "MinCPU" | "UserCPU" | "SystemCPU" => {
+                    push_duration(&mut sacct, *field, &fieldvals[i]);
+                }
+                "ElapsedRaw" => {
+                    push_uint(&mut sacct, *field, &fieldvals[i]);
+                }
+                "AllocTRES" => {
+                    push_string(&mut sacct, *field, &fieldvals[i]);
+                }
+                //-implicit-use
+
+                // push_s("gres_detail", _)
+                // push_s("minimum_cpus_per_node", _)
+
+                _ => {
+                    panic!("Bad field name");
+                }
+            }
+        }
+        if !sacct.is_empty() {
+            output_line.push_o("sacct", sacct);
+        }
+        jobs.push_o(output_line);
+    }
+    jobs
+}
+
+fn push_uint(obj: &mut output::Object, name: &str, val: &str) {
+    push_uint_full(obj, name, val, 1, 0, false);
+}
+
+fn push_uint_full(obj: &mut output::Object, name: &str, val: &str, scale: u64, bias: u64, always: bool) {
+    if val != "" {
+        match val.parse::<u64>() {
+            Ok(n) => if n != 0 || bias != 0 || always {
+                obj.push_u(name, bias + n*scale);
+            }
+            Err(_) => { }
+        }
+    }
+}
+
+fn push_duration(obj: &mut output::Object, name: &str, mut val: &str) {
+    // [DD-[hh:]]mm:ss
+    let days =
+        if let Some((dd,rest)) = val.split_once('-') {
+            if let Ok(n) = dd.parse::<u64>() {
+                val = rest;
+                n
+            } else {
+                return;
+            }
+        } else {
+            0
+        };
+    let mut elts = val.split(':').collect::<Vec<&str>>();
+    let hours =
+        if elts.len() == 3 {
+            if let Ok(n) = elts[0].parse::<u64>() {
+                elts.remove(0);
+                n
+            } else {
+                return;
+            }
+        } else {
+            0
+        };
+    let minutes =
+        if let Ok(n) = elts[0].parse::<u64>() {
+            n
+        } else {
+            return;
+        };
+    let seconds =
+        if let Ok(n) = elts[1].parse::<u64>() {
+            n
+        } else {
+            return;
+        };
+    let t = days * (24*60*60) + hours * (60*60) + minutes * 60 + seconds;
+    if t != 0 {
+        obj.push_u(name, t);
+    }
+}
+
+fn push_volume(obj: &mut output::Object, name: &str, val: &str) {
+    if val != "" {
+        let (val, scale) =
+            if let Some(suffix) = val.strip_suffix('K') {
+                (suffix, 1024)
+            } else if let Some(suffix) = val.strip_suffix('M') {
+                (suffix, 1024*1024)
+            } else if let Some(suffix) = val.strip_suffix('G') {
+                (suffix, 1024*1024*1024)
+            } else {
+                (val, 1)
+            };
+        match val.parse::<u64>() {
+            Ok(n) => if n != 0 {
+                obj.push_u(name, n*scale);
+            }
+            Err(_) => { }
+        }
+    }
+}
+
+fn push_string(obj: &mut output::Object, name: &str, val: &str) {
+    if val != "" && val != "Unknown" {
+        obj.push_s(name, val.to_string())
+    }
+}
+
+fn push_date(obj: &mut output::Object, name: &str, val: &str, local: &libc::tm) {
+    if val != "" && val != "Unknown" {
+        // Reformat timestamps.  The slurm date format is localtime without a time zone offset.
+        // This is bound to lead to problems eventually, so reformat.  If parsing fails, just
+        // transmit the date and let the consumer deal with it.
+        if let Ok(mut t) = time::parse_date_and_time_no_tzo(val) {
+            t.tm_gmtoff = local.tm_gmtoff;
+            t.tm_isdst = local.tm_isdst;
+            // If t.tm_zone is not null then it must point to static data, so
+            // copy it just to be safe.
+            t.tm_zone = local.tm_zone;
+            obj.push_s(name, time::format_iso8601(&t).to_string());
+        }
+    }
+}
 
 // There is a test case that the "error" field is generated correctly in ../tests/slurm-no-sacct.sh.
 
 // Test that known sacct output is formatted correctly.
 #[test]
-pub fn test_format_jobs() {
-    let (_, field_names) = parameters();
-
+pub fn test_format_sacct_jobs() {
     // Actual sacct output from Fox, anonymized and with one command name replaced and Priority
     // added.
     let sacct_output = std::include_str!("testdata/sacct-output.txt");
@@ -247,8 +511,10 @@ pub fn test_format_jobs() {
     // The output below depends on us being in UTC+01:00 and not in dst so mock that.
     local.tm_gmtoff = 3600;
     local.tm_isdst = 0;
-    let jobs = parse_jobs(sacct_output, &field_names, &local, true);
-    print_jobs(&mut output, jobs, false);
+    let jobs = parse_sacct_jobs_oldfmt(sacct_output, &local);
+    for i in 0..jobs.len() {
+        output::write_csv(&mut output, jobs.at(i));
+    }
     if output != expected.as_bytes() {
         let xs = &output;
         let ys = expected.as_bytes();
@@ -270,9 +536,9 @@ pub fn test_format_jobs() {
         }
         println!("{} {}", xs.len(), ys.len());
         if xs.len() > ys.len() {
-            println!("{}", String::from_utf8_lossy(&xs[ys.len()..]));
+            println!("`output` tail = {}", String::from_utf8_lossy(&xs[ys.len()..]));
         } else {
-            println!("{}", String::from_utf8_lossy(&ys[xs.len()..]));
+            println!("`expected` tail = {}", String::from_utf8_lossy(&ys[xs.len()..]));
         }
         assert!(false);
     }

@@ -38,14 +38,14 @@ echo "CSV ok"
 
 # JSON
 
-output=$(../target/debug/sonar slurm --json)
+output=$(../target/debug/sonar slurm --cluster x --json)
 
 # Syntax check
 
 jq . <<< $output > /dev/null
 
 # There is always at least an envelope with a version field
-version=$(jq .v <<< $output)
+version=$(jq .meta.version <<< $output)
 if [[ !( $version =~ [0-9]+\.[0-9]+\.[0-9](-.+)? ) ]]; then
     echo "JSON version bad, got $version"
     exit 1

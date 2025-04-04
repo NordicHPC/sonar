@@ -172,10 +172,9 @@ int amdml_device_get_card_info(uint32_t device, struct amdml_card_info_t* infobu
     memset(infobuf, 0, sizeof(*infobuf));
 
     xrsmi_dev_name_get(device, infobuf->model, sizeof(infobuf->model)-1);
-    /* The alternative to the guid is to load amdsmi.so and get at the UUID that way */
-    uint64_t guid;
-    if (xrsmi_dev_guid_get(device, &guid) == 0) {
-        snprintf(infobuf->uuid, sizeof(infobuf->uuid), "%llu", (unsigned long long)guid);
+    uint64_t uuid;
+    if (xrsmi_dev_unique_id_get(device, &uuid) == 0) {
+        snprintf(infobuf->uuid, sizeof(infobuf->uuid), "%llx", (unsigned long long)uuid);
     }
     xrsmi_version_str_get(RSMI_SW_COMP_DRIVER, infobuf->driver, sizeof(infobuf->driver)-1);
 
@@ -373,6 +372,10 @@ int amdml_device_probe_processes(uint32_t* count) {
             continue;
         }
         if (xrsmi_compute_process_gpus_get(procs[p].process_id, cards, &numcards) != 0) {
+            continue;
+        }
+        if (numcards == 0) {
+            // This happens on idle cards, for whatever reason.
             continue;
         }
 

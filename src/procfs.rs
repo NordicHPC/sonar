@@ -1,4 +1,4 @@
-/// Collect CPU process information without GPU information, from files in /proc.
+// Collect CPU process information without GPU information, from files in /proc.
 
 #[cfg(test)]
 use crate::mocksystem;
@@ -8,134 +8,176 @@ use crate::systemapi;
 use crate::systemapi::SystemAPI;
 
 use std::collections::{HashMap, HashSet};
+use std::thread;
+use std::time;
 
-#[derive(PartialEq, Debug)]
-pub struct Process {
-    pub pid: usize,
-    pub ppid: usize,
-    pub pgrp: usize,
-    pub uid: usize,
-    pub user: String, // _noinfo_<uid> if name unobtainable
-    pub cpu_pct: f64,
-    pub mem_pct: f64,
-    pub cputime_sec: usize,
-    pub mem_size_kib: usize,
-    pub rssanon_kib: usize,
-    pub command: String,
-    pub has_children: bool,
+// All figures in KB, as reported by OS in /proc/meminfo.
+
+pub struct Memory {
+    pub total: u64,
+    pub available: u64,
 }
 
-/// Read the /proc/meminfo file from the fs and return the value for total installed memory.
+// Read the /proc/meminfo file from the fs and return the value for total installed memory.
 
-pub fn get_memtotal_kib(fs: &dyn procfsapi::ProcfsAPI) -> Result<usize, String> {
-    let mut memtotal_kib = 0;
+pub fn get_memory(fs: &dyn procfsapi::ProcfsAPI) -> Result<Memory, String> {
+    let mut memory = Memory { total: 0, available: 0 };
     let meminfo_s = fs.read_to_string("meminfo")?;
-    for l in meminfo_s.split('\n') {
-        if l.starts_with("MemTotal: ") {
-            // We expect "MemTotal:\s+(\d+)\s+kB", roughly
+    {
+        let total = &mut memory.total;
+        let available = &mut memory.available;
+        for l in meminfo_s.split('\n') {
+            let ptr : &mut u64;
+            if l.starts_with("MemTotal: ") {
+                ptr = total;
+            } else if l.starts_with("MemAvailable: ") {
+                ptr = available;
+            } else {
+                continue;
+            }
+            // We expect "tag:\s+(\d+)\s+kB", roughly
             let fields = l.split_ascii_whitespace().collect::<Vec<&str>>();
             if fields.len() != 3 || fields[2] != "kB" {
-                return Err(format!("Unexpected MemTotal in /proc/meminfo: {l}"));
+                return Err(format!("Unexpected {} in /proc/meminfo: {l}", fields[0]));
             }
-            memtotal_kib = parse_usize_field(&fields, 1, l, "meminfo", 0, "MemTotal")?;
-            break;
+            *ptr = parse_usize_field(&fields, 1, l, "meminfo", 0, fields[0])? as u64;
         }
     }
-    if memtotal_kib == 0 {
+    if memory.total == 0 {
         return Err(format!(
             "Could not find MemTotal in /proc/meminfo: {meminfo_s}"
         ));
     }
-    Ok(memtotal_kib)
+    Ok(memory)
 }
 
-/// Read the /proc/cpuinfo file from the fs and return information about installed CPUs.
-///
-/// Fun fact: this file is very different on x86_64 and aarch64.
+// Read the /proc/cpuinfo file from the fs and return information about installed CPUs.
+//
+// Fun fact: this file is very different on x86_64 and aarch64 and requires custom parsing for
+// each.
 
-pub fn get_cpu_info(fs: &dyn procfsapi::ProcfsAPI) -> Result<(String, i32, i32, i32), String> {
-    let mut physids = HashMap::<i32, bool>::new();
-    let mut processors = HashSet::<i32>::new();
+pub struct CpuInfo {
+    pub sockets: i32,
+    pub cores_per_socket: i32,
+    pub threads_per_core: i32,
+    pub cores: Vec<CoreInfo>,
+}
+
+#[allow(dead_code)]
+pub struct CoreInfo {
+    pub model_name: String,
+    pub logical_index: i32,
+    pub physical_index: i32,
+}
+
+#[cfg(target_arch = "x86_64")]
+pub fn get_cpu_info(fs: &dyn procfsapi::ProcfsAPI) -> Result<CpuInfo, String> {
+    get_cpu_info_x86_64(fs)
+}
+
+#[cfg(target_arch = "aarch64")]
+pub fn get_cpu_info(fs: &dyn procfsapi::ProcfsAPI) -> Result<CpuInfo, String> {
+    get_cpu_info_aarch64(fs)
+}
+
+// Otherwise, get_cpu_info() will be undefined and we'll get a compile error; rustc is good about
+// notifying the user that there are ifdef'd cases that are inactive.
+
+#[cfg(any(target_arch = "x86_64", test))]
+pub fn get_cpu_info_x86_64(fs: &dyn procfsapi::ProcfsAPI) -> Result<CpuInfo, String> {
+    let mut physids = HashSet::new();
+    let mut cores = vec![];
+    let mut model_name = None;
+    let mut physical_index = 0i32;
+    let mut logical_index = 0i32;
     let mut cores_per_socket = 0i32;
     let mut siblings = 0i32;
+    let mut sockets = 0i32;
+
+    // On x86_64, the first line of every blob is "processor", which carries the logical index, and
+    // all other lines relate to that.  Probably in principle, the "siblings" and "cpu cores" fields
+    // could be different among sockets but we ignore that.
+
     let cpuinfo = fs.read_to_string("cpuinfo")?;
-    let mut model_name = "".to_string();
-    let mut amd64 = false;
-    let mut aarch64 = false;
+    for l in cpuinfo.split('\n') {
+        if l.starts_with("processor") {
+            if let Some(model_name) = model_name {
+                cores.push(CoreInfo {
+                    model_name,
+                    physical_index,
+                    logical_index,
+                })
+            }
+            model_name = None;
+            logical_index = parse_i32_field(l)?;
+            physical_index = 0i32;
+        } else if l.starts_with("model name") {
+            model_name = Some(parse_text_field(l)?);
+        } else if l.starts_with("physical id") {
+            physical_index = parse_i32_field(l)?;
+            if !physids.contains(&physical_index) {
+                physids.insert(physical_index);
+                sockets += 1;
+            }
+        } else if l.starts_with("siblings") {
+            siblings = parse_i32_field(l)?;
+        } else if l.starts_with("cpu cores") {
+            cores_per_socket = parse_i32_field(l)?;
+        }
+    }
+    if let Some(model_name) = model_name {
+        cores.push(CoreInfo {
+            model_name,
+            physical_index,
+            logical_index,
+        })
+    }
+    if cores.len() == 0 || sockets == 0 || siblings == 0 || cores_per_socket == 0 {
+        return Err("Incomplete information in /proc/cpuinfo".to_string());
+    }
+    let threads_per_core = siblings / cores_per_socket;
+    Ok(CpuInfo { sockets, cores_per_socket, threads_per_core, cores })
+}
+
+#[cfg(any(target_arch = "aarch64", test))]
+pub fn get_cpu_info_aarch64(fs: &dyn procfsapi::ProcfsAPI) -> Result<CpuInfo, String> {
+    let mut processors = HashSet::<i32>::new();
     let mut model_major = 0i32;
     let mut model_minor = 0i32;
+
+    // Tested on UiO "freebio3" node.  The first line of every blob is `processor`, which carries
+    // the logical index.  There is no separate physical index.  Indeed the values on freebio3 seem
+    // to be pretty borked, e.g. BogoMIPS = 50.00 is nuts.
+
+    let cpuinfo = fs.read_to_string("cpuinfo")?;
     for l in cpuinfo.split('\n') {
-        // "processor" could be either kind of CPU, so don't commit
         if l.starts_with("processor") {
-            processors.insert(i32_field(l)?);
-        }
-        // model name, physical id, siblings, cpu cores are x86_64
-        else if l.starts_with("model name") {
-            amd64 = true;
-            model_name = text_field(l)?;
-        } else if l.starts_with("physical id") {
-            amd64 = true;
-            physids.insert(i32_field(l)?, true);
-        } else if l.starts_with("siblings") {
-            amd64 = true;
-            siblings = i32_field(l)?;
-        } else if l.starts_with("cpu cores") {
-            amd64 = true;
-            cores_per_socket = i32_field(l)?;
-        }
-        // CPU architecture, CPU variant are aarch64
-        else if l.starts_with("CPU architecture") {
-            aarch64 = true;
-            model_major = i32_field(l)?;
+            processors.insert(parse_i32_field(l)?);
+        } else if l.starts_with("CPU architecture") {
+            model_major = parse_i32_field(l)?;
         } else if l.starts_with("CPU variant") {
-            aarch64 = true;
-            model_minor = i32_field(l)?;
+            model_minor = parse_i32_field(l)?;
         }
     }
-    if amd64 {
-        let sockets = physids.len() as i32;
-        if model_name.is_empty() || sockets == 0 || siblings == 0 || cores_per_socket == 0 {
-            return Err("Incomplete information in /proc/cpuinfo".to_string());
-        }
-        let threads_per_core = siblings / cores_per_socket;
-        Ok((model_name, sockets, cores_per_socket, threads_per_core))
-    } else if aarch64 {
-        Ok((
-            format!("ARMv{model_major}.{model_minor}"),
-            1,
-            processors.len() as i32,
-            1,
-        ))
-    } else {
-        Err("Unknown processor type in /proc/cpuinfo".to_string())
+
+    let cores_per_socket = processors.len() as i32;
+    let threads_per_core = 1;
+    let sockets = 1;
+    let model_name = format!("ARMv{model_major}.{model_minor}");
+    let mut cores = vec![];
+    for core in 0..sockets*cores_per_socket {
+        cores.push(CoreInfo {
+            logical_index: core,
+            physical_index: 0,
+            model_name: model_name.clone(),
+        })
     }
+    Ok(CpuInfo { sockets, cores_per_socket, threads_per_core, cores })
 }
 
-fn text_field(l: &str) -> Result<String, String> {
-    if let Some((_, after)) = l.split_once(':') {
-        Ok(after.trim().to_string())
-    } else {
-        Err(format!("Missing text field in {l}"))
-    }
-}
-
-fn i32_field(l: &str) -> Result<i32, String> {
-    if let Some((_, after)) = l.split_once(':') {
-        let after = after.trim();
-        match after.strip_prefix("0x") {
-            Some(s) => match i32::from_str_radix(s, 16) {
-                Ok(n) => Ok(n),
-                Err(_) => Err(format!("Bad int field {l}")),
-            },
-            None => match after.parse::<i32>() {
-                Ok(n) => Ok(n),
-                Err(_) => Err(format!("Bad int field {l}")),
-            },
-        }
-    } else {
-        Err(format!("Missing or bad int field in {l}"))
-    }
-}
+// The boot time is first field of the `btime` line of /proc/stat.  It is measured in seconds since
+// epoch.  We need this to compute the process's real time, which we need to compute ps-compatible
+// cpu utilization.
 
 pub fn get_boot_time(fs: &dyn procfsapi::ProcfsAPI) -> Result<u64, String> {
     let stat_s = fs.read_to_string("stat")?;
@@ -148,21 +190,13 @@ pub fn get_boot_time(fs: &dyn procfsapi::ProcfsAPI) -> Result<u64, String> {
     Err(format!("Could not find btime in /proc/stat: {stat_s}"))
 }
 
-/// Obtain process information via /proc and return a hashmap of structures with all the information
-/// we need, keyed by pid.  Pids uniquely tag the records.
-///
-/// This returns Ok(data) on success, otherwise Err(msg).
-///
-/// This function uniformly uses /proc, even though in some cases there are system calls that
-/// provide the same information.
+// Extract system data from /proc/stat.  https://man7.org/linux/man-pages/man5/procfs.5.html.
+//
+// The per-CPU usage is the sum of some fields of the `cpuN` lines.  These are in ticks since
+// boot.  In addition there is an across-the-system line called simply `cpu` with the same
+// format.  These data are useful for analyzing core bindings.
 
-pub fn get_process_information(
-    system: &dyn systemapi::SystemAPI,
-    memtotal_kib: usize,
-) -> Result<(HashMap<usize, Process>, u64, Vec<u64>), String> {
-    // We need this for a lot of things.  On x86 and x64 this is always 100 but in principle it
-    // might be something else, so read the true value.
-
+pub fn get_node_information(system: &dyn systemapi::SystemAPI) -> Result<(u64, Vec<u64>), String> {
     let ticks_per_sec = system.get_clock_ticks_per_sec() as u64;
     if ticks_per_sec == 0 {
         return Err("Could not get a sensible CLK_TCK".to_string());
@@ -170,17 +204,6 @@ pub fn get_process_information(
 
     let fs = system.get_procfs();
 
-    // Extract system data from /proc/stat.  https://man7.org/linux/man-pages/man5/procfs.5.html.
-    //
-    // The per-CPU usage is the sum of some fields of the `cpuN` lines.  These are in ticks since
-    // boot.  In addition there is an across-the-system line called simply `cpu` with the same
-    // format.  These data are useful for analyzing core bindings.
-    //
-    // The boot time is first field of the `btime` line of /proc/stat.  It is measured in seconds
-    // since epoch.  We need this to compute the process's real time, which we need to compute
-    // ps-compatible cpu utilization.
-
-    let mut boot_time = 0;
     let mut cpu_total_secs = 0;
     let mut per_cpu_secs = vec![];
     let stat_s = fs.read_to_string("stat")?;
@@ -209,14 +232,53 @@ pub fn get_process_information(
                 }
                 per_cpu_secs[cpu_no] = sum / ticks_per_sec;
             }
-        } else if l.starts_with("btime ") {
-            let fields = l.split_ascii_whitespace().collect::<Vec<&str>>();
-            boot_time = parse_usize_field(&fields, 1, l, "stat", 0, "btime")? as u64;
         }
     }
-    if boot_time == 0 {
-        return Err(format!("Could not find btime in /proc/stat: {stat_s}"));
+    Ok((cpu_total_secs, per_cpu_secs))
+}
+
+#[derive(PartialEq, Debug)]
+pub struct Process {
+    pub pid: usize,
+    pub ppid: usize,
+    pub pgrp: usize,
+    pub uid: usize,
+    pub user: String, // _noinfo_<uid> if name unobtainable
+    pub cpu_pct: f64, // Cumulative, not very useful but sonalyze uses it
+    pub mem_pct: f64,
+    pub cpu_util: f64, // Sample (over a short time period), slurm-monitor uses it
+    pub cputime_sec: usize,
+    pub mem_size_kib: usize,
+    pub rssanon_kib: usize,
+    pub command: String,
+    pub has_children: bool,
+}
+
+// Obtain process information via /proc and return a hashmap of structures with all the information
+// we need, keyed by pid.  Pids uniquely tag the records.
+//
+// Also return a vector mapping pid to total cpu ticks for the process.  This will be used to
+// compute per-process CPU utilization in get_cpu_utilization(), below.
+//
+// This returns Ok(data) on success, otherwise Err(msg).
+//
+// This function uniformly uses /proc, even though in some cases there are system calls that
+// provide the same information.
+
+pub fn get_process_information(
+    system: &dyn systemapi::SystemAPI,
+    memtotal_kib: usize,
+) -> Result<(HashMap<usize, Process>, Vec<(usize, u64)>), String> {
+    // We need this for a lot of things.  On x86 and x64 this is always 100 but in principle it
+    // might be something else, so read the true value.
+
+    let ticks_per_sec = system.get_clock_ticks_per_sec() as u64;
+    if ticks_per_sec == 0 {
+        return Err("Could not get a sensible CLK_TCK".to_string());
     }
+
+    let fs = system.get_procfs();
+    let boot_time = get_boot_time(fs)?;
 
     // Enumerate all pids, and collect the uids while we're here.
     //
@@ -235,8 +297,8 @@ pub fn get_process_information(
     let mut result = HashMap::<usize, Process>::new();
     let mut ppids = HashSet::<usize>::new();
     let mut user_table = UserTable::new();
-    let clock_ticks_per_sec = ticks_per_sec as f64;
 
+    let mut per_pid_cpu_ticks = vec![];
     for (pid, uid) in pids {
         // Basic system variables.  Intermediate time values are represented in ticks to prevent
         // various roundoff artifacts resulting in NaN or Infinity.
@@ -329,28 +391,28 @@ pub fn get_process_information(
             // has no history, and has no notion of a job or process being "gone".  Instead, enough
             // data must be emitted by Sonar for a postprocessor of the data to reconstruct the job
             // tree and correct the data, if necessary.
-            utime_ticks = parse_usize_field(&fields, 11, &line, "stat", pid, "utime")? as f64;
-            stime_ticks = parse_usize_field(&fields, 12, &line, "stat", pid, "stime")? as f64;
-            let cutime_ticks = parse_usize_field(&fields, 13, &line, "stat", pid, "cutime")? as f64;
-            let cstime_ticks = parse_usize_field(&fields, 14, &line, "stat", pid, "cstime")? as f64;
+            utime_ticks = parse_usize_field(&fields, 11, &line, "stat", pid, "utime")? as u64;
+            stime_ticks = parse_usize_field(&fields, 12, &line, "stat", pid, "stime")? as u64;
+            let cutime_ticks = parse_usize_field(&fields, 13, &line, "stat", pid, "cutime")? as u64;
+            let cstime_ticks = parse_usize_field(&fields, 14, &line, "stat", pid, "cstime")? as u64;
             bsdtime_ticks = utime_ticks + stime_ticks + cutime_ticks + cstime_ticks;
             let start_time_ticks =
-                parse_usize_field(&fields, 19, &line, "stat", pid, "starttime")? as f64;
+                parse_usize_field(&fields, 19, &line, "stat", pid, "starttime")? as u64;
 
             // boot_time and the current time are both time_t, ie, a 31-bit quantity in 2023 and a
             // 32-bit quantity before 2038.  clock_ticks_per_sec is on the order of 100.  Ergo
             // boot_ticks and now_ticks can be represented in about 32+7=39 bits, fine for an f64.
-            let now_ticks = system.get_now_in_secs_since_epoch() as f64 * clock_ticks_per_sec;
-            let boot_ticks = boot_time as f64 * clock_ticks_per_sec;
+            let now_ticks = system.get_now_in_secs_since_epoch() as u64 * ticks_per_sec;
+            let boot_ticks = boot_time as u64 * ticks_per_sec;
 
             // start_time_ticks should be on the order of a few years, there is no risk of overflow
             // here, and in any case boot_ticks + start_time_ticks <= now_ticks, and by the above
             // reasoning now_ticks fits in an f64, ergo the sum does too.
             //
             // Take the max with 1 here to ensure realtime_ticks is not zero.
-            realtime_ticks = now_ticks - (boot_ticks + start_time_ticks);
-            if realtime_ticks < 1.0 {
-                realtime_ticks = 1.0;
+            realtime_ticks = now_ticks as i64 - (boot_ticks + start_time_ticks) as i64;
+            if realtime_ticks < 1 {
+                realtime_ticks = 1;
             }
         } else {
             // This is *usually* benign - the process may have gone away since we enumerated the
@@ -437,12 +499,13 @@ pub fn get_process_information(
         // floor() or ceil() is the most correct, but it's unlikely to matter much.
 
         // realtime_ticks is nonzero, so this division will not produce NaN or Infinity
-        let pcpu_value = (utime_ticks + stime_ticks) / realtime_ticks;
+        let pcpu_value = (utime_ticks + stime_ticks) as f64 / realtime_ticks as f64;
         let pcpu_formatted = (pcpu_value * 1000.0).round() / 10.0;
 
-        // clock_ticks_per_sec is nonzero, so this division will not produce NaN or Infinity.  See
-        // block comment earlier about why bsdtime_ticks is the best base value here.
-        let cputime_sec = (bsdtime_ticks / clock_ticks_per_sec).round() as usize;
+        // ticks_per_sec is nonzero, so this division will not fail.  See block comment earlier
+        // about why bsdtime_ticks is the best base value here.  We round, as that yields the most
+        // natural result.
+        let cputime_sec = (bsdtime_ticks + (ticks_per_sec / 2)) / ticks_per_sec;
 
         // Note ps uses rss not size here.  Also, ps doesn't trust rss to be <= 100% of memory, so
         // let's not trust it either.  memtotal_kib is nonzero, so this division will not produce
@@ -452,6 +515,7 @@ pub fn get_process_information(
             99.9,
         );
 
+        per_pid_cpu_ticks.push((pid, bsdtime_ticks));
         result.insert(
             pid,
             Process {
@@ -462,7 +526,8 @@ pub fn get_process_information(
                 user: user_table.lookup(system, uid),
                 cpu_pct: pcpu_formatted,
                 mem_pct: pmem,
-                cputime_sec,
+                cpu_util: 0.0,    // FIXME
+                cputime_sec: cputime_sec as usize,
                 mem_size_kib: size_kib,
                 rssanon_kib,
                 command: comm,
@@ -477,7 +542,86 @@ pub fn get_process_information(
         p.has_children = ppids.contains(&p.pid);
     }
 
-    Ok((result, cpu_total_secs, per_cpu_secs))
+    Ok((result, per_pid_cpu_ticks))
+}
+
+// Given the per-process CPU time computed by get_process_information, and a time to wait, wait for
+// that time and then read the CPU time again.  The sampled process CPU utilization is the delta of
+// CPU time divided by the delta of time.
+
+pub fn get_cpu_utilization(
+    system: &dyn systemapi::SystemAPI,
+    per_pid_cpu_ticks: &[(usize, u64)],
+    wait_time_ms: usize,
+) -> Result<Vec<(usize, f64)>, String> {
+    let ticks_per_sec = system.get_clock_ticks_per_sec() as u64;
+    let fs = system.get_procfs();
+
+    // This is somewhat dodgy.  It may wait more than 100ms.  It may be that the previous
+    // information was not obtained just before sleeping, but sometime prior to that.
+    thread::sleep(time::Duration::from_millis(100));
+
+    let mut result = vec![];
+    for (pid, prev_cputime_ticks) in per_pid_cpu_ticks {
+        let bsdtime_ticks;
+        match fs.read_to_string(&format!("{pid}/stat")) {
+            Err(_) => {
+                continue;
+            }
+            Ok(line) => {
+                let field_storage: String;
+                let fields: Vec<&str>;
+                match line.rfind(')') {
+                    None => {
+                        continue;
+                    }
+                    Some(commend) => {
+                        field_storage = line[commend + 1..].trim().to_string();
+                        fields = field_storage
+                            .split_ascii_whitespace()
+                            .collect::<Vec<&str>>();
+                    }
+                }
+                let utime_ticks = parse_usize_field(&fields, 11, &line, "stat", *pid, "utime")? as u64;
+                let stime_ticks = parse_usize_field(&fields, 12, &line, "stat", *pid, "stime")? as u64;
+                let cutime_ticks = parse_usize_field(&fields, 13, &line, "stat", *pid, "cutime")? as u64;
+                let cstime_ticks = parse_usize_field(&fields, 14, &line, "stat", *pid, "cstime")? as u64;
+                bsdtime_ticks = utime_ticks + stime_ticks + cutime_ticks + cstime_ticks;
+            }
+        }
+        let utilization = (bsdtime_ticks - prev_cputime_ticks) as f64 *
+            (1000.0 / wait_time_ms as f64) /
+            ticks_per_sec as f64;
+        result.push((*pid, utilization));
+    }
+    Ok(result)
+}
+
+#[cfg(any(target_arch = "x86_64", test))]
+fn parse_text_field(l: &str) -> Result<String, String> {
+    if let Some((_, after)) = l.split_once(':') {
+        Ok(after.trim().to_string())
+    } else {
+        Err(format!("Missing text field in {l}"))
+    }
+}
+
+fn parse_i32_field(l: &str) -> Result<i32, String> {
+    if let Some((_, after)) = l.split_once(':') {
+        let after = after.trim();
+        match after.strip_prefix("0x") {
+            Some(s) => match i32::from_str_radix(s, 16) {
+                Ok(n) => Ok(n),
+                Err(_) => Err(format!("Bad int field {l}")),
+            },
+            None => match after.parse::<i32>() {
+                Ok(n) => Ok(n),
+                Err(_) => Err(format!("Bad int field {l}")),
+            },
+        }
+    } else {
+        Err(format!("Missing or bad int field in {l}"))
+    }
 }
 
 fn parse_usize_field(
@@ -529,7 +673,7 @@ impl UserTable {
             self.ht.insert(uid, name.clone());
             name
         } else {
-            format!("_noinfo_{uid}")
+            format!("_user_{uid}")
         }
     }
 }
@@ -581,9 +725,11 @@ pub fn procfs_parse_test() {
         .with_now(now)
         .freeze();
     let fs = system.get_procfs();
-    let memtotal_kib = get_memtotal_kib(fs).expect("Test: Must have data");
-    let (mut info, total_secs, per_cpu_secs) =
-        get_process_information(&system, memtotal_kib).expect("Test: Must have data");
+    let memory = get_memory(fs).expect("Test: Must have data");
+    assert!(memory.total == 16093776);
+    assert!(memory.available == 8162068);
+    let (total_secs, per_cpu_secs) = get_node_information(&system).expect("Test: Must have data");
+    let (mut info, _) = get_process_information(&system, memory.total as usize).expect("Test: Must have data");
     assert!(info.len() == 1);
     let mut xs = info.drain();
     let p = xs.next().expect("Test: Should have data").1;
@@ -659,8 +805,8 @@ pub fn procfs_dead_and_undead_test() {
         .with_users(users)
         .freeze();
     let fs = system.get_procfs();
-    let memtotal_kib = get_memtotal_kib(fs).expect("Test: Must have data");
-    let (mut info, _, _) = get_process_information(&system, memtotal_kib).expect("Test: Must have data");
+    let memory = get_memory(fs).expect("Test: Must have data");
+    let (mut info, _) = get_process_information(&system, memory.total as usize).expect("Test: Must have data");
 
     // 4020 should be dropped - it's dead
     assert!(info.len() == 2);
@@ -678,14 +824,27 @@ pub fn procfs_dead_and_undead_test() {
 }
 
 #[test]
-pub fn procfs_cpuinfo_test() {
+pub fn procfs_cpuinfo_test_x86_64() {
     let mut files = HashMap::new();
-    files.insert("cpuinfo".to_string(), std::include_str!("testdata/cpuinfo.txt").to_string());
+    files.insert("cpuinfo".to_string(), std::include_str!("testdata/cpuinfo-x86_64.txt").to_string());
     let system = mocksystem::MockSystem::new().with_files(files).freeze();
-    let (model, sockets, cores, threads) =
-        get_cpu_info(system.get_procfs()).expect("Test: Must have data");
-    assert!(model.find("E5-2637").is_some());
+    let CpuInfo { sockets, cores_per_socket, threads_per_core, cores } =
+        get_cpu_info_x86_64(system.get_procfs()).expect("Test: Must have data");
+    assert!(cores[0].model_name.find("E5-2637").is_some());
     assert!(sockets == 2);
-    assert!(cores == 4);
-    assert!(threads == 2);
+    assert!(cores_per_socket == 4);
+    assert!(threads_per_core == 2);
+}
+
+#[test]
+pub fn procfs_cpuinfo_test_aarch64() {
+    let mut files = HashMap::new();
+    files.insert("cpuinfo".to_string(), std::include_str!("testdata/cpuinfo-aarch64.txt").to_string());
+    let system = mocksystem::MockSystem::new().with_files(files).freeze();
+    let CpuInfo { sockets, cores_per_socket, threads_per_core, cores } =
+        get_cpu_info_aarch64(system.get_procfs()).expect("Test: Must have data");
+    assert!(cores[0].model_name.find("ARMv8.3").is_some());
+    assert!(sockets == 1);
+    assert!(cores_per_socket == 96);
+    assert!(threads_per_core == 1);
 }

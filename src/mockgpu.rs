@@ -24,22 +24,22 @@ pub struct MockGpus {
 }
 
 impl GPU for MockGpus {
-    fn get_manufacturer(&mut self) -> String {
+    fn get_manufacturer(&self) -> String {
         "Yoyodyne, Inc.".to_string()
     }
 
-    fn get_card_configuration(&mut self) -> Result<Vec<Card>, String> {
+    fn get_card_configuration(&self) -> Result<Vec<Card>, String> {
         Ok(self.cards.clone())
     }
 
     fn get_process_utilization(
-        &mut self,
-        _user_by_pid: &ps::UserTable,
+        &self,
+        _ptable: &ps::ProcessTable,
     ) -> Result<Vec<Process>, String> {
         Err("No processes yet".to_string())
     }
 
-    fn get_card_utilization(&mut self) -> Result<Vec<CardState>, String> {
+    fn get_card_utilization(&self) -> Result<Vec<CardState>, String> {
         Err("No utilization yet".to_string())
     }
 }

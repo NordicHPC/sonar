@@ -11,7 +11,7 @@ import (
 	"github.com/NordicHPC/sonar/util/formats/oldfmt"
 )
 
-func TestJSONSysinfo(t *testing.T) {
+func TestOldJSONSysinfo(t *testing.T) {
 	f, err := os.Open("testdata/oldfmt_sysinfo.json")
 	if err != nil {
 		t.Fatal(err)
@@ -59,7 +59,7 @@ func TestJSONSysinfo(t *testing.T) {
 	}
 }
 
-func TestCSVSamples(t *testing.T) {
+func TestOldCSVSamples(t *testing.T) {
 	f, err := os.Open("testdata/oldfmt_samples.csv")
 	if err != nil {
 		t.Fatal(err)
@@ -119,7 +119,7 @@ func TestCSVSamples(t *testing.T) {
 	}
 }
 
-func TestCSVSlurmJobs(t *testing.T) {
+func TestOldCSVSlurmJobs(t *testing.T) {
 	f, err := os.Open("testdata/oldfmt_slurmjobs.csv")
 	if err != nil {
 		t.Fatal(err)
@@ -150,11 +150,5 @@ func TestCSVSlurmJobs(t *testing.T) {
 	assert(t, iter == 4, "Iteration count")
 	if err != nil {
 		t.Fatal(err)
-	}
-}
-
-func assert(t *testing.T, c bool, msg string) {
-	if !c {
-		t.Fatal(msg)
 	}
 }

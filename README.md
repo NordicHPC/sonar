@@ -7,8 +7,9 @@
 Tool to profile usage of HPC resources by regularly probing processes.
 
 Sonar examines `/proc` and runs some diagnostic programs and filters and groups the output and
-prints it to stdout as CSV text.  The output format is defined in detail below.  Sonar can also
-probe the system and reports on its overall configuration.
+prints it to stdout.  The output format is defined in detail in
+[doc/DATA-FORMAT.md](doc/DATA-FORMAT.md).  Sonar can also probe the system and reports on its
+overall configuration.
 
 ![image of a fish swarm](img/sonar-small.png)
 
@@ -17,25 +18,137 @@ Image: [Midjourney](https://midjourney.com/), [CC BY-NC 4.0](https://creativecom
 
 ## Subcommands
 
-Sonar has two subcommands, `ps` and `sysinfo`.  Both collect information about the system and print
-it on stdout.  `sonar ps` collects information about running processes.  `sonar sysinfo` collects
-information about the configuration of the system itself - cores, memory, gpus.
+Sonar has several subcommands that collect information about nodes, jobs, clusters, and processes
+and print it on stdout:
+
+- `sonar ps` takes a snapshot of the currently running processes
+- `sonar sysinfo` extracts hardware information about the node
+- `sonar slurm` extracts information about overall job state from the slurm databases
+- `sonar cluster` extracts information about partitions and node state from the slurm databases
+- `sonar help` prints some useful help
+
+
+## Compilation and installation
+
+- Make sure you have [Rust installed](https://www.rust-lang.org/learn/get-started) (I install Rust through `rustup`)
+- Clone this project
+- Build it: `cargo build --release`
+- The binary is then located at `target/release/sonar`
+- Copy it to wherever it needs to be
+
+If the build results in a link error for `libsonar-<something>.a` then your binutils are too old,
+this can be a problem on eg RHEL9.  See comments in `gpuapi/Makefile` for how to resolve this.
+
+
+## Output format options
+
+The recommended output format is the "new" JSON format.  Use the command line switch `--json` with
+all commands to force this format.  Most subcommands currently default to either CSV or an older
+JSON format.
+
+
+## Collect processes with `sonar ps`
+
+It's sensible to run `sonar ps` every 5 minutes on every compute node.
 
 ```console
-$ sonar
+$ sonar ps --help
+Take a snapshot of the currently running processes
 
-Usage: sonar <COMMAND>
-
-Commands:
-  ps       Take a snapshot of the currently running processes
-  sysinfo  Extract system information
-  slurm    Extract slurm information
-  help     Print this message or the help of the given subcommand(s)
+Usage: sonar ps [OPTIONS]
 
 Options:
-  -h, --help     Print help
-  -V, --version  Print version
+      --batchless
+          Synthesize a job ID from the process tree in which a process finds itself
+      --rollup
+          Merge process records that have the same job ID and command name
+      --min-cpu-percent <MIN_CPU_PERCENT>
+          Include records for jobs that have on average used at least this percentage of CPU, note this is nonmonotonic [default: none]
+      --min-mem-percent <MIN_MEM_PERCENT>
+          Include records for jobs that presently use at least this percentage of real memory, note this is nonmonotonic [default: none]
+      --min-cpu-time <MIN_CPU_TIME>
+          Include records for jobs that have used at least this much CPU time (in seconds) [default: none]
+      --exclude-system-jobs
+          Exclude records for system jobs (uid < 1000)
+      --exclude-users <EXCLUDE_USERS>
+          Exclude records for these comma-separated user names [default: none]
+      --exclude-commands <EXCLUDE_COMMANDS>
+          Exclude records whose commands start with these comma-separated names [default: none]
+      --lockdir <LOCKDIR>
+          Create a per-host lockfile in this directory and exit early if the file exists on startup [default: none]
+  -h, --help
+          Print help
 ```
+
+**NOTE** that if you use `--lockdir`, it should name a directory that is cleaned on reboot, such as
+`/var/run`, `/run`, or a tmpfs, and ideally it is a directory on a disk local to the node, not a
+shared disk.
+
+Here is an example output (with the default CSV output format):
+```console
+$ sonar ps --exclude-system-jobs --min-cpu-time=10 --rollup
+
+v=0.7.0,time=2023-08-10T11:09:41+02:00,host=somehost,cores=8,user=someone,job=0,cmd=fish,cpu%=2.1,cpukib=64400,gpus=none,gpu%=0,gpumem%=0,gpukib=0,cputime_sec=138
+v=0.7.0,time=2023-08-10T11:09:41+02:00,host=somehost,cores=8,user=someone,job=0,cmd=sonar,cpu%=761,cpukib=372,gpus=none,gpu%=0,gpumem%=0,gpukib=0,cputime_sec=137
+v=0.7.0,time=2023-08-10T11:09:41+02:00,host=somehost,cores=8,user=someone,job=0,cmd=brave,cpu%=14.6,cpukib=2907168,gpus=none,gpu%=0,gpumem%=0,gpukib=0,cputime_sec=3532
+v=0.7.0,time=2023-08-10T11:09:41+02:00,host=somehost,cores=8,user=someone,job=0,cmd=alacritty,cpu%=0.8,cpukib=126700,gpus=none,gpu%=0,gpumem%=0,gpukib=0,cputime_sec=51
+v=0.7.0,time=2023-08-10T11:09:41+02:00,host=somehost,cores=8,user=someone,job=0,cmd=pulseaudio,cpu%=0.7,cpukib=90640,gpus=none,gpu%=0,gpumem%=0,gpukib=0,cputime_sec=399
+v=0.7.0,time=2023-08-10T11:09:41+02:00,host=somehost,cores=8,user=someone,job=0,cmd=slack,cpu%=3.9,cpukib=716924,gpus=none,gpu%=0,gpumem%=0,gpukib=0,cputime_sec=266
+```
+
+## Collect system information with `sonar sysinfo`
+
+The `sysinfo` subcommand collects information about the system and prints it in JSON form on stdout
+(this is the older JSON format):
+
+```console
+$ sonar sysinfo
+{
+ "timestamp": "2024-02-26T00:00:02+01:00",
+ "hostname": "ml1.hpc.uio.no",
+ "description": "2x14 (hyperthreaded) Intel(R) Xeon(R) Gold 5120 CPU @ 2.20GHz, 125 GB, 3x NVIDIA GeForce RTX 2080 Ti @ 11GB",
+ "cpu_cores": 56,
+ "mem_gb": 125,
+ "gpu_cards": 3,
+ "gpumem_gb": 33
+}
+```
+
+Typical usage for `sysinfo` is to run the command after reboot and (for hot-swappable systems and
+VMs) once every 24 hours, and to aggregate the information in some database.
+
+The `sysinfo` subcommand currently has no options.
+
+
+## Collecting job information with `sonar slurm`
+
+To be written.
+
+This command exists partly to allow clusters to always push data, partly to collect the data for
+long-term storage, partly to offload the Slurm database manager during query processing.
+
+## Collecting partition and node information with `sonar cluster`
+
+To be written.
+
+This command exists partly to allow clusters to always push data, partly to collect the data for
+long-term storage.
+
+## Collect and analyze results
+
+Sonar data are used by two other tools:
+
+* [JobGraph](https://github.com/NordicHPC/jobgraph) provides high-level plots of system activity. Mapping
+  files for JobGraph can be found in the [data](data) folder.
+* [JobAnalyzer](https://github.com/NAICNO/Jobanalyzer) allows sonar logs to be queried and analyzed, and
+  provides dashboards, interactive and batch queries, and reporting of system activity, policy violations,
+  hung jobs, and more.
+
+
+## Output formats
+
+See [doc/DATA-FORMAT.md](doc/DATA-FORMAT.md) for a specification of the output data formats and the
+semantics of individual fields.
 
 
 ## Versions and release procedures
@@ -98,107 +211,6 @@ Policy for changing the minimum Rust version:
 - Once we reach agreement in the issue discussion:
   - Update the version inside the test workflow [test-minimal.yml](.github/workflows/test-minimal.yml)
   - Update the documentation (this section)
-
-
-## Installation
-
-- Make sure you have [Rust installed](https://www.rust-lang.org/learn/get-started) (I install Rust through `rustup`)
-- Clone this project
-- Build it: `cargo build --release`
-- The binary is then located at `target/release/sonar`
-- Copy it to where-ever it needs to be
-
-If the build results in a link error for `libsonar-<something>.a` then your binutils are too old,
-this can be a problem on eg RHEL9.  See comments in `gpuapi/Makefile` for how to resolve this.
-
-
-## Collect processes with `sonar ps`
-
-It's sensible to run `sonar ps` every 5 minutes on every compute node.
-
-```console
-$ sonar ps --help
-Take a snapshot of the currently running processes
-
-Usage: sonar ps [OPTIONS]
-
-Options:
-      --batchless
-          Synthesize a job ID from the process tree in which a process finds itself
-      --rollup
-          Merge process records that have the same job ID and command name
-      --min-cpu-percent <MIN_CPU_PERCENT>
-          Include records for jobs that have on average used at least this percentage of CPU, note this is nonmonotonic [default: none]
-      --min-mem-percent <MIN_MEM_PERCENT>
-          Include records for jobs that presently use at least this percentage of real memory, note this is nonmonotonic [default: none]
-      --min-cpu-time <MIN_CPU_TIME>
-          Include records for jobs that have used at least this much CPU time (in seconds) [default: none]
-      --exclude-system-jobs
-          Exclude records for system jobs (uid < 1000)
-      --exclude-users <EXCLUDE_USERS>
-          Exclude records for these comma-separated user names [default: none]
-      --exclude-commands <EXCLUDE_COMMANDS>
-          Exclude records whose commands start with these comma-separated names [default: none]
-      --lockdir <LOCKDIR>
-          Create a per-host lockfile in this directory and exit early if the file exists on startup [default: none]
-  -h, --help
-          Print help
-```
-
-**NOTE** that if you use `--lockdir`, it should name a directory that is cleaned on reboot, such as
-`/var/run`, `/run`, or a tmpfs, and ideally it is a directory on a disk local to the node, not a
-shared disk.
-
-Here is an example output (with the default CSV output format):
-```console
-$ sonar ps --exclude-system-jobs --min-cpu-time=10 --rollup
-
-v=0.7.0,time=2023-08-10T11:09:41+02:00,host=somehost,cores=8,user=someone,job=0,cmd=fish,cpu%=2.1,cpukib=64400,gpus=none,gpu%=0,gpumem%=0,gpukib=0,cputime_sec=138
-v=0.7.0,time=2023-08-10T11:09:41+02:00,host=somehost,cores=8,user=someone,job=0,cmd=sonar,cpu%=761,cpukib=372,gpus=none,gpu%=0,gpumem%=0,gpukib=0,cputime_sec=137
-v=0.7.0,time=2023-08-10T11:09:41+02:00,host=somehost,cores=8,user=someone,job=0,cmd=brave,cpu%=14.6,cpukib=2907168,gpus=none,gpu%=0,gpumem%=0,gpukib=0,cputime_sec=3532
-v=0.7.0,time=2023-08-10T11:09:41+02:00,host=somehost,cores=8,user=someone,job=0,cmd=alacritty,cpu%=0.8,cpukib=126700,gpus=none,gpu%=0,gpumem%=0,gpukib=0,cputime_sec=51
-v=0.7.0,time=2023-08-10T11:09:41+02:00,host=somehost,cores=8,user=someone,job=0,cmd=pulseaudio,cpu%=0.7,cpukib=90640,gpus=none,gpu%=0,gpumem%=0,gpukib=0,cputime_sec=399
-v=0.7.0,time=2023-08-10T11:09:41+02:00,host=somehost,cores=8,user=someone,job=0,cmd=slack,cpu%=3.9,cpukib=716924,gpus=none,gpu%=0,gpumem%=0,gpukib=0,cputime_sec=266
-```
-
-## Collect system information with `sonar sysinfo`
-
-The `sysinfo` subcommand collects information about the system and prints it in JSON form on stdout:
-
-```console
-$ sonar sysinfo
-{
- "timestamp": "2024-02-26T00:00:02+01:00",
- "hostname": "ml1.hpc.uio.no",
- "description": "2x14 (hyperthreaded) Intel(R) Xeon(R) Gold 5120 CPU @ 2.20GHz, 125 GB, 3x NVIDIA GeForce RTX 2080 Ti @ 11GB",
- "cpu_cores": 56,
- "mem_gb": 125,
- "gpu_cards": 3,
- "gpumem_gb": 33
-}
-```
-
-Typical usage for `sysinfo` is to run the command after reboot and (for hot-swappable systems and
-VMs) once every 24 hours, and to aggregate the information in some database.
-
-The `sysinfo` subcommand currently has no options.
-
-
-## Collect and analyze results
-
-Sonar data are used by two other tools:
-
-* [JobGraph](https://github.com/NordicHPC/jobgraph) provides high-level plots of system activity. Mapping
-  files for JobGraph can be found in the [data](data) folder.
-* [JobAnalyzer](https://github.com/NAICNO/Jobanalyzer) allows sonar logs to be queried and analyzed, and
-  provides dashboards, interactive and batch queries, and reporting of system activity, policy violations,
-  hung jobs, and more.
-
-
-## Output formats
-
-See [doc/DATA-FORMAT.md](doc/DATA-FORMAT.md) for a specification of the output data formats and the
-semantics of individual fields.
 
 
 ## Authors

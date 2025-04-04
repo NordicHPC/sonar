@@ -10,6 +10,7 @@ use crate::realprocfs;
 use crate::systemapi;
 use crate::time;
 use crate::users;
+use crate::util;
 
 use std::fs;
 use std::io;
@@ -18,11 +19,23 @@ use std::path;
 // 3 minutes ought to be enough for anyone.
 const SACCT_TIMEOUT_S: u64 = 180;
 
+// sinfo will normally be very quick
+const SINFO_TIMEOUT_S: u64 = 10;
+
 pub struct RealSystemBuilder {
     jm: Option<Box<dyn jobsapi::JobManager>>,
+    cluster: String,
 }
 
 impl RealSystemBuilder {
+    #[allow(dead_code)]
+    pub fn with_cluster(self, cluster: &str) -> RealSystemBuilder {
+        RealSystemBuilder {
+            cluster: cluster.to_string(),
+            ..self
+        }
+    }
+
     pub fn with_jobmanager(self, jm: Box<dyn jobsapi::JobManager>) -> RealSystemBuilder {
         RealSystemBuilder {
             jm: Some(jm),
@@ -36,6 +49,7 @@ impl RealSystemBuilder {
         Ok(RealSystem {
             timestamp: time::now_iso8601(),
             hostname: hostname::get(),
+            cluster: self.cluster,
             jm: if let Some(x) = self.jm {
                 x
             } else {
@@ -49,9 +63,19 @@ impl RealSystemBuilder {
     }
 }
 
+#[cfg(target_arch = "x86_64")]
+const ARCHITECTURE: &'static str = "x86_64";
+
+#[cfg(target_arch = "aarch64")]
+const ARCHITECTURE: &'static str = "aarch64";
+
+// Otherwise, `ARCHITECTURE` will be undefined and we'll get a compile error; rustc is good about
+// notifying the user that there are ifdef'd cases that are inactive.
+
 pub struct RealSystem {
     timestamp: String,
     hostname: String,
+    cluster: String,
     fs: realprocfs::RealProcFS,
     gpus: realgpu::RealGpu,
     jm: Box<dyn jobsapi::JobManager>,
@@ -61,7 +85,7 @@ pub struct RealSystem {
 
 impl RealSystem {
     pub fn new() -> RealSystemBuilder {
-        RealSystemBuilder { jm: None }
+        RealSystemBuilder { jm: None, cluster: "".to_string() }
     }
 }
 
@@ -74,8 +98,36 @@ impl systemapi::SystemAPI for RealSystem {
         self.timestamp.clone()
     }
 
+    fn get_cluster(&self) -> String {
+        self.cluster.clone()
+    }
+
     fn get_hostname(&self) -> String {
         self.hostname.clone()
+    }
+
+    fn get_os_name(&self) -> String {
+        unsafe {
+            let mut utsname: libc::utsname = std::mem::zeroed();
+            if libc::uname(&mut utsname) != 0 {
+                return "".to_string();
+            }
+            util::cstrdup(&utsname.sysname)
+        }
+    }
+
+    fn get_os_release(&self) -> String {
+        unsafe {
+            let mut utsname: libc::utsname = std::mem::zeroed();
+            if libc::uname(&mut utsname) != 0 {
+                return "".to_string();
+            }
+            util::cstrdup(&utsname.release)
+        }
+    }
+
+    fn get_architecture(&self) -> String {
+        ARCHITECTURE.to_string()
     }
 
     fn get_procfs(&self) -> &dyn procfsapi::ProcfsAPI {
@@ -131,7 +183,7 @@ impl systemapi::SystemAPI for RealSystem {
         from: &str,
         to: &str,
     ) -> Result<String, String> {
-        match command::safe_command(
+        runit(
             "sacct",
             &[
                 "-aP",
@@ -146,10 +198,15 @@ impl systemapi::SystemAPI for RealSystem {
                 to,
             ],
             SACCT_TIMEOUT_S,
-        ) {
-            Err(e) => Err(format!("sacct failed: {:?}", e)),
-            Ok(sacct_output) => Ok(sacct_output),
-        }
+        )
+    }
+
+    fn run_sinfo_partitions(&self) -> Result<Vec<(String,String)>, String> {
+	twofields(runit("sinfo", &["-h", "-a", "-O", "Partition:|,NodeList:|"], SINFO_TIMEOUT_S)?)
+    }
+
+    fn run_sinfo_nodes(&self) -> Result<Vec<(String,String)>, String> {
+        twofields(runit("sinfo", &["-h", "-a", "-e", "-O", "NodeList:|,StateComplete:|"], SINFO_TIMEOUT_S)?)
     }
 
     fn handle_interruptions(&self) {
@@ -159,4 +216,25 @@ impl systemapi::SystemAPI for RealSystem {
     fn is_interrupted(&self) -> bool {
         interrupt::is_interrupted()
     }
+}
+
+fn runit(cmd: &str, args: &[&str], timeout: u64) -> Result<String, String> {
+    match command::safe_command(cmd, args, timeout) {
+        Ok(s) => Ok(s),
+        Err(command::CmdError::CouldNotStart(e)) => Err(e),
+        Err(command::CmdError::Failed(e)) => Err(e),
+        Err(command::CmdError::Hung(e)) => Err(e),
+        Err(command::CmdError::InternalError(e)) => Err(e),
+    }
+}
+
+fn twofields(text: String) -> Result<Vec<(String,String)>, String> {
+    let mut v = vec![];
+    for l in text.lines() {
+        let mut fields = l.split('|');
+        let a = fields.next().ok_or("Bad sinfo output")?;
+        let b = fields.next().ok_or("Bad sinfo output")?;
+        v.push((a.to_string(),b.to_string()));
+    }
+    Ok(v)
 }

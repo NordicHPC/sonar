@@ -34,3 +34,8 @@ jobs:
       run: |
         cd tests
         ./run_tests.sh
+
+    - name: Output format tests
+      run: |
+        cd util
+        make test

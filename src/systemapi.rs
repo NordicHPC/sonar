@@ -10,7 +10,11 @@ pub trait SystemAPI {
     // The `get_` methods always return the same values for every call.
     fn get_version(&self) -> String;
     fn get_timestamp(&self) -> String;
+    fn get_cluster(&self) -> String;
     fn get_hostname(&self) -> String;
+    fn get_os_name(&self) -> String;
+    fn get_os_release(&self) -> String;
+    fn get_architecture(&self) -> String;
     fn get_clock_ticks_per_sec(&self) -> usize;
     fn get_page_size_in_kib(&self) -> usize;
     fn get_now_in_secs_since_epoch(&self) -> u64;
@@ -35,6 +39,12 @@ pub trait SystemAPI {
         from: &str,
         to: &str,
     ) -> Result<String, String>;
+
+    // Run sinfo and return its output as a vector of partition name and unparsed nodelist.
+    fn run_sinfo_partitions(&self) -> Result<Vec<(String,String)>, String>;
+
+    // Run sinfo and return its output as a vector of unparsed nodelist and state list.
+    fn run_sinfo_nodes(&self) -> Result<Vec<(String,String)>, String>;
 
     // `create_lock_file` creates it atomically if it does not exist, returning Ok if so; if it does
     // exist, returns Err(io::ErrorKind::AlreadyExists), otherwise some other Err.
