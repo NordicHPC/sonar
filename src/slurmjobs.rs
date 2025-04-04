@@ -72,6 +72,100 @@ lazy_static! {
     //-ignore-strings
 }
 
+// The Jobber has state that implements a redundancy filter, used by the daemon mode.
+
+pub struct Jobber<'a> {
+    window: Option<u32>,
+    span: Option<String>,
+    incomplete: bool,
+    system: &'a dyn systemapi::SystemAPI,
+}
+
+impl<'a> Jobber<'a> {
+    pub fn new(
+        window: &Option<u32>,
+        span: &Option<String>,
+        incomplete: bool,
+        system: &'a dyn systemapi::SystemAPI,
+    ) -> Jobber<'a> {
+        Jobber {
+            window: window.clone(),
+            span: span.clone(),
+            incomplete,
+            system,
+        }
+    }
+
+    pub fn show_jobs(&mut self, writer: &mut dyn io::Write) {
+        match collect_sacct_jobs(self.system, &self.window, &self.span, self.incomplete, false) {
+            Ok(jobs) => {
+                if self.incomplete {
+                    // FIXME: Here we filter
+                    //
+                    // When set, we include PENDING / RUNNING in the set of states *but* we want to
+                    // filter the output so that redundant information is not sent.
+                    //
+                    // What does this mean?
+                    //
+                    // - It probably means that we can't go from parsing the sacct output directly
+                    //   to an output object, but must go via some easier-to-use storage, *or* there
+                    //   must be stuff on the side that discriminates enough to make filtering
+                    //   possible.
+                    //
+                    // - we need to determine what it means for something to be redundant.  these current
+                    //   output fields seem relevant, if the job is in running or pending state:
+                    //
+                    //    - job_state (so, we push running after pending)
+                    //    - requested_cpus
+                    //    - requested_memory_per_node
+                    //    - requested_node_count
+                    //    - distribution
+                    //    - time limit
+                    //    - priority
+                    //    - gres_detail or other resource stuff
+                    //
+                    // - really anything that can be changed with scontrol or similar might be relevant,
+                    //   so if eg reservation or account can be changed then yes, those too
+                    //
+                    // - fields that are *not* relevant might include
+                    //    - job ids (all fields)
+                    //    - user name
+                    //    - account name
+                    //    - reservation
+                    //    - end
+                    //    - exit code
+                    //    - submit time
+                    //    - suspended time (i think - discuss)
+                    //    - partition
+                    //    - node list
+                    //    - job name?
+                    //    - anything in the sacct subobject *including* elapsed time
+                    //
+                    // We want to do two things:
+                    //
+                    // - determine if any pertinent fields have changed
+                    // - determine which pertient fields have changed
+                    //
+                    // We transmit only identifying data + pertinent fields that have changed.
+                }
+                // Maybe no data at all, though that's probably so rare that it's not worth
+                // optimizing for.
+                let mut envelope = output::newfmt_envelope(self.system, &vec![]);
+                let (mut data, mut attrs) = output::newfmt_data(self.system, "slurm_jobs");
+                attrs.push_a("slurm_jobs", jobs);
+                data.push_o("attributes", attrs);
+                envelope.push_o("data", data);
+                output::write_json(writer, &output::Value::O(envelope));
+            }
+            Err(error) => {
+                let mut envelope = output::newfmt_envelope(self.system, &vec![]);
+                envelope.push_a("errors", output::newfmt_one_error(self.system, error));
+                output::write_json(writer, &output::Value::O(envelope));
+            }
+        }
+    }
+}
+
 // Default sacct reporting window.  Note this value is baked into the help message in main.rs too.
 const DEFAULT_WINDOW: u32 = 90;
 
