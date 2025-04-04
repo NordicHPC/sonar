@@ -225,7 +225,7 @@ struct Ini {
     cluster: ClusterIni,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum Operation {
     Sample,
     Sysinfo,
@@ -241,7 +241,7 @@ pub enum Operation {
     Fatal(String),
 }
 
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Dur {
     Hours(u64),
     Minutes(u64),
@@ -860,7 +860,7 @@ fn parse_config(config_file: &str) -> Result<Ini, String> {
             Section::Jobs => match name.as_str() {
                 "cadence" => {
                     let dur = parse_duration(&value, false)?;
-                    ini.cluster.cadence = Some(dur);
+                    ini.jobs.cadence = Some(dur);
                     if ini.jobs.window.is_none() {
                         ini.jobs.window = Some(Dur::Seconds(2 * dur.to_seconds()));
                     }
