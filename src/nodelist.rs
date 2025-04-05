@@ -59,7 +59,9 @@ impl<'a> NodelistParser<'a> {
         }
         match std::str::from_utf8(&self.s[start..self.i]) {
             Ok(s) => Ok(s.to_string()),
-            Err(_) => { panic!("Should not happen") }
+            Err(_) => {
+                panic!("Should not happen")
+            }
         }
     }
 
@@ -102,8 +104,7 @@ impl<'a> NodelistParser<'a> {
         if !self.eat_digit() {
             return Err("Number expected".to_string());
         }
-        while self.eat_digit() {
-        }
+        while self.eat_digit() {}
         Ok(())
     }
 

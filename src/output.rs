@@ -402,13 +402,10 @@ pub struct AttrVal {
     pub value: String,
 }
 
-pub fn newfmt_envelope(
-    system: &dyn systemapi::SystemAPI,
-    attrs: &[AttrVal],
-) -> Object {
+pub fn newfmt_envelope(system: &dyn systemapi::SystemAPI, attrs: &[AttrVal]) -> Object {
     let mut envelope = Object::new();
     let mut meta = Object::new();
-    meta.push_s("producer","sonar".to_string());
+    meta.push_s("producer", "sonar".to_string());
     meta.push_s("version", system.get_version());
     // meta.push_u("format", 1) // 1 is the default
     // meta.push_s("token") // FIXME
@@ -428,7 +425,7 @@ pub fn newfmt_envelope(
 
 pub fn newfmt_data(system: &dyn systemapi::SystemAPI, ty: &str) -> (Object, Object) {
     let mut data = Object::new();
-    data.push_s("type",ty.to_string());
+    data.push_s("type", ty.to_string());
     let mut attrs = Object::new();
     attrs.push_s("time", system.get_timestamp());
     let c = system.get_cluster();

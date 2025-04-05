@@ -45,9 +45,7 @@ pub struct AnyJobManager {
 
 impl AnyJobManager {
     pub fn new(force_slurm: bool) -> AnyJobManager {
-        AnyJobManager {
-            force_slurm,
-        }
+        AnyJobManager { force_slurm }
     }
 }
 
@@ -57,7 +55,7 @@ impl JobManager for AnyJobManager {
         system: &dyn systemapi::SystemAPI,
         pid: usize,
         processes: &HashMap<usize, procfs::Process>,
-    ) -> (usize,bool) {
+    ) -> (usize, bool) {
         if let Some(id) = slurm::get_job_id(system, pid) {
             (id, id != 0)
         } else if let Some(p) = processes.get(&pid) {

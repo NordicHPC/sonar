@@ -5,7 +5,12 @@ use crate::systemapi;
 
 use std::io;
 
-pub fn show_system(writer: &mut dyn io::Write, system: &dyn systemapi::SystemAPI, csv: bool, new_json: bool) {
+pub fn show_system(
+    writer: &mut dyn io::Write,
+    system: &dyn systemapi::SystemAPI,
+    csv: bool,
+    new_json: bool,
+) {
     let sysinfo = match compute_nodeinfo(system) {
         Ok(info) => {
             if !new_json {
@@ -122,28 +127,64 @@ fn layout_card_info(node_info: &NodeInfo, new_json: bool) -> output::Array {
             max_mem_clock_mhz,
         } = c;
         let mut gpu = output::Object::new();
-        gpu.push_s(if new_json { "address" } else { "bus_addr" },
-                   bus_addr.to_string());
+        gpu.push_s(
+            if new_json { "address" } else { "bus_addr" },
+            bus_addr.to_string(),
+        );
         gpu.push_i("index", device.index as i64);
         gpu.push_s("uuid", device.uuid.to_string());
         gpu.push_s("manufacturer", node_info.card_manufacturer.clone());
         gpu.push_s("model", model.to_string());
-        gpu.push_s(if new_json { "architecture" } else { "arch" },
-                   arch.to_string());
+        gpu.push_s(
+            if new_json { "architecture" } else { "arch" },
+            arch.to_string(),
+        );
         gpu.push_s("driver", driver.to_string());
         gpu.push_s("firmware", firmware.to_string());
-        gpu.push_i(if new_json { "memory" } else { "mem_size_kib" },
-                   *mem_size_kib);
-        gpu.push_i(if new_json { "power_limit" } else { "power_limit_watt" },
-                   *power_limit_watt as i64);
-        gpu.push_i(if new_json { "max_power_limit" } else { "max_power_limit_watt" },
-                   *max_power_limit_watt as i64);
-        gpu.push_i(if new_json { "min_power_limit" } else { "min_power_limit_watt" },
-                   *min_power_limit_watt as i64);
-        gpu.push_i(if new_json { "max_ce_clock" } else { "max_ce_clock_mhz" },
-                   *max_ce_clock_mhz as i64);
-        gpu.push_i(if new_json { "max_memory_clock" } else { "max_mem_clock_mhz" },
-                   *max_mem_clock_mhz as i64);
+        gpu.push_i(
+            if new_json { "memory" } else { "mem_size_kib" },
+            *mem_size_kib,
+        );
+        gpu.push_i(
+            if new_json {
+                "power_limit"
+            } else {
+                "power_limit_watt"
+            },
+            *power_limit_watt as i64,
+        );
+        gpu.push_i(
+            if new_json {
+                "max_power_limit"
+            } else {
+                "max_power_limit_watt"
+            },
+            *max_power_limit_watt as i64,
+        );
+        gpu.push_i(
+            if new_json {
+                "min_power_limit"
+            } else {
+                "min_power_limit_watt"
+            },
+            *min_power_limit_watt as i64,
+        );
+        gpu.push_i(
+            if new_json {
+                "max_ce_clock"
+            } else {
+                "max_ce_clock_mhz"
+            },
+            *max_ce_clock_mhz as i64,
+        );
+        gpu.push_i(
+            if new_json {
+                "max_memory_clock"
+            } else {
+                "max_mem_clock_mhz"
+            },
+            *max_mem_clock_mhz as i64,
+        );
         gpu_info.push_o(gpu);
     }
     gpu_info
@@ -169,8 +210,12 @@ struct NodeInfo {
 fn compute_nodeinfo(system: &dyn systemapi::SystemAPI) -> Result<NodeInfo, String> {
     let fs = system.get_procfs();
     let gpus = system.get_gpus();
-    let procfs::CpuInfo { sockets, cores_per_socket, threads_per_core, cores } =
-        procfs::get_cpu_info(fs)?;
+    let procfs::CpuInfo {
+        sockets,
+        cores_per_socket,
+        threads_per_core,
+        cores,
+    } = procfs::get_cpu_info(fs)?;
     let model_name = cores[0].model_name.clone(); // expedient
     let memory = procfs::get_memory(fs)?;
     let mem_kb = memory.total;
@@ -230,7 +275,9 @@ fn compute_nodeinfo(system: &dyn systemapi::SystemAPI) -> Result<NodeInfo, Strin
     };
     Ok(NodeInfo {
         node: system.get_hostname(),
-        description: format!("{sockets}x{cores_per_socket}{ht} {model_name}, {mem_gb} GiB{gpu_desc}"),
+        description: format!(
+            "{sockets}x{cores_per_socket}{ht} {model_name}, {mem_gb} GiB{gpu_desc}"
+        ),
         logical_cores: (sockets * cores_per_socket * threads_per_core) as u64,
         sockets: sockets as u64,
         cores_per_socket: cores_per_socket as u64,

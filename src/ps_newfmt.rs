@@ -1,6 +1,6 @@
 use crate::gpuapi;
 use crate::output;
-use crate::ps::{EPOCH_TIME_BASE,ProcInfo,PsOptions,SampleData};
+use crate::ps::{ProcInfo, PsOptions, SampleData, EPOCH_TIME_BASE};
 use crate::systemapi;
 use crate::util::three_places;
 
@@ -34,15 +34,15 @@ pub fn format_newfmt(
     // Group processes under (user, jobid) except for jobid 0.
     // `collected` collects the sample indices for like (user,job) where job != 0.
     // `zeroes` collects the sample indices for job = 0.
-    let mut collected = HashMap::<(&str,usize),Vec<usize>>::new();
+    let mut collected = HashMap::<(&str, usize), Vec<usize>>::new();
     let mut zeroes = vec![];
     for i in 0..c.process_samples.len() {
         let sample = &c.process_samples[i];
         if sample.job_id == 0 {
             zeroes.push(i);
         } else {
-            collected.
-                entry((&sample.user, sample.job_id))
+            collected
+                .entry((&sample.user, sample.job_id))
                 .and_modify(|e| e.push(i))
                 .or_insert(vec![i]);
         }
@@ -50,10 +50,22 @@ pub fn format_newfmt(
     let mut jobs = output::Array::new();
     for k in zeroes {
         let j = &c.process_samples[k];
-        jobs.push_o(format_newfmt_job(system, 0, &j.user, &[k], &c.process_samples));
+        jobs.push_o(format_newfmt_job(
+            system,
+            0,
+            &j.user,
+            &[k],
+            &c.process_samples,
+        ));
     }
-    for ((user,id),ixs) in collected {
-        jobs.push_o(format_newfmt_job(system, id, user, &ixs, &c.process_samples));
+    for ((user, id), ixs) in collected {
+        jobs.push_o(format_newfmt_job(
+            system,
+            id,
+            user,
+            &ixs,
+            &c.process_samples,
+        ));
     }
     attrs.push_a("jobs", jobs);
     data.push_o("attributes", attrs);
@@ -113,7 +125,7 @@ fn format_newfmt_job(
     system: &dyn systemapi::SystemAPI,
     id: usize,
     user: &str,
-    ixs: &[usize],              // Not empty
+    ixs: &[usize], // Not empty
     samples: &[ProcInfo],
 ) -> output::Object {
     let mut job = output::Object::new();

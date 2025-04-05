@@ -187,16 +187,16 @@ fn compute_field_values(line: &str) -> Vec<String> {
     // we have the same number of fields and names.  (Could just ignore excess fields
     // instead.)
     let n = SACCT_FIELDS.len();
-    let jobname = field_store[n-1..].join("");
-    field_store[n-1] = &jobname;
-    field_store[..n].iter().map(|x| x.to_string()).collect::<Vec<String>>()
+    let jobname = field_store[n - 1..].join("");
+    field_store[n - 1] = &jobname;
+    field_store[..n]
+        .iter()
+        .map(|x| x.to_string())
+        .collect::<Vec<String>>()
 }
 
 //+oldnames
-fn parse_sacct_jobs_oldfmt(
-    sacct_output: &str,
-    local: &libc::tm,
-) -> output::Array {
+fn parse_sacct_jobs_oldfmt(sacct_output: &str, local: &libc::tm) -> output::Array {
     // Fields that are dates that may be reinterpreted before transmission.
     let date_fields = HashSet::from(["Start", "End", "Submit"]);
 
@@ -243,10 +243,7 @@ fn parse_sacct_jobs_oldfmt(
 }
 //-oldnames
 
-fn parse_sacct_jobs_newfmt(
-    sacct_output: &str,
-    local: &libc::tm,
-) -> output::Array {
+fn parse_sacct_jobs_newfmt(sacct_output: &str, local: &libc::tm) -> output::Array {
     let mut jobs = output::Array::new();
     for line in sacct_output.lines() {
         // There are ways of making this table-driven but none that are not complicated.
@@ -264,21 +261,19 @@ fn parse_sacct_jobs_newfmt(
                     // het job ID and task or offset values.
                     if let Some((id, task)) = fieldvals[i].split_once('_') {
                         push_uint(&mut output_line, "array_job_id", id);
-                        let task =
-                            if let Some((task_id, _)) = task.split_once('.') {
-                                task_id
-                            } else {
-                                task
-                            };
+                        let task = if let Some((task_id, _)) = task.split_once('.') {
+                            task_id
+                        } else {
+                            task
+                        };
                         push_uint(&mut output_line, "array_task_id", task);
                     } else if let Some((id, offset)) = fieldvals[i].split_once('+') {
                         push_uint(&mut output_line, "het_job_id", id);
-                        let offset =
-                            if let Some((offset_id, _)) = offset.split_once('.') {
-                                offset_id
-                            } else {
-                                offset
-                            };
+                        let offset = if let Some((offset_id, _)) = offset.split_once('.') {
+                            offset_id
+                        } else {
+                            offset
+                        };
                         push_uint(&mut output_line, "het_job_offset", offset);
                     }
                 }
@@ -309,7 +304,7 @@ fn parse_sacct_jobs_newfmt(
                 "ExitCode" => {
                     if fieldvals[i] != "" {
                         // The format is code:signal
-                        if let Some((code,_signal)) = fieldvals[i].split_once(':') {
+                        if let Some((code, _signal)) = fieldvals[i].split_once(':') {
                             push_uint(&mut output_line, "exit_code", code);
                         }
                     }
@@ -363,7 +358,8 @@ fn parse_sacct_jobs_newfmt(
 
                 // Sacct fields
                 //+implicit-use
-                "AveDiskRead" | "AveDiskWrite" | "AveRSS" | "AveVMSize" | "MaxRSS" | "MaxVMSize" => {
+                "AveDiskRead" | "AveDiskWrite" | "AveRSS" | "AveVMSize" | "MaxRSS"
+                | "MaxVMSize" => {
                     push_volume(&mut sacct, *field, &fieldvals[i]);
                 }
                 "AveCPU" | "MinCPU" | "UserCPU" | "SystemCPU" => {
@@ -379,7 +375,6 @@ fn parse_sacct_jobs_newfmt(
 
                 // push_s("gres_detail", _)
                 // push_s("minimum_cpus_per_node", _)
-
                 _ => {
                     panic!("Bad field name");
                 }
@@ -397,55 +392,60 @@ fn push_uint(obj: &mut output::Object, name: &str, val: &str) {
     push_uint_full(obj, name, val, 1, 0, false);
 }
 
-fn push_uint_full(obj: &mut output::Object, name: &str, val: &str, scale: u64, bias: u64, always: bool) {
+fn push_uint_full(
+    obj: &mut output::Object,
+    name: &str,
+    val: &str,
+    scale: u64,
+    bias: u64,
+    always: bool,
+) {
     if val != "" {
         match val.parse::<u64>() {
-            Ok(n) => if n != 0 || bias != 0 || always {
-                obj.push_u(name, bias + n*scale);
+            Ok(n) => {
+                if n != 0 || bias != 0 || always {
+                    obj.push_u(name, bias + n * scale);
+                }
             }
-            Err(_) => { }
+            Err(_) => {}
         }
     }
 }
 
 fn push_duration(obj: &mut output::Object, name: &str, mut val: &str) {
     // [DD-[hh:]]mm:ss
-    let days =
-        if let Some((dd,rest)) = val.split_once('-') {
-            if let Ok(n) = dd.parse::<u64>() {
-                val = rest;
-                n
-            } else {
-                return;
-            }
+    let days = if let Some((dd, rest)) = val.split_once('-') {
+        if let Ok(n) = dd.parse::<u64>() {
+            val = rest;
+            n
         } else {
-            0
-        };
+            return;
+        }
+    } else {
+        0
+    };
     let mut elts = val.split(':').collect::<Vec<&str>>();
-    let hours =
-        if elts.len() == 3 {
-            if let Ok(n) = elts[0].parse::<u64>() {
-                elts.remove(0);
-                n
-            } else {
-                return;
-            }
-        } else {
-            0
-        };
-    let minutes =
+    let hours = if elts.len() == 3 {
         if let Ok(n) = elts[0].parse::<u64>() {
+            elts.remove(0);
             n
         } else {
             return;
-        };
-    let seconds =
-        if let Ok(n) = elts[1].parse::<u64>() {
-            n
-        } else {
-            return;
-        };
-    let t = days * (24*60*60) + hours * (60*60) + minutes * 60 + seconds;
+        }
+    } else {
+        0
+    };
+    let minutes = if let Ok(n) = elts[0].parse::<u64>() {
+        n
+    } else {
+        return;
+    };
+    let seconds = if let Ok(n) = elts[1].parse::<u64>() {
+        n
+    } else {
+        return;
+    };
+    let t = days * (24 * 60 * 60) + hours * (60 * 60) + minutes * 60 + seconds;
     if t != 0 {
         obj.push_u(name, t);
     }
@@ -453,21 +453,22 @@ fn push_duration(obj: &mut output::Object, name: &str, mut val: &str) {
 
 fn push_volume(obj: &mut output::Object, name: &str, val: &str) {
     if val != "" {
-        let (val, scale) =
-            if let Some(suffix) = val.strip_suffix('K') {
-                (suffix, 1024)
-            } else if let Some(suffix) = val.strip_suffix('M') {
-                (suffix, 1024*1024)
-            } else if let Some(suffix) = val.strip_suffix('G') {
-                (suffix, 1024*1024*1024)
-            } else {
-                (val, 1)
-            };
+        let (val, scale) = if let Some(suffix) = val.strip_suffix('K') {
+            (suffix, 1024)
+        } else if let Some(suffix) = val.strip_suffix('M') {
+            (suffix, 1024 * 1024)
+        } else if let Some(suffix) = val.strip_suffix('G') {
+            (suffix, 1024 * 1024 * 1024)
+        } else {
+            (val, 1)
+        };
         match val.parse::<u64>() {
-            Ok(n) => if n != 0 {
-                obj.push_u(name, n*scale);
+            Ok(n) => {
+                if n != 0 {
+                    obj.push_u(name, n * scale);
+                }
             }
-            Err(_) => { }
+            Err(_) => {}
         }
     }
 }
@@ -536,9 +537,15 @@ pub fn test_format_sacct_jobs() {
         }
         println!("{} {}", xs.len(), ys.len());
         if xs.len() > ys.len() {
-            println!("`output` tail = {}", String::from_utf8_lossy(&xs[ys.len()..]));
+            println!(
+                "`output` tail = {}",
+                String::from_utf8_lossy(&xs[ys.len()..])
+            );
         } else {
-            println!("`expected` tail = {}", String::from_utf8_lossy(&ys[xs.len()..]));
+            println!(
+                "`expected` tail = {}",
+                String::from_utf8_lossy(&ys[xs.len()..])
+            );
         }
         assert!(false);
     }

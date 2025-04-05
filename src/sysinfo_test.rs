@@ -1,20 +1,23 @@
 #[allow(unused_imports)]
-use crate::sysinfo;
+use crate::gpuapi;
 #[allow(unused_imports)]
 use crate::mocksystem;
 #[allow(unused_imports)]
-use crate::gpuapi;
+use crate::sysinfo;
 
 #[allow(unused_imports)]
 use std::collections::HashMap;
 
 // Test that the output is the expected output
 
-#[cfg(target_arch = "x86_64")]  // the mock cpuinfo files are x86_64-specific
+#[cfg(target_arch = "x86_64")] // the mock cpuinfo files are x86_64-specific
 #[test]
 pub fn sysinfo_output_test() {
     let mut files = HashMap::new();
-    files.insert("cpuinfo".to_string(), std::include_str!("testdata/cpuinfo-x86_64.txt").to_string());
+    files.insert(
+        "cpuinfo".to_string(),
+        std::include_str!("testdata/cpuinfo-x86_64.txt").to_string(),
+    );
     files.insert(
         "meminfo".to_string(),
         "MemTotal:       16093776 kB".to_string(),
@@ -27,14 +30,14 @@ pub fn sysinfo_output_test() {
         .with_os("CP/M", "2.2")
         .with_architecture("Z80")
         .with_files(files)
-        .with_card(gpuapi::Card{
+        .with_card(gpuapi::Card {
             bus_addr: "12:14:16".to_string(),
             device: gpuapi::GpuName {
                 index: 0,
                 uuid: "1234.5678".to_string(),
             },
             model: "Yoyodyne 1".to_string(),
-            mem_size_kib: 1024*1024,
+            mem_size_kib: 1024 * 1024,
             power_limit_watt: 2000,
             max_power_limit_watt: 3000,
             max_ce_clock_mhz: 100000,
@@ -104,5 +107,5 @@ pub fn sysinfo_output_test() {
 "#;
     // println!("{}", info.replace('\n',""));
     // println!("{}", expect.replace('\n',""));
-    assert!(info.replace('\n',"") == expect.replace('\n',""));
+    assert!(info.replace('\n', "") == expect.replace('\n', ""));
 }

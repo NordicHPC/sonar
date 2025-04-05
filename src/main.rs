@@ -186,7 +186,11 @@ fn main() {
             } else {
                 system
             };
-            ps::create_snapshot(writer, &system.freeze().expect("System initialization"), &opts);
+            ps::create_snapshot(
+                writer,
+                &system.freeze().expect("System initialization"),
+                &opts,
+            );
         }
         Commands::Sysinfo { csv, json, cluster } => {
             let system = if cluster.is_some() {
@@ -194,15 +198,33 @@ fn main() {
             } else {
                 system
             };
-            sysinfo::show_system(writer, &system.freeze().expect("System initialization"), *csv, *json);
+            sysinfo::show_system(
+                writer,
+                &system.freeze().expect("System initialization"),
+                *csv,
+                *json,
+            );
         }
-        Commands::Slurmjobs { window, span, json, deluge, cluster } => {
+        Commands::Slurmjobs {
+            window,
+            span,
+            json,
+            deluge,
+            cluster,
+        } => {
             let system = if cluster.is_some() {
                 system.with_cluster(cluster.as_ref().unwrap())
             } else {
                 system
             };
-            slurmjobs::show_slurm_jobs(writer, window, span, *deluge, &system.freeze().expect("System initialization"), *json);
+            slurmjobs::show_slurm_jobs(
+                writer,
+                window,
+                span,
+                *deluge,
+                &system.freeze().expect("System initialization"),
+                *json,
+            );
         }
         Commands::Cluster { cluster } => {
             let system = if cluster.is_some() {
@@ -389,7 +411,13 @@ fn command_line() -> Commands {
                     eprintln!("--json requires --cluster");
                     std::process::exit(USAGE_ERROR);
                 }
-                Commands::Slurmjobs { window, span, json, cluster, deluge }
+                Commands::Slurmjobs {
+                    window,
+                    span,
+                    json,
+                    cluster,
+                    deluge,
+                }
             }
             "cluster" => {
                 let mut cluster = None;
