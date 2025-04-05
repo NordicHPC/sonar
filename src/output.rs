@@ -256,7 +256,7 @@ fn write_json_object(writer: &mut dyn io::Write, o: &Object) {
     let _ = writer.write(b"}");
 }
 
-fn write_json_string(writer: &mut dyn io::Write, s: &String) {
+fn write_json_string(writer: &mut dyn io::Write, s: &str) {
     let _ = writer.write(b"\"");
     write_chars(writer, &util::json_quote(s));
     let _ = writer.write(b"\"");
@@ -409,7 +409,7 @@ pub fn newfmt_envelope(system: &dyn systemapi::SystemAPI, attrs: &[AttrVal]) -> 
     meta.push_s("version", system.get_version());
     // meta.push_u("format", 1) // 1 is the default
     // meta.push_s("token") // FIXME
-    if attrs.len() > 0 {
+    if !attrs.is_empty() {
         let mut attrvals = Array::new();
         for AttrVal { key, value } in attrs {
             let mut pair = Object::new();
@@ -429,7 +429,7 @@ pub fn newfmt_data(system: &dyn systemapi::SystemAPI, ty: &str) -> (Object, Obje
     let mut attrs = Object::new();
     attrs.push_s("time", system.get_timestamp());
     let c = system.get_cluster();
-    if c != "" {
+    if !c.is_empty() {
         attrs.push_s("cluster", c);
     }
     (data, attrs)

@@ -24,7 +24,7 @@ pub fn show_cluster(writer: &mut dyn io::Write, system: &dyn systemapi::SystemAP
         &output::Value::O(match do_show_cluster(system) {
             Ok(envelope) => envelope,
             Err(error) => {
-                let mut envelope = output::newfmt_envelope(system, &vec![]);
+                let mut envelope = output::newfmt_envelope(system, &[]);
                 envelope.push_a("errors", output::newfmt_one_error(system, error));
                 envelope
             }
@@ -59,7 +59,7 @@ fn do_show_cluster(system: &dyn systemapi::SystemAPI) -> Result<output::Object, 
         nodes.push_o(p);
     }
 
-    let mut envelope = output::newfmt_envelope(system, &vec![]);
+    let mut envelope = output::newfmt_envelope(system, &[]);
     let (mut data, mut attrs) = output::newfmt_data(system, "cluster");
     attrs.push_b("slurm", true);
     attrs.push_a("partitions", partitions);

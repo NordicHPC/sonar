@@ -64,10 +64,10 @@ impl RealSystemBuilder {
 }
 
 #[cfg(target_arch = "x86_64")]
-const ARCHITECTURE: &'static str = "x86_64";
+const ARCHITECTURE: &str = "x86_64";
 
 #[cfg(target_arch = "aarch64")]
-const ARCHITECTURE: &'static str = "aarch64";
+const ARCHITECTURE: &str = "aarch64";
 
 // Otherwise, `ARCHITECTURE` will be undefined and we'll get a compile error; rustc is good about
 // notifying the user that there are ifdef'd cases that are inactive.

@@ -138,7 +138,7 @@ fn do_create_snapshot(
                 output::write_json(writer, &o);
             } else {
                 let mut elements = format_oldfmt(&sample_data, system, opts).take();
-                if elements.len() == 0 {
+                if elements.is_empty() {
                     elements.push(output::Value::O(make_oldfmt_heartbeat(system)))
                 }
                 for e in &elements {
@@ -151,7 +151,7 @@ fn do_create_snapshot(
         }
         Err(error) => {
             if opts.new_json {
-                let mut envelope = output::newfmt_envelope(system, &vec![]);
+                let mut envelope = output::newfmt_envelope(system, &[]);
                 envelope.push_a("errors", output::newfmt_one_error(system, error));
                 output::write_json(writer, &output::Value::O(envelope));
             } else {
@@ -242,16 +242,11 @@ pub struct GpuProcInfo {
     pub gpu_mem_util: u32,
 }
 
-#[derive(Copy, Clone, PartialEq, Eq)]
+#[derive(Copy, Clone, PartialEq, Eq, Default)]
 pub enum GpuStatus {
+    #[default]
     Ok = 0,
     UnknownFailure = 1,
-}
-
-impl Default for GpuStatus {
-    fn default() -> GpuStatus {
-        GpuStatus::Ok
-    }
 }
 
 pub struct SampleData {

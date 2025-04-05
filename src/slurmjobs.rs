@@ -90,7 +90,7 @@ pub fn show_slurm_jobs(
     match collect_sacct_jobs(system, window, span, deluge, embed_envelope) {
         Ok(jobs) => {
             if new_json {
-                let mut envelope = output::newfmt_envelope(system, &vec![]);
+                let mut envelope = output::newfmt_envelope(system, &[]);
                 let (mut data, mut attrs) = output::newfmt_data(system, "slurm_jobs");
                 attrs.push_a("slurm_jobs", jobs);
                 data.push_o("attributes", attrs);
@@ -104,7 +104,7 @@ pub fn show_slurm_jobs(
         }
         Err(error) => {
             if new_json {
-                let mut envelope = output::newfmt_envelope(system, &vec![]);
+                let mut envelope = output::newfmt_envelope(system, &[]);
                 envelope.push_a("errors", output::newfmt_one_error(system, error));
                 output::write_json(writer, &output::Value::O(envelope));
             } else {
@@ -302,7 +302,7 @@ fn parse_sacct_jobs_newfmt(sacct_output: &str, local: &libc::tm) -> output::Arra
                     push_date(&mut output_line, "end_time", &fieldvals[i], local);
                 }
                 "ExitCode" => {
-                    if fieldvals[i] != "" {
+                    if !fieldvals[i].is_empty() {
                         // The format is code:signal
                         if let Some((code, _signal)) = fieldvals[i].split_once(':') {
                             push_uint(&mut output_line, "exit_code", code);
@@ -322,7 +322,7 @@ fn parse_sacct_jobs_newfmt(sacct_output: &str, local: &libc::tm) -> output::Arra
                     push_uint(&mut output_line, "requested_node_count", &fieldvals[i]);
                 }
                 "Reservation" => {
-                    if fieldvals[i] != "" {
+                    if !fieldvals[i].is_empty() {
                         output_line.push_s("reservation", fieldvals[i].clone());
                     }
                 }
@@ -340,7 +340,7 @@ fn parse_sacct_jobs_newfmt(sacct_output: &str, local: &libc::tm) -> output::Arra
                     }
                 }
                 "NodeList" => {
-                    if fieldvals[i] != "" {
+                    if !fieldvals[i].is_empty() {
                         if let Ok(nodes) = nodelist::parse_and_render(&fieldvals[i]) {
                             output_line.push_a("nodes", nodes);
                         }
@@ -360,16 +360,16 @@ fn parse_sacct_jobs_newfmt(sacct_output: &str, local: &libc::tm) -> output::Arra
                 //+implicit-use
                 "AveDiskRead" | "AveDiskWrite" | "AveRSS" | "AveVMSize" | "MaxRSS"
                 | "MaxVMSize" => {
-                    push_volume(&mut sacct, *field, &fieldvals[i]);
+                    push_volume(&mut sacct, field, &fieldvals[i]);
                 }
                 "AveCPU" | "MinCPU" | "UserCPU" | "SystemCPU" => {
-                    push_duration(&mut sacct, *field, &fieldvals[i]);
+                    push_duration(&mut sacct, field, &fieldvals[i]);
                 }
                 "ElapsedRaw" => {
-                    push_uint(&mut sacct, *field, &fieldvals[i]);
+                    push_uint(&mut sacct, field, &fieldvals[i]);
                 }
                 "AllocTRES" => {
-                    push_string(&mut sacct, *field, &fieldvals[i]);
+                    push_string(&mut sacct, field, &fieldvals[i]);
                 }
                 //-implicit-use
 
@@ -400,14 +400,11 @@ fn push_uint_full(
     bias: u64,
     always: bool,
 ) {
-    if val != "" {
-        match val.parse::<u64>() {
-            Ok(n) => {
-                if n != 0 || bias != 0 || always {
-                    obj.push_u(name, bias + n * scale);
-                }
+    if !val.is_empty() {
+        if let Ok(n) = val.parse::<u64>() {
+            if n != 0 || bias != 0 || always {
+                obj.push_u(name, bias + n * scale);
             }
-            Err(_) => {}
         }
     }
 }
@@ -452,7 +449,7 @@ fn push_duration(obj: &mut output::Object, name: &str, mut val: &str) {
 }
 
 fn push_volume(obj: &mut output::Object, name: &str, val: &str) {
-    if val != "" {
+    if !val.is_empty() {
         let (val, scale) = if let Some(suffix) = val.strip_suffix('K') {
             (suffix, 1024)
         } else if let Some(suffix) = val.strip_suffix('M') {
@@ -462,25 +459,22 @@ fn push_volume(obj: &mut output::Object, name: &str, val: &str) {
         } else {
             (val, 1)
         };
-        match val.parse::<u64>() {
-            Ok(n) => {
-                if n != 0 {
-                    obj.push_u(name, n * scale);
-                }
+        if let Ok(n) = val.parse::<u64>() {
+            if n != 0 {
+                obj.push_u(name, n * scale);
             }
-            Err(_) => {}
         }
     }
 }
 
 fn push_string(obj: &mut output::Object, name: &str, val: &str) {
-    if val != "" && val != "Unknown" {
+    if !val.is_empty() && val != "Unknown" {
         obj.push_s(name, val.to_string())
     }
 }
 
 fn push_date(obj: &mut output::Object, name: &str, val: &str, local: &libc::tm) {
-    if val != "" && val != "Unknown" {
+    if !val.is_empty() && val != "Unknown" {
         // Reformat timestamps.  The slurm date format is localtime without a time zone offset.
         // This is bound to lead to problems eventually, so reformat.  If parsing fails, just
         // transmit the date and let the consumer deal with it.

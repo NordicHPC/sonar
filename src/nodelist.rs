@@ -48,7 +48,7 @@ struct NodelistParser<'a> {
     i: usize,
 }
 
-impl<'a> NodelistParser<'a> {
+impl NodelistParser<'_> {
     fn element(&mut self) -> Result<String, String> {
         let start = self.i;
         if !self.fragment()? {

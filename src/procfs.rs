@@ -135,7 +135,7 @@ pub fn get_cpu_info_x86_64(fs: &dyn procfsapi::ProcfsAPI) -> Result<CpuInfo, Str
             logical_index,
         })
     }
-    if cores.len() == 0 || sockets == 0 || siblings == 0 || cores_per_socket == 0 {
+    if cores.is_empty() || sockets == 0 || siblings == 0 || cores_per_socket == 0 {
         return Err("Incomplete information in /proc/cpuinfo".to_string());
     }
     let threads_per_core = siblings / cores_per_socket;
@@ -415,7 +415,7 @@ pub fn get_process_information(
             // boot_time and the current time are both time_t, ie, a 31-bit quantity in 2023 and a
             // 32-bit quantity before 2038.  clock_ticks_per_sec is on the order of 100.  Ergo
             // boot_ticks and now_ticks can be represented in about 32+7=39 bits, fine for an f64.
-            let now_ticks = system.get_now_in_secs_since_epoch() as u64 * ticks_per_sec;
+            let now_ticks = system.get_now_in_secs_since_epoch() * ticks_per_sec;
             let boot_ticks = boot_time as u64 * ticks_per_sec;
 
             // start_time_ticks should be on the order of a few years, there is no risk of overflow

@@ -37,7 +37,7 @@ pub fn show_system(
 // New JSON format - json:api compatible, see spec.
 
 fn layout_sysinfo_newfmt(system: &dyn systemapi::SystemAPI, node_info: NodeInfo) -> output::Object {
-    let mut envelope = output::newfmt_envelope(system, &vec![]);
+    let mut envelope = output::newfmt_envelope(system, &[]);
     let (mut data, mut attrs) = output::newfmt_data(system, "sysinfo");
     attrs.push_s("node", node_info.node.clone());
     attrs.push_s("os_name", system.get_os_name());
@@ -63,7 +63,7 @@ fn layout_sysinfo_newfmt(system: &dyn systemapi::SystemAPI, node_info: NodeInfo)
 }
 
 fn layout_error_newfmt(system: &dyn systemapi::SystemAPI, error: String) -> output::Object {
-    let mut envelope = output::newfmt_envelope(system, &vec![]);
+    let mut envelope = output::newfmt_envelope(system, &[]);
     envelope.push_a("errors", output::newfmt_one_error(system, error));
     envelope
 }

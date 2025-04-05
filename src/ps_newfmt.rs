@@ -11,7 +11,7 @@ pub fn format_newfmt(
     system: &dyn systemapi::SystemAPI,
     opts: &PsOptions,
 ) -> output::Object {
-    let mut envelope = output::newfmt_envelope(system, &vec![]);
+    let mut envelope = output::newfmt_envelope(system, &[]);
     let (mut data, mut attrs) = output::newfmt_data(system, "sample");
     attrs.push_s("node", system.get_hostname());
     if opts.load {
@@ -78,7 +78,7 @@ fn format_newfmt_gpu_sample(c: &gpuapi::CardState) -> output::Object {
     if c.device.index != 0 {
         s.push_i("index", c.device.index as i64);
     }
-    if c.device.uuid != "" {
+    if !c.device.uuid.is_empty() {
         s.push_s("uuid", c.device.uuid.clone());
     }
     if c.failing != 0 {
@@ -87,7 +87,7 @@ fn format_newfmt_gpu_sample(c: &gpuapi::CardState) -> output::Object {
     if c.fan_speed_pct != 0.0 {
         s.push_i("fan", c.fan_speed_pct.round() as i64);
     }
-    if c.compute_mode != "" {
+    if !c.compute_mode.is_empty() {
         s.push_s("compute_mode", c.compute_mode.clone());
     }
     let perf = c.perf_state as u64 + 1; // extended-unsigned encoding
