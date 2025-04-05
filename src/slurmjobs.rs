@@ -8,36 +8,35 @@ use crate::output;
 use crate::systemapi;
 use crate::time;
 
-use lazy_static::lazy_static;
+use once_cell::sync::Lazy;
 
 #[cfg(test)]
 use std::cmp::min;
 use std::collections::HashSet;
 use std::io;
 
-lazy_static! {
-    // The job states we are interested in collecting information about, notably PENDING and RUNNING
-    // are not here by default but will be added if the --deluge option is given.
+// The job states we are interested in collecting information about, notably PENDING and RUNNING
+// are not here by default but will be added if the --deluge option is given.
 
-    //+ignore-strings
-    static ref SACCT_STATES : Vec<&'static str> = vec![
+static SACCT_STATES: Lazy<Vec<&'static str>> = Lazy::new(|| {
+    vec![
         "CANCELLED",
         "COMPLETED",
         "DEADLINE",
         "FAILED",
         "OUT_OF_MEMORY",
         "TIMEOUT",
-    ];
-    //-ignore-strings
+    ]
+});
 
-    // The fields we want to extract.  We can just pile it on here, but it's unlikely that
-    // everything is of interest, hence we select.  The capitalization shall be exactly as it is in
-    // the sacct man page, even though sacct appears to ignore capitalization.
-    //
-    // The order here MUST NOT change without updating both new and old formats and test cases.
+// The fields we want to extract.  We can just pile it on here, but it's unlikely that
+// everything is of interest, hence we select.  The capitalization shall be exactly as it is in
+// the sacct man page, even though sacct appears to ignore capitalization.
+//
+// The order here MUST NOT change without updating both new and old formats and test cases.
 
-    //+ignore-strings
-    static ref SACCT_FIELDS : Vec<&'static str> = vec![
+static SACCT_FIELDS: Lazy<Vec<&'static str>> = Lazy::new(|| {
+    vec![
         "JobID",
         "JobIDRaw",
         "User",
@@ -71,9 +70,8 @@ lazy_static! {
         "Priority",
         // JobName must be last in case it contains `|`.
         "JobName",
-    ];
-    //-ignore-strings
-}
+    ]
+});
 
 // Default sacct reporting window.  Note this value is baked into the help message in main.rs too.
 const DEFAULT_WINDOW: u32 = 90;
