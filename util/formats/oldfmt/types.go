@@ -1,5 +1,5 @@
 // JSON and CSV field names were always the same.  Any comments here are meant to be informative,
-// the authoritative documentation is still doc/DATA-FORMAT.md.
+// the authoritative documentation is still doc/OLD-FORMAT.md.
 //
 // Number representations are chosen to be compatible with the new data format: invariably 64-bit
 // integers and floats, and unsigned except where a sign is explicitly possible.

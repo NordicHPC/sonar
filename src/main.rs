@@ -8,6 +8,7 @@ mod gpuapi;
 mod hostname;
 mod interrupt;
 mod jobsapi;
+mod json_tags;
 mod log;
 #[cfg(test)]
 mod mockfs;
@@ -50,6 +51,8 @@ mod xpu;
 use std::io;
 
 const USAGE_ERROR: i32 = 2; // clap, Python, Go
+
+const OUTPUT_FORMAT : u64 = 0;
 
 enum Commands {
     /// Take a snapshot of the currently running processes
@@ -137,6 +140,7 @@ fn main() {
     let mut stdout = io::stdout();
     let writer: &mut dyn io::Write = &mut stdout;
     let system = realsystem::RealSystem::new();
+    let token = "".to_string(); // API token, to be implemented
 
     match &command_line() {
         Commands::PS {
@@ -172,6 +176,7 @@ fn main() {
                 lockdir: lockdir.clone(),
                 new_json: *json,
                 cpu_util: true,
+                token,
             };
 
             #[cfg(debug_assertions)]
@@ -194,7 +199,7 @@ fn main() {
             } else {
                 system
             };
-            sysinfo::show_system(writer, &system.freeze().expect("System initialization"), *csv, *json);
+            sysinfo::show_system(writer, &system.freeze().expect("System initialization"), token, *csv, *json);
         }
         Commands::Slurmjobs { window, span, json, deluge, cluster } => {
             let system = if cluster.is_some() {
@@ -202,7 +207,7 @@ fn main() {
             } else {
                 system
             };
-            slurmjobs::show_slurm_jobs(writer, window, span, *deluge, &system.freeze().expect("System initialization"), *json);
+            slurmjobs::show_slurm_jobs(writer, window, span, *deluge, &system.freeze().expect("System initialization"), token, *json);
         }
         Commands::Cluster { cluster } => {
             let system = if cluster.is_some() {
@@ -210,7 +215,7 @@ fn main() {
             } else {
                 system
             };
-            cluster::show_cluster(writer, &system.freeze().expect("System initialization"));
+            cluster::show_cluster(writer, token, &system.freeze().expect("System initialization"));
         }
         Commands::Version {} => {
             show_version(writer);

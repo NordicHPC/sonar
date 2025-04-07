@@ -1,0 +1,341 @@
+{
+  "meta": {
+    "producer": "sonar",
+    "version": "0.13.0",
+    "format": 37,
+    "token": "abc"
+  },
+  "data": {
+    "type": "sample",
+    "attributes": {
+      "time": "2025-04-07T13:53:24+02:00",
+      "cluster": "bling.uio.no",
+      "node": "bling",
+      "system": {
+        "cpus": [
+          739,
+          840,
+          808,
+          809,
+          861,
+          836,
+          814,
+          838
+        ],
+        "used_memory": 5992528
+      },
+      "jobs": [
+        {
+          "job": 3474,
+          "user": "larstha",
+          "epoch": 166179831,
+          "processes": [
+            {
+              "resident_memory": 6144,
+              "virtual_memory": 37608,
+              "cmd": "tracker-extract",
+              "pid": 31745,
+              "ppid": 3474,
+              "cpu_avg": 0.9
+            },
+            {
+              "resident_memory": 13900,
+              "virtual_memory": 102736,
+              "cmd": "tracker-miner-f",
+              "pid": 3474,
+              "ppid": 2569,
+              "cpu_time": 2
+            }
+          ]
+        },
+        {
+          "job": 5071,
+          "user": "larstha",
+          "epoch": 166179831,
+          "processes": [
+            {
+              "resident_memory": 16108,
+              "virtual_memory": 69488,
+              "cmd": "gsd-xsettings",
+              "pid": 5071,
+              "ppid": 2569,
+              "cpu_time": 2
+            },
+            {
+              "resident_memory": 6536,
+              "virtual_memory": 31360,
+              "cmd": "ibus-x11",
+              "pid": 5099,
+              "ppid": 2569,
+              "cpu_avg": 0.4,
+              "cpu_time": 44
+            }
+          ]
+        },
+        {
+          "job": 2610,
+          "user": "larstha",
+          "epoch": 166179831,
+          "processes": [
+            {
+              "resident_memory": 21284,
+              "virtual_memory": 42516,
+              "cmd": "pipewire-pulse",
+              "pid": 2610,
+              "ppid": 2569,
+              "cpu_avg": 1.2,
+              "cpu_util": 0.1,
+              "cpu_time": 120
+            }
+          ]
+        }
+      ]
+    }
+  }
+}
+{
+  "meta": {
+    "producer": "sonar",
+    "version": "0.13.0-devel"
+  },
+  "data": {
+    "type": "sample",
+    "attributes": {
+      "time": "2025-04-07T14:17:11+02:00",
+      "cluster": "mlx.hpc.uio.no",
+      "node": "ml6.hpc.uio.no",
+      "system": {
+        "cpus": [
+          726304,
+          744672,
+          700787,
+          707718,
+          919197,
+          730778,
+          720443,
+          731742,
+          901248,
+          717916,
+          688905,
+          691738,
+          841491,
+          696638,
+          677622,
+          697716,
+          812150,
+          720409,
+          707288,
+          718217,
+          844047,
+          675983,
+          652980,
+          400339,
+          836818,
+          685139,
+          694007,
+          690720,
+          858625,
+          671824,
+          649458,
+          708884,
+          785937,
+          448314,
+          566372,
+          552312,
+          647945,
+          592893,
+          621932,
+          615751,
+          608892,
+          594140,
+          660567,
+          601468,
+          670295,
+          607563,
+          587168,
+          631874,
+          656475,
+          630024,
+          577576,
+          594618,
+          598058,
+          563903,
+          543142,
+          1189724,
+          644194,
+          620134,
+          576855,
+          588461,
+          631003,
+          615503,
+          661074,
+          593891
+        ],
+        "gpus": [
+          {
+            "uuid": "GPU-bfee27e4-a446-af6a-abe8-986aa796d58b",
+            "fan": 37,
+            "performance_state": 3,
+            "memory": 5122496,
+            "ce_util": 94,
+            "memory_util": 53,
+            "temperature": 61,
+            "power": 191,
+            "power_limit": 250,
+            "ce_clock": 1785,
+            "memory_clock": 6800
+          },
+          {
+            "index": 1,
+            "uuid": "GPU-58e35c9e-2f36-e57e-22a5-16148be1d786",
+            "fan": 40,
+            "performance_state": 3,
+            "memory": 754112,
+            "ce_util": 90,
+            "memory_util": 10,
+            "temperature": 66,
+            "power": 216,
+            "power_limit": 250,
+            "ce_clock": 1800,
+            "memory_clock": 6800
+          },
+          {
+            "index": 2,
+            "uuid": "GPU-1a93320a-442c-ea70-48f0-13eec991b330",
+            "fan": 30,
+            "performance_state": 3,
+            "memory": 4514240,
+            "ce_util": 73,
+            "memory_util": 58,
+            "temperature": 53,
+            "power": 146,
+            "power_limit": 250,
+            "ce_clock": 1800,
+            "memory_clock": 6800
+          },
+          {
+            "index": 3,
+            "uuid": "GPU-e276e243-5d04-d899-f884-ae496e3aa688",
+            "fan": 22,
+            "performance_state": 9,
+            "memory": 262592,
+            "temperature": 27,
+            "power": 2,
+            "power_limit": 250,
+            "ce_clock": 300,
+            "memory_clock": 405
+          },
+          {
+            "index": 4,
+            "uuid": "GPU-e3d88416-1e6b-1995-c7ec-b8db0c26b7be",
+            "fan": 30,
+            "performance_state": 3,
+            "memory": 1352128,
+            "ce_util": 79,
+            "memory_util": 11,
+            "temperature": 52,
+            "power": 109,
+            "power_limit": 250,
+            "ce_clock": 1845,
+            "memory_clock": 6800
+          },
+          {
+            "index": 5,
+            "uuid": "GPU-9940ce98-8bc0-3460-95ac-f5a4a79c0cd7",
+            "fan": 40,
+            "performance_state": 3,
+            "memory": 2417088,
+            "ce_util": 63,
+            "memory_util": 44,
+            "temperature": 67,
+            "power": 219,
+            "power_limit": 250,
+            "ce_clock": 1830,
+            "memory_clock": 6800
+          },
+          {
+            "index": 6,
+            "uuid": "GPU-93bdaeae-de10-a34b-6395-5871cabd5639",
+            "fan": 30,
+            "performance_state": 3,
+            "memory": 1333696,
+            "ce_util": 75,
+            "memory_util": 11,
+            "temperature": 52,
+            "power": 106,
+            "power_limit": 250,
+            "ce_clock": 1860,
+            "memory_clock": 6800
+          },
+          {
+            "index": 7,
+            "uuid": "GPU-c20ecede-7586-5d0c-5a45-eaf390833e2c",
+            "fan": 23,
+            "performance_state": 3,
+            "memory": 1016256,
+            "ce_util": 18,
+            "memory_util": 1,
+            "temperature": 42,
+            "power": 86,
+            "power_limit": 250,
+            "ce_clock": 1875,
+            "memory_clock": 6800
+          }
+        ],
+        "used_memory": 77468396
+      },
+      "jobs": [
+        {
+          "job": 54561,
+          "user": "daniehh",
+          "epoch": 161931769,
+          "processes": [
+            {
+              "resident_memory": 281040,
+              "virtual_memory": 9201936,
+              "cmd": "pmemd.cuda",
+              "pid": 895400,
+              "ppid": 891882,
+              "cpu_avg": 91.7,
+              "cpu_util": 1.3,
+              "cpu_time": 833,
+              "gpus": [
+                {
+                  "index": 1,
+                  "uuid": "GPU-58e35c9e-2f36-e57e-22a5-16148be1d786",
+                  "gpu_util": 80,
+                  "gpu_memory": 491520,
+                  "gpu_memory_util": 8
+                }
+              ]
+            },
+            {
+              "resident_memory": 504,
+              "virtual_memory": 1032,
+              "cmd": "sh",
+              "pid": 58902,
+              "ppid": 1,
+              "cpu_time": 138389
+            },
+            {
+              "resident_memory": 784,
+              "virtual_memory": 900,
+              "cmd": "submit.sh",
+              "pid": 891882,
+              "ppid": 313194,
+              "cpu_time": 11
+            },
+            {
+              "resident_memory": 756,
+              "virtual_memory": 900,
+              "cmd": "2_run.sh",
+              "pid": 313194,
+              "ppid": 58902,
+              "cpu_time": 22618
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

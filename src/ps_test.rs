@@ -5,6 +5,7 @@ use crate::ps;
 pub fn test_ps_no_meminfo() {
     let system = mocksystem::MockSystem::new().
         with_timestamp("2025-02-17T12:54:12+01:00").
+        with_cluster("cl.no").
         with_hostname("yes.no").
         with_version("1.2.3").
         freeze();
@@ -19,10 +20,14 @@ pub fn test_ps_no_meminfo() {
     let expect = r#"
 {
 "meta":{"producer":"sonar","version":"1.2.3"},
-"errors":[{"detail":"Unable to read /proc/stat","time":"2025-02-17T12:54:12+01:00"}]
+"errors":[{
+"detail":"Unable to read /proc/stat",
+"time":"2025-02-17T12:54:12+01:00",
+"cluster":"cl.no",
+"node":"yes.no"}]
 }
 "#;
-    //println!("{}", info.replace('\n',""));
-    //println!("{}", expect.replace('\n',""));
+    // println!("{}", info.replace('\n',""));
+    // println!("{}", expect.replace('\n',""));
     assert!(info.replace('\n',"") == expect.replace('\n',""));
 }

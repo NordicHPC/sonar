@@ -3,8 +3,9 @@
 // - touch every defined data field at least once and make sure it has the expected value
 // - check some internal consistency, eg Errors xor Data
 // - check the TRES parser
-// - check that every JSON field defined in newfmt/types.go is emitted by Rust code, and vice versa
-// - (less important) check the JSON consumer logic
+// - check that every JSON field defined in newfmt/types.go is emitted by Rust code, and only
+//   using their symbolic names
+// - check the JSON consumer logic
 
 package formats
 
@@ -13,6 +14,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"reflect"
 	"regexp"
 	"strings"
 	"testing"
@@ -61,7 +63,7 @@ func TestNewJSONSysinfo(t *testing.T) {
 			assert(t, c.MaxPowerLimit == 280, "#0 card max power limit")
 			assert(t, c.MinPowerLimit == 100, "#0 card min power limit")
 			assert(t, c.MaxCEClock == 2100, "#0 card max ce clock")
-			assert(t, c.MaxMemClock == 7000, "#0 card max memory clock")
+			assert(t, c.MaxMemoryClock == 7000, "#0 card max memory clock")
 			assert(t, len(a.Software) == 0, "#0 software")
 		case 1:
 			a := info.Data.Attributes
@@ -113,7 +115,79 @@ func TestNewJSONSysinfoActual(t *testing.T) {
 	}
 }
 
-// TODO: Samples all fields
+func TestNewJSONSamples(t *testing.T) {
+	f, err := os.Open("testdata/newfmt_samples.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+	var iter int
+	err = newfmt.ConsumeJSONSamples(f, false, func(info *newfmt.SampleEnvelope) {
+		switch iter {
+		case 0:
+			// lth laptop
+			assert(t, info.Meta.Producer == "sonar", "#0 producer")
+			assert(t, info.Meta.Version == "0.13.0", "#0 version")
+			assert(t, info.Meta.Format == 37, "#0 format") // will bite us later, but not now
+			assert(t, info.Meta.Token == "abc", "#0 token")
+			assert(t, info.Errors == nil, "#0 errors")
+			assert(t, info.Data.Type == "sample", "#0 type")
+			a := info.Data.Attributes
+			assert(t, a.Time == "2025-04-07T13:53:24+02:00", "#0 time")
+			assert(t, a.Cluster == "bling.uio.no", "#0 cluster")
+			assert(t, a.Node == "bling", "#0 node")
+			s := a.System
+			assert(t, len(s.Cpus) == 8, "#0 system cpus")
+			assert(t, s.Cpus[2] == 808, "#0 system cpu time")
+			assert(t, len(s.Gpus) == 0, "#0 system gpus")
+			assert(t, s.UsedMemory == 5992528, "#0 system mem")
+			assert(t, len(a.Jobs) == 3, "#0 jobs")
+			j := a.Jobs[2]
+			assert(t, j.Job == 2610, "#0 job id")
+			assert(t, j.User == "larstha", "#0 user")
+			assert(t, j.Epoch == 166179831, "#0 epoch")
+			assert(t, len(j.Processes) == 1, "#0 processes")
+			p := j.Processes[0]
+			assert(t, p.ResidentMemory == 21284, "#0 resident")
+			assert(t, p.VirtualMemory == 42516, "#0 virtual")
+			assert(t, p.Cmd == "pipewire-pulse", "#0 Cmd")
+			assert(t, p.Pid == 2610, "#0 pid")
+			assert(t, p.ParentPid == 2569, "#0 ppid")
+			assert(t, p.CpuAvg == 1.2, "#0 cpu avg")
+			assert(t, p.CpuUtil == 0.1, "#0 cpu util")
+			assert(t, p.CpuTime == 120, "#0 cpu time")
+		case 1:
+			// ml6
+			a := info.Data.Attributes
+			assert(t, a.Time == "2025-04-07T14:17:11+02:00", "#1 time")
+			assert(t, a.Cluster == "mlx.hpc.uio.no", "#1 cluster")
+			assert(t, a.Node == "ml6.hpc.uio.no", "#1 node")
+			s := a.System
+			assert(t, len(s.Cpus) == 64, "#1 system cpus")
+			assert(t, s.Cpus[2] == 700787, "#1 system cpu time")
+			assert(t, len(s.Gpus) == 8, "#1 system gpus")
+			g := s.Gpus[2]
+			assert(t, g.Index == 2, "#1 index")
+			assert(t, g.UUID == "GPU-1a93320a-442c-ea70-48f0-13eec991b330", "#1 uuid")
+			assert(t, g.Fan == 30, "#1 fan")
+			assert(t, g.ComputeMode =="", "#1 compute mode")
+			assert(t, g.PerformanceState == 3, "#1 perf state")
+			assert(t, g.Memory == 4514240, "#1 memory")
+			assert(t, g.CEUtil == 73, "#1 CE util")
+			assert(t, g.MemoryUtil == 58, "#1 Memory util")
+			assert(t, g.Temperature == 53, "#1 temperature")
+			assert(t, g.Power == 146, "#1 power")
+			assert(t, g.PowerLimit == 250, "#1 power limit")
+			assert(t, g.CEClock == 1800, "#1 ce clock")
+			assert(t, g.MemoryClock == 6800, "#1 memory clock")
+		}
+		iter++
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert(t, iter == 2, "Iteration count")
+}
 
 func TestNewJSONSamplesActual(t *testing.T) {
 	// See comments above about this logic
@@ -138,16 +212,19 @@ func TestNewJSONCluster(t *testing.T) {
 	err = newfmt.ConsumeJSONCluster(f, false, func(info *newfmt.ClusterEnvelope) {
 		switch iter {
 		case 0:
-			// TODO: All fields
 			assert(t, info.Meta.Producer == "sonar", "#0 producer")
+			assert(t, info.Meta.Version == "0.13.0", "#0 version")
 			assert(t, info.Data.Type == "cluster", "#0 tag")
 			assert(t, info.Errors == nil, "#0 errors")
 			a := info.Data.Attributes
+			assert(t, a.Time == "2025-04-01T12:41:18+02:00", "#0 time")
 			assert(t, a.Slurm, "#0 slurm")
 			assert(t, a.Cluster == "xyzzy.no", "#0 cluster")
 			assert(t, a.Partitions[0].Name == "normal", "#0 partition name")
-			assert(t, len(a.Partitions[0].Nodes) == 1, "#0 nodes len")
-			assert(t, a.Partitions[0].Nodes[0] == "c1-[5-28]", "#0 node name")
+			assert(t, len(a.Partitions[0].Nodes) == 1, "#0 partition -> nodes len")
+			assert(t, a.Partitions[0].Nodes[0] == "c1-[5-28]", "#0 partition -> node name")
+			assert(t, a.Nodes[0].Names[0] == "c1-[12-13,16-18,27]", "#0 node names")
+			assert(t, strings.Join(a.Nodes[0].States, ",") == "ALLOCATED,MAINTENANCE,RESERVED", "#0 states")
 		case 1:
 			a := info.Data.Attributes
 			assert(t, a.Cluster == "fram.sigma2.no", "#1 cluster")
@@ -186,7 +263,6 @@ func TestNewJSONSlurmJobs(t *testing.T) {
 	err = newfmt.ConsumeJSONJobs(f, false, func(info *newfmt.JobsEnvelope) {
 		switch iter {
 		case 0:
-			// TODO: All fields
 			assert(t, info.Errors == nil, "#0 defined")
 			assert(t, info.Meta.Producer == "sonar", "#0 producer")
 			assert(t, info.Meta.Version == "1.2.3", "#0 version")
@@ -198,6 +274,46 @@ func TestNewJSONSlurmJobs(t *testing.T) {
 			j := a.SlurmJobs[0]
 			assert(t, j.JobID == 1, "#0 id")
 			assert(t, j.JobStep == "0", "#0 step")
+			assert(t, j.JobName == "zappa", "#0 name")
+			assert(t, j.JobState == "COMPLETED", "#0 state")
+			assert(t, j.ArrayJobID == 0, "#0 array id")
+			assert(t, j.ArrayTaskID == 0, "#0 array task")
+			assert(t, j.HetJobID == 0, "#0 het id")
+			assert(t, j.HetJobOffset == 0, "#0 het offset")
+			assert(t, j.UserName == "moonunit", "#0 user")
+			assert(t, j.Account == "ec666", "#0 account")
+			assert(t, j.SubmitTime == "2025-03-08T13:49:06+01:00", "#0 submit time")
+			assert(t, j.Timelimit == 100, "#0 time limit")
+			assert(t, j.Partition == "normal", "#0 partition")
+			assert(t, j.Reservation == "big-cheese", "#0 reservation")
+			assert(t, reflect.DeepEqual(j.NodeList, []string{"c1-[10-20]","bigmem-1"}), "#0 nodelist")
+			p, err := j.Priority.ToUint()
+			if err != nil {
+				t.Fatal(err)
+			}
+			assert(t, p == 1000, "#0 priority")
+			assert(t, j.Layout == "cyclic", "#0 layout")
+			assert(t, len(j.GRESDetail) == 0, "#0 gres")
+			assert(t, j.ReqCPUS == 22, "#0 req cpus")
+			assert(t, j.MinCPUSPerNode == 2, "#0 min cpus per node")
+			assert(t, j.ReqMemoryPerNode == 12345678, "#0 req memory")
+			assert(t, j.ReqNodes == 11, "#0 req nodes")
+			assert(t, j.Start == "2025-03-08T18:11:02+01:00", "#0 start")
+			assert(t, j.Suspended == 37, "#0 suspended")
+			assert(t, j.End == "2025-03-10T01:35:24+01:00", "#0 end")
+			assert(t, j.ExitCode == 1, "#0 exit")
+			assert(t, j.Sacct.MinCPU == 5, "#0 MinCPU")
+			assert(t, j.Sacct.AllocTRES == "billing=128,cpu=128,energy=52238802,mem=472.50G,node=1", "#0 alloctres")
+			assert(t, j.Sacct.AveCPU == 5, "#0 AveCPU")
+			assert(t, j.Sacct.AveDiskRead == 2000000, "#0 AveDiskRead")
+			assert(t, j.Sacct.AveDiskWrite == 900000, "#0 AveDiskWrite")
+			assert(t, j.Sacct.AveRSS == 64400000, "#0 AveRSS")
+			assert(t, j.Sacct.AveVMSize == 400000, "#0 AveVMSize")
+			assert(t, j.Sacct.ElapsedRaw == 113062, "#0 ElapsedRaw")
+			assert(t, j.Sacct.SystemCPU == 12345, "#0 SystemCPU")
+			assert(t, j.Sacct.UserCPU == 11111111, "#0 UserCPU")
+			assert(t, j.Sacct.MaxRSS == 6444000, "#0 MaxRSS")
+			assert(t, j.Sacct.MaxVMSize == 8000000, "#0 MaxVMSize")
 			tres, dropped := newfmt.DecodeSlurmTRES(j.Sacct.AllocTRES)
 			assert(t, len(dropped) == 0, "#0 tres dropped")
 			assert(t, len(tres) == 5, "#0 tres len")
@@ -256,20 +372,53 @@ func TestDecodeSlurmTRES(t *testing.T) {
 	}
 }
 
-// This is a hack but it works well.  Extract all strings in some contexts from some Rust source
-// files and then all json fields from types.go and make sure the sets are the same.  I've found a
-// bunch of bugs with this.  It basically ensures that we don't change one piece of code without
-// changing the other.  (Clearly the final step is to sync both to the documentation.)
-//
-// Lines between //+oldnames and //-oldnames are ignored.  Yay #ifdef.
-//
-// All strings on each line found between //+implicit-use and //-implicit-use are marked as used.
+var built bool
 
-func TestFieldNames(t *testing.T) {
-	push_re := regexp.MustCompile(`push_(?:string|uint_full|uint|duration|date|volume|s|i|u|f|o|a|b)\([^"]*"([a-zA-Z0-9_-]*)`)
-	implicit_re := regexp.MustCompile(`"([a-zA-Z0-9_-]*)"`)
-	usedStrings := make(map[string]string)
-	defdStrings := make(map[string]int)
+func runSonar(t *testing.T, args ...string) string {
+	if !built {
+		err := exec.Command("sh", "-c", "cd ../.. ; cargo build").Run()
+		if err != nil {
+			t.Fatal("Compiling sonar:", err)
+		}
+		built = true
+	}
+	cmdline := "../../target/debug/sonar " + strings.Join(args, " ")
+	cmd := exec.Command("sh", "-c", cmdline)
+	stdout, err := cmd.Output()
+	if err != nil {
+		t.Fatal("Running sonar:", err)
+	}
+	return string(stdout)
+}
+
+// This looks for the names defined in src/json_tags.rs and checks that they are used by some code
+// in a subset of files in the source directory.  This is one check on whether the output code uses
+// only well-defined strings.
+
+var (
+	defRe = regexp.MustCompile(`pub\s+const\s+([^\s]+)\s*:`)
+	idRe = regexp.MustCompile(`[A-Z][A-Z0-9_]*`)
+)
+
+func TestFieldNames1(t *testing.T) {
+	f, err := os.Open("../../src/json_tags.rs")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+	b := bufio.NewScanner(f)
+	var ln int
+	defined := make(map[string]int)
+	for b.Scan() {
+		ln++
+		l := b.Text()
+		if m := defRe.FindStringSubmatch(l); m != nil {
+			if defined[m[1]] > 0 {
+				panic("Multiple defs " + m[1])
+			}
+			defined[m[1]] = ln
+		}
+	}
 	for _, fn := range []string{
 		"../../src/cluster.rs",
 		"../../src/sysinfo.rs",
@@ -285,101 +434,69 @@ func TestFieldNames(t *testing.T) {
 		defer f.Close()
 		b := bufio.NewScanner(f)
 		var ln int
-		var oldnames bool
-		var implicitUse bool
 		for b.Scan() {
 			ln++
 			l := b.Text()
-			if strings.Index(l, "//+oldnames") != -1 {
-				oldnames = true
-				continue
-			}
-			if strings.Index(l, "//-oldnames") != -1 {
-				oldnames = false
-				continue
-			}
-			if strings.Index(l, "//+ignore-strings") != -1 {
-				oldnames = true
-				continue
-			}
-			if strings.Index(l, "//-ignore-strings") != -1 {
-				oldnames = false
-				continue
-			}
-			if strings.Index(l, "//+implicit-use") != -1 {
-				implicitUse = true
-				continue
-			}
-			if strings.Index(l, "//-implicit-use") != -1 {
-				implicitUse = false
-				continue
-			}
-			if !oldnames {
-				if r := push_re.FindStringSubmatch(l); r != nil {
-					if r[1] != "" {
-						usedStrings[r[1]] = fmt.Sprint(fn, ":", ln)
-					}
-				}
-			}
-			if implicitUse {
-				if r := implicit_re.FindAllStringSubmatch(l, -1); r != nil {
-					for _, m := range r {
-						usedStrings[m[1]] = fmt.Sprint(fn, ":", ln)
-					}
-				}
+			for _, id := range idRe.FindAllString(l, -1) {
+				delete(defined, id)
 			}
 		}
 	}
-	json_re := regexp.MustCompile(`json:"([a-zA-Z0-0_-]*)`)
-	{
-		f, err := os.Open("newfmt/types.go")
+	for k, v := range defined {
+		fmt.Println(k,  " ", v)
+	}
+	if len(defined) > 0 {
+		t.Fatal("oops")
+	}
+}
+
+
+// Extract all strings in some contexts from some Rust source files and ensure that there are none.
+// This is a second check on whether the output code uses only well-defined names.
+//
+// In the input files, lines between //+ignore-strings and //-ignore-strings are ignored.
+
+func TestFieldNames2(t *testing.T) {
+	push_re := regexp.MustCompile(`push_(?:string|uint_full|uint|duration|date|volume|s|i|u|f|o|a|b)\([^"]*"([a-zA-Z0-9_-]*)`)
+	var fail bool
+	for _, fn := range []string{
+		"../../src/cluster.rs",
+		"../../src/sysinfo.rs",
+		"../../src/output.rs",
+		"../../src/ps.rs",
+		"../../src/ps_newfmt.rs",
+		"../../src/slurmjobs.rs",
+	} {
+		f, err := os.Open(fn)
 		if err != nil {
 			t.Fatal(err)
 		}
 		defer f.Close()
 		b := bufio.NewScanner(f)
 		var ln int
+		var ignore bool
 		for b.Scan() {
 			ln++
 			l := b.Text()
-			if r := json_re.FindStringSubmatch(l); r != nil {
-				defdStrings[r[1]] = ln
+			if strings.Index(l, "//+ignore-strings") != -1 {
+				ignore = true
+				continue
 			}
-		}
-	}
-	var fail bool
-	for k, v := range usedStrings {
-		if defdStrings[k] == 0 {
-			fail = true
-			fmt.Printf("Used @ %s but not defined: %s\n", v, k)
-		}
-	}
-	for k, v := range defdStrings {
-		if usedStrings[k] == "" {
-			fail = true
-			fmt.Printf("Defined @ %d but not used: %s\n", v, k)
+			if strings.Index(l, "//-ignore-strings") != -1 {
+				ignore = false
+				continue
+			}
+			if !ignore {
+				if r := push_re.FindStringSubmatch(l); r != nil {
+					if r[1] != "" {
+						fmt.Printf("%s:%d: String found: %s\n", fn, ln, r[1])
+						fail = true
+					}
+				}
+			}
 		}
 	}
 	if fail {
 		t.Fatal("failed")
 	}
-}
-
-var built bool
-
-func runSonar(t *testing.T, args ...string) string {
-	if !built {
-		err := exec.Command("sh", "-c", "cd ../.. ; cargo build").Run()
-		if err != nil {
-			t.Fatal(err)
-		}
-		built = true
-	}
-	cmdline := "../../target/debug/sonar " + strings.Join(args, " ")
-	cmd := exec.Command("sh", "-c", cmdline)
-	stdout, err := cmd.Output()
-	if err != nil {
-		t.Fatal(err)
-	}
-	return string(stdout)
 }
