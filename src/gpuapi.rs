@@ -13,8 +13,8 @@ use crate::ps;
 
 #[derive(PartialEq, Eq, Hash, Default, Clone, Debug)]
 pub struct GpuName {
-    pub index: i32,             // May change at boot time
-    pub uuid: String,           // Forever immutable
+    pub index: i32,   // May change at boot time
+    pub uuid: String, // Forever immutable
 }
 
 // Dynamic (per-sample) process information, across cards.  The GPU layer can report a single datum

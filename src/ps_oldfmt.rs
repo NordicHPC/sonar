@@ -1,6 +1,6 @@
 use crate::gpuapi;
 use crate::output;
-use crate::ps::{EPOCH_TIME_BASE,GpuStatus,ProcInfo,PsOptions,SampleData};
+use crate::ps::{GpuStatus, ProcInfo, PsOptions, SampleData, EPOCH_TIME_BASE};
 use crate::systemapi;
 use crate::util::three_places;
 
@@ -90,7 +90,8 @@ fn format_oldfmt_sample(proc_info: &ProcInfo, system: &dyn systemapi::SystemAPI)
     } else {
         fields.push_s(
             "gpus",
-            proc_info.gpus
+            proc_info
+                .gpus
                 .keys()
                 .map(|device| device.index.to_string())
                 .collect::<Vec<String>>()
@@ -134,13 +135,11 @@ fn format_gpu_samples_horizontally(cards: &[gpuapi::CardState]) -> Option<output
         }
     });
     s = add_key(s, "perf", cards, |c: &gpuapi::CardState| {
-        output::Value::S(
-            if c.perf_state == -1 {
-                "".to_string()
-            } else {
-                format!("P{}", c.perf_state)
-            }
-        )
+        output::Value::S(if c.perf_state == -1 {
+            "".to_string()
+        } else {
+            format!("P{}", c.perf_state)
+        })
     });
     // Reserved memory is really not interesting, it's possible it would have been
     // interesting as part of the card configuration.

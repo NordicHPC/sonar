@@ -125,7 +125,7 @@ pub fn get_card_configuration() -> Option<Vec<gpuapi::Card>> {
             }
             result.push(gpuapi::Card {
                 bus_addr: cstrdup(&infobuf.bus_addr),
-                device: gpuapi::GpuName{
+                device: gpuapi::GpuName {
                     index: dev as i32,
                     uuid: cstrdup(&infobuf.uuid),
                 },
@@ -157,7 +157,7 @@ pub fn get_card_utilization() -> Option<Vec<gpuapi::CardState>> {
     for dev in 0..num_devices {
         if unsafe { amdml_device_get_card_state(dev, &mut infobuf) } == 0 {
             result.push(gpuapi::CardState {
-                device: gpuapi::GpuName{
+                device: gpuapi::GpuName {
                     index: dev as i32,
                     uuid: get_card_uuid(dev),
                 },
@@ -177,7 +177,7 @@ pub fn get_card_utilization() -> Option<Vec<gpuapi::CardState>> {
             })
         } else {
             result.push(gpuapi::CardState {
-                device: gpuapi::GpuName{
+                device: gpuapi::GpuName {
                     index: dev as i32,
                     uuid: get_card_uuid(dev),
                 },
@@ -215,7 +215,7 @@ pub fn get_process_utilization(ptable: &ps::ProcessTable) -> Option<Vec<gpuapi::
         let mut devices = vec![];
         while indices != 0 {
             if (indices & 1) == 1 {
-                devices.push(gpuapi::GpuName{
+                devices.push(gpuapi::GpuName {
                     index: k as i32,
                     uuid: get_card_uuid(k),
                 });

@@ -4,9 +4,9 @@
 //
 // Adding eg a compact binary serialization form would be very simple.
 
+use crate::json_tags::*;
 use crate::systemapi;
 use crate::util;
-use crate::json_tags::*;
 
 use std::io;
 
@@ -443,7 +443,7 @@ pub fn newfmt_envelope(
 
 pub fn newfmt_data(system: &dyn systemapi::SystemAPI, ty: &str) -> (Object, Object) {
     let mut data = Object::new();
-    data.push_s(SYSINFO_DATA_TYPE,ty.to_string());
+    data.push_s(SYSINFO_DATA_TYPE, ty.to_string());
     // NOTE - tag not specific to sysinfo
     assert!(CLUSTER_DATA_TYPE == SYSINFO_DATA_TYPE);
     assert!(SAMPLE_DATA_TYPE == SYSINFO_DATA_TYPE);

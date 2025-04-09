@@ -12,7 +12,7 @@ impl jobsapi::JobManager for MockJobManager {
         _system: &dyn systemapi::SystemAPI,
         pid: usize,
         _processes: &HashMap<usize, procfs::Process>,
-    ) -> (usize,bool) {
+    ) -> (usize, bool) {
         (pid, false)
     }
 }

@@ -1,10 +1,10 @@
 // Run sacct, extract output and reformat as CSV or JSON on stdout.
 
+use crate::json_tags::*;
 use crate::nodelist;
 use crate::output;
 use crate::systemapi;
 use crate::time;
-use crate::json_tags::*;
 
 use lazy_static::lazy_static;
 
@@ -107,7 +107,10 @@ pub fn show_slurm_jobs(
         Err(error) => {
             if new_json {
                 let mut envelope = output::newfmt_envelope(system, token, &vec![]);
-                envelope.push_a(JOBS_ENVELOPE_ERRORS, output::newfmt_one_error(system, error));
+                envelope.push_a(
+                    JOBS_ENVELOPE_ERRORS,
+                    output::newfmt_one_error(system, error),
+                );
                 output::write_json(writer, &output::Value::O(envelope));
             } else {
                 //+ignore-strings
@@ -189,16 +192,16 @@ fn compute_field_values(line: &str) -> Vec<String> {
     // we have the same number of fields and names.  (Could just ignore excess fields
     // instead.)
     let n = SACCT_FIELDS.len();
-    let jobname = field_store[n-1..].join("");
-    field_store[n-1] = &jobname;
-    field_store[..n].iter().map(|x| x.to_string()).collect::<Vec<String>>()
+    let jobname = field_store[n - 1..].join("");
+    field_store[n - 1] = &jobname;
+    field_store[..n]
+        .iter()
+        .map(|x| x.to_string())
+        .collect::<Vec<String>>()
 }
 
 //+ignore-strings
-fn parse_sacct_jobs_oldfmt(
-    sacct_output: &str,
-    local: &libc::tm,
-) -> output::Array {
+fn parse_sacct_jobs_oldfmt(sacct_output: &str, local: &libc::tm) -> output::Array {
     // Fields that are dates that may be reinterpreted before transmission.
     let date_fields = HashSet::from(["Start", "End", "Submit"]);
 
@@ -245,10 +248,7 @@ fn parse_sacct_jobs_oldfmt(
 }
 //-ignore-strings
 
-fn parse_sacct_jobs_newfmt(
-    sacct_output: &str,
-    local: &libc::tm,
-) -> output::Array {
+fn parse_sacct_jobs_newfmt(sacct_output: &str, local: &libc::tm) -> output::Array {
     let mut jobs = output::Array::new();
     for line in sacct_output.lines() {
         // There are ways of making this table-driven but none that are not complicated.
@@ -266,21 +266,19 @@ fn parse_sacct_jobs_newfmt(
                     // het job ID and task or offset values.
                     if let Some((id, task)) = fieldvals[i].split_once('_') {
                         push_uint(&mut output_line, SLURM_JOB_ARRAY_JOB_ID, id);
-                        let task =
-                            if let Some((task_id, _)) = task.split_once('.') {
-                                task_id
-                            } else {
-                                task
-                            };
+                        let task = if let Some((task_id, _)) = task.split_once('.') {
+                            task_id
+                        } else {
+                            task
+                        };
                         push_uint(&mut output_line, SLURM_JOB_ARRAY_TASK_ID, task);
                     } else if let Some((id, offset)) = fieldvals[i].split_once('+') {
                         push_uint(&mut output_line, SLURM_JOB_HET_JOB_ID, id);
-                        let offset =
-                            if let Some((offset_id, _)) = offset.split_once('.') {
-                                offset_id
-                            } else {
-                                offset
-                            };
+                        let offset = if let Some((offset_id, _)) = offset.split_once('.') {
+                            offset_id
+                        } else {
+                            offset
+                        };
                         push_uint(&mut output_line, SLURM_JOB_HET_JOB_OFFSET, offset);
                     }
                 }
@@ -311,7 +309,7 @@ fn parse_sacct_jobs_newfmt(
                 "ExitCode" => {
                     if fieldvals[i] != "" {
                         // The format is code:signal
-                        if let Some((code,_signal)) = fieldvals[i].split_once(':') {
+                        if let Some((code, _signal)) = fieldvals[i].split_once(':') {
                             push_uint(&mut output_line, SLURM_JOB_EXIT_CODE, code);
                         }
                     }
@@ -323,7 +321,11 @@ fn parse_sacct_jobs_newfmt(
                     push_uint(&mut output_line, SLURM_JOB_REQ_CPUS, &fieldvals[i]);
                 }
                 "ReqMem" => {
-                    push_uint(&mut output_line, SLURM_JOB_REQ_MEMORY_PER_NODE, &fieldvals[i]);
+                    push_uint(
+                        &mut output_line,
+                        SLURM_JOB_REQ_MEMORY_PER_NODE,
+                        &fieldvals[i],
+                    );
                 }
                 "ReqNodes" => {
                     push_uint(&mut output_line, SLURM_JOB_REQ_NODES, &fieldvals[i]);
@@ -334,7 +336,12 @@ fn parse_sacct_jobs_newfmt(
                     }
                 }
                 "Submit" => {
-                    push_date(&mut output_line, SLURM_JOB_SUBMIT_TIME, &fieldvals[i], local);
+                    push_date(
+                        &mut output_line,
+                        SLURM_JOB_SUBMIT_TIME,
+                        &fieldvals[i],
+                        local,
+                    );
                 }
                 "Suspended" => {
                     push_duration(&mut output_line, SLURM_JOB_SUSPENDED, &fieldvals[i]);
@@ -345,7 +352,14 @@ fn parse_sacct_jobs_newfmt(
                     if fieldvals[i] == "UNLIMITED" {
                         output_line.push_u(SLURM_JOB_TIMELIMIT, EXTENDED_UINT_INFINITE);
                     } else if fieldvals[i] != "Partition_limit" {
-                        push_uint_full(&mut output_line, SLURM_JOB_TIMELIMIT, &fieldvals[i], 60, EXTENDED_UINT_BASE, false);
+                        push_uint_full(
+                            &mut output_line,
+                            SLURM_JOB_TIMELIMIT,
+                            &fieldvals[i],
+                            60,
+                            EXTENDED_UINT_BASE,
+                            false,
+                        );
                     }
                 }
                 "NodeList" => {
@@ -359,14 +373,22 @@ fn parse_sacct_jobs_newfmt(
                     push_string(&mut output_line, SLURM_JOB_PARTITION, &fieldvals[i]);
                 }
                 "Priority" => {
-                    push_uint_full(&mut output_line, SLURM_JOB_PRIORITY, &fieldvals[i], 1, EXTENDED_UINT_BASE, false);
+                    push_uint_full(
+                        &mut output_line,
+                        SLURM_JOB_PRIORITY,
+                        &fieldvals[i],
+                        1,
+                        EXTENDED_UINT_BASE,
+                        false,
+                    );
                 }
                 "JobName" => {
                     output_line.push_s(SLURM_JOB_JOB_NAME, fieldvals[i].clone());
                 }
 
                 // Sacct fields
-                "AveDiskRead" | "AveDiskWrite" | "AveRSS" | "AveVMSize" | "MaxRSS" | "MaxVMSize" => {
+                "AveDiskRead" | "AveDiskWrite" | "AveRSS" | "AveVMSize" | "MaxRSS"
+                | "MaxVMSize" => {
                     // NOTE - tags are the same as the fields
                     assert!(SACCT_DATA_AVE_DISK_READ == "AveDiskRead");
                     assert!(SACCT_DATA_AVE_DISK_WRITE == "AveDiskWrite");
@@ -415,55 +437,60 @@ fn push_uint(obj: &mut output::Object, name: &str, val: &str) {
     push_uint_full(obj, name, val, 1, 0, false);
 }
 
-fn push_uint_full(obj: &mut output::Object, name: &str, val: &str, scale: u64, bias: u64, always: bool) {
+fn push_uint_full(
+    obj: &mut output::Object,
+    name: &str,
+    val: &str,
+    scale: u64,
+    bias: u64,
+    always: bool,
+) {
     if val != "" {
         match val.parse::<u64>() {
-            Ok(n) => if n != 0 || bias != 0 || always {
-                obj.push_u(name, bias + n*scale);
+            Ok(n) => {
+                if n != 0 || bias != 0 || always {
+                    obj.push_u(name, bias + n * scale);
+                }
             }
-            Err(_) => { }
+            Err(_) => {}
         }
     }
 }
 
 fn push_duration(obj: &mut output::Object, name: &str, mut val: &str) {
     // [DD-[hh:]]mm:ss
-    let days =
-        if let Some((dd,rest)) = val.split_once('-') {
-            if let Ok(n) = dd.parse::<u64>() {
-                val = rest;
-                n
-            } else {
-                return;
-            }
+    let days = if let Some((dd, rest)) = val.split_once('-') {
+        if let Ok(n) = dd.parse::<u64>() {
+            val = rest;
+            n
         } else {
-            0
-        };
+            return;
+        }
+    } else {
+        0
+    };
     let mut elts = val.split(':').collect::<Vec<&str>>();
-    let hours =
-        if elts.len() == 3 {
-            if let Ok(n) = elts[0].parse::<u64>() {
-                elts.remove(0);
-                n
-            } else {
-                return;
-            }
-        } else {
-            0
-        };
-    let minutes =
+    let hours = if elts.len() == 3 {
         if let Ok(n) = elts[0].parse::<u64>() {
+            elts.remove(0);
             n
         } else {
             return;
-        };
-    let seconds =
-        if let Ok(n) = elts[1].parse::<u64>() {
-            n
-        } else {
-            return;
-        };
-    let t = days * (24*60*60) + hours * (60*60) + minutes * 60 + seconds;
+        }
+    } else {
+        0
+    };
+    let minutes = if let Ok(n) = elts[0].parse::<u64>() {
+        n
+    } else {
+        return;
+    };
+    let seconds = if let Ok(n) = elts[1].parse::<u64>() {
+        n
+    } else {
+        return;
+    };
+    let t = days * (24 * 60 * 60) + hours * (60 * 60) + minutes * 60 + seconds;
     if t != 0 {
         obj.push_u(name, t);
     }
@@ -471,21 +498,22 @@ fn push_duration(obj: &mut output::Object, name: &str, mut val: &str) {
 
 fn push_volume(obj: &mut output::Object, name: &str, val: &str) {
     if val != "" {
-        let (val, scale) =
-            if let Some(suffix) = val.strip_suffix('K') {
-                (suffix, 1024)
-            } else if let Some(suffix) = val.strip_suffix('M') {
-                (suffix, 1024*1024)
-            } else if let Some(suffix) = val.strip_suffix('G') {
-                (suffix, 1024*1024*1024)
-            } else {
-                (val, 1)
-            };
+        let (val, scale) = if let Some(suffix) = val.strip_suffix('K') {
+            (suffix, 1024)
+        } else if let Some(suffix) = val.strip_suffix('M') {
+            (suffix, 1024 * 1024)
+        } else if let Some(suffix) = val.strip_suffix('G') {
+            (suffix, 1024 * 1024 * 1024)
+        } else {
+            (val, 1)
+        };
         match val.parse::<u64>() {
-            Ok(n) => if n != 0 {
-                obj.push_u(name, n*scale);
+            Ok(n) => {
+                if n != 0 {
+                    obj.push_u(name, n * scale);
+                }
             }
-            Err(_) => { }
+            Err(_) => {}
         }
     }
 }
@@ -554,9 +582,15 @@ pub fn test_format_sacct_jobs() {
         }
         println!("{} {}", xs.len(), ys.len());
         if xs.len() > ys.len() {
-            println!("`output` tail = {}", String::from_utf8_lossy(&xs[ys.len()..]));
+            println!(
+                "`output` tail = {}",
+                String::from_utf8_lossy(&xs[ys.len()..])
+            );
         } else {
-            println!("`expected` tail = {}", String::from_utf8_lossy(&ys[xs.len()..]));
+            println!(
+                "`expected` tail = {}",
+                String::from_utf8_lossy(&ys[xs.len()..])
+            );
         }
         assert!(false);
     }

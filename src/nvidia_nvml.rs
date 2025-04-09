@@ -120,7 +120,7 @@ pub fn get_card_configuration() -> Option<Vec<gpuapi::Card>> {
         if unsafe { nvml_device_get_card_info(dev, &mut infobuf) } == 0 {
             result.push(gpuapi::Card {
                 bus_addr: cstrdup(&infobuf.bus_addr),
-                device: gpuapi::GpuName{
+                device: gpuapi::GpuName {
                     index: dev as i32,
                     uuid: cstrdup(&infobuf.uuid),
                 },
@@ -162,7 +162,7 @@ pub fn get_card_utilization() -> Option<Vec<gpuapi::CardState>> {
                 x => x,
             };
             result.push(gpuapi::CardState {
-                device: gpuapi::GpuName{
+                device: gpuapi::GpuName {
                     index: dev as i32,
                     uuid: get_card_uuid(dev),
                 },
@@ -182,7 +182,7 @@ pub fn get_card_utilization() -> Option<Vec<gpuapi::CardState>> {
             })
         } else {
             result.push(gpuapi::CardState {
-                device: gpuapi::GpuName{
+                device: gpuapi::GpuName {
                     index: dev as i32,
                     uuid: get_card_uuid(dev),
                 },
@@ -217,7 +217,7 @@ pub fn get_process_utilization(ptable: &ps::ProcessTable) -> Option<Vec<gpuapi::
 
             let (username, uid) = ptable.lookup(infobuf.pid as ps::Pid);
             result.push(gpuapi::Process {
-                devices: vec![gpuapi::GpuName{
+                devices: vec![gpuapi::GpuName {
                     index: dev as i32,
                     uuid: get_card_uuid(dev),
                 }],

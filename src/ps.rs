@@ -1,19 +1,19 @@
 use crate::gpuapi;
+use crate::json_tags::*;
 use crate::log;
 use crate::output;
 use crate::procfs;
 use crate::ps_newfmt::format_newfmt;
 use crate::ps_oldfmt::{format_oldfmt, make_oldfmt_heartbeat};
 use crate::systemapi;
-use crate::json_tags::*;
 
 use std::collections::HashMap;
 use std::io::{self, Write};
 use std::path::PathBuf;
 #[cfg(debug_assertions)]
-use std::time;
-#[cfg(debug_assertions)]
 use std::thread;
+#[cfg(debug_assertions)]
+use std::time;
 
 #[derive(Default)]
 pub struct PsOptions {
@@ -128,7 +128,7 @@ pub fn create_snapshot(
     }
 }
 
-pub const EPOCH_TIME_BASE : u64 = 1577836800; // 2020-01-01T00:00:00Z
+pub const EPOCH_TIME_BASE: u64 = 1577836800; // 2020-01-01T00:00:00Z
 
 fn do_create_snapshot(
     writer: &mut dyn io::Write,
@@ -139,7 +139,12 @@ fn do_create_snapshot(
         Ok(Some(sample_data)) => {
             if opts.new_json {
                 let recoverable_errors = output::Array::new();
-                let o = output::Value::O(format_newfmt(&sample_data, system, opts, recoverable_errors));
+                let o = output::Value::O(format_newfmt(
+                    &sample_data,
+                    system,
+                    opts,
+                    recoverable_errors,
+                ));
                 output::write_json(writer, &o);
             } else {
                 let mut elements = format_oldfmt(&sample_data, system, opts).take();
@@ -157,7 +162,10 @@ fn do_create_snapshot(
         Err(error) => {
             if opts.new_json {
                 let mut envelope = output::newfmt_envelope(system, opts.token.clone(), &vec![]);
-                envelope.push_a(SAMPLE_ENVELOPE_ERRORS, output::newfmt_one_error(system, error));
+                envelope.push_a(
+                    SAMPLE_ENVELOPE_ERRORS,
+                    output::newfmt_one_error(system, error),
+                );
                 output::write_json(writer, &output::Value::O(envelope));
             } else {
                 let mut hb = make_oldfmt_heartbeat(system);
@@ -189,7 +197,7 @@ pub struct ProcessTable {
 }
 
 impl ProcessTable {
-    pub fn from_processes<T>(procs: &HashMap<T,procfs::Process>) -> ProcessTable {
+    pub fn from_processes<T>(procs: &HashMap<T, procfs::Process>) -> ProcessTable {
         let mut by_pid = HashMap::new();
         for proc in procs.values() {
             by_pid.insert(proc.pid, (proc.user.clone(), proc.uid));
@@ -278,16 +286,15 @@ fn collect_sample_data(
 
     let (_cpu_total_secs, per_cpu_secs) = procfs::get_node_information(system)?;
     let memory = procfs::get_memory(system.get_procfs())?;
-    let (mut processes, per_pid_cpu_ticks) = procfs::get_process_information(system, memory.total as usize)?;
+    let (mut processes, per_pid_cpu_ticks) =
+        procfs::get_process_information(system, memory.total as usize)?;
 
     if opts.cpu_util {
         let utils = procfs::get_cpu_utilization(system, &per_pid_cpu_ticks, 100)?;
         for (pid, cpu_util) in utils.iter() {
-            processes
-                .entry(*pid)
-                .and_modify(|e| {
-                    e.cpu_util = *cpu_util;
-                });
+            processes.entry(*pid).and_modify(|e| {
+                e.cpu_util = *cpu_util;
+            });
             // There is no or_insert case.  It may be that a process has gone away, and there's no
             // data for it, but not that a process has appeared during the utilization computation.
         }
@@ -309,7 +316,10 @@ fn collect_sample_data(
     let mut candidates = if opts.rollup {
         rollup_processes(procinfo_by_pid)
     } else {
-        procinfo_by_pid.drain().map(|(_,v)| v).collect::<Vec<ProcInfo>>()
+        procinfo_by_pid
+            .drain()
+            .map(|(_, v)| v)
+            .collect::<Vec<ProcInfo>>()
     };
 
     let candidates = candidates
@@ -344,7 +354,9 @@ fn add_cpu_info(
                 assert!(proc.ppid == e.ppid);
             })
             .or_insert_with(|| {
-                let (job_id, is_slurm) = system.get_jobs().job_id_from_pid(system, proc.pid, processes);
+                let (job_id, is_slurm) = system
+                    .get_jobs()
+                    .job_id_from_pid(system, proc.pid, processes);
                 ProcInfo {
                     user: proc.user.to_string(),
                     command: proc.command.to_string(),
@@ -363,7 +375,6 @@ fn add_cpu_info(
                     ..Default::default()
                 }
             });
-
     }
     procinfo_by_pid
 }
@@ -417,8 +428,9 @@ fn add_gpu_info(
 
                 for proc in &gpu_utilization {
                     assert!(proc.devices.len() == 1);
-                    let (ppid, has_children) =
-                        processes.get(&proc.pid).map_or((1, true), |p| (p.ppid, p.has_children));
+                    let (ppid, has_children) = processes
+                        .get(&proc.pid)
+                        .map_or((1, true), |p| (p.ppid, p.has_children));
                     // TODO: This is not what we want, we can do better.  (Should specify how.)
                     let command = match &proc.command {
                         Some(cmd) => cmd.clone(),
@@ -427,18 +439,21 @@ fn add_gpu_info(
                     procinfo_by_pid
                         .entry(proc.pid)
                         .and_modify(|e| {
-                            aggregate_gpu(&mut e.gpus,
-                                          &proc.devices[0],
-                                          proc.gpu_pct as u32,
-                                          proc.mem_pct as u32,
-                                          proc.mem_size_kib as u64);
+                            aggregate_gpu(
+                                &mut e.gpus,
+                                &proc.devices[0],
+                                proc.gpu_pct as u32,
+                                proc.mem_pct as u32,
+                                proc.mem_size_kib as u64,
+                            );
                             e.gpu_percentage += proc.gpu_pct;
                             e.gpu_mem_percentage += proc.mem_pct;
                             e.gpu_mem_size_kib += proc.mem_size_kib;
                         })
                         .or_insert_with(|| {
-                            let (job_id, is_slurm) =
-                                system.get_jobs().job_id_from_pid(system, proc.pid, processes);
+                            let (job_id, is_slurm) = system
+                                .get_jobs()
+                                .job_id_from_pid(system, proc.pid, processes);
                             ProcInfo {
                                 user: proc.user.to_string(),
                                 command,
@@ -448,10 +463,12 @@ fn add_gpu_info(
                                 has_children,
                                 job_id,
                                 is_slurm,
-                                gpus: singleton_gpu(&proc.devices[0],
-                                                    proc.gpu_pct as u32,
-                                                    proc.mem_pct as u32,
-                                                    proc.mem_size_kib as u64),
+                                gpus: singleton_gpu(
+                                    &proc.devices[0],
+                                    proc.gpu_pct as u32,
+                                    proc.mem_pct as u32,
+                                    proc.mem_size_kib as u64,
+                                ),
                                 gpu_percentage: proc.gpu_pct,
                                 gpu_mem_percentage: proc.mem_pct,
                                 gpu_mem_size_kib: proc.mem_size_kib,
@@ -486,12 +503,15 @@ fn singleton_gpu(
     mem_size: u64,
 ) -> GpuProcInfos {
     let mut h = HashMap::new();
-    h.insert(device.clone(), GpuProcInfo{
-        device: device.clone(),
-        gpu_util,
-        gpu_mem: mem_size,
-        gpu_mem_util: mem_util,
-    });
+    h.insert(
+        device.clone(),
+        GpuProcInfo {
+            device: device.clone(),
+            gpu_util,
+            gpu_mem: mem_size,
+            gpu_mem_util: mem_util,
+        },
+    );
     h
 }
 
@@ -516,22 +536,13 @@ fn aggregate_gpu(
         });
 }
 
-fn aggregate_gpus(
-    gpus: &mut GpuProcInfos,
-    others: &GpuProcInfos,
-) {
+fn aggregate_gpus(gpus: &mut GpuProcInfos, others: &GpuProcInfos) {
     for (name, info) in others {
-        aggregate_gpu(gpus,
-                      name,
-                      info.gpu_util,
-                      info.gpu_mem_util,
-                      info.gpu_mem);
+        aggregate_gpu(gpus, name, info.gpu_util, info.gpu_mem_util, info.gpu_mem);
     }
 }
 
-fn rollup_processes(
-    procinfo_by_pid: ProcInfoTable,
-) -> Vec<ProcInfo> {
+fn rollup_processes(procinfo_by_pid: ProcInfoTable) -> Vec<ProcInfo> {
     // This is a little complicated because processes with job_id 0 or processes that have
     // subprocesses or processes that do not belong to Slurm jobs cannot be rolled up, nor can
     // we roll up processes with different ppid.
@@ -630,12 +641,7 @@ fn filter_proc(proc_info: &ProcInfo, opts: &PsOptions) -> bool {
     if opts.exclude_system_jobs && proc_info.is_system_job {
         included = false;
     }
-    if !opts.exclude_users.is_empty()
-        && opts
-            .exclude_users
-            .iter()
-            .any(|x| *x == proc_info.user)
-    {
+    if !opts.exclude_users.is_empty() && opts.exclude_users.iter().any(|x| *x == proc_info.user) {
         included = false;
     }
     if !opts.exclude_commands.is_empty()

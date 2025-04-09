@@ -10,14 +10,8 @@ pub struct MockFS {
 }
 
 impl MockFS {
-    pub fn new(
-        files: HashMap<String, String>,
-        pids: Vec<(usize, u32)>,
-    ) -> MockFS {
-        MockFS {
-            files,
-            pids,
-        }
+    pub fn new(files: HashMap<String, String>, pids: Vec<(usize, u32)>) -> MockFS {
+        MockFS { files, pids }
     }
 }
 
