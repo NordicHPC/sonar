@@ -41,10 +41,10 @@ pub trait SystemAPI {
     ) -> Result<String, String>;
 
     // Run sinfo and return its output as a vector of partition name and unparsed nodelist.
-    fn run_sinfo_partitions(&self) -> Result<Vec<(String,String)>, String>;
+    fn run_sinfo_partitions(&self) -> Result<Vec<(String, String)>, String>;
 
     // Run sinfo and return its output as a vector of unparsed nodelist and state list.
-    fn run_sinfo_nodes(&self) -> Result<Vec<(String,String)>, String>;
+    fn run_sinfo_nodes(&self) -> Result<Vec<(String, String)>, String>;
 
     // `create_lock_file` creates it atomically if it does not exist, returning Ok if so; if it does
     // exist, returns Err(io::ErrorKind::AlreadyExists), otherwise some other Err.

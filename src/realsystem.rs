@@ -85,7 +85,10 @@ pub struct RealSystem {
 
 impl RealSystem {
     pub fn new() -> RealSystemBuilder {
-        RealSystemBuilder { jm: None, cluster: "".to_string() }
+        RealSystemBuilder {
+            jm: None,
+            cluster: "".to_string(),
+        }
     }
 }
 
@@ -201,12 +204,20 @@ impl systemapi::SystemAPI for RealSystem {
         )
     }
 
-    fn run_sinfo_partitions(&self) -> Result<Vec<(String,String)>, String> {
-	twofields(runit("sinfo", &["-h", "-a", "-O", "Partition:|,NodeList:|"], SINFO_TIMEOUT_S)?)
+    fn run_sinfo_partitions(&self) -> Result<Vec<(String, String)>, String> {
+        twofields(runit(
+            "sinfo",
+            &["-h", "-a", "-O", "Partition:|,NodeList:|"],
+            SINFO_TIMEOUT_S,
+        )?)
     }
 
-    fn run_sinfo_nodes(&self) -> Result<Vec<(String,String)>, String> {
-        twofields(runit("sinfo", &["-h", "-a", "-e", "-O", "NodeList:|,StateComplete:|"], SINFO_TIMEOUT_S)?)
+    fn run_sinfo_nodes(&self) -> Result<Vec<(String, String)>, String> {
+        twofields(runit(
+            "sinfo",
+            &["-h", "-a", "-e", "-O", "NodeList:|,StateComplete:|"],
+            SINFO_TIMEOUT_S,
+        )?)
     }
 
     fn handle_interruptions(&self) {
@@ -228,13 +239,13 @@ fn runit(cmd: &str, args: &[&str], timeout: u64) -> Result<String, String> {
     }
 }
 
-fn twofields(text: String) -> Result<Vec<(String,String)>, String> {
+fn twofields(text: String) -> Result<Vec<(String, String)>, String> {
     let mut v = vec![];
     for l in text.lines() {
         let mut fields = l.split('|');
         let a = fields.next().ok_or("Bad sinfo output")?;
         let b = fields.next().ok_or("Bad sinfo output")?;
-        v.push((a.to_string(),b.to_string()));
+        v.push((a.to_string(), b.to_string()));
     }
     Ok(v)
 }

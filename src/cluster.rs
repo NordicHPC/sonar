@@ -12,41 +12,48 @@
 //
 // If there is no sinfo, this emits an error.
 
+use crate::json_tags::*;
+use crate::nodelist;
 use crate::output;
 use crate::systemapi;
-use crate::nodelist;
-use crate::json_tags::*;
 
 use std::io;
 
 pub fn show_cluster(writer: &mut dyn io::Write, token: String, system: &dyn systemapi::SystemAPI) {
     output::write_json(
         writer,
-        &output::Value::O(
-            match do_show_cluster(system, token.clone()) {
-                Ok(envelope) => envelope,
-                Err(error) => {
-                    let mut envelope = output::newfmt_envelope(system, token, &vec![]);
-                    envelope.push_a(CLUSTER_ENVELOPE_ERRORS, output::newfmt_one_error(system, error));
-                    envelope
-                }
+        &output::Value::O(match do_show_cluster(system, token.clone()) {
+            Ok(envelope) => envelope,
+            Err(error) => {
+                let mut envelope = output::newfmt_envelope(system, token, &vec![]);
+                envelope.push_a(
+                    CLUSTER_ENVELOPE_ERRORS,
+                    output::newfmt_one_error(system, error),
+                );
+                envelope
             }
-        )
+        }),
     )
 }
 
-fn do_show_cluster(system: &dyn systemapi::SystemAPI, token: String) -> Result<output::Object, String>{
+fn do_show_cluster(
+    system: &dyn systemapi::SystemAPI,
+    token: String,
+) -> Result<output::Object, String> {
     let mut partitions = output::Array::new();
     for (name, nodelist) in system.run_sinfo_partitions()? {
         let mut p = output::Object::new();
         // The default partition is marked but of no interest to us.
         let name = if let Some(suffix) = name.strip_suffix('*') {
             suffix.to_string()
-	} else {
+        } else {
             name.to_string()
-	};
+        };
         p.push_s(CLUSTER_PARTITION_NAME, name);
-        p.push_a(CLUSTER_PARTITION_NODES, nodelist::parse_and_render(&nodelist)?);
+        p.push_a(
+            CLUSTER_PARTITION_NODES,
+            nodelist::parse_and_render(&nodelist)?,
+        );
         partitions.push_o(p);
     }
 

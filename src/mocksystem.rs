@@ -2,8 +2,8 @@ use crate::gpuapi;
 use crate::jobsapi;
 use crate::mockfs;
 use crate::mockgpu;
-use crate::ps;
 use crate::procfsapi;
+use crate::ps;
 use crate::systemapi;
 use crate::time;
 
@@ -310,11 +310,11 @@ impl systemapi::SystemAPI for MockSystem {
         Ok("".to_string()) // Not in use yet
     }
 
-    fn run_sinfo_partitions(&self) -> Result<Vec<(String,String)>, String> {
+    fn run_sinfo_partitions(&self) -> Result<Vec<(String, String)>, String> {
         Ok(vec![]) // Not in use yet
     }
 
-    fn run_sinfo_nodes(&self) -> Result<Vec<(String,String)>, String> {
+    fn run_sinfo_nodes(&self) -> Result<Vec<(String, String)>, String> {
         Ok(vec![]) // Not in use yet
     }
 

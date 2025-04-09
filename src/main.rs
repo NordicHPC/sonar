@@ -52,7 +52,7 @@ use std::io;
 
 const USAGE_ERROR: i32 = 2; // clap, Python, Go
 
-const OUTPUT_FORMAT : u64 = 0;
+const OUTPUT_FORMAT: u64 = 0;
 
 enum Commands {
     /// Take a snapshot of the currently running processes
@@ -191,7 +191,11 @@ fn main() {
             } else {
                 system
             };
-            ps::create_snapshot(writer, &system.freeze().expect("System initialization"), &opts);
+            ps::create_snapshot(
+                writer,
+                &system.freeze().expect("System initialization"),
+                &opts,
+            );
         }
         Commands::Sysinfo { csv, json, cluster } => {
             let system = if cluster.is_some() {
@@ -199,15 +203,35 @@ fn main() {
             } else {
                 system
             };
-            sysinfo::show_system(writer, &system.freeze().expect("System initialization"), token, *csv, *json);
+            sysinfo::show_system(
+                writer,
+                &system.freeze().expect("System initialization"),
+                token,
+                *csv,
+                *json,
+            );
         }
-        Commands::Slurmjobs { window, span, json, deluge, cluster } => {
+        Commands::Slurmjobs {
+            window,
+            span,
+            json,
+            deluge,
+            cluster,
+        } => {
             let system = if cluster.is_some() {
                 system.with_cluster(cluster.as_ref().unwrap())
             } else {
                 system
             };
-            slurmjobs::show_slurm_jobs(writer, window, span, *deluge, &system.freeze().expect("System initialization"), token, *json);
+            slurmjobs::show_slurm_jobs(
+                writer,
+                window,
+                span,
+                *deluge,
+                &system.freeze().expect("System initialization"),
+                token,
+                *json,
+            );
         }
         Commands::Cluster { cluster } => {
             let system = if cluster.is_some() {
@@ -215,7 +239,11 @@ fn main() {
             } else {
                 system
             };
-            cluster::show_cluster(writer, token, &system.freeze().expect("System initialization"));
+            cluster::show_cluster(
+                writer,
+                token,
+                &system.freeze().expect("System initialization"),
+            );
         }
         Commands::Version {} => {
             show_version(writer);
@@ -394,7 +422,13 @@ fn command_line() -> Commands {
                     eprintln!("--json requires --cluster");
                     std::process::exit(USAGE_ERROR);
                 }
-                Commands::Slurmjobs { window, span, json, cluster, deluge }
+                Commands::Slurmjobs {
+                    window,
+                    span,
+                    json,
+                    cluster,
+                    deluge,
+                }
             }
             "cluster" => {
                 let mut cluster = None;

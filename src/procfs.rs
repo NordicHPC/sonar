@@ -21,13 +21,16 @@ pub struct Memory {
 // Read the /proc/meminfo file from the fs and return the value for total installed memory.
 
 pub fn get_memory(fs: &dyn procfsapi::ProcfsAPI) -> Result<Memory, String> {
-    let mut memory = Memory { total: 0, available: 0 };
+    let mut memory = Memory {
+        total: 0,
+        available: 0,
+    };
     let meminfo_s = fs.read_to_string("meminfo")?;
     {
         let total = &mut memory.total;
         let available = &mut memory.available;
         for l in meminfo_s.split('\n') {
-            let ptr : &mut u64;
+            let ptr: &mut u64;
             if l.starts_with("MemTotal: ") {
                 ptr = total;
             } else if l.starts_with("MemAvailable: ") {
@@ -136,7 +139,12 @@ pub fn get_cpu_info_x86_64(fs: &dyn procfsapi::ProcfsAPI) -> Result<CpuInfo, Str
         return Err("Incomplete information in /proc/cpuinfo".to_string());
     }
     let threads_per_core = siblings / cores_per_socket;
-    Ok(CpuInfo { sockets, cores_per_socket, threads_per_core, cores })
+    Ok(CpuInfo {
+        sockets,
+        cores_per_socket,
+        threads_per_core,
+        cores,
+    })
 }
 
 #[cfg(any(target_arch = "aarch64", test))]
@@ -165,14 +173,19 @@ pub fn get_cpu_info_aarch64(fs: &dyn procfsapi::ProcfsAPI) -> Result<CpuInfo, St
     let sockets = 1;
     let model_name = format!("ARMv{model_major}.{model_minor}");
     let mut cores = vec![];
-    for core in 0..sockets*cores_per_socket {
+    for core in 0..sockets * cores_per_socket {
         cores.push(CoreInfo {
             logical_index: core,
             physical_index: 0,
             model_name: model_name.clone(),
         })
     }
-    Ok(CpuInfo { sockets, cores_per_socket, threads_per_core, cores })
+    Ok(CpuInfo {
+        sockets,
+        cores_per_socket,
+        threads_per_core,
+        cores,
+    })
 }
 
 // The boot time is first field of the `btime` line of /proc/stat.  It is measured in seconds since
@@ -582,16 +595,20 @@ pub fn get_cpu_utilization(
                             .collect::<Vec<&str>>();
                     }
                 }
-                let utime_ticks = parse_usize_field(&fields, 11, &line, "stat", *pid, "utime")? as u64;
-                let stime_ticks = parse_usize_field(&fields, 12, &line, "stat", *pid, "stime")? as u64;
-                let cutime_ticks = parse_usize_field(&fields, 13, &line, "stat", *pid, "cutime")? as u64;
-                let cstime_ticks = parse_usize_field(&fields, 14, &line, "stat", *pid, "cstime")? as u64;
+                let utime_ticks =
+                    parse_usize_field(&fields, 11, &line, "stat", *pid, "utime")? as u64;
+                let stime_ticks =
+                    parse_usize_field(&fields, 12, &line, "stat", *pid, "stime")? as u64;
+                let cutime_ticks =
+                    parse_usize_field(&fields, 13, &line, "stat", *pid, "cutime")? as u64;
+                let cstime_ticks =
+                    parse_usize_field(&fields, 14, &line, "stat", *pid, "cstime")? as u64;
                 bsdtime_ticks = utime_ticks + stime_ticks + cutime_ticks + cstime_ticks;
             }
         }
-        let utilization = (bsdtime_ticks - prev_cputime_ticks) as f64 *
-            (1000.0 / wait_time_ms as f64) /
-            ticks_per_sec as f64;
+        let utilization = (bsdtime_ticks - prev_cputime_ticks) as f64
+            * (1000.0 / wait_time_ms as f64)
+            / ticks_per_sec as f64;
         result.push((*pid, utilization));
     }
     Ok(result)
@@ -690,8 +707,14 @@ pub fn procfs_parse_test() {
     users.insert(1000, "zappa".to_string());
 
     let mut files = HashMap::new();
-    files.insert("stat".to_string(), std::include_str!("testdata/stat.txt").to_string());
-    files.insert("meminfo".to_string(), std::include_str!("testdata/meminfo.txt").to_string());
+    files.insert(
+        "stat".to_string(),
+        std::include_str!("testdata/stat.txt").to_string(),
+    );
+    files.insert(
+        "meminfo".to_string(),
+        std::include_str!("testdata/meminfo.txt").to_string(),
+    );
     files.insert(
         "4018/stat".to_string(),
         "4018 (firefox) S 2190 2189 2189 0 -1 4194560 19293188 3117638 1823 557 51361 15728 5390 2925 20 0 187 0 16400 5144358912 184775 18446744073709551615 94466859782144 94466860597976 140720852341888 0 0 0 0 4096 17663 0 0 0 17 4 0 0 0 0 0 94466860605280 94466860610840 94466863497216 140720852350777 140720852350820 140720852350820 140720852357069 0".to_string());
@@ -729,7 +752,8 @@ pub fn procfs_parse_test() {
     assert!(memory.total == 16093776);
     assert!(memory.available == 8162068);
     let (total_secs, per_cpu_secs) = get_node_information(&system).expect("Test: Must have data");
-    let (mut info, _) = get_process_information(&system, memory.total as usize).expect("Test: Must have data");
+    let (mut info, _) =
+        get_process_information(&system, memory.total as usize).expect("Test: Must have data");
     assert!(info.len() == 1);
     let mut xs = info.drain();
     let p = xs.next().expect("Test: Should have data").1;
@@ -806,7 +830,8 @@ pub fn procfs_dead_and_undead_test() {
         .freeze();
     let fs = system.get_procfs();
     let memory = get_memory(fs).expect("Test: Must have data");
-    let (mut info, _) = get_process_information(&system, memory.total as usize).expect("Test: Must have data");
+    let (mut info, _) =
+        get_process_information(&system, memory.total as usize).expect("Test: Must have data");
 
     // 4020 should be dropped - it's dead
     assert!(info.len() == 2);
@@ -826,10 +851,17 @@ pub fn procfs_dead_and_undead_test() {
 #[test]
 pub fn procfs_cpuinfo_test_x86_64() {
     let mut files = HashMap::new();
-    files.insert("cpuinfo".to_string(), std::include_str!("testdata/cpuinfo-x86_64.txt").to_string());
+    files.insert(
+        "cpuinfo".to_string(),
+        std::include_str!("testdata/cpuinfo-x86_64.txt").to_string(),
+    );
     let system = mocksystem::MockSystem::new().with_files(files).freeze();
-    let CpuInfo { sockets, cores_per_socket, threads_per_core, cores } =
-        get_cpu_info_x86_64(system.get_procfs()).expect("Test: Must have data");
+    let CpuInfo {
+        sockets,
+        cores_per_socket,
+        threads_per_core,
+        cores,
+    } = get_cpu_info_x86_64(system.get_procfs()).expect("Test: Must have data");
     assert!(cores[0].model_name.find("E5-2637").is_some());
     assert!(sockets == 2);
     assert!(cores_per_socket == 4);
@@ -839,10 +871,17 @@ pub fn procfs_cpuinfo_test_x86_64() {
 #[test]
 pub fn procfs_cpuinfo_test_aarch64() {
     let mut files = HashMap::new();
-    files.insert("cpuinfo".to_string(), std::include_str!("testdata/cpuinfo-aarch64.txt").to_string());
+    files.insert(
+        "cpuinfo".to_string(),
+        std::include_str!("testdata/cpuinfo-aarch64.txt").to_string(),
+    );
     let system = mocksystem::MockSystem::new().with_files(files).freeze();
-    let CpuInfo { sockets, cores_per_socket, threads_per_core, cores } =
-        get_cpu_info_aarch64(system.get_procfs()).expect("Test: Must have data");
+    let CpuInfo {
+        sockets,
+        cores_per_socket,
+        threads_per_core,
+        cores,
+    } = get_cpu_info_aarch64(system.get_procfs()).expect("Test: Must have data");
     assert!(cores[0].model_name.find("ARMv8.3").is_some());
     assert!(sockets == 1);
     assert!(cores_per_socket == 96);

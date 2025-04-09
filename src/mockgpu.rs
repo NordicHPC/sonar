@@ -1,4 +1,4 @@
-use crate::gpuapi::{GpuAPI, GPU, Card, CardState, Process};
+use crate::gpuapi::{Card, CardState, GpuAPI, Process, GPU};
 use crate::ps;
 
 pub struct MockGpuAPI {
@@ -7,20 +7,20 @@ pub struct MockGpuAPI {
 
 impl MockGpuAPI {
     pub fn new(cards: Vec<Card>) -> MockGpuAPI {
-        MockGpuAPI {
-            cards,
-        }
+        MockGpuAPI { cards }
     }
 }
 
 impl GpuAPI for MockGpuAPI {
     fn probe(&self) -> Option<Box<dyn GPU>> {
-        Some(Box::new(MockGpus{ cards: self.cards.clone() }))
+        Some(Box::new(MockGpus {
+            cards: self.cards.clone(),
+        }))
     }
 }
 
 pub struct MockGpus {
-    cards: Vec<Card>
+    cards: Vec<Card>,
 }
 
 impl GPU for MockGpus {
@@ -32,10 +32,7 @@ impl GPU for MockGpus {
         Ok(self.cards.clone())
     }
 
-    fn get_process_utilization(
-        &self,
-        _ptable: &ps::ProcessTable,
-    ) -> Result<Vec<Process>, String> {
+    fn get_process_utilization(&self, _ptable: &ps::ProcessTable) -> Result<Vec<Process>, String> {
         Err("No processes yet".to_string())
     }
 

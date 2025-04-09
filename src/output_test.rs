@@ -1,7 +1,7 @@
 // These are separated so as not to confuse some test code that greps output.rs for strings that
 // look like field names.
 
-use crate::output::{Array,Object,Value,write_json,write_csv};
+use crate::output::{write_csv, write_json, Array, Object, Value};
 
 #[test]
 pub fn test_json() {
@@ -57,4 +57,3 @@ pub fn test_csv() {
     let got = String::from_utf8_lossy(&output);
     assert!(expect == got);
 }
-
