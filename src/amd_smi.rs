@@ -135,8 +135,8 @@ pub fn get_card_configuration() -> Option<Vec<gpuapi::Card>> {
                 firmware: cstrdup(&infobuf.firmware),
                 mem_size_kib: (infobuf.mem_total / 1024) as i64,
                 power_limit_watt: (infobuf.power_limit / 1000) as i32,
-                max_power_limit_watt: (infobuf.min_power_limit / 1000) as i32,
-                min_power_limit_watt: (infobuf.max_power_limit / 1000) as i32,
+                max_power_limit_watt: (infobuf.max_power_limit / 1000) as i32,
+                min_power_limit_watt: (infobuf.min_power_limit / 1000) as i32,
                 max_ce_clock_mhz: infobuf.max_ce_clock as i32,
                 max_mem_clock_mhz: infobuf.max_mem_clock as i32,
             })
