@@ -76,7 +76,7 @@ func TestParsing(t *testing.T) {
 	readFiles("testdata/sonar-output")
 	output := make([]string, 0, len(collected))
 	for k, v := range collected {
-		output = append(output, k + " " + v)
+		output = append(output, k+" "+v)
 	}
 	slices.Sort(output)
 	if !reflect.DeepEqual(output, expected) {
