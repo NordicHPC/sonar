@@ -108,7 +108,7 @@ func TestNewJSONSysinfoActual(t *testing.T) {
 	err := newfmt.ConsumeJSONSysinfo(
 		strings.NewReader(stdout),
 		true,
-		func(info *newfmt.SysinfoEnvelope) { },
+		func(info *newfmt.SysinfoEnvelope) {},
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -170,7 +170,7 @@ func TestNewJSONSamples(t *testing.T) {
 			assert(t, g.Index == 2, "#1 index")
 			assert(t, g.UUID == "GPU-1a93320a-442c-ea70-48f0-13eec991b330", "#1 uuid")
 			assert(t, g.Fan == 30, "#1 fan")
-			assert(t, g.ComputeMode =="", "#1 compute mode")
+			assert(t, g.ComputeMode == "", "#1 compute mode")
 			assert(t, g.PerformanceState == 3, "#1 perf state")
 			assert(t, g.Memory == 4514240, "#1 memory")
 			assert(t, g.CEUtil == 73, "#1 CE util")
@@ -195,7 +195,7 @@ func TestNewJSONSamplesActual(t *testing.T) {
 	err := newfmt.ConsumeJSONSamples(
 		strings.NewReader(stdout),
 		true,
-		func(info *newfmt.SampleEnvelope) { },
+		func(info *newfmt.SampleEnvelope) {},
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -246,7 +246,7 @@ func TestNewJSONClusterActual(t *testing.T) {
 	err := newfmt.ConsumeJSONCluster(
 		strings.NewReader(stdout),
 		true,
-		func(info *newfmt.ClusterEnvelope) { },
+		func(info *newfmt.ClusterEnvelope) {},
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -286,7 +286,7 @@ func TestNewJSONSlurmJobs(t *testing.T) {
 			assert(t, j.Timelimit == 100, "#0 time limit")
 			assert(t, j.Partition == "normal", "#0 partition")
 			assert(t, j.Reservation == "big-cheese", "#0 reservation")
-			assert(t, reflect.DeepEqual(j.NodeList, []string{"c1-[10-20]","bigmem-1"}), "#0 nodelist")
+			assert(t, reflect.DeepEqual(j.NodeList, []string{"c1-[10-20]", "bigmem-1"}), "#0 nodelist")
 			p, err := j.Priority.ToUint()
 			if err != nil {
 				t.Fatal(err)
@@ -352,7 +352,7 @@ func TestNewJSONSlurmJobsActual(t *testing.T) {
 	err := newfmt.ConsumeJSONJobs(
 		strings.NewReader(stdout),
 		true,
-		func(info *newfmt.JobsEnvelope) { },
+		func(info *newfmt.JobsEnvelope) {},
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -397,7 +397,7 @@ func runSonar(t *testing.T, args ...string) string {
 
 var (
 	defRe = regexp.MustCompile(`pub\s+const\s+([^\s]+)\s*:`)
-	idRe = regexp.MustCompile(`[A-Z][A-Z0-9_]*`)
+	idRe  = regexp.MustCompile(`[A-Z][A-Z0-9_]*`)
 )
 
 func TestFieldNames1(t *testing.T) {
@@ -443,13 +443,12 @@ func TestFieldNames1(t *testing.T) {
 		}
 	}
 	for k, v := range defined {
-		fmt.Println(k,  " ", v)
+		fmt.Println(k, " ", v)
 	}
 	if len(defined) > 0 {
 		t.Fatal("oops")
 	}
 }
-
 
 // Extract all strings in some contexts from some Rust source files and ensure that there are none.
 // This is a second check on whether the output code uses only well-defined names.

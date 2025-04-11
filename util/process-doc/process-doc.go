@@ -229,7 +229,7 @@ func emitField(l FieldLine, currType string, doc []string) {
 		// type, to prevent literal strings from being used at all.  (It could be an enum wrapping a
 		// &str, modulo problems with initialization, or maybe it would be an enum whose value
 		// points into some table.)
-		fmt.Printf("pub const %s: &str = \"%s\"; // %s\n", transformName(currType + l.Name), l.Json, l.Type)
+		fmt.Printf("pub const %s: &str = \"%s\"; // %s\n", transformName(currType+l.Name), l.Json, l.Type)
 	}
 }
 

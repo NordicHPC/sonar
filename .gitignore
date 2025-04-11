@@ -2,4 +2,3 @@ target/
 *~
 *.rej
 *.orig
-util/ingest-files/ingest-files
