@@ -127,9 +127,17 @@ lazy_static! {
 // changed, if any (with identifying fields).
 //
 // Once a job reaches the completed stage we would expect for nothing to change, but we have to
-// garbage collect the table every so often.  Not sure what's best.  I'm guessing that we can purge
-// anything that is in a completed state where it reached the completed state at least 2 * cadence
-// time ago.  This GC can run off a timer or as part of the Jobber's normal workload.
+// garbage collect the table every so often.  This GC can run off a timer or as part of the Jobber's
+// normal workload.
+//
+// The best option for GC is probably that once we *stop* seeing data for a table entry *and* the
+// table entry is in a completed state we can remove it.  To do this, every table entry can have a
+// mark.  Suppose the mark is initially zero.  When we run sacct, we set the mark for every job we
+// see information about.  Entries whose mark is clean will not have been seen.
+//
+// We might trigger this mark/sweep collector every hour, say, simply by comparing a timestamp to
+// the previous time it was run - no timer is needed, it's driven entirely by the cadence of normal
+// work.
 
 #[cfg(feature = "daemon")]
 pub struct Jobber<'a> {
@@ -139,6 +147,10 @@ pub struct Jobber<'a> {
     system: &'a dyn systemapi::SystemAPI,
     // Map from (id, step) to data
     known: HashMap<(u64, String), Box<JobAll>>,
+    // Earliest time of next garbage collection, UTC time in seconds
+    next_collection: u64,
+    // The delta we use for computing next collection
+    delta: u64,
 }
 
 #[derive(Default, Clone)]
@@ -191,21 +203,28 @@ impl<'a> Jobber<'a> {
         incomplete: bool,
         system: &'a dyn systemapi::SystemAPI,
     ) -> Jobber<'a> {
+        let delta = if let Some(w) = window {
+            std::cmp::min(3600, w * 60 * 2) as u64
+        } else {
+            3600
+        };
         Jobber {
             window: *window,
             span: span.clone(),
             incomplete,
             system,
             known: HashMap::new(),
+            next_collection: time::unix_now() + delta,
+            delta,
         }
     }
 
     pub fn show_jobs(&mut self, token: String, writer: &mut dyn io::Write) {
         match collect_sacct_jobs_newfmt(self.system, &self.window, &self.span, self.incomplete) {
             Ok(mut jobs) => {
-                if self.incomplete {
-                    jobs = self.filter_jobs(jobs);
-                }
+                // Always filter, so that we don't redundantly push out data about completed jobs
+                // that are seen multiple times.
+                jobs = self.filter_jobs(jobs);
 
                 // This will push out a record even if the jobs array is empty.  This is probably
                 // the right thing, it serves as a heartbeat.
@@ -229,8 +248,13 @@ impl<'a> Jobber<'a> {
 
     fn filter_jobs(&mut self, jobs: Vec<Box<JobAll>>) -> Vec<Box<JobAll>> {
         let mut new_jobs = vec![];
+        let mut marked = HashSet::new();
+        let collecting = time::unix_now() >= self.next_collection;
         for j in jobs {
             let key = (j.job_id, j.job_step.clone());
+            if collecting {
+                marked.insert(key.clone());
+            }
             let (pertinent, found) = match self.known.get(&key) {
                 Some(p) => (
                     p.job_state != j.job_state
@@ -304,7 +328,7 @@ impl<'a> Jobber<'a> {
             }
 
             // Expose these only for completed states
-            if j.job_state == "PENDING" || j.job_state == "RUNNING" {
+            if !is_completed_state(&j.job_state) {
                 new_j.sacct_min_cpu = 0;
                 new_j.sacct_ave_cpu = 0;
                 new_j.sacct_ave_disk_read = 0;
@@ -323,8 +347,22 @@ impl<'a> Jobber<'a> {
 
             new_jobs.push(new_j);
         }
+        if collecting {
+            let mut old_known = HashMap::new();
+            std::mem::swap(&mut old_known, &mut self.known);
+            for (k, v) in old_known {
+                if marked.contains(&k) || !is_completed_state(&v.job_state) {
+                    self.known.insert(k, v);
+                }
+            }
+            self.next_collection = time::unix_now() + self.delta;
+        }
         new_jobs
     }
+}
+
+fn is_completed_state(state: &str) -> bool {
+    !(state == "PENDING" || state == "RUNNING")
 }
 
 // Default sacct reporting window.  Note this value is baked into the help message in main.rs too.
