@@ -24,7 +24,7 @@ pub fn format_oldfmt(
         records.push(format_oldfmt_sample(p, system));
     }
 
-    if opts.load && records.len() > 0 {
+    if opts.load && !records.is_empty() {
         if !c.cpu_samples.is_empty() {
             let mut a = output::Array::from_vec(
                 c.cpu_samples
@@ -128,7 +128,7 @@ fn format_gpu_samples_horizontally(cards: &[gpuapi::CardState]) -> Option<output
         nonzero(c.fan_speed_pct as i64)
     });
     s = add_key(s, "mode", cards, |c: &gpuapi::CardState| {
-        if c.compute_mode == "" {
+        if c.compute_mode.is_empty() {
             output::Value::E()
         } else {
             output::Value::S(c.compute_mode.clone())
