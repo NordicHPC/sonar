@@ -256,13 +256,16 @@ pub struct GpuProcInfo {
 }
 
 #[derive(Copy, Clone, PartialEq, Eq)]
-#[derive(Default)]
 pub enum GpuStatus {
-    #[default]
     Ok = 0,
     UnknownFailure = 1,
 }
 
+impl Default for GpuStatus {
+    fn default() -> GpuStatus {
+        GpuStatus::Ok
+    }
+}
 
 pub struct SampleData {
     pub process_samples: Vec<ProcInfo>,
