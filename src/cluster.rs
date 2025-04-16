@@ -25,7 +25,7 @@ pub fn show_cluster(writer: &mut dyn io::Write, token: String, system: &dyn syst
         &output::Value::O(match do_show_cluster(system, token.clone()) {
             Ok(envelope) => envelope,
             Err(error) => {
-                let mut envelope = output::newfmt_envelope(system, token, &vec![]);
+                let mut envelope = output::newfmt_envelope(system, token, &[]);
                 envelope.push_a(
                     CLUSTER_ENVELOPE_ERRORS,
                     output::newfmt_one_error(system, error),
@@ -69,7 +69,7 @@ fn do_show_cluster(
         nodes.push_o(p);
     }
 
-    let mut envelope = output::newfmt_envelope(system, token, &vec![]);
+    let mut envelope = output::newfmt_envelope(system, token, &[]);
     let (mut data, mut attrs) = output::newfmt_data(system, DATA_TAG_CLUSTER);
     attrs.push_b(CLUSTER_ATTRIBUTES_SLURM, true);
     attrs.push_a(CLUSTER_ATTRIBUTES_PARTITIONS, partitions);

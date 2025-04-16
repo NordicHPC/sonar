@@ -43,7 +43,7 @@ fn layout_sysinfo_newfmt(
     token: String,
     node_info: NodeInfo,
 ) -> output::Object {
-    let mut envelope = output::newfmt_envelope(system, token, &vec![]);
+    let mut envelope = output::newfmt_envelope(system, token, &[]);
     let (mut data, mut attrs) = output::newfmt_data(system, DATA_TAG_SYSINFO);
     attrs.push_s(SYSINFO_ATTRIBUTES_NODE, node_info.node.clone());
     attrs.push_s(SYSINFO_ATTRIBUTES_OS_NAME, system.get_os_name());
@@ -55,20 +55,20 @@ fn layout_sysinfo_newfmt(
     attrs.push_s(SYSINFO_ATTRIBUTES_ARCHITECTURE, system.get_architecture());
     attrs.push_u(SYSINFO_ATTRIBUTES_MEMORY, node_info.mem_kb);
     let topo_svg = "".to_string(); // TODO: should be in node_info
-    if topo_svg != "" {
+    if !topo_svg.is_empty() {
         attrs.push_s(SYSINFO_ATTRIBUTES_TOPO_SVG, topo_svg);
     }
     let gpu_info = layout_card_info_newfmt(&node_info);
-    if gpu_info.len() > 0 {
+    if !gpu_info.is_empty() {
         attrs.push_a(SYSINFO_ATTRIBUTES_CARDS, gpu_info);
     }
     let software = Vec::<(String, String, String)>::new(); // TODO: should be in node_info
-    if software.len() > 0 {
+    if !software.is_empty() {
         let mut sw = output::Array::new();
         for (key, name, version) in software {
             let mut s = output::Object::new();
             s.push_s(SYSINFO_SOFTWARE_VERSION_KEY, key);
-            if name != "" {
+            if !name.is_empty() {
                 s.push_s(SYSINFO_SOFTWARE_VERSION_NAME, name);
             }
             s.push_s(SYSINFO_SOFTWARE_VERSION_VERSION, version);
@@ -86,7 +86,7 @@ fn layout_error_newfmt(
     token: String,
     error: String,
 ) -> output::Object {
-    let mut envelope = output::newfmt_envelope(system, token, &vec![]);
+    let mut envelope = output::newfmt_envelope(system, token, &[]);
     envelope.push_a(
         SYSINFO_ENVELOPE_ERRORS,
         output::newfmt_one_error(system, error),
@@ -148,7 +148,7 @@ fn layout_sysinfo_oldfmt(system: &dyn systemapi::SystemAPI, node_info: NodeInfo)
         if node_info.gpumem_kb != 0 {
             sysinfo.push_u("gpumem_gb", node_info.gpumem_kb / (1024 * 1024));
         }
-        if gpu_info.len() > 0 {
+        if !gpu_info.is_empty() {
             sysinfo.push_a("gpu_info", gpu_info);
         }
     }

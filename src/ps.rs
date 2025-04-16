@@ -148,7 +148,7 @@ fn do_create_snapshot(
                 output::write_json(writer, &o);
             } else {
                 let mut elements = format_oldfmt(&sample_data, system, opts).take();
-                if elements.len() == 0 {
+                if elements.is_empty() {
                     elements.push(output::Value::O(make_oldfmt_heartbeat(system)))
                 }
                 for e in &elements {
@@ -161,7 +161,7 @@ fn do_create_snapshot(
         }
         Err(error) => {
             if opts.new_json {
-                let mut envelope = output::newfmt_envelope(system, opts.token.clone(), &vec![]);
+                let mut envelope = output::newfmt_envelope(system, opts.token.clone(), &[]);
                 envelope.push_a(
                     SAMPLE_ENVELOPE_ERRORS,
                     output::newfmt_one_error(system, error),

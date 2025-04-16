@@ -44,7 +44,7 @@ pub fn test_csv() {
     let mut ab = Array::new();
     ab.set_encode_nonempty_base45();
     // See the encoding test further down for an explanation of the encoded value.
-    for x in vec![1, 30, 89, 12] {
+    for x in [1, 30, 89, 12] {
         ab.push_u(x);
     }
     o.push_a("x", ab);

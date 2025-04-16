@@ -92,7 +92,7 @@ pub fn show_slurm_jobs(
     match collect_sacct_jobs(system, window, span, deluge, embed_envelope) {
         Ok(jobs) => {
             if new_json {
-                let mut envelope = output::newfmt_envelope(system, token, &vec![]);
+                let mut envelope = output::newfmt_envelope(system, token, &[]);
                 let (mut data, mut attrs) = output::newfmt_data(system, DATA_TAG_JOBS);
                 attrs.push_a(JOBS_ATTRIBUTES_SLURM_JOBS, jobs);
                 data.push_o(JOBS_DATA_ATTRIBUTES, attrs);
@@ -106,7 +106,7 @@ pub fn show_slurm_jobs(
         }
         Err(error) => {
             if new_json {
-                let mut envelope = output::newfmt_envelope(system, token, &vec![]);
+                let mut envelope = output::newfmt_envelope(system, token, &[]);
                 envelope.push_a(
                     JOBS_ENVELOPE_ERRORS,
                     output::newfmt_one_error(system, error),
@@ -307,7 +307,7 @@ fn parse_sacct_jobs_newfmt(sacct_output: &str, local: &libc::tm) -> output::Arra
                     push_date(&mut output_line, SLURM_JOB_END, &fieldvals[i], local);
                 }
                 "ExitCode" => {
-                    if fieldvals[i] != "" {
+                    if !fieldvals[i].is_empty() {
                         // The format is code:signal
                         if let Some((code, _signal)) = fieldvals[i].split_once(':') {
                             push_uint(&mut output_line, SLURM_JOB_EXIT_CODE, code);
@@ -331,7 +331,7 @@ fn parse_sacct_jobs_newfmt(sacct_output: &str, local: &libc::tm) -> output::Arra
                     push_uint(&mut output_line, SLURM_JOB_REQ_NODES, &fieldvals[i]);
                 }
                 "Reservation" => {
-                    if fieldvals[i] != "" {
+                    if !fieldvals[i].is_empty() {
                         output_line.push_s(SLURM_JOB_RESERVATION, fieldvals[i].clone());
                     }
                 }
@@ -363,7 +363,7 @@ fn parse_sacct_jobs_newfmt(sacct_output: &str, local: &libc::tm) -> output::Arra
                     }
                 }
                 "NodeList" => {
-                    if fieldvals[i] != "" {
+                    if !fieldvals[i].is_empty() {
                         if let Ok(nodes) = nodelist::parse_and_render(&fieldvals[i]) {
                             output_line.push_a(SLURM_JOB_NODE_LIST, nodes);
                         }
@@ -396,7 +396,7 @@ fn parse_sacct_jobs_newfmt(sacct_output: &str, local: &libc::tm) -> output::Arra
                     assert!(SACCT_DATA_AVE_VMSIZE == "AveVMSize");
                     assert!(SACCT_DATA_MAX_RSS == "MaxRSS");
                     assert!(SACCT_DATA_MAX_VMSIZE == "MaxVMSize");
-                    push_volume(&mut sacct, *field, &fieldvals[i]);
+                    push_volume(&mut sacct, field, &fieldvals[i]);
                 }
                 "AveCPU" | "MinCPU" | "UserCPU" | "SystemCPU" => {
                     // NOTE - tags are the same as the fields
@@ -404,17 +404,17 @@ fn parse_sacct_jobs_newfmt(sacct_output: &str, local: &libc::tm) -> output::Arra
                     assert!(SACCT_DATA_MIN_CPU == "MinCPU");
                     assert!(SACCT_DATA_USER_CPU == "UserCPU");
                     assert!(SACCT_DATA_SYSTEM_CPU == "SystemCPU");
-                    push_duration(&mut sacct, *field, &fieldvals[i]);
+                    push_duration(&mut sacct, field, &fieldvals[i]);
                 }
                 "ElapsedRaw" => {
                     // NOTE - tags are the same as the fields
                     assert!(SACCT_DATA_ELAPSED_RAW == "ElapsedRaw");
-                    push_uint(&mut sacct, *field, &fieldvals[i]);
+                    push_uint(&mut sacct, field, &fieldvals[i]);
                 }
                 "AllocTRES" => {
                     // NOTE - tags are the same as the fields
                     assert!(SACCT_DATA_ALLOC_TRES == "AllocTRES");
-                    push_string(&mut sacct, *field, &fieldvals[i]);
+                    push_string(&mut sacct, field, &fieldvals[i]);
                 }
 
                 _ => {
@@ -445,14 +445,11 @@ fn push_uint_full(
     bias: u64,
     always: bool,
 ) {
-    if val != "" {
-        match val.parse::<u64>() {
-            Ok(n) => {
-                if n != 0 || bias != 0 || always {
-                    obj.push_u(name, bias + n * scale);
-                }
+    if !val.is_empty() {
+        if let Ok(n) = val.parse::<u64>() {
+            if n != 0 || bias != 0 || always {
+                obj.push_u(name, bias + n * scale);
             }
-            Err(_) => {}
         }
     }
 }
@@ -497,7 +494,7 @@ fn push_duration(obj: &mut output::Object, name: &str, mut val: &str) {
 }
 
 fn push_volume(obj: &mut output::Object, name: &str, val: &str) {
-    if val != "" {
+    if !val.is_empty() {
         let (val, scale) = if let Some(suffix) = val.strip_suffix('K') {
             (suffix, 1024)
         } else if let Some(suffix) = val.strip_suffix('M') {
@@ -507,25 +504,22 @@ fn push_volume(obj: &mut output::Object, name: &str, val: &str) {
         } else {
             (val, 1)
         };
-        match val.parse::<u64>() {
-            Ok(n) => {
-                if n != 0 {
-                    obj.push_u(name, n * scale);
-                }
+        if let Ok(n) = val.parse::<u64>() {
+            if n != 0 {
+                obj.push_u(name, n * scale);
             }
-            Err(_) => {}
         }
     }
 }
 
 fn push_string(obj: &mut output::Object, name: &str, val: &str) {
-    if val != "" && val != "Unknown" {
+    if !val.is_empty() && val != "Unknown" {
         obj.push_s(name, val.to_string())
     }
 }
 
 fn push_date(obj: &mut output::Object, name: &str, val: &str, local: &libc::tm) {
-    if val != "" && val != "Unknown" {
+    if !val.is_empty() && val != "Unknown" {
         // Reformat timestamps.  The slurm date format is localtime without a time zone offset.
         // This is bound to lead to problems eventually, so reformat.  If parsing fails, just
         // transmit the date and let the consumer deal with it.
@@ -565,16 +559,16 @@ pub fn test_format_sacct_jobs() {
         let xs = &output;
         let ys = expected.as_bytes();
         if xs.len() != ys.len() {
-            print!(
-                "Lengths differ: output={} expected={}\n",
+            println!(
+                "Lengths differ: output={} expected={}",
                 xs.len(),
                 ys.len()
             );
         }
         for i in 0..min(xs.len(), ys.len()) {
             if xs[i] != ys[i] {
-                print!(
-                    "Text differs first at {i}: output={} expected={}\n",
+                println!(
+                    "Text differs first at {i}: output={} expected={}",
                     xs[i], ys[i]
                 );
                 break;

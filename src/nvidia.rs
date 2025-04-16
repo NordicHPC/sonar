@@ -51,5 +51,5 @@ impl gpuapi::GPU for NvidiaGPU {
 // nvidia accelerators present.
 
 fn nvidia_present() -> bool {
-    return Path::new("/sys/module/nvidia").exists();
+    Path::new("/sys/module/nvidia").exists()
 }

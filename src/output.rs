@@ -261,7 +261,7 @@ fn write_json_object(writer: &mut dyn io::Write, o: &Object) {
     let _ = writer.write(b"}");
 }
 
-fn write_json_string(writer: &mut dyn io::Write, s: &String) {
+fn write_json_string(writer: &mut dyn io::Write, s: &str) {
     let _ = writer.write(b"\"");
     write_chars(writer, &util::json_quote(s));
     let _ = writer.write(b"\"");
@@ -420,10 +420,10 @@ pub fn newfmt_envelope(
     if crate::OUTPUT_FORMAT != 0 {
         meta.push_u(METADATA_OBJECT_FORMAT, crate::OUTPUT_FORMAT)
     }
-    if token != "" {
+    if !token.is_empty() {
         meta.push_s(METADATA_OBJECT_TOKEN, token)
     }
-    if attrs.len() > 0 {
+    if !attrs.is_empty() {
         let mut attrvals = Array::new();
         for AttrVal { key, value } in attrs {
             let mut pair = Object::new();
@@ -455,7 +455,7 @@ pub fn newfmt_data(system: &dyn systemapi::SystemAPI, ty: &str) -> (Object, Obje
     assert!(SAMPLE_ATTRIBUTES_TIME == SYSINFO_ATTRIBUTES_TIME);
     assert!(JOBS_ATTRIBUTES_TIME == SYSINFO_ATTRIBUTES_TIME);
     let c = system.get_cluster();
-    if c != "" {
+    if !c.is_empty() {
         attrs.push_s(SYSINFO_ATTRIBUTES_CLUSTER, c);
         // NOTE - tag not specific to sysinfo
         assert!(CLUSTER_ATTRIBUTES_CLUSTER == SYSINFO_ATTRIBUTES_CLUSTER);
@@ -470,11 +470,11 @@ pub fn newfmt_one_error(system: &dyn systemapi::SystemAPI, error: String) -> Arr
     err0.push_s(ERROR_OBJECT_DETAIL, error);
     err0.push_s(ERROR_OBJECT_TIME, system.get_timestamp());
     let cluster = system.get_cluster();
-    if cluster != "" {
+    if !cluster.is_empty() {
         err0.push_s(ERROR_OBJECT_CLUSTER, cluster);
     }
     let node = system.get_hostname();
-    if node != "" {
+    if !node.is_empty() {
         err0.push_s(ERROR_OBJECT_NODE, node);
     }
     let mut errors = Array::new();

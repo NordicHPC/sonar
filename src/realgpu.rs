@@ -29,6 +29,6 @@ impl GpuAPI for RealGpu {
         if let Some(xpu) = xpu::probe() {
             return Some(xpu);
         }
-        return None;
+        None
     }
 }

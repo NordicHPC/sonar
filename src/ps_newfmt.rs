@@ -13,7 +13,7 @@ pub fn format_newfmt(
     opts: &PsOptions,
     recoverable_errors: output::Array,
 ) -> output::Object {
-    let mut envelope = output::newfmt_envelope(system, opts.token.clone(), &vec![]);
+    let mut envelope = output::newfmt_envelope(system, opts.token.clone(), &[]);
     let (mut data, mut attrs) = output::newfmt_data(system, DATA_TAG_SAMPLE);
     attrs.push_s(SAMPLE_ATTRIBUTES_NODE, system.get_hostname());
     if opts.load {
@@ -83,7 +83,7 @@ fn format_newfmt_gpu_sample(c: &gpuapi::CardState) -> output::Object {
     if c.device.index != 0 {
         s.push_i(SAMPLE_GPU_INDEX, c.device.index as i64);
     }
-    if c.device.uuid != "" {
+    if !c.device.uuid.is_empty() {
         s.push_s(SAMPLE_GPU_UUID, c.device.uuid.clone());
     }
     if c.failing != 0 {
@@ -92,7 +92,7 @@ fn format_newfmt_gpu_sample(c: &gpuapi::CardState) -> output::Object {
     if c.fan_speed_pct != 0.0 {
         s.push_i(SAMPLE_GPU_FAN, c.fan_speed_pct.round() as i64);
     }
-    if c.compute_mode != "" {
+    if !c.compute_mode.is_empty() {
         s.push_s(SAMPLE_GPU_COMPUTE_MODE, c.compute_mode.clone());
     }
     let perf = c.perf_state as u64 + 1; // extended-unsigned encoding

@@ -48,7 +48,7 @@ struct NodelistParser<'a> {
     i: usize,
 }
 
-impl<'a> NodelistParser<'a> {
+impl NodelistParser<'_> {
     fn element(&mut self) -> Result<String, String> {
         let start = self.i;
         if !self.fragment()? {
@@ -111,7 +111,7 @@ impl<'a> NodelistParser<'a> {
     fn eat_digit(&mut self) -> bool {
         if !self.at_end() {
             let c = self.s[self.i];
-            if c >= b'0' && c <= b'9' {
+            if c.is_ascii_digit() {
                 self.i += 1;
                 return true;
             }
