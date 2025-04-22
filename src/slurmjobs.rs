@@ -307,7 +307,7 @@ fn parse_sacct_jobs_newfmt(sacct_output: &str, local: &libc::tm) -> output::Arra
                     push_date(&mut output_line, SLURM_JOB_END, &fieldvals[i], local);
                 }
                 "ExitCode" => {
-                    if !fieldvals[i].is_empty() {
+                    if fieldvals[i] != "" {
                         // The format is code:signal
                         if let Some((code, _signal)) = fieldvals[i].split_once(':') {
                             push_uint(&mut output_line, SLURM_JOB_EXIT_CODE, code);
@@ -331,7 +331,7 @@ fn parse_sacct_jobs_newfmt(sacct_output: &str, local: &libc::tm) -> output::Arra
                     push_uint(&mut output_line, SLURM_JOB_REQ_NODES, &fieldvals[i]);
                 }
                 "Reservation" => {
-                    if !fieldvals[i].is_empty() {
+                    if fieldvals[i] != "" {
                         output_line.push_s(SLURM_JOB_RESERVATION, fieldvals[i].clone());
                     }
                 }
@@ -363,7 +363,7 @@ fn parse_sacct_jobs_newfmt(sacct_output: &str, local: &libc::tm) -> output::Arra
                     }
                 }
                 "NodeList" => {
-                    if !fieldvals[i].is_empty() {
+                    if fieldvals[i] != "" {
                         if let Ok(nodes) = nodelist::parse_and_render(&fieldvals[i]) {
                             output_line.push_a(SLURM_JOB_NODE_LIST, nodes);
                         }
@@ -445,7 +445,7 @@ fn push_uint_full(
     bias: u64,
     always: bool,
 ) {
-    if !val.is_empty() {
+    if val != "" {
         if let Ok(n) = val.parse::<u64>() {
             if n != 0 || bias != 0 || always {
                 obj.push_u(name, bias + n * scale);
@@ -494,7 +494,7 @@ fn push_duration(obj: &mut output::Object, name: &str, mut val: &str) {
 }
 
 fn push_volume(obj: &mut output::Object, name: &str, val: &str) {
-    if !val.is_empty() {
+    if val != "" {
         let (val, scale) = if let Some(suffix) = val.strip_suffix('K') {
             (suffix, 1024)
         } else if let Some(suffix) = val.strip_suffix('M') {
@@ -513,13 +513,13 @@ fn push_volume(obj: &mut output::Object, name: &str, val: &str) {
 }
 
 fn push_string(obj: &mut output::Object, name: &str, val: &str) {
-    if !val.is_empty() && val != "Unknown" {
+    if val != "" && val != "Unknown" {
         obj.push_s(name, val.to_string())
     }
 }
 
 fn push_date(obj: &mut output::Object, name: &str, val: &str, local: &libc::tm) {
-    if !val.is_empty() && val != "Unknown" {
+    if val != "" && val != "Unknown" {
         // Reformat timestamps.  The slurm date format is localtime without a time zone offset.
         // This is bound to lead to problems eventually, so reformat.  If parsing fails, just
         // transmit the date and let the consumer deal with it.

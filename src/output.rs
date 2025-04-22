@@ -420,10 +420,10 @@ pub fn newfmt_envelope(
     if crate::OUTPUT_FORMAT != 0 {
         meta.push_u(METADATA_OBJECT_FORMAT, crate::OUTPUT_FORMAT)
     }
-    if !token.is_empty() {
+    if token != "" {
         meta.push_s(METADATA_OBJECT_TOKEN, token)
     }
-    if !attrs.is_empty() {
+    if attrs.len() > 0 {
         let mut attrvals = Array::new();
         for AttrVal { key, value } in attrs {
             let mut pair = Object::new();
@@ -455,7 +455,7 @@ pub fn newfmt_data(system: &dyn systemapi::SystemAPI, ty: &str) -> (Object, Obje
     assert!(SAMPLE_ATTRIBUTES_TIME == SYSINFO_ATTRIBUTES_TIME);
     assert!(JOBS_ATTRIBUTES_TIME == SYSINFO_ATTRIBUTES_TIME);
     let c = system.get_cluster();
-    if !c.is_empty() {
+    if c != "" {
         attrs.push_s(SYSINFO_ATTRIBUTES_CLUSTER, c);
         // NOTE - tag not specific to sysinfo
         assert!(CLUSTER_ATTRIBUTES_CLUSTER == SYSINFO_ATTRIBUTES_CLUSTER);
@@ -470,11 +470,11 @@ pub fn newfmt_one_error(system: &dyn systemapi::SystemAPI, error: String) -> Arr
     err0.push_s(ERROR_OBJECT_DETAIL, error);
     err0.push_s(ERROR_OBJECT_TIME, system.get_timestamp());
     let cluster = system.get_cluster();
-    if !cluster.is_empty() {
+    if cluster != "" {
         err0.push_s(ERROR_OBJECT_CLUSTER, cluster);
     }
     let node = system.get_hostname();
-    if !node.is_empty() {
+    if node != "" {
         err0.push_s(ERROR_OBJECT_NODE, node);
     }
     let mut errors = Array::new();

@@ -148,7 +148,7 @@ fn do_create_snapshot(
                 output::write_json(writer, &o);
             } else {
                 let mut elements = format_oldfmt(&sample_data, system, opts).take();
-                if elements.is_empty() {
+                if elements.len() == 0 {
                     elements.push(output::Value::O(make_oldfmt_heartbeat(system)))
                 }
                 for e in &elements {
