@@ -29,7 +29,7 @@ const (
 )
 
 var (
-	mode = mPrint
+	mode      = mPrint
 	collected map[string]string
 )
 
@@ -85,7 +85,7 @@ func consumeOldSampleFile(fn, hostname string) {
 		log.Fatal(err)
 	}
 	defer f.Close()
-	oldfmt.ConsumeCSVSamples(f, func (info *oldfmt.SampleEnvelope) {
+	oldfmt.ConsumeCSVSamples(f, func(info *oldfmt.SampleEnvelope) {
 		consumeOldSample(fn, info)
 	})
 }
@@ -96,7 +96,7 @@ func consumeOldSysinfoFile(fn, hostname string) {
 		log.Fatal(err)
 	}
 	defer f.Close()
-	oldfmt.ConsumeJSONSysinfo(f, func (info *oldfmt.SysinfoEnvelope) {
+	oldfmt.ConsumeJSONSysinfo(f, func(info *oldfmt.SysinfoEnvelope) {
 		consumeOldSysinfo(fn, info)
 	})
 }
@@ -107,7 +107,7 @@ func consumeOldSacctFile(fn string) {
 		log.Fatal(err)
 	}
 	defer f.Close()
-	oldfmt.ConsumeCSVSlurmJobs(f, func (info any) {
+	oldfmt.ConsumeCSVSlurmJobs(f, func(info any) {
 		consumeOldSlurmJob(fn, info)
 	})
 }
