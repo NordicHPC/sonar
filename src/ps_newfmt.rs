@@ -13,7 +13,7 @@ pub fn format_newfmt(
     opts: &PsOptions,
     recoverable_errors: output::Array,
 ) -> output::Object {
-    let mut envelope = output::newfmt_envelope(system, opts.token.clone(), &vec![]);
+    let mut envelope = output::newfmt_envelope(system, opts.token.clone(), &[]);
     let (mut data, mut attrs) = output::newfmt_data(system, DATA_TAG_SAMPLE);
     attrs.push_s(SAMPLE_ATTRIBUTES_NODE, system.get_hostname());
     if opts.load {

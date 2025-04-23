@@ -166,12 +166,8 @@ impl MockSystemBuilder {
                 "unknown-architecture".to_string()
             },
             fs: {
-                let files = if let Some(x) = self.files {
-                    x
-                } else {
-                    HashMap::new()
-                };
-                let pids = if let Some(x) = self.pids { x } else { vec![] };
+                let files = self.files.unwrap_or_default();
+                let pids = self.pids.unwrap_or_default();
                 mockfs::MockFS::new(files, pids)
             },
             now: if let Some(x) = self.now {
@@ -188,11 +184,7 @@ impl MockSystemBuilder {
             pid: 1337,
             ticks_per_sec: 100,
             pagesz: 4,
-            users: if let Some(x) = self.users {
-                x
-            } else {
-                HashMap::new()
-            },
+            users: self.users.unwrap_or_default(),
         }
     }
 }
@@ -286,10 +278,7 @@ impl systemapi::SystemAPI for MockSystem {
     }
 
     fn user_by_uid(&self, uid: u32) -> Option<String> {
-        match self.users.get(&uid) {
-            Some(s) => Some(s.clone()),
-            None => None,
-        }
+        self.users.get(&uid).map(|s| s.clone())
     }
 
     fn create_lock_file(&self, _p: &path::PathBuf) -> io::Result<fs::File> {
