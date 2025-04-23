@@ -1,4 +1,4 @@
-use crate::gpuapi::{Card, CardState, GpuAPI, Process, GPU};
+use crate::gpuapi::{Card, CardState, Gpu, GpuAPI, Process};
 use crate::ps;
 
 pub struct MockGpuAPI {
@@ -12,7 +12,7 @@ impl MockGpuAPI {
 }
 
 impl GpuAPI for MockGpuAPI {
-    fn probe(&self) -> Option<Box<dyn GPU>> {
+    fn probe(&self) -> Option<Box<dyn Gpu>> {
         Some(Box::new(MockGpus {
             cards: self.cards.clone(),
         }))
@@ -23,7 +23,7 @@ pub struct MockGpus {
     cards: Vec<Card>,
 }
 
-impl GPU for MockGpus {
+impl Gpu for MockGpus {
     fn get_manufacturer(&self) -> String {
         "Yoyodyne, Inc.".to_string()
     }

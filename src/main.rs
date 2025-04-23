@@ -43,6 +43,7 @@ mod sysinfo;
 mod sysinfo_test;
 mod systemapi;
 mod time;
+mod types;
 mod users;
 mod util;
 #[cfg(feature = "xpu")]

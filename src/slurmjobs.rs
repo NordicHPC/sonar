@@ -1,3 +1,5 @@
+#![allow(clippy::comparison_to_empty)]
+
 // Run sacct, extract output and reformat as CSV or JSON on stdout.
 
 use crate::json_tags::*;
@@ -559,11 +561,7 @@ pub fn test_format_sacct_jobs() {
         let xs = &output;
         let ys = expected.as_bytes();
         if xs.len() != ys.len() {
-            println!(
-                "Lengths differ: output={} expected={}",
-                xs.len(),
-                ys.len()
-            );
+            println!("Lengths differ: output={} expected={}", xs.len(), ys.len());
         }
         for i in 0..min(xs.len(), ys.len()) {
             if xs[i] != ys[i] {

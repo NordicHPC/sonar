@@ -1,6 +1,6 @@
-#![allow(clippy::upper_case_acronyms)]
 // Low-level but common API to performance data for cards installed on the node.
 use crate::ps;
+use crate::types::{Pid, Uid};
 
 // The card index is zero-based and cards are densely packed in the index space.
 //
@@ -13,7 +13,7 @@ use crate::ps;
 
 #[derive(PartialEq, Eq, Hash, Default, Clone, Debug)]
 pub struct GpuName {
-    pub index: i32,   // May change at boot time
+    pub index: u32,   // May change at boot time
     pub uuid: String, // Forever immutable
 }
 
@@ -24,7 +24,7 @@ pub struct GpuName {
 // itself.  However by correlating CardState and Process something might be derived, especially if
 // cards are not shared among processes.
 //
-// If the size of `devices` is larger than 1 then the values reported here should be divided among
+// If the length of `devices` is larger than 1 then the values reported here should be divided among
 // those devices, either evenly or (with CardState information in mind) in some kind of proportional
 // manner.  The values of `gpu_pct`, `mem_pct` and `mem_size_kib` are the sums across all the
 // `devices`.  Thus for four devices, `gpu_pct` can be up to 400.
@@ -32,12 +32,12 @@ pub struct GpuName {
 #[derive(PartialEq, Default, Clone, Debug)]
 pub struct Process {
     pub devices: Vec<GpuName>,   // Names are distinct
-    pub pid: usize,              // Process ID
+    pub pid: Pid,                // Process ID
     pub user: String,            // User name
-    pub uid: usize,              // User ID
-    pub gpu_pct: f64,            // Percent of GPU /for this sample/
-    pub mem_pct: f64,            // Percent of memory /for this sample/
-    pub mem_size_kib: usize,     // Memory use in KiB /for this sample/
+    pub uid: Uid,                // User ID
+    pub gpu_pct: f32,            // Percent of GPU /for this sample/
+    pub mem_pct: f32,            // Percent of memory /for this sample/
+    pub mem_size_kib: u64,       // Memory use in KiB /for this sample/
     pub command: Option<String>, // The command, or None when the GPU layer can't know
 }
 
@@ -48,45 +48,47 @@ pub struct Process {
 pub struct Card {
     pub device: GpuName,
     pub bus_addr: String,
-    pub model: String,    // NVIDIA: Product Name
-    pub arch: String,     // NVIDIA: Product Architecture
-    pub driver: String,   // NVIDIA: driver version
-    pub firmware: String, // NVIDIA: CUDA version
-    pub mem_size_kib: i64,
-    pub power_limit_watt: i32, // "current", but probably changes rarely
-    pub max_power_limit_watt: i32,
-    pub min_power_limit_watt: i32,
-    pub max_ce_clock_mhz: i32,
-    pub max_mem_clock_mhz: i32,
+    pub model: String,
+    pub arch: String,
+    pub driver: String,
+    pub firmware: String,
+    pub mem_size_kib: u64,
+    pub power_limit_watt: u32,
+    pub max_power_limit_watt: u32,
+    pub min_power_limit_watt: u32,
+    pub max_ce_clock_mhz: u32,
+    pub max_mem_clock_mhz: u32,
 }
 
 // Dynamic (per-sample) card information, across processes
 //
 // If the card is OK then `failing` is 0, otherwise some error code listed below.
+//
+// The perf_state is -1 for unknown, otherwise >= 0.
 
 #[derive(PartialEq, Default, Clone, Debug)]
 pub struct CardState {
     pub device: GpuName,
-    pub failing: i32,
+    pub failing: u32,
     pub fan_speed_pct: f32,
     pub compute_mode: String,
     pub perf_state: i64,
-    pub mem_reserved_kib: i64,
-    pub mem_used_kib: i64,
+    pub mem_reserved_kib: u64,
+    pub mem_used_kib: u64,
     pub gpu_utilization_pct: f32,
     pub mem_utilization_pct: f32,
-    pub temp_c: i32,
-    pub power_watt: i32,
-    pub power_limit_watt: i32,
-    pub ce_clock_mhz: i32,
-    pub mem_clock_mhz: i32,
+    pub temp_c: u32,
+    pub power_watt: u32,
+    pub power_limit_watt: u32,
+    pub ce_clock_mhz: u32,
+    pub mem_clock_mhz: u32,
 }
 
 #[allow(dead_code)]
-pub const GENERIC_FAILURE: i32 = 1;
+pub const GENERIC_FAILURE: u32 = 1;
 
 // Trait representing the set of cards installed on a node.
-pub trait GPU {
+pub trait Gpu {
     // Retrieve the standard name of the manufacturer of the GPUs.  As get_manufacturer() is for the
     // GPU object as a whole and not per-card, we are currently assuming that nodes don't have cards
     // from multiple manufacturers.
@@ -118,5 +120,5 @@ pub trait GPU {
 
 // Probe the node for installed cards and return an object representing them, if any are found.
 pub trait GpuAPI {
-    fn probe(&self) -> Option<Box<dyn GPU>>;
+    fn probe(&self) -> Option<Box<dyn Gpu>>;
 }

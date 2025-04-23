@@ -6,7 +6,7 @@ use std::path::Path;
 
 pub struct NvidiaGPU {}
 
-pub fn probe() -> Option<Box<dyn gpuapi::GPU>> {
+pub fn probe() -> Option<Box<dyn gpuapi::Gpu>> {
     if nvidia_present() {
         Some(Box::new(NvidiaGPU {}))
     } else {
@@ -14,7 +14,7 @@ pub fn probe() -> Option<Box<dyn gpuapi::GPU>> {
     }
 }
 
-impl gpuapi::GPU for NvidiaGPU {
+impl gpuapi::Gpu for NvidiaGPU {
     fn get_manufacturer(&self) -> String {
         "NVIDIA".to_string()
     }

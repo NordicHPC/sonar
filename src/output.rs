@@ -1,3 +1,6 @@
+#![allow(clippy::len_zero)]
+#![allow(clippy::comparison_to_empty)]
+
 // Define a nested data structure of arrays, objects, and scalar values that can subsequently be
 // serialized, currently as CSV and JSON, following conventions that are backward compatible with
 // the older ad-hoc Sonar formatting code.

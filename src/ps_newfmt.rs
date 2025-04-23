@@ -1,3 +1,5 @@
+#![allow(clippy::comparison_to_empty)]
+
 use crate::gpuapi;
 use crate::json_tags::*;
 use crate::output;
@@ -100,7 +102,7 @@ fn format_newfmt_gpu_sample(c: &gpuapi::CardState) -> output::Object {
         s.push_u(SAMPLE_GPU_PERFORMANCE_STATE, perf);
     }
     if c.mem_used_kib != 0 {
-        s.push_i(SAMPLE_GPU_MEMORY, c.mem_used_kib);
+        s.push_u(SAMPLE_GPU_MEMORY, c.mem_used_kib);
     }
     if c.gpu_utilization_pct != 0.0 {
         s.push_i(SAMPLE_GPU_CEUTIL, c.gpu_utilization_pct.round() as i64);

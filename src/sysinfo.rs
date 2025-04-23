@@ -1,3 +1,6 @@
+#![allow(clippy::len_zero)]
+#![allow(clippy::comparison_to_empty)]
+
 use crate::gpuapi;
 use crate::json_tags::*;
 use crate::output;
@@ -120,7 +123,7 @@ fn layout_card_info_newfmt(node_info: &NodeInfo) -> output::Array {
         gpu.push_s(SYSINFO_GPU_CARD_ARCHITECTURE, arch.to_string());
         gpu.push_s(SYSINFO_GPU_CARD_DRIVER, driver.to_string());
         gpu.push_s(SYSINFO_GPU_CARD_FIRMWARE, firmware.to_string());
-        gpu.push_i(SYSINFO_GPU_CARD_MEMORY, *mem_size_kib);
+        gpu.push_u(SYSINFO_GPU_CARD_MEMORY, *mem_size_kib);
         gpu.push_i(SYSINFO_GPU_CARD_POWER_LIMIT, *power_limit_watt as i64);
         gpu.push_i(SYSINFO_GPU_CARD_MAX_POWER_LIMIT, *max_power_limit_watt as i64);
         gpu.push_i(SYSINFO_GPU_CARD_MIN_POWER_LIMIT, *min_power_limit_watt as i64);
@@ -190,7 +193,7 @@ fn layout_card_info_oldfmt(node_info: &NodeInfo) -> output::Array {
         gpu.push_s("arch", arch.to_string());
         gpu.push_s("driver", driver.to_string());
         gpu.push_s("firmware", firmware.to_string());
-        gpu.push_i("mem_size_kib", *mem_size_kib);
+        gpu.push_u("mem_size_kib", *mem_size_kib);
         gpu.push_i("power_limit_watt", *power_limit_watt as i64);
         gpu.push_i("max_power_limit_watt", *max_power_limit_watt as i64);
         gpu.push_i("min_power_limit_watt", *min_power_limit_watt as i64);
@@ -279,7 +282,7 @@ fn compute_nodeinfo(system: &dyn systemapi::SystemAPI) -> Result<NodeInfo, Strin
         let gpu_cards = cards.len() as i32;
         let mut total_mem_kb = 0u64;
         for c in &cards {
-            total_mem_kb += c.mem_size_kib as u64;
+            total_mem_kb += c.mem_size_kib;
         }
         (gpu_desc, gpu_cards, total_mem_kb)
     } else {
