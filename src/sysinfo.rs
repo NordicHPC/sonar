@@ -43,7 +43,7 @@ fn layout_sysinfo_newfmt(
     token: String,
     node_info: NodeInfo,
 ) -> output::Object {
-    let mut envelope = output::newfmt_envelope(system, token, &vec![]);
+    let mut envelope = output::newfmt_envelope(system, token, &[]);
     let (mut data, mut attrs) = output::newfmt_data(system, DATA_TAG_SYSINFO);
     attrs.push_s(SYSINFO_ATTRIBUTES_NODE, node_info.node.clone());
     attrs.push_s(SYSINFO_ATTRIBUTES_OS_NAME, system.get_os_name());
@@ -86,7 +86,7 @@ fn layout_error_newfmt(
     token: String,
     error: String,
 ) -> output::Object {
-    let mut envelope = output::newfmt_envelope(system, token, &vec![]);
+    let mut envelope = output::newfmt_envelope(system, token, &[]);
     envelope.push_a(
         SYSINFO_ENVELOPE_ERRORS,
         output::newfmt_one_error(system, error),

@@ -92,7 +92,7 @@ pub fn show_slurm_jobs(
     match collect_sacct_jobs(system, window, span, deluge, embed_envelope) {
         Ok(jobs) => {
             if new_json {
-                let mut envelope = output::newfmt_envelope(system, token, &vec![]);
+                let mut envelope = output::newfmt_envelope(system, token, &[]);
                 let (mut data, mut attrs) = output::newfmt_data(system, DATA_TAG_JOBS);
                 attrs.push_a(JOBS_ATTRIBUTES_SLURM_JOBS, jobs);
                 data.push_o(JOBS_DATA_ATTRIBUTES, attrs);
@@ -106,7 +106,7 @@ pub fn show_slurm_jobs(
         }
         Err(error) => {
             if new_json {
-                let mut envelope = output::newfmt_envelope(system, token, &vec![]);
+                let mut envelope = output::newfmt_envelope(system, token, &[]);
                 envelope.push_a(
                     JOBS_ENVELOPE_ERRORS,
                     output::newfmt_one_error(system, error),
@@ -396,7 +396,7 @@ fn parse_sacct_jobs_newfmt(sacct_output: &str, local: &libc::tm) -> output::Arra
                     assert!(SACCT_DATA_AVE_VMSIZE == "AveVMSize");
                     assert!(SACCT_DATA_MAX_RSS == "MaxRSS");
                     assert!(SACCT_DATA_MAX_VMSIZE == "MaxVMSize");
-                    push_volume(&mut sacct, *field, &fieldvals[i]);
+                    push_volume(&mut sacct, field, &fieldvals[i]);
                 }
                 "AveCPU" | "MinCPU" | "UserCPU" | "SystemCPU" => {
                     // NOTE - tags are the same as the fields
@@ -404,17 +404,17 @@ fn parse_sacct_jobs_newfmt(sacct_output: &str, local: &libc::tm) -> output::Arra
                     assert!(SACCT_DATA_MIN_CPU == "MinCPU");
                     assert!(SACCT_DATA_USER_CPU == "UserCPU");
                     assert!(SACCT_DATA_SYSTEM_CPU == "SystemCPU");
-                    push_duration(&mut sacct, *field, &fieldvals[i]);
+                    push_duration(&mut sacct, field, &fieldvals[i]);
                 }
                 "ElapsedRaw" => {
                     // NOTE - tags are the same as the fields
                     assert!(SACCT_DATA_ELAPSED_RAW == "ElapsedRaw");
-                    push_uint(&mut sacct, *field, &fieldvals[i]);
+                    push_uint(&mut sacct, field, &fieldvals[i]);
                 }
                 "AllocTRES" => {
                     // NOTE - tags are the same as the fields
                     assert!(SACCT_DATA_ALLOC_TRES == "AllocTRES");
-                    push_string(&mut sacct, *field, &fieldvals[i]);
+                    push_string(&mut sacct, field, &fieldvals[i]);
                 }
 
                 _ => {
@@ -446,13 +446,10 @@ fn push_uint_full(
     always: bool,
 ) {
     if val != "" {
-        match val.parse::<u64>() {
-            Ok(n) => {
-                if n != 0 || bias != 0 || always {
-                    obj.push_u(name, bias + n * scale);
-                }
+        if let Ok(n) = val.parse::<u64>() {
+            if n != 0 || bias != 0 || always {
+                obj.push_u(name, bias + n * scale);
             }
-            Err(_) => {}
         }
     }
 }
@@ -507,13 +504,10 @@ fn push_volume(obj: &mut output::Object, name: &str, val: &str) {
         } else {
             (val, 1)
         };
-        match val.parse::<u64>() {
-            Ok(n) => {
-                if n != 0 {
-                    obj.push_u(name, n * scale);
-                }
+        if let Ok(n) = val.parse::<u64>() {
+            if n != 0 {
+                obj.push_u(name, n * scale);
             }
-            Err(_) => {}
         }
     }
 }
@@ -565,16 +559,16 @@ pub fn test_format_sacct_jobs() {
         let xs = &output;
         let ys = expected.as_bytes();
         if xs.len() != ys.len() {
-            print!(
-                "Lengths differ: output={} expected={}\n",
+            println!(
+                "Lengths differ: output={} expected={}",
                 xs.len(),
                 ys.len()
             );
         }
         for i in 0..min(xs.len(), ys.len()) {
             if xs[i] != ys[i] {
-                print!(
-                    "Text differs first at {i}: output={} expected={}\n",
+                println!(
+                    "Text differs first at {i}: output={} expected={}",
                     xs[i], ys[i]
                 );
                 break;

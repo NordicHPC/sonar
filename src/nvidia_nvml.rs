@@ -155,7 +155,8 @@ pub fn get_card_utilization() -> Option<Vec<gpuapi::CardState>> {
                 COMP_MODE_DEFAULT => "",
                 COMP_MODE_PROHIBITED => "Prohibited",
                 COMP_MODE_EXCLUSIVE_PROCESS => "ExclusiveProcess",
-                COMP_MODE_UNKNOWN | _ => "Unknown",
+                COMP_MODE_UNKNOWN => "Unknown",
+                _ => "Unknown",
             };
             let perf = match infobuf.perf_state {
                 PERF_STATE_UNKNOWN => -1,
@@ -223,7 +224,7 @@ pub fn get_process_utilization(ptable: &ps::ProcessTable) -> Option<Vec<gpuapi::
                 }],
                 pid: infobuf.pid as usize,
                 user: username.to_string(),
-                uid: uid,
+                uid,
                 mem_pct: infobuf.mem_util as f64,
                 gpu_pct: infobuf.gpu_util as f64,
                 mem_size_kib: infobuf.mem_size as usize,

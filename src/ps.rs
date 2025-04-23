@@ -161,7 +161,7 @@ fn do_create_snapshot(
         }
         Err(error) => {
             if opts.new_json {
-                let mut envelope = output::newfmt_envelope(system, opts.token.clone(), &vec![]);
+                let mut envelope = output::newfmt_envelope(system, opts.token.clone(), &[]);
                 envelope.push_a(
                     SAMPLE_ENVELOPE_ERRORS,
                     output::newfmt_one_error(system, error),

@@ -1,5 +1,5 @@
+#![allow(clippy::upper_case_acronyms)]
 // Low-level but common API to performance data for cards installed on the node.
-
 use crate::ps;
 
 // The card index is zero-based and cards are densely packed in the index space.

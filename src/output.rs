@@ -261,7 +261,7 @@ fn write_json_object(writer: &mut dyn io::Write, o: &Object) {
     let _ = writer.write(b"}");
 }
 
-fn write_json_string(writer: &mut dyn io::Write, s: &String) {
+fn write_json_string(writer: &mut dyn io::Write, s: &str) {
     let _ = writer.write(b"\"");
     write_chars(writer, &util::json_quote(s));
     let _ = writer.write(b"\"");
