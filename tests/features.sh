@@ -13,25 +13,27 @@ echo " Default"
 output=$(../target/debug/sonar sysinfo)
 jq . <<< $output > /dev/null
 
-echo " None"
-( cd .. ; cargo build --no-default-features )
-output=$(../target/debug/sonar sysinfo)
-jq . <<< $output > /dev/null
+for d in "" ",daemon"; do
+    echo " no-defaults$d"
+    ( cd .. ; cargo build --no-default-features --features "$d" )
+    output=$(../target/debug/sonar sysinfo)
+    jq . <<< $output > /dev/null
 
-echo " AMD"
-( cd .. ; cargo build --no-default-features --features amd )
-output=$(../target/debug/sonar sysinfo)
-jq . <<< $output > /dev/null
+    echo " amd$d"
+    ( cd .. ; cargo build --no-default-features --features amd$d )
+    output=$(../target/debug/sonar sysinfo)
+    jq . <<< $output > /dev/null
 
-echo " NVIDIA"
-( cd .. ; cargo build --no-default-features --features nvidia )
-output=$(../target/debug/sonar sysinfo)
-jq . <<< $output > /dev/null
+    echo " nvidia$d"
+    ( cd .. ; cargo build --no-default-features --features nvidia$d )
+    output=$(../target/debug/sonar sysinfo)
+    jq . <<< $output > /dev/null
 
-echo " NVIDIA,AMD"
-( cd .. ; cargo build --no-default-features --features nvidia,amd )
-output=$(../target/debug/sonar sysinfo)
-jq . <<< $output > /dev/null
+    echo " nvidia,amd$d"
+    ( cd .. ; cargo build --no-default-features --features nvidia,amd$d )
+    output=$(../target/debug/sonar sysinfo)
+    jq . <<< $output > /dev/null
+done
 
 # No XPU library yet so this feature should cause link failure
 

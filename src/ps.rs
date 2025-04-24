@@ -18,7 +18,7 @@ use std::thread;
 #[cfg(debug_assertions)]
 use std::time;
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct PsOptions {
     pub rollup: bool,
     pub min_cpu_percent: Option<f64>,
@@ -32,6 +32,26 @@ pub struct PsOptions {
     pub load: bool,
     pub new_json: bool,
     pub cpu_util: bool,
+}
+
+#[cfg(feature = "daemon")]
+pub struct State<'a> {
+    system: &'a dyn systemapi::SystemAPI,
+    opts: PsOptions,
+}
+
+#[cfg(feature = "daemon")]
+impl<'a> State<'a> {
+    pub fn new(system: &'a dyn systemapi::SystemAPI, opts: &PsOptions) -> State<'a> {
+        State {
+            system,
+            opts: opts.clone(),
+        }
+    }
+
+    pub fn run(&mut self, writer: &mut dyn io::Write) {
+        do_create_snapshot(writer, self.system, &self.opts)
+    }
 }
 
 pub fn create_snapshot(

@@ -9,6 +9,23 @@ use crate::systemapi;
 
 use std::io;
 
+#[cfg(feature = "daemon")]
+pub struct State<'a> {
+    system: &'a dyn systemapi::SystemAPI,
+    token: String,
+}
+
+#[cfg(feature = "daemon")]
+impl<'a> State<'a> {
+    pub fn new(system: &'a dyn systemapi::SystemAPI, token: String) -> State<'a> {
+        State { system, token }
+    }
+
+    pub fn run(&mut self, writer: &mut dyn io::Write) {
+        show_system(writer, self.system, self.token.clone(), false, true)
+    }
+}
+
 pub fn show_system(
     writer: &mut dyn io::Write,
     system: &dyn systemapi::SystemAPI,
