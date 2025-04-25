@@ -54,6 +54,8 @@ use std::thread;
 use std::time::Duration;
 
 use kafka::{client, consumer, error, producer};
+#[allow(unused_imports)]
+use openssl::ssl::{SslConnector, SslFiletype, SslMethod, SslVerifyMode};
 
 struct Message {
     timestamp: u64,
@@ -81,6 +83,36 @@ impl KafkaRust {
         let debug = &ini.debug;
 
         let (kafka_sender, kafka_receiver) = mpsc::channel();
+
+        // TODO: Here we should test-read the TLS files if they are defined and return
+        // with a sane error if they can't be read, since later there's not going to be much
+        // to do but panic if they disappear.
+
+        /*
+
+        // TODO: TLS
+
+        let connector =
+            if let (Some(cert_file), Some(key_file), Some(ca_file)) =
+                (&kafka.cert_file, &kafka.key_file, &kafka.ca_file)
+            {
+                // TODO: Way too many unwraps
+                let mut builder = SslConnector::builder(SslMethod::tls()).unwrap();
+                builder.set_cipher_list("DEFAULT").unwrap();
+                builder.set_verify(SslVerifyMode::PEER);
+                builder
+                    .set_certificate_file(cert_file, SslFiletype::PEM)
+                    .unwrap();
+                builder
+                    .set_private_key_file(key_file, SslFiletype::PEM)
+                    .unwrap();
+                builder.check_private_key().unwrap();
+                builder.set_ca_file(ca_file).unwrap();
+                Some(builder.build())
+            } else {
+                None
+            };
+        */
 
         // Spawn threads to manage the Kafka connection.  This will always succeed, even if the
         // connection is not necessarily made right away.

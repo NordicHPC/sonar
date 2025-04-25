@@ -61,6 +61,10 @@ broker-address = <hostname and port>
 poll-interval = <duration value>                # default 5m
 sending-window = <duration value>               # default 5m
 compression = <type>                            # default "none"
+api-token-file = <path>
+cert-file = <path>
+key-file = <path>
+ca-file = <path>
 dump = bool                                     # default false
 ```
 
@@ -74,6 +78,13 @@ starts at the point when there are no data available to send.
 
 The `compression` can take the values `gzip`, `snappy`, or `none` and if set to something other than
 `none` will attempt to enable compression of the requested type in the outgoing transmission stream.
+
+The `api-token-file` holds an API token which, if present, is embedded into the transmitted data (in
+`Meta.Token` currently but this may change) and should be specific to the cluster that is reporting.
+The server will check that the token corresponds to the cluster identifier in the topic and in the
+data.  If the token is used then there must be TLS.
+
+`cert-file`, `key-file` and `ca-file` have to be used together and if present will force a TLS connection.
 
 Setting `dump` to true will cause the Kafka sink to dump all data it is sending on stdout.
 

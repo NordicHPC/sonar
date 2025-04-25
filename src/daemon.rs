@@ -33,7 +33,11 @@ use crate::sysinfo;
 use crate::systemapi::SystemAPI;
 use crate::time::{unix_now, unix_time_components};
 
+#[cfg(feature = "kafka-rust")]
+use std::fs;
 use std::io::BufRead;
+#[cfg(feature = "kafka-rust")]
+use std::path;
 use std::sync::mpsc;
 use std::thread;
 
@@ -50,6 +54,10 @@ pub struct KafkaIni {
     pub poll_interval: Dur,
     pub sending_window: Dur,
     pub compression: Option<String>,
+    pub api_token_file: Option<String>,
+    pub cert_file: Option<String>,
+    pub key_file: Option<String>,
+    pub ca_file: Option<String>,
     pub dump: bool,
 }
 
@@ -164,7 +172,21 @@ pub fn daemon_mode(
 
     let system = system.with_cluster(&ini.global.cluster).freeze()?;
     let hostname = system.get_hostname();
+
+    #[cfg(not(feature = "kafka-rust"))]
     let api_token = "".to_string();
+
+    #[cfg(feature = "kafka-rust")]
+    let api_token = if let Some(filename) = &ini.kafka.api_token_file {
+        match fs::read_to_string(path::Path::new(filename)) {
+            Ok(s) => s,
+            Err(_) => {
+                return Err("Can't read api token file".to_string());
+            }
+        }
+    } else {
+        "".to_string()
+    };
 
     if ini.global.lockdir.is_some() {
         // TODO: Acquire lockdir here
@@ -583,6 +605,10 @@ fn parse_config(config_file: &str) -> Result<Ini, String> {
             poll_interval: Dur::Minutes(5),
             sending_window: Dur::Minutes(5),
             compression: None,
+            api_token_file: None,
+            cert_file: None,
+            key_file: None,
+            ca_file: None,
             dump: false,
         },
         debug: DebugIni { verbose: false },
@@ -720,6 +746,18 @@ fn parse_config(config_file: &str) -> Result<Ini, String> {
                     }
                     _ => return Err(format!("Invalid kafka.compression value `{value}`")),
                 }
+                "api-token-file" => {
+                    ini.kafka.api_token_file = Some(value);
+                }
+                "cert-file" => {
+                    ini.kafka.cert_file = Some(value);
+                }
+                "key-file" => {
+                    ini.kafka.key_file = Some(value);
+                }
+                "ca-file" => {
+                    ini.kafka.ca_file = Some(value);
+                }
                 "dump" => {
                     ini.kafka.dump = parse_bool(&value)?;
                 },
@@ -800,8 +838,20 @@ fn parse_config(config_file: &str) -> Result<Ini, String> {
     }
 
     #[cfg(feature = "kafka-rust")]
-    if have_kafka && !have_kafka_remote {
-        return Err("Missing kafka.remote-host setting".to_string());
+    if have_kafka {
+        if !have_kafka_remote {
+            return Err("Missing kafka.broker-address setting".to_string());
+        }
+        if ini.kafka.cert_file.is_some() != ini.kafka.key_file.is_some()
+            && ini.kafka.cert_file.is_some() != ini.kafka.ca_file.is_some()
+        {
+            return Err(
+                "Define all or none of kafka.cert-file, kafka.key-file, kafka.ca-file".to_string(),
+            );
+        }
+        if ini.kafka.api_token_file.is_some() && ini.kafka.cert_file.is_none()  {
+            return Err("Token file without TLS".to_string());
+        }
     }
 
     Ok(ini)
