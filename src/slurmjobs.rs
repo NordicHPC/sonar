@@ -16,8 +16,12 @@ use once_cell::sync::Lazy;
 
 #[cfg(test)]
 use std::cmp::min;
+#[cfg(feature = "daemon")]
+use std::collections::HashMap;
 use std::collections::HashSet;
 use std::io;
+#[cfg(feature = "daemon")]
+use std::io::Write;
 
 // The job states we are interested in collecting information about, notably PENDING and RUNNING
 // are not here by default but will be added if the `uncompleted` flag is set.
@@ -77,15 +81,70 @@ static SACCT_FIELDS: Lazy<Vec<&'static str>> = Lazy::new(|| {
     ]
 });
 
-// The State is an object that wraps the slurm job data extractor, potentially taking advantage of
-// repeated invocations to avoid overhead or sending redundant data.
+// The State wraps a redundancy filter, `filter_jobs()`, which ensures that the daemon only sends
+// data that have changed.  Not doing the filtering can result in a deluge of data being sent,
+// especially for PENDING and RUNNING jobs, and especially with a high cadence, when there are many
+// redundancies.
+//
+// These output fields are used to determine if the job has relevant changes, if the job is in
+// RUNNING or PENDING state:
+//
+//    - job_state (so, we push running after pending)
+//    - requested_cpus
+//    - requested_memory_per_node
+//    - requested_node_count
+//    - distribution
+//    - time limit
+//    - priority
+//    - gres_detail or other resource stuff
+//
+// (TODO: Really anything that can be changed with scontrol or similar might be relevant, so if eg
+// reservation or account can be changed then yes, those too; figure this out later.)
+//
+// Fields that are clearly not relevant to determining whether the job has changed include at least
+// these:
+//
+//    - job ids (all fields)
+//    - user name
+//    - account name
+//    - reservation
+//    - end
+//    - exit code
+//    - submit time
+//    - suspended time
+//    - partition
+//    - node list
+//    - job name
+//    - anything in the sacct subobject *including* elapsed time
+//
+// The filter does two things:
+//
+// - determines if any pertinent fields have changed
+// - determines which pertient fields have changed
+//
+// Subsequently we transmit only identifying data + pertinent fields that have changed.  The algorithm
+// is described below, in the filter.
+//
+// A complication is that, once a job reaches the completed stage, the job has to be removed from
+// the set of known jobs once the underlying Slurm primitive will no longer return information about
+// the job.  The GC will occasionally scan all the jobs and mark those for which information is
+// still being produced by Slurm.  Unmarked jobs can be removed.
 
 #[cfg(feature = "daemon")]
 pub struct State<'a> {
     window: Option<u32>,
     token: String,
+    verbose: bool,
     uncompleted: bool,
+    delta_coding: bool,
+    dump: Option<String>,
     system: &'a dyn systemapi::SystemAPI,
+    // Map from (id, step) to data
+    known: HashMap<(u64, String), Box<JobAll>>,
+    // Earliest time of next garbage collection, UTC time in seconds
+    next_collection: u64,
+    // The delta we use for computing next collection, in seconds
+    delta: u64,
 }
 
 #[derive(Default, Clone)]
@@ -134,21 +193,54 @@ struct JobAll {
 impl<'a> State<'a> {
     pub fn new(
         window: Option<u32>, // Minutes
+        verbose: bool,
         uncompleted: bool,
+        delta_coding: bool,
+        dump: Option<String>,
         system: &'a dyn systemapi::SystemAPI,
         token: String,
     ) -> State<'a> {
+        let delta = if let Some(w) = window {
+            std::cmp::min(3600, w * 60 * 2) as u64
+        } else {
+            3600
+        };
         State {
             window,
             token,
+            verbose,
             uncompleted,
+            delta_coding,
+            dump,
             system,
+            known: HashMap::new(),
+            next_collection: time::unix_now() + delta,
+            delta,
         }
     }
 
     pub fn run(&mut self, writer: &mut dyn io::Write) {
         match collect_sacct_jobs_newfmt(self.system, &self.window, &None, self.uncompleted) {
-            Ok(jobs) => {
+            Ok(mut jobs) => {
+                if let Some(ref filename) = self.dump {
+                    // If data are to be dumped, they must be the uncompressed data, so we need to
+                    // render them as they are.  It's fine for this to be expensive - it's for
+                    // debugging.
+                    let mut envelope = output::newfmt_envelope(self.system, self.token.clone(), &[]);
+                    let (mut data, mut attrs) = output::newfmt_data(self.system, DATA_TAG_JOBS);
+                    attrs.push_a(JOBS_ATTRIBUTES_SLURM_JOBS, render_jobs_newfmt(jobs.clone()));
+                    data.push_o(JOBS_DATA_ATTRIBUTES, attrs);
+                    envelope.push_o(JOBS_ENVELOPE_DATA, data);
+                    let mut output = Vec::new();
+                    output::write_json(&mut output, &output::Value::O(envelope));
+                    let value = String::from_utf8_lossy(&output).to_string();
+                    dump_data(filename, &value, self.verbose);
+                }
+
+                if self.delta_coding {
+                    jobs = self.filter_jobs(jobs);
+                }
+
                 // This will push out a record even if the jobs array is empty.  This is probably
                 // the right thing, it serves as a heartbeat.
                 let mut envelope = output::newfmt_envelope(self.system, self.token.clone(), &[]);
@@ -165,6 +257,146 @@ impl<'a> State<'a> {
                     output::newfmt_one_error(self.system, error),
                 );
                 output::write_json(writer, &output::Value::O(envelope));
+            }
+        }
+    }
+
+    fn filter_jobs(&mut self, jobs: Vec<Box<JobAll>>) -> Vec<Box<JobAll>> {
+        let mut new_jobs = vec![];
+        let mut marked = HashSet::new();
+        let collecting = time::unix_now() >= self.next_collection;
+        for j in jobs {
+            let key = (j.job_id, j.job_step.clone());
+            if collecting {
+                marked.insert(key.clone());
+            }
+            // Unknown jobs are always pertinent.  Known jobs are pertinent if any pertinent field
+            // has changed.
+            let (pertinent, found) = match self.known.get(&key) {
+                Some(p) => (
+                    p.job_state != j.job_state
+                        || p.requested_cpus != j.requested_cpus
+                        || p.requested_memory_per_node != j.requested_memory_per_node
+                        || p.requested_node_count != j.requested_node_count
+                        || p.distribution != j.distribution
+                        || p.time_limit != j.time_limit
+                        || p.priority != j.priority
+                        || p.gres_detail != j.gres_detail,
+                    true,
+                ),
+                None => (true, false),
+            };
+            if !pertinent {
+                continue;
+            }
+            let mut new_j = j.clone();
+            if found {
+                // Here we must first update new_j so that redundant data are not transmitted,
+                // by clearing fields that have not changed.
+                let prev = self.known.get(&key).unwrap();
+
+                // In the interest of brevity, this makes some assumptions about what can change
+                new_j.job_name = "".to_string();
+                if prev.job_state == j.job_state {
+                    new_j.job_state = "".to_string();
+                }
+                new_j.user_name = "".to_string();
+                new_j.account = "".to_string();
+                new_j.submit_time = "".to_string();
+                if prev.time_limit == j.time_limit {
+                    new_j.time_limit = 0;
+                }
+                new_j.partition = "".to_string();
+                new_j.reservation = "".to_string();
+                new_j.nodes = vec![];
+                if prev.priority == j.priority {
+                    new_j.priority = 0;
+                }
+                if prev.distribution == j.distribution {
+                    new_j.distribution = "".to_string();
+                }
+                if prev.gres_detail == j.gres_detail {
+                    new_j.gres_detail = "".to_string();
+                }
+                if prev.minimum_cpus_per_node == j.minimum_cpus_per_node {
+                    new_j.minimum_cpus_per_node = 0;
+                }
+                if prev.requested_memory_per_node == j.requested_memory_per_node {
+                    new_j.requested_memory_per_node = 0;
+                }
+                if prev.requested_node_count == j.requested_node_count {
+                    new_j.requested_node_count = 0;
+                }
+                if prev.start_time == j.start_time {
+                    new_j.start_time = "".to_string();
+                }
+                if prev.suspend_time == j.suspend_time {
+                    new_j.suspend_time = 0;
+                }
+                if prev.end_time == j.end_time {
+                    new_j.end_time = "".to_string();
+                }
+                if prev.exit_code == j.exit_code {
+                    new_j.exit_code = 0;
+                }
+                if prev.sacct_alloc_tres == j.sacct_alloc_tres {
+                    new_j.sacct_alloc_tres = "".to_string();
+                }
+            }
+
+            // Expose these only for completed states
+            if !is_completed_state(&j.job_state) {
+                new_j.sacct_min_cpu = 0;
+                new_j.sacct_ave_cpu = 0;
+                new_j.sacct_ave_disk_read = 0;
+                new_j.sacct_ave_disk_write = 0;
+                new_j.sacct_ave_rss = 0;
+                new_j.sacct_ave_vmsize = 0;
+                new_j.sacct_elapsed_raw = 0;
+                new_j.sacct_system_cpu = 0;
+                new_j.sacct_user_cpu = 0;
+                new_j.sacct_max_rss = 0;
+                new_j.sacct_max_vmsize = 0;
+            }
+
+            // Whether found or not, store the new object as the known object for the job.
+            self.known.insert(key, j);
+
+            new_jobs.push(new_j);
+        }
+        if collecting {
+            let mut old_known = HashMap::new();
+            std::mem::swap(&mut old_known, &mut self.known);
+            for (k, v) in old_known {
+                if marked.contains(&k) || !is_completed_state(&v.job_state) {
+                    self.known.insert(k, v);
+                }
+            }
+            self.next_collection = time::unix_now() + self.delta;
+        }
+        new_jobs
+    }
+}
+
+#[cfg(feature = "daemon")]
+fn is_completed_state(state: &str) -> bool {
+    !(state == "PENDING" || state == "RUNNING")
+}
+
+#[cfg(feature = "daemon")]
+fn dump_data(filename: &str, value: &str, verbose: bool) {
+    match std::fs::File::options().append(true).open(filename) {
+        Ok(mut f) => match writeln!(&mut f, "{value}") {
+            Ok(_) => {}
+            Err(_) => {
+                if verbose {
+                    println!("Failed to dump data");
+                }
+            }
+        },
+        Err(_) => {
+            if verbose {
+                println!("Failed to dump data");
             }
         }
     }

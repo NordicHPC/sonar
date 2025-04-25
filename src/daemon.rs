@@ -65,6 +65,8 @@ pub struct JobsIni {
     pub cadence: Option<Dur>,
     pub window: Option<Dur>,
     pub uncompleted: bool,
+    pub delta_coding: bool,
+    pub dump: Option<String>,
 }
 
 pub struct ClusterIni {
@@ -236,7 +238,10 @@ pub fn daemon_mode(
 
     let mut slurm_extractor = slurmjobs::State::new(
         ini.jobs.window.map(|c| c.to_minutes() as u32),
+        ini.debug.verbose,
         ini.jobs.uncompleted,
+        ini.jobs.delta_coding,
+        ini.jobs.dump.clone(),
         &system,
         api_token.clone(),
     );
@@ -544,6 +549,8 @@ fn parse_config(config_file: &str) -> Result<Ini, String> {
             cadence: None,
             window: None,
             uncompleted: false,
+            delta_coding: true,
+            dump: None,
         },
         cluster: ClusterIni { cadence: None },
     };
@@ -676,6 +683,12 @@ fn parse_config(config_file: &str) -> Result<Ini, String> {
                 }
                 "uncompleted" | "incomplete" => {
                     ini.jobs.uncompleted = parse_bool(&value)?;
+                }
+                "delta-coding" => {
+                    ini.jobs.delta_coding = parse_bool(&value)?;
+                }
+                "dump" => {
+                    ini.jobs.dump = Some(value);
                 }
                 _ => return Err(format!("Invalid [jobs] setting name `{name}`")),
             },

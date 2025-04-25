@@ -81,6 +81,8 @@ started, in addition to according to the cadence.
 cadence = <duration value>
 window = <duration value>                       # default 2*cadence
 uncompleted = <bool>                            # default false
+delta-coding = <bool>                           # default true
+dump = <filename>                               # default none
 ```
 
 The `window` is the sacct time window used for looking for data.
@@ -89,6 +91,21 @@ The `uncompleted` option, if true, triggers the inclusion of data about pending 
 This will result in multiple transmissions of data for the same `(job_id,job_step)`, one at each
 sample point.  If a job stays in, say, the PENDING state for several sampling windows then multiple
 transmissions for the job in the PENDING state will be seen.
+
+The `delta-coding` option, if true, triggers optimization of data transmission: redundant data are
+omitted in subsequent transmissions, and if there are no pertient data changes - for example, if a
+new `PENDING` record has the same contents as one already sent because no settings have changed -
+then the second record will not be sent at all.  What is deemed pertient or redundant is up for
+discussion for both `PENDING` and `RUNNING` jobs.  In any case, the recipient must be prepared to
+reconstruct the complete data stream from the initial record for the `(job_id,job_step)` and any
+subsequent deltas, applied in order.  If `uncompleted` is true, the `delta-coding` option can
+greatly reduce transmitted data volume.  If `uncompleted` is false, it can still avoid redundantly
+sending information about completed jobs.
+
+Setting `dump` to a file name will cause JSON output - without delta encoding - to be appended to
+the given file, while also being sent in the normal way.  If appending fails, a diagnostic is
+printed if `[debug]:verbose` is true.  (This is mostly useful for debugging the delta coding itself
+and to understand how to reconstruct the coded output.)
 
 ### `[cluster]` section
 
