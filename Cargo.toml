@@ -10,11 +10,19 @@ repository = "https://github.com/NordicHPC/sonar"
 nvidia = []
 amd = []
 xpu = []
-daemon = []
+kafka-rust = [ "kafka" ]
+daemon = [ "kafka-rust" ]
 default = [ "nvidia", "amd", "daemon" ]
 
 [dependencies]
 cty = "0.2.2"
-once_cell = "1.21.1"
+# Somebody forgot to properly tag kafka-rust aka kafka v0.10.0 in git.  The rev we're working from
+# appears to be 779981238d05364abf180dc4d06e60e107e8a0d9 or possibly
+# 32d9d6b7b8c7d8163b37063cdca7568c0fbe18ca - the former is just the merge commit, the latter is
+# marked "Version 0.10.0" in the commit message.
+# Currently this is without "security", so we don't need openssl
+# `cargo add kafka --no-default-features -F snappy,gzip --optional`
+kafka = { version = "0.10.0", default-features = false, features = ["snappy", "gzip"], optional = true }
 libc = "0.2"
+once_cell = "1.21.1"
 subprocess = { version = "= 0.2.9" }

@@ -13,6 +13,8 @@ mod hostname;
 mod interrupt;
 mod jobsapi;
 mod json_tags;
+#[cfg(all(feature = "daemon", feature = "kafka-rust"))]
+mod kafka;
 mod log;
 #[cfg(test)]
 mod mockfs;

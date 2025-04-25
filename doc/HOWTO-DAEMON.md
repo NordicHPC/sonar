@@ -6,6 +6,7 @@ command line parameter is the name of a config file.
 The daemon is a multi-threaded system that performs system sampling, communicates with the sink, and
 handles signals and lock files.
 
+If a sink is configured (currently only Kafka) then that is used for all data and control messages.
 If no other data sink is specified, the daemon prints output on stdout and reads control messages
 from stdin, see later sections.
 
@@ -24,10 +25,11 @@ divide an hour evenly and < 60, and hour values must divide a day evenly or be a
 of 24.  (Some sensible cadences such as 90m aka 1h30m are not currently expressible.)
 
 The config file has `[global]` and `[debug]` sections that control general operation; an optional
-section for the transport type chosen, currently none; and a section each for the sonar operations,
-controlling their cadence and operation in the same way as normal command line switches.  For the
-Sonar operations, the cadence setting is required for the operation to be run, the command will be
-run at a time that is zero mod the cadence.
+section for the transport type chosen, currently `[kafka]` (otherwise terminal I/O is used for
+transport); and a section each for the sonar operations, controlling their cadence and operation in
+the same way as normal command line switches.  For the Sonar operations, the cadence setting is
+required for the operation to be run, the command will be run at a time that is zero mod the
+cadence.
 
 ### `[global]` section
 
@@ -51,6 +53,29 @@ relinquished temporarily (and the restarted config file may name a different loc
 If there is a `topic-prefix` then it is prefixed to each data packet's topic.  A popular value would
 be `test` to tag the data coming from test setups.  (See "DATA MESSAGE FORMATS" below for more about
 topics.)
+
+### `[kafka]` section
+
+```
+broker-address = <hostname and port>
+poll-interval = <duration value>                # default 5m
+sending-window = <duration value>               # default 5m
+compression = <type>                            # default "none"
+dump = bool                                     # default false
+```
+
+The `broker-address` is required and names the address of the broker.  For Kafka it's usually host:port,
+eg `localhost:9092` for a local broker on the standard port.
+
+The `poll-interval` specifies how often sonar should be polling the broker for control messages.
+
+All available data are sent to the data sink at some random time within the `sending-window`, which
+starts at the point when there are no data available to send.
+
+The `compression` can take the values `gzip`, `snappy`, or `none` and if set to something other than
+`none` will attempt to enable compression of the requested type in the outgoing transmission stream.
+
+Setting `dump` to true will cause the Kafka sink to dump all data it is sending on stdout.
 
 ### `[sample]` section aka `[ps]` section
 

@@ -25,6 +25,7 @@ use crate::cluster;
 use crate::datasink::{DataSink, StdioSink};
 use crate::jobsapi;
 use crate::json_tags;
+use crate::kafka::KafkaRust;
 use crate::ps;
 use crate::realsystem;
 use crate::slurmjobs;
@@ -41,6 +42,15 @@ pub struct GlobalIni {
     pub role: String,
     pub lockdir: Option<String>,
     pub topic_prefix: Option<String>,
+}
+
+#[cfg(feature = "kafka-rust")]
+pub struct KafkaIni {
+    pub broker_address: String,
+    pub poll_interval: Dur,
+    pub sending_window: Dur,
+    pub compression: Option<String>,
+    pub dump: bool,
 }
 
 pub struct DebugIni {
@@ -75,6 +85,8 @@ pub struct ClusterIni {
 
 pub struct Ini {
     pub global: GlobalIni,
+    #[cfg(feature = "kafka-rust")]
+    pub kafka: KafkaIni,
     pub debug: DebugIni,
     pub sample: SampleIni,
     pub sysinfo: SysinfoIni,
@@ -202,13 +214,30 @@ pub fn daemon_mode(
         control_topic = prefix.clone() + "." + &control_topic;
     }
 
-    // At the moment, with the ini having no sections for data sinks, the only possible data sink is
-    // the stdio sink.
-    let data_sink: Box<dyn DataSink> = Box::new(StdioSink::new(
-        ini.global.cluster.clone() + "/" + &hostname,
+    let client_id = ini.global.cluster.clone() + "/" + &hostname;
+
+    #[cfg(not(feature = "kafka-rust"))]
+    let mut data_sink: Box<dyn DataSink> = Box::new(StdioSink::new(
+        client_id,
         control_topic,
         event_sender,
     ));
+
+    #[cfg(feature = "kafka-rust")]
+    let data_sink: Box<dyn DataSink> = if ini.kafka.broker_address != "" {
+        Box::new(KafkaRust::new(
+            &ini,
+            client_id,
+            control_topic,
+            event_sender,
+        ))
+    } else {
+        Box::new(StdioSink::new(
+            client_id,
+            control_topic,
+            event_sender,
+        ))
+    };
 
     if ini.debug.verbose {
         println!("Initialization succeeded");
@@ -245,6 +274,9 @@ pub fn daemon_mode(
         &system,
         api_token.clone(),
     );
+
+    #[cfg(feature = "kafka-rust")]
+    let mut dump = ini.kafka.dump;
 
     let mut fatal_msg = "".to_string();
     'messageloop: loop {
@@ -308,6 +340,14 @@ pub fn daemon_mode(
                 // TODO: Maybe a reload function
                 // TODO: Maybe pause / restart functions
                 match (key.as_str(), value.as_str()) {
+                    #[cfg(feature = "kafka-rust")]
+                    ("dump", "true") => {
+                        dump = true;
+                    }
+                    #[cfg(feature = "kafka-rust")]
+                    ("dump", "false") => {
+                        dump = false;
+                    }
                     ("exit", _) => {
                         break 'messageloop;
                     }
@@ -330,6 +370,11 @@ pub fn daemon_mode(
         }
         let key = hostname.clone();
         let value = String::from_utf8_lossy(&output).to_string();
+
+        #[cfg(feature = "kafka-rust")]
+        if dump {
+            println!("DUMP\nTOPIC: {topic}\nKEY: {key}\n{value}");
+        }
 
         data_sink.post(topic, key, value);
     }
@@ -532,6 +577,14 @@ fn parse_config(config_file: &str) -> Result<Ini, String> {
             lockdir: None,
             topic_prefix: None,
         },
+        #[cfg(feature = "kafka-rust")]
+        kafka: KafkaIni {
+            broker_address: "".to_string(),
+            poll_interval: Dur::Minutes(5),
+            sending_window: Dur::Minutes(5),
+            compression: None,
+            dump: false,
+        },
         debug: DebugIni { verbose: false },
         sample: SampleIni {
             cadence: None,
@@ -558,6 +611,8 @@ fn parse_config(config_file: &str) -> Result<Ini, String> {
     enum Section {
         None,
         Global,
+        #[cfg(feature = "kafka-rust")]
+        Kafka,
         Debug,
         Sample,
         Sysinfo,
@@ -565,6 +620,10 @@ fn parse_config(config_file: &str) -> Result<Ini, String> {
         Cluster,
     }
     let mut curr_section = Section::None;
+    #[cfg(feature = "kafka-rust")]
+    let mut have_kafka = false;
+    #[cfg(feature = "kafka-rust")]
+    let mut have_kafka_remote = false;
     let file = match std::fs::File::open(config_file) {
         Ok(f) => f,
         Err(e) => {
@@ -587,6 +646,12 @@ fn parse_config(config_file: &str) -> Result<Ini, String> {
         }
         if l == "[global]" {
             curr_section = Section::Global;
+            continue;
+        }
+        #[cfg(feature = "kafka-rust")]
+        if l == "[kafka]" {
+            curr_section = Section::Kafka;
+            have_kafka = true;
             continue;
         }
         if l == "[debug]" {
@@ -633,6 +698,32 @@ fn parse_config(config_file: &str) -> Result<Ini, String> {
                     ini.global.topic_prefix = Some(value);
                 }
                 _ => return Err(format!("Invalid [global] setting name `{name}`")),
+            },
+            #[cfg(feature = "kafka-rust")]
+            Section::Kafka => match name.as_str() {
+                "broker-address" | "remote-host" => {
+                    ini.kafka.broker_address = value;
+                    have_kafka_remote = true;
+                }
+                "poll-interval" => {
+                    ini.kafka.poll_interval = parse_duration("kafka.poll-interval", &value, false)?;
+                }
+                "sending-window" => {
+                    ini.kafka.sending_window = parse_duration("kafka.sending-window", &value, true)?;
+                }
+                "compression" => match value.as_str() {
+                    "none" => {
+                        ini.kafka.compression = None;
+                    }
+                    "gzip" | "snappy" => {
+                        ini.kafka.compression = Some(value);
+                    }
+                    _ => return Err(format!("Invalid kafka.compression value `{value}`")),
+                }
+                "dump" => {
+                    ini.kafka.dump = parse_bool(&value)?;
+                },
+                _ => return Err(format!("Invalid [kafka] setting name `{name}`")),
             },
             Section::Debug => match name.as_str() {
                 "verbose" => {
@@ -706,6 +797,11 @@ fn parse_config(config_file: &str) -> Result<Ini, String> {
     }
     if ini.global.role == "" {
         return Err("Missing global.role setting".to_string());
+    }
+
+    #[cfg(feature = "kafka-rust")]
+    if have_kafka && !have_kafka_remote {
+        return Err("Missing kafka.remote-host setting".to_string());
     }
 
     Ok(ini)
