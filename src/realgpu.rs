@@ -1,4 +1,4 @@
-use crate::gpuapi::{GpuAPI, GPU};
+use crate::gpuapi::{Gpu, GpuAPI};
 
 #[cfg(feature = "amd")]
 use crate::amd;
@@ -16,7 +16,7 @@ impl RealGpu {
 }
 
 impl GpuAPI for RealGpu {
-    fn probe(&self) -> Option<Box<dyn GPU>> {
+    fn probe(&self) -> Option<Box<dyn Gpu>> {
         #[cfg(feature = "nvidia")]
         if let Some(nvidia) = nvidia::probe() {
             return Some(nvidia);

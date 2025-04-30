@@ -1,3 +1,5 @@
+#![allow(clippy::len_zero)]
+
 use crate::gpuapi;
 use crate::json_tags::*;
 use crate::log;
@@ -6,6 +8,7 @@ use crate::procfs;
 use crate::ps_newfmt::format_newfmt;
 use crate::ps_oldfmt::{format_oldfmt, make_oldfmt_heartbeat};
 use crate::systemapi;
+use crate::types::{JobID, Pid, Uid};
 
 use std::collections::HashMap;
 use std::io::{self, Write};
@@ -182,12 +185,6 @@ fn do_create_snapshot(
 //
 // Data collection code
 
-// Some basic types, just for clarity.
-
-pub type Pid = usize;
-pub type JobID = usize;
-pub type Uid = usize;
-
 // The table mapping a Pid to user name / Uid is used by the GPU subsystems to provide information
 // about users for the processes on the GPUS.
 
@@ -338,7 +335,7 @@ fn collect_sample_data(
 fn add_cpu_info(
     mut procinfo_by_pid: ProcInfoTable,
     system: &dyn systemapi::SystemAPI,
-    processes: &HashMap<usize, procfs::Process>,
+    processes: &HashMap<Pid, procfs::Process>,
 ) -> ProcInfoTable {
     for proc in processes.values() {
         procinfo_by_pid
@@ -382,7 +379,7 @@ fn add_cpu_info(
 fn add_gpu_info(
     mut procinfo_by_pid: ProcInfoTable,
     system: &dyn systemapi::SystemAPI,
-    processes: &HashMap<usize, procfs::Process>,
+    processes: &HashMap<Pid, procfs::Process>,
 ) -> (ProcInfoTable, Option<Vec<gpuapi::CardState>>) {
     // When a GPU fails it may be a transient error or a permanent error, but either way sonar does
     // not know.  We just record the failure.  This is a soft failure, surfaced through dashboards;
@@ -414,9 +411,9 @@ fn add_gpu_info(
                     if l > 1 {
                         let mut devices = vec![proc.devices[0].clone()];
                         std::mem::swap(&mut proc.devices, &mut devices);
-                        proc.mem_size_kib /= l;
-                        proc.gpu_pct /= l as f64;
-                        proc.mem_pct /= l as f64;
+                        proc.mem_size_kib /= l as u64;
+                        proc.gpu_pct /= l as f32;
+                        proc.mem_pct /= l as f32;
                         for d in devices.drain(1..) {
                             let mut c = proc.clone();
                             c.devices[0] = d;
@@ -444,11 +441,11 @@ fn add_gpu_info(
                                 &proc.devices[0],
                                 proc.gpu_pct as u32,
                                 proc.mem_pct as u32,
-                                proc.mem_size_kib as u64,
+                                proc.mem_size_kib,
                             );
-                            e.gpu_percentage += proc.gpu_pct;
-                            e.gpu_mem_percentage += proc.mem_pct;
-                            e.gpu_mem_size_kib += proc.mem_size_kib;
+                            e.gpu_percentage += proc.gpu_pct as f64;
+                            e.gpu_mem_percentage += proc.mem_pct as f64;
+                            e.gpu_mem_size_kib += proc.mem_size_kib as usize;
                         })
                         .or_insert_with(|| {
                             let (job_id, is_slurm) = system
@@ -467,11 +464,11 @@ fn add_gpu_info(
                                     &proc.devices[0],
                                     proc.gpu_pct as u32,
                                     proc.mem_pct as u32,
-                                    proc.mem_size_kib as u64,
+                                    proc.mem_size_kib,
                                 ),
-                                gpu_percentage: proc.gpu_pct,
-                                gpu_mem_percentage: proc.mem_pct,
-                                gpu_mem_size_kib: proc.mem_size_kib,
+                                gpu_percentage: proc.gpu_pct as f64,
+                                gpu_mem_percentage: proc.mem_pct as f64,
+                                gpu_mem_size_kib: proc.mem_size_kib as usize,
                                 ..Default::default()
                             }
                         });
