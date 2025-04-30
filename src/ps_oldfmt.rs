@@ -1,3 +1,6 @@
+#![allow(clippy::len_zero)]
+#![allow(clippy::comparison_to_empty)]
+
 use crate::gpuapi;
 use crate::output;
 use crate::ps::{GpuStatus, ProcInfo, PsOptions, SampleData, EPOCH_TIME_BASE};
@@ -145,7 +148,7 @@ fn format_gpu_samples_horizontally(cards: &[gpuapi::CardState]) -> Option<output
     // interesting as part of the card configuration.
     //s = add_key(s, "mreskib", cards, |c: &gpuapi::CardState| nonzero(c.mem_reserved_kib));
     s = add_key(s, "musekib", cards, |c: &gpuapi::CardState| {
-        nonzero(c.mem_used_kib)
+        nonzero(c.mem_used_kib as i64)
     });
     s = add_key(s, "cutil%", cards, |c: &gpuapi::CardState| {
         nonzero(c.gpu_utilization_pct as i64)

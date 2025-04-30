@@ -2,6 +2,7 @@
 
 use crate::gpuapi;
 use crate::ps;
+use crate::types::{Pid, Uid};
 use crate::util::cstrdup;
 
 ////// C library API //////////////////////////////////////////////////////////////////////////////
@@ -121,19 +122,19 @@ pub fn get_card_configuration() -> Option<Vec<gpuapi::Card>> {
             result.push(gpuapi::Card {
                 bus_addr: cstrdup(&infobuf.bus_addr),
                 device: gpuapi::GpuName {
-                    index: dev as i32,
+                    index: dev,
                     uuid: cstrdup(&infobuf.uuid),
                 },
                 model: cstrdup(&infobuf.model),
                 arch: cstrdup(&infobuf.architecture),
                 driver: cstrdup(&infobuf.driver),
                 firmware: cstrdup(&infobuf.firmware),
-                mem_size_kib: (infobuf.mem_total / 1024) as i64,
-                power_limit_watt: (infobuf.power_limit / 1000) as i32,
-                max_power_limit_watt: (infobuf.max_power_limit / 1000) as i32,
-                min_power_limit_watt: (infobuf.min_power_limit / 1000) as i32,
-                max_ce_clock_mhz: infobuf.max_ce_clock as i32,
-                max_mem_clock_mhz: infobuf.max_mem_clock as i32,
+                mem_size_kib: (infobuf.mem_total / 1024),
+                power_limit_watt: (infobuf.power_limit / 1000),
+                max_power_limit_watt: (infobuf.max_power_limit / 1000),
+                min_power_limit_watt: (infobuf.min_power_limit / 1000),
+                max_ce_clock_mhz: infobuf.max_ce_clock,
+                max_mem_clock_mhz: infobuf.max_mem_clock,
             })
         }
     }
@@ -164,27 +165,27 @@ pub fn get_card_utilization() -> Option<Vec<gpuapi::CardState>> {
             };
             result.push(gpuapi::CardState {
                 device: gpuapi::GpuName {
-                    index: dev as i32,
+                    index: dev,
                     uuid: get_card_uuid(dev),
                 },
                 failing: 0,
                 fan_speed_pct: infobuf.fan_speed as f32,
                 compute_mode: mode.to_string(),
                 perf_state: perf as i64,
-                mem_reserved_kib: (infobuf.mem_reserved / 1024) as i64,
-                mem_used_kib: (infobuf.mem_used / 1024) as i64,
+                mem_reserved_kib: (infobuf.mem_reserved / 1024),
+                mem_used_kib: (infobuf.mem_used / 1024),
                 gpu_utilization_pct: infobuf.gpu_util,
                 mem_utilization_pct: infobuf.mem_util,
-                temp_c: infobuf.temp as i32,
-                power_watt: (infobuf.power / 1000) as i32,
-                power_limit_watt: (infobuf.power_limit / 1000) as i32,
-                ce_clock_mhz: infobuf.ce_clock as i32,
-                mem_clock_mhz: infobuf.mem_clock as i32,
+                temp_c: infobuf.temp,
+                power_watt: (infobuf.power / 1000),
+                power_limit_watt: (infobuf.power_limit / 1000),
+                ce_clock_mhz: infobuf.ce_clock,
+                mem_clock_mhz: infobuf.mem_clock,
             })
         } else {
             result.push(gpuapi::CardState {
                 device: gpuapi::GpuName {
-                    index: dev as i32,
+                    index: dev,
                     uuid: get_card_uuid(dev),
                 },
                 failing: gpuapi::GENERIC_FAILURE,
@@ -216,18 +217,18 @@ pub fn get_process_utilization(ptable: &ps::ProcessTable) -> Option<Vec<gpuapi::
                 continue;
             }
 
-            let (username, uid) = ptable.lookup(infobuf.pid as ps::Pid);
+            let (username, uid) = ptable.lookup(infobuf.pid as Pid);
             result.push(gpuapi::Process {
                 devices: vec![gpuapi::GpuName {
-                    index: dev as i32,
+                    index: dev,
                     uuid: get_card_uuid(dev),
                 }],
-                pid: infobuf.pid as usize,
+                pid: infobuf.pid as Pid,
                 user: username.to_string(),
-                uid,
-                mem_pct: infobuf.mem_util as f64,
-                gpu_pct: infobuf.gpu_util as f64,
-                mem_size_kib: infobuf.mem_size as usize,
+                uid: uid as Uid,
+                mem_pct: infobuf.mem_util as f32,
+                gpu_pct: infobuf.gpu_util as f32,
+                mem_size_kib: infobuf.mem_size,
                 command: None,
             })
         }

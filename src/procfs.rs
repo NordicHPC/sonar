@@ -1,3 +1,5 @@
+#![allow(clippy::len_zero)]
+
 // Collect CPU process information without GPU information, from files in /proc.
 
 #[cfg(test)]
@@ -415,7 +417,7 @@ pub fn get_process_information(
             // boot_time and the current time are both time_t, ie, a 31-bit quantity in 2023 and a
             // 32-bit quantity before 2038.  clock_ticks_per_sec is on the order of 100.  Ergo
             // boot_ticks and now_ticks can be represented in about 32+7=39 bits, fine for an f64.
-            let now_ticks = system.get_now_in_secs_since_epoch() as u64 * ticks_per_sec;
+            let now_ticks = system.get_now_in_secs_since_epoch() * ticks_per_sec;
             let boot_ticks = boot_time as u64 * ticks_per_sec;
 
             // start_time_ticks should be on the order of a few years, there is no risk of overflow
