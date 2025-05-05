@@ -19,7 +19,24 @@ use crate::systemapi;
 
 use std::io;
 
-pub fn show_cluster(writer: &mut dyn io::Write, token: String, system: &dyn systemapi::SystemAPI) {
+#[cfg(feature = "daemon")]
+pub struct State<'a> {
+    system: &'a dyn systemapi::SystemAPI,
+    token: String,
+}
+
+#[cfg(feature = "daemon")]
+impl<'a> State<'a> {
+    pub fn new(system: &'a dyn systemapi::SystemAPI, token: String) -> State<'a> {
+        State { system, token }
+    }
+
+    pub fn run(&mut self, writer: &mut dyn io::Write) {
+        show_cluster(writer, self.system, self.token.clone())
+    }
+}
+
+pub fn show_cluster(writer: &mut dyn io::Write, system: &dyn systemapi::SystemAPI, token: String) {
     output::write_json(
         writer,
         &output::Value::O(match do_show_cluster(system, token.clone()) {

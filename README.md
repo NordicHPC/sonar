@@ -53,31 +53,37 @@ It's sensible to run `sonar ps` every 5 minutes on every compute node.
 
 ```console
 $ sonar ps --help
-Take a snapshot of the currently running processes
 
-Usage: sonar ps [OPTIONS]
+...
 
-Options:
-      --batchless
-          Synthesize a job ID from the process tree in which a process finds itself
-      --rollup
-          Merge process records that have the same job ID and command name
-      --min-cpu-percent <MIN_CPU_PERCENT>
-          Include records for jobs that have on average used at least this percentage of CPU, note this is nonmonotonic [default: none]
-      --min-mem-percent <MIN_MEM_PERCENT>
-          Include records for jobs that presently use at least this percentage of real memory, note this is nonmonotonic [default: none]
-      --min-cpu-time <MIN_CPU_TIME>
-          Include records for jobs that have used at least this much CPU time (in seconds) [default: none]
-      --exclude-system-jobs
-          Exclude records for system jobs (uid < 1000)
-      --exclude-users <EXCLUDE_USERS>
-          Exclude records for these comma-separated user names [default: none]
-      --exclude-commands <EXCLUDE_COMMANDS>
-          Exclude records whose commands start with these comma-separated names [default: none]
-      --lockdir <LOCKDIR>
-          Create a per-host lockfile in this directory and exit early if the file exists on startup [default: none]
-  -h, --help
-          Print help
+Options for `ps`:
+  --rollup
+      Merge process records that have the same job ID and command name (on systems
+      with stable job IDs only)
+  --min-cpu-time seconds
+      Include records for jobs that have used at least this much CPU time
+      [default: none]
+  --exclude-system-jobs
+      Exclude records for system jobs (uid < 1000)
+  --exclude-users user,user,...
+      Exclude records whose users match these names [default: none]
+  --exclude-commands command,command,...
+      Exclude records whose commands start with these names [default: none]
+  --min-cpu-percent percentage
+      Include records for jobs that have on average used at least this
+      percentage of CPU, NOTE THIS IS NONMONOTONIC [default: none]
+  --min-mem-percent percentage
+      Include records for jobs that presently use at least this percentage of
+      real memory, NOTE THIS IS NONMONOTONIC [default: none]
+  --lockdir directory
+      Create a per-host lockfile in this directory and exit early if the file
+      exists on startup [default: none]
+  --load
+      Print per-cpu and per-gpu load data
+  --json
+      Format output as new JSON, not CSV
+  --cluster name
+      Optional cluster name (required for --json) with which to tag output
 ```
 
 **NOTE** that if you use `--lockdir`, it should name a directory that is cleaned on reboot, such as
