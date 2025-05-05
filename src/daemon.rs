@@ -25,6 +25,9 @@ use crate::cluster;
 use crate::datasink::{DataSink, StdioSink};
 use crate::jobsapi;
 use crate::json_tags;
+#[cfg(feature = "kafka")]
+use crate::kafka::RdKafka;
+use crate::log;
 use crate::ps;
 use crate::realsystem;
 use crate::slurmjobs;
@@ -41,6 +44,14 @@ pub struct GlobalIni {
     pub role: String,
     pub lockdir: Option<String>,
     pub topic_prefix: Option<String>,
+}
+
+#[cfg(feature = "kafka")]
+pub struct KafkaIni {
+    pub broker_address: String,
+    pub sending_window: Dur,
+    pub ca_file: Option<String>,
+    pub sasl_password: Option<String>,
 }
 
 pub struct DebugIni {
@@ -73,6 +84,8 @@ pub struct ClusterIni {
 
 pub struct Ini {
     pub global: GlobalIni,
+    #[cfg(feature = "kafka")]
+    pub kafka: KafkaIni,
     pub debug: DebugIni,
     pub sample: SampleIni,
     pub sysinfo: SysinfoIni,
@@ -95,6 +108,9 @@ pub enum Operation {
     // Unrecoverable errors on other threads: explanatory message
     #[allow(dead_code)]
     Fatal(String),
+    // Maybe-recoverable message delivery error: explanatory message
+    #[allow(dead_code)]
+    MessageDeliveryError(String),
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -195,21 +211,26 @@ pub fn daemon_mode(
         });
     }
 
+    let client_id = ini.global.cluster.clone() + "/" + &hostname;
+
     let mut control_topic = ini.global.cluster.clone() + ".control." + &ini.global.role;
     if let Some(ref prefix) = ini.global.topic_prefix {
         control_topic = prefix.clone() + "." + &control_topic;
     }
 
-    // At the moment, with the ini having no sections for data sinks, the only possible data sink is
-    // the stdio sink.
-    let data_sink: Box<dyn DataSink> = Box::new(StdioSink::new(
-        ini.global.cluster.clone() + "/" + &hostname,
-        control_topic,
-        event_sender,
-    ));
+    #[cfg(not(feature = "kafka"))]
+    let data_sink: Box<dyn DataSink> =
+        Box::new(StdioSink::new(client_id, control_topic, event_sender));
+
+    #[cfg(feature = "kafka")]
+    let data_sink: Box<dyn DataSink> = if ini.kafka.broker_address != "" {
+        Box::new(RdKafka::new(&ini, client_id, control_topic, event_sender))
+    } else {
+        Box::new(StdioSink::new(client_id, control_topic, event_sender))
+    };
 
     if ini.debug.verbose {
-        println!("Initialization succeeded");
+        log::verbose("Initialization succeeded");
     }
 
     let mut sample_extractor = ps::State::new(
@@ -253,35 +274,35 @@ pub fn daemon_mode(
         match op {
             Operation::Sample => {
                 if ini.debug.verbose {
-                    println!("Sample");
+                    log::verbose("Sample");
                 }
                 sample_extractor.run(&mut output);
                 topic = json_tags::DATA_TAG_SAMPLE;
             }
             Operation::Sysinfo => {
                 if ini.debug.verbose {
-                    println!("Sysinfo");
+                    log::verbose("Sysinfo");
                 }
                 sysinfo_extractor.run(&mut output);
                 topic = json_tags::DATA_TAG_SYSINFO;
             }
             Operation::Jobs => {
                 if ini.debug.verbose {
-                    println!("Jobs");
+                    log::verbose("Jobs");
                 }
                 slurm_extractor.run(&mut output);
                 topic = json_tags::DATA_TAG_JOBS;
             }
             Operation::Cluster => {
                 if ini.debug.verbose {
-                    println!("Cluster");
+                    log::verbose("Cluster");
                 }
                 cluster_extractor.run(&mut output);
                 topic = json_tags::DATA_TAG_CLUSTER;
             }
             Operation::Signal(s) => {
                 if ini.debug.verbose {
-                    println!("signal {s}");
+                    log::verbose(&format!("signal {s}"));
                 }
                 match s {
                     libc::SIGINT | libc::SIGHUP => {
@@ -298,7 +319,7 @@ pub fn daemon_mode(
             }
             Operation::Incoming(key, value) => {
                 if ini.debug.verbose {
-                    println!("Incoming");
+                    log::verbose("Incoming");
                 }
                 // TODO: Maybe a reload function
                 // TODO: Maybe pause / restart functions
@@ -312,9 +333,16 @@ pub fn daemon_mode(
             }
             Operation::Fatal(msg) => {
                 if ini.debug.verbose {
-                    println!("Fatal {msg}");
+                    log::verbose(&format!("Fatal error: {msg}"));
                 }
                 fatal_msg = msg;
+                break 'messageloop;
+            }
+            Operation::MessageDeliveryError(msg) => {
+                if ini.debug.verbose {
+                    log::verbose(&msg);
+                }
+                log::error(&msg);
                 break 'messageloop;
             }
         }
@@ -527,6 +555,13 @@ fn parse_config(config_file: &str) -> Result<Ini, String> {
             lockdir: None,
             topic_prefix: None,
         },
+        #[cfg(feature = "kafka")]
+        kafka: KafkaIni {
+            broker_address: "".to_string(),
+            sending_window: Dur::Minutes(5),
+            ca_file: None,
+            sasl_password: None,
+        },
         debug: DebugIni { verbose: false },
         sample: SampleIni {
             cadence: None,
@@ -551,6 +586,8 @@ fn parse_config(config_file: &str) -> Result<Ini, String> {
     enum Section {
         None,
         Global,
+        #[cfg(feature = "kafka")]
+        Kafka,
         Debug,
         Sample,
         Sysinfo,
@@ -558,6 +595,10 @@ fn parse_config(config_file: &str) -> Result<Ini, String> {
         Cluster,
     }
     let mut curr_section = Section::None;
+    #[cfg(feature = "kafka")]
+    let mut have_kafka = false;
+    #[cfg(feature = "kafka")]
+    let mut have_kafka_remote = false;
     let file = match std::fs::File::open(config_file) {
         Ok(f) => f,
         Err(e) => {
@@ -580,6 +621,12 @@ fn parse_config(config_file: &str) -> Result<Ini, String> {
         }
         if l == "[global]" {
             curr_section = Section::Global;
+            continue;
+        }
+        #[cfg(feature = "kafka")]
+        if l == "[kafka]" {
+            curr_section = Section::Kafka;
+            have_kafka = true;
             continue;
         }
         if l == "[debug]" {
@@ -626,6 +673,24 @@ fn parse_config(config_file: &str) -> Result<Ini, String> {
                     ini.global.topic_prefix = Some(value);
                 }
                 _ => return Err(format!("Invalid [global] setting name `{name}`")),
+            },
+            #[cfg(feature = "kafka")]
+            Section::Kafka => match name.as_str() {
+                "broker-address" | "remote-host" => {
+                    ini.kafka.broker_address = value;
+                    have_kafka_remote = true;
+                }
+                "sending-window" => {
+                    ini.kafka.sending_window =
+                        parse_duration("kafka.sending-window", &value, true)?;
+                }
+                "ca-file" => {
+                    ini.kafka.ca_file = Some(value);
+                }
+                "sasl-password" => {
+                    ini.kafka.sasl_password = Some(value);
+                }
+                _ => return Err(format!("Invalid [kafka] setting name `{name}`")),
             },
             Section::Debug => match name.as_str() {
                 "verbose" => {
@@ -693,6 +758,21 @@ fn parse_config(config_file: &str) -> Result<Ini, String> {
     }
     if ini.global.role == "" {
         return Err("Missing global.role setting".to_string());
+    }
+
+    #[cfg(feature = "kafka")]
+    if have_kafka {
+        if !have_kafka_remote {
+            return Err("Missing kafka.remote-host setting".to_string());
+        }
+        if ini.kafka.sasl_password.is_some() {
+            if ini.kafka.ca_file.is_none()
+                || (ini.kafka.sasl_password.as_ref().unwrap() != ""
+                    && ini.kafka.ca_file.as_ref().unwrap() == "")
+            {
+                return Err("kafka.sasl_password requires kafka.ca_file".to_string());
+            }
+        }
     }
 
     Ok(ini)

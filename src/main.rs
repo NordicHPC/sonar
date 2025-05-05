@@ -13,6 +13,8 @@ mod hostname;
 mod interrupt;
 mod jobsapi;
 mod json_tags;
+#[cfg(all(feature = "daemon", feature = "kafka"))]
+mod kafka;
 mod log;
 #[cfg(test)]
 mod mockfs;
@@ -168,7 +170,7 @@ fn main() {
             match daemon::daemon_mode(config_file, system, force_slurm) {
                 Ok(_) => {}
                 Err(e) => {
-                    eprintln!("Daemon returned with error: {e}");
+                    log::error(&format!("Daemon returned with error: {e}"));
                 }
             }
         }

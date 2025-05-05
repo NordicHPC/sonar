@@ -12,7 +12,8 @@ pub trait DataSink {
     // Queue the message for sending, to be sent within the sending window.
     fn post(&self, topic: String, key: String, value: String);
 
-    // Stop the sink.
+    // Stop the sink. Nobody should be calling post() after calling stop().  Furthermore, the
+    // DataSink object should be dropped as soon as possible after being stopped.
     fn stop(&self);
 }
 
@@ -27,10 +28,10 @@ impl StdioSink {
     pub fn new(
         client_id: String,
         control_topic: String,
-        sender: mpsc::Sender<daemon::Operation>,
+        control_and_errors: mpsc::Sender<daemon::Operation>,
     ) -> StdioSink {
         thread::spawn(move || {
-            control_message_reader(control_topic, sender);
+            control_message_reader(control_topic, control_and_errors);
         });
         StdioSink { client_id }
     }
@@ -45,11 +46,16 @@ impl DataSink for StdioSink {
     }
 
     fn stop(&self) {
-        // TODO: This (maybe) needs to kill the stdin thread
+        // TODO: This (maybe) needs to kill the stdin thread.  But it's probably doesn't need to
+        // happen, and it's not clear how it could happen, there's no obvious signalling facility
+        // for threads.
     }
 }
 
-fn control_message_reader(control_topic: String, sender: mpsc::Sender<daemon::Operation>) {
+fn control_message_reader(
+    control_topic: String,
+    control_and_errors: mpsc::Sender<daemon::Operation>,
+) {
     for line in io::stdin().lines() {
         match line {
             Ok(s) => {
@@ -58,10 +64,10 @@ fn control_message_reader(control_topic: String, sender: mpsc::Sender<daemon::Op
                     if control_topic == topic {
                         if let Some(key) = fields.next() {
                             let mut value = fields.next().unwrap_or_default().to_string();
-                            while let Some(f) = fields.next() {
+                            for f in fields {
                                 value = value + " " + f;
                             }
-                            if sender
+                            if control_and_errors
                                 .send(daemon::Operation::Incoming(key.to_string(), value))
                                 .is_err()
                             {
