@@ -6,6 +6,9 @@ command line parameter is the name of a config file.
 The daemon is a multi-threaded system that performs system sampling, communicates with the sink, and
 handles signals and lock files.
 
+If no other data sink is specified, the daemon prints output on stdout and reads control messages
+from stdin, see later sections.
+
 ## CONFIG FILE
 
 The config file is an ini-type file.  Blank lines and lines starting with '#' are ignored.  Each
@@ -32,6 +35,7 @@ run at a time that is zero mod the cadence.
 cluster = <canonical cluster name>
 role = node | master
 lockdir = <string>                              # default none
+topic-prefix = <string>                         # default none
 ```
 
 The `cluster` option is required, eg `fox.educloud.no`.
@@ -43,6 +47,10 @@ and sysinfo data only, a `master` often only slurm and cluster data.
 If there is a `lockdir` then a lockfile in that directory is acquired when the daemon runs and stays
 acquired for the daemon's lifetime.  If the daemon is reloaded by remote command the lock is
 relinquished temporarily (and the restarted config file may name a different lockdir).
+
+If there is a `topic-prefix` then it is prefixed to each data packet's topic.  A popular value would
+be `test` to tag the data coming from test setups.  (See "DATA MESSAGE FORMATS" below for more about
+topics.)
 
 ### `[sample]` section aka `[ps]` section
 
@@ -101,8 +109,10 @@ it's doing at important points during the run.
 
 Data messages are sent to a topic with a key and a value.
 
-Data messages are sent from Sonar to the broker under topics `<cluster>.<data-type>` where `<cluster>`
-is as configured in the `[global]` section and `<data-type>` is `sample`, `sysinfo`, `job`, `cluster`.
+Data messages are sent from Sonar to the broker under topics `<cluster>.<data-type>` where
+`<cluster>` is as configured in the `[global]` section and `<data-type>` is `sample`, `sysinfo`,
+`job`, `cluster`.  If a topic prefix is configured, the topics become
+`<prefix>.<cluster>.<data-type>`.
 
 The key sent with a message is currently the name of the originating node, including when that node
 is a master node.
@@ -112,13 +122,14 @@ see [NEW-FORMAT.md](NEW-FORMAT.md)), compressed text, and/or otherwise transform
 is no way of requesting anything other than JSON, and if there is compression it is applied
 transparently.
 
-When using the stdout sink, the printed data messages are JSON objects with "topic", "key",
+When using the stdio sink, the printed data messages are JSON objects with "topic", "key",
 "client", and "value" members.
 
 ## CONTROL MESSAGE FORMATS
 
 Control messages are sent to Sonar under topics `<cluster>.control.<role>` where `<cluster>` is as
-configured in the `[global]` section and `<role>` is `node` or `master`.  These will have key and
+configured in the `[global]` section and `<role>` is `node` or `master`.  If a topic-prefix has been set,
+the topics will also have to be `<prefix>.<cluster>.control.<role>`.  The messages will have key and
 value as follows (very much TBD):
 
 ```
@@ -129,6 +140,15 @@ value as follows (very much TBD):
 
 Control messages may be delivered more than once - just a fact of life - but will be ignored if they
 are too old.
+
+When using the stdio sink, the control messages are always single lines on the format
+```
+topic key value
+```
+For example, for a node on a cluster `hpc.xyzzy.no` with a prefix `test`, type this:
+```
+test.hpc.xyzzy.no.control.node exit
+```
 
 TODO: It's quite possible that the key should be either the node name or the empty string, for
 messages directed at a specific node or at all, and that the command/argument should be in the
