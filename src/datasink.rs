@@ -17,16 +17,20 @@ pub trait DataSink {
 }
 
 // Trivial data sink.  This dumps the output as JSON on stdout, and reads command messages from
-// stdin, on the form /key\s+value/.
+// stdin, on the form /target\s+key\s+value/.
 
 pub struct StdioSink {
     client_id: String,
 }
 
 impl StdioSink {
-    pub fn new(client_id: String, sender: mpsc::Sender<daemon::Operation>) -> StdioSink {
+    pub fn new(
+        client_id: String,
+        control_topic: String,
+        sender: mpsc::Sender<daemon::Operation>,
+    ) -> StdioSink {
         thread::spawn(move || {
-            control_message_reader(sender);
+            control_message_reader(control_topic, sender);
         });
         StdioSink { client_id }
     }
@@ -45,19 +49,28 @@ impl DataSink for StdioSink {
     }
 }
 
-fn control_message_reader(sender: mpsc::Sender<daemon::Operation>) {
+fn control_message_reader(control_topic: String, sender: mpsc::Sender<daemon::Operation>) {
     for line in io::stdin().lines() {
         match line {
             Ok(s) => {
-                if let Some((a, b)) = s.trim().split_once([' ', '\t']) {
-                    if sender
-                        .send(daemon::Operation::Incoming(
-                            a.trim().to_string(),
-                            b.trim().to_string(),
-                        ))
-                        .is_err()
-                    {
-                        return;
+                let mut fields = s.split_ascii_whitespace();
+                if let Some(topic) = fields.next() {
+                    if control_topic == topic {
+                        if let Some(key) = fields.next() {
+                            let mut value = fields.next().unwrap_or_default().to_string();
+                            while let Some(f) = fields.next() {
+                                value = value + " " + f;
+                            }
+                            if sender
+                                .send(daemon::Operation::Incoming(
+                                    key.to_string(),
+                                    value,
+                                ))
+                                .is_err()
+                            {
+                                return;
+                            }
+                        }
                     }
                 }
             }

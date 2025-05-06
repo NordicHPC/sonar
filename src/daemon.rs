@@ -40,6 +40,7 @@ pub struct GlobalIni {
     pub cluster: String,
     pub role: String,
     pub lockdir: Option<String>,
+    pub topic_prefix: Option<String>,
 }
 
 pub struct DebugIni {
@@ -194,10 +195,16 @@ pub fn daemon_mode(
         });
     }
 
+    let mut control_topic = ini.global.cluster.clone() + ".control." + &ini.global.role;
+    if let Some(ref prefix) = ini.global.topic_prefix {
+        control_topic = prefix.clone() + "." + &control_topic;
+    }
+
     // At the moment, with the ini having no sections for data sinks, the only possible data sink is
     // the stdio sink.
     let data_sink: Box<dyn DataSink> = Box::new(StdioSink::new(
         ini.global.cluster.clone() + "/" + &hostname,
+        control_topic,
         event_sender,
     ));
 
@@ -312,7 +319,10 @@ pub fn daemon_mode(
             }
         }
 
-        let topic = ini.global.cluster.clone() + "." + topic;
+        let mut topic = ini.global.cluster.clone() + "." + topic;
+        if let Some(ref prefix) = ini.global.topic_prefix {
+            topic = prefix.clone() + "." + &topic;
+        }
         let key = hostname.clone();
         let value = String::from_utf8_lossy(&output).to_string();
 
@@ -515,6 +525,7 @@ fn parse_config(config_file: &str) -> Result<Ini, String> {
             cluster: "".to_string(),
             role: "".to_string(),
             lockdir: None,
+            topic_prefix: None,
         },
         debug: DebugIni { verbose: false },
         sample: SampleIni {
@@ -610,6 +621,9 @@ fn parse_config(config_file: &str) -> Result<Ini, String> {
                 },
                 "lockdir" => {
                     ini.global.lockdir = Some(value);
+                }
+                "topic-prefix" => {
+                    ini.global.topic_prefix = Some(value);
                 }
                 _ => return Err(format!("Invalid [global] setting name `{name}`")),
             },

@@ -18,6 +18,7 @@ for test in amd-gpu \
                 cluster-no-sinfo \
                 cluster-syntax \
                 command-line \
+                daemon \
                 exclude-commands \
                 exclude-system-jobs \
                 exclude-users \
