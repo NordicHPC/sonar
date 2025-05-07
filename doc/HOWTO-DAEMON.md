@@ -6,6 +6,7 @@ command line parameter is the name of a config file.
 The daemon is a multi-threaded system that performs system sampling, communicates with the sink, and
 handles signals and lock files.
 
+If a sink is configured (currently only Kafka) then that is used for all data and control messages.
 If no other data sink is specified, the daemon prints output on stdout and reads control messages
 from stdin, see later sections.
 
@@ -24,10 +25,11 @@ divide an hour evenly and < 60, and hour values must divide a day evenly or be a
 of 24.  (Some sensible cadences such as 90m aka 1h30m are not currently expressible.)
 
 The config file has `[global]` and `[debug]` sections that control general operation; an optional
-section for the transport type chosen, currently none; and a section each for the sonar operations,
-controlling their cadence and operation in the same way as normal command line switches.  For the
-Sonar operations, the cadence setting is required for the operation to be run, the command will be
-run at a time that is zero mod the cadence.
+section for the transport type chosen, currently `[kafka]` (otherwise terminal I/O is used for
+transport); and a section each for the sonar operations, controlling their cadence and operation in
+the same way as normal command line switches.  For the Sonar operations, the cadence setting is
+required for the operation to be run, the command will be run at a time that is zero mod the
+cadence.
 
 ### `[global]` section
 
@@ -51,6 +53,40 @@ relinquished temporarily (and the restarted config file may name a different loc
 If there is a `topic-prefix` then it is prefixed to each data packet's topic.  A popular value would
 be `test` to tag the data coming from test setups.  (See "DATA MESSAGE FORMATS" below for more about
 topics.)
+
+### `[kafka]` section
+
+```
+broker-address = <hostname and port>
+poll-interval = <duration value>                # default 5m
+sending-window = <duration value>               # default 5m
+compression = <type>                            # default "none"
+api-token-file = <path>
+cert-file = <path>
+key-file = <path>
+ca-file = <path>
+dump = bool                                     # default false
+```
+
+The `broker-address` is required and names the address of the broker.  For Kafka it's usually host:port,
+eg `localhost:9092` for a local broker on the standard port.
+
+The `poll-interval` specifies how often sonar should be polling the broker for control messages.
+
+All available data are sent to the data sink at some random time within the `sending-window`, which
+starts at the point when there are no data available to send.
+
+The `compression` can take the values `gzip`, `snappy`, or `none` and if set to something other than
+`none` will attempt to enable compression of the requested type in the outgoing transmission stream.
+
+The `api-token-file` holds an API token which, if present, is embedded into the transmitted data (in
+`Meta.Token` currently but this may change) and should be specific to the cluster that is reporting.
+The server will check that the token corresponds to the cluster identifier in the topic and in the
+data.  If the token is used then there must be TLS.
+
+`cert-file`, `key-file` and `ca-file` have to be used together and if present will force a TLS connection.
+
+Setting `dump` to true will cause the Kafka sink to dump all data it is sending on stdout.
 
 ### `[sample]` section aka `[ps]` section
 
@@ -81,6 +117,8 @@ started, in addition to according to the cadence.
 cadence = <duration value>
 window = <duration value>                       # default 2*cadence
 uncompleted = <bool>                            # default false
+delta-coding = <bool>                           # default true
+dump = <filename>                               # default none
 ```
 
 The `window` is the sacct time window used for looking for data.
@@ -89,6 +127,21 @@ The `uncompleted` option, if true, triggers the inclusion of data about pending 
 This will result in multiple transmissions of data for the same `(job_id,job_step)`, one at each
 sample point.  If a job stays in, say, the PENDING state for several sampling windows then multiple
 transmissions for the job in the PENDING state will be seen.
+
+The `delta-coding` option, if true, triggers optimization of data transmission: redundant data are
+omitted in subsequent transmissions, and if there are no pertient data changes - for example, if a
+new `PENDING` record has the same contents as one already sent because no settings have changed -
+then the second record will not be sent at all.  What is deemed pertient or redundant is up for
+discussion for both `PENDING` and `RUNNING` jobs.  In any case, the recipient must be prepared to
+reconstruct the complete data stream from the initial record for the `(job_id,job_step)` and any
+subsequent deltas, applied in order.  If `uncompleted` is true, the `delta-coding` option can
+greatly reduce transmitted data volume.  If `uncompleted` is false, it can still avoid redundantly
+sending information about completed jobs.
+
+Setting `dump` to a file name will cause JSON output - without delta encoding - to be appended to
+the given file, while also being sent in the normal way.  If appending fails, a diagnostic is
+printed if `[debug]:verbose` is true.  (This is mostly useful for debugging the delta coding itself
+and to understand how to reconstruct the coded output.)
 
 ### `[cluster]` section
 

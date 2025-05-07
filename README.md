@@ -210,7 +210,7 @@ With the branches come some additional rules for how to move patches around:
 
 At the time of writing we require:
 - 2021 edition of Rust
-- Rust 1.65.0 (can be found with `cargo msrv find`)
+- Rust 1.67.0 (can be found with `cargo msrv find`)
 
 Policy for changing the minimum Rust version:
 - Open a GitHub issue and motivate the change
