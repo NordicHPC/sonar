@@ -97,7 +97,17 @@ And/or on a single node with access to slurm (eg a login node):
 
 Sonar will run continuously and start pumping data to Kafka.
 
-For easy testing, run this in the Consumer shell to listen for `sysinfo` messages and echo them:
+In the Consumer shell, go to `util/ingest-kafka` and build `ingest-kafka` if you haven't already.  Run
+it; it will subscribe to Kafka and store messages it receives in a data store.  See instructions in
+`ingest-kafka.go`.  Typical use when running on the same node as the broker with a non-standard port
+XXXX would be:
+
+```
+mkdir -p data/test-cluster.hpc.uio.no
+./ingest-kafka -cluster test-cluster.hpc.uio.no -data-dir data/test-cluster.hpc.uio.no -broker localhost:XXXX
+```
+
+Alternatively, for easy testing, run this in the Consumer shell to listen for sysinfo messages and echo them:
 
 ```
   bin/kafka-console-consumer.sh --bootstrap-server localhost:XXXX \
