@@ -151,8 +151,6 @@ pub fn create_snapshot(
     }
 }
 
-pub const EPOCH_TIME_BASE: u64 = 1577836800; // 2020-01-01T00:00:00Z
-
 fn do_create_snapshot(
     writer: &mut dyn io::Write,
     system: &dyn systemapi::SystemAPI,

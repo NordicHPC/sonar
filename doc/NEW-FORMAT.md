@@ -879,7 +879,7 @@ discard ("CANCELLED by nnn").
 
 slurm: `JOB_STATE.current` probably, though that has multiple values.
 
-#### **`array_job_id`** NonzeroUint
+#### **`array_job_id`** uint64
 
 The overarching ID of an array job, see discussion in the postamble.
 
@@ -897,7 +897,7 @@ sacct: the m of a `JobID` of the form `n_m.s`.
 
 slurm: `JOB_INFO.array_task_id`.
 
-#### **`het_job_id`** NonzeroUint
+#### **`het_job_id`** uint64
 
 If not zero, the overarching ID of a heterogenous job.
 

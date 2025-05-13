@@ -110,8 +110,7 @@ func handleConst(v *ast.ValueSpec, d *ast.CommentGroup) {
 	}
 }
 
-// Probably there's some non-regexp way of doing this
-var jsonRe = regexp.MustCompile(`json:"(.*)"`)
+var jsonRe = regexp.MustCompile(`json:"([^,"]*)(?:,.*)?"`)
 
 func handleStructType(item *ast.GenDecl, td *ast.TypeSpec, st *ast.StructType) {
 	currType := td.Name.Name
