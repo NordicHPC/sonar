@@ -173,6 +173,14 @@ const (
 	ExtendedUintBase ExtendedUint = 2
 )
 
+const (
+	// The bias that we subtract from a timestamp to represent the epoch (it saves a few bytes per data
+	// item).  This is technically not part of the spec, but it's hard for it not to be, because it is
+	// exposed indirectly in the emitted data and it can't subsequently be moved forward, only backward.
+	// The value represents 2020-01-01T00:00:00Z, somewhat arbitrarily.
+	EpochTimeBase uint64 = 1577836800
+)
+
 func (e ExtendedUint) ToUint() (uint64, error) {
 	if e >= ExtendedUintBase {
 		return uint64(e - ExtendedUintBase), nil
@@ -212,15 +220,15 @@ type MetadataObject struct {
 	Version NonemptyString `json:"version"`
 
 	// The data format version
-	Format uint64 `json:"format"`
+	Format uint64 `json:"format,omitempty"`
 
 	// An array of generator-dependent attribute values
-	Attrs []KVPair `json:"attrs"`
+	Attrs []KVPair `json:"attrs,omitempty"`
 
 	// EXPERIMENTAL / UNDERSPECIFIED.  An API token to be used with
 	// Envelope.Data.Attributes.Cluster, it proves that the producer of the datum was authorized to
 	// produce data for that cluster name.
-	Token string `json:"token"`
+	Token string `json:"token,omitempty"`
 }
 
 // Information about a continuable or non-continuable error.
@@ -244,7 +252,7 @@ type KVPair struct {
 	Key NonemptyString `json:"key"`
 
 	// Some attribute value
-	Value string `json:"value"`
+	Value string `json:"value,omitempty"`
 }
 
 // The Sysinfo object carries hardware information about a node.
@@ -262,10 +270,10 @@ type SysinfoEnvelope struct {
 	Meta MetadataObject `json:"meta"`
 
 	// Node data, for successful probes
-	Data *SysinfoData `json:"data"`
+	Data *SysinfoData `json:"data,omitempty"`
 
 	// Error information, for unsuccessful probes
-	Errors []ErrorObject `json:"errors"`
+	Errors []ErrorObject `json:"errors,omitempty"`
 }
 
 // System data, for successful sysinfo probes
@@ -324,13 +332,13 @@ type SysinfoAttributes struct {
 	Memory NonzeroUint `json:"memory"`
 
 	// Base64-encoded SVG output of `lstopo`
-	TopoSVG string `json:"topo_svg"`
+	TopoSVG string `json:"topo_svg,omitempty"`
 
 	// Per-card information
-	Cards []SysinfoGpuCard `json:"cards"`
+	Cards []SysinfoGpuCard `json:"cards,omitempty"`
 
 	// Per-software-package information
-	Software []SysinfoSoftwareVersion `json:"software"`
+	Software []SysinfoSoftwareVersion `json:"software,omitempty"`
 }
 
 // Per-card information.
@@ -351,40 +359,40 @@ type SysinfoGpuCard struct {
 	UUID string `json:"uuid"`
 
 	// Indicates an intra-system card address, eg PCI address
-	Address string `json:"address"`
+	Address string `json:"address,omitempty"`
 
 	// A keyword, "NVIDIA", "AMD", "Intel" (others TBD)
-	Manufacturer string `json:"manufacturer"`
+	Manufacturer string `json:"manufacturer,omitempty"`
 
 	// Card-dependent, this is the manufacturer's model string
-	Model string `json:"model"`
+	Model string `json:"model,omitempty"`
 
 	// Card-dependent, for NVIDIA this is "Turing", "Volta" etc
-	Architecture string `json:"architecture"`
+	Architecture string `json:"architecture,omitempty"`
 
 	// Card-dependent, the manufacturer's driver string
-	Driver string `json:"driver"`
+	Driver string `json:"driver,omitempty"`
 
 	// Card-dependent, the manufacturer's firmware string
-	Firmware string `json:"firmware"`
+	Firmware string `json:"firmware,omitempty"`
 
 	// GPU memory in kilobytes
-	Memory uint64 `json:"memory"`
+	Memory uint64 `json:"memory,omitempty"`
 
 	// Power limit in watts
-	PowerLimit uint64 `json:"power_limit"`
+	PowerLimit uint64 `json:"power_limit,omitempty"`
 
 	// Max power limit in watts
-	MaxPowerLimit uint64 `json:"max_power_limit"`
+	MaxPowerLimit uint64 `json:"max_power_limit,omitempty"`
 
 	// Min power limit in watts
-	MinPowerLimit uint64 `json:"min_power_limit"`
+	MinPowerLimit uint64 `json:"min_power_limit,omitempty"`
 
 	// Max clock of compute element
-	MaxCEClock uint64 `json:"max_ce_clock"`
+	MaxCEClock uint64 `json:"max_ce_clock,omitempty"`
 
 	// Max clock of GPU memory
-	MaxMemoryClock uint64 `json:"max_memory_clock"`
+	MaxMemoryClock uint64 `json:"max_memory_clock,omitempty"`
 }
 
 // The software versions are obtained by system-dependent means. As the monitoring component runs
@@ -403,7 +411,7 @@ type SysinfoSoftwareVersion struct {
 	Key NonemptyString `json:"key"`
 
 	// Human-readable name of the software package
-	Name string `json:"name"`
+	Name string `json:"name,omitempty"`
 
 	// The package's version number, in some package-specific format
 	Version NonemptyString `json:"version"`
@@ -420,10 +428,10 @@ type SampleEnvelope struct {
 	Meta MetadataObject `json:"meta"`
 
 	// Sample data, for successful probes
-	Data *SampleData `json:"data"`
+	Data *SampleData `json:"data,omitempty"`
 
 	// Error information, for unsuccessful probes
-	Errors []ErrorObject `json:"errors"`
+	Errors []ErrorObject `json:"errors,omitempty"`
 }
 
 // Sample data, for successful sysinfo probes
@@ -454,10 +462,10 @@ type SampleAttributes struct {
 	System SampleSystem `json:"system"`
 
 	// State of jobs on the nodes
-	Jobs []SampleJob `json:"jobs"`
+	Jobs []SampleJob `json:"jobs,omitempty"`
 
 	// Recoverable errors, if any
-	Errors []ErrorObject `json:"errors"`
+	Errors []ErrorObject `json:"errors,omitempty"`
 }
 
 // This object describes the state of the node independently of the jobs running on it.
@@ -468,13 +476,13 @@ type SampleAttributes struct {
 // NOTE: The sysinfo for the node provides the total memory; available memory = total - used.
 type SampleSystem struct {
 	// The state of individual cores
-	Cpus []SampleCpu `json:"cpus"`
+	Cpus []SampleCpu `json:"cpus,omitempty"`
 
 	// The state of individual GPU devices
-	Gpus []SampleGpu `json:"gpus"`
+	Gpus []SampleGpu `json:"gpus,omitempty"`
 
 	// The amount of primary memory in use in kilobytes
-	UsedMemory uint64 `json:"used_memory"`
+	UsedMemory uint64 `json:"used_memory,omitempty"`
 }
 
 // The number of CPU seconds used by the core since boot.
@@ -502,40 +510,40 @@ type SampleGpu struct {
 
 	// If not zero, an error code indicating a card failure state. code=1 is "generic failure".
 	// Other codes TBD.
-	Failing uint64 `json:"failing"`
+	Failing uint64 `json:"failing,omitempty"`
 
 	// Percent of primary fan's max speed, may exceed 100% on some cards in some cases
-	Fan uint64 `json:"fan"`
+	Fan uint64 `json:"fan,omitempty"`
 
 	// Current compute mode, completely card-specific if known at all
-	ComputeMode string `json:"compute_mode"`
+	ComputeMode string `json:"compute_mode,omitempty"`
 
 	// Current performance level, card-specific >= 0, or unset for "unknown".
-	PerformanceState ExtendedUint `json:"performance_state"`
+	PerformanceState ExtendedUint `json:"performance_state,omitempty"`
 
 	// Memory use in Kilobytes
-	Memory uint64 `json:"memory"`
+	Memory uint64 `json:"memory,omitempty"`
 
 	// Percent of computing element capability used
-	CEUtil uint64 `json:"ce_util"`
+	CEUtil uint64 `json:"ce_util,omitempty"`
 
 	// Percent of memory used
-	MemoryUtil uint64 `json:"memory_util"`
+	MemoryUtil uint64 `json:"memory_util,omitempty"`
 
 	// Degrees C card temperature at primary sensor (note can be negative)
-	Temperature int64 `json:"temperature"`
+	Temperature int64 `json:"temperature,omitempty"`
 
 	// Watts current power usage
-	Power uint64 `json:"power"`
+	Power uint64 `json:"power,omitempty"`
 
 	// Watts current power limit
-	PowerLimit uint64 `json:"power_limit"`
+	PowerLimit uint64 `json:"power_limit,omitempty"`
 
 	// Compute element current clock
-	CEClock uint64 `json:"ce_clock"`
+	CEClock uint64 `json:"ce_clock,omitempty"`
 
 	// memory current clock
-	MemoryClock uint64 `json:"memory_clock"`
+	MemoryClock uint64 `json:"memory_clock,omitempty"`
 }
 
 // Sample data for a single job
@@ -572,7 +580,7 @@ type SampleJob struct {
 	Epoch uint64 `json:"epoch"`
 
 	// Processes in the job, all have the same Job ID.
-	Processes []SampleProcess `json:"processes"`
+	Processes []SampleProcess `json:"processes,omitempty"`
 }
 
 // Sample values for a single process within a job.
@@ -610,40 +618,40 @@ type SampleJob struct {
 // savings in data volume.
 type SampleProcess struct {
 	// Kilobytes of private resident memory.
-	ResidentMemory uint64 `json:"resident_memory"`
+	ResidentMemory uint64 `json:"resident_memory,omitempty"`
 
 	// Kilobytes of virtual data+stack memory
-	VirtualMemory uint64 `json:"virtual_memory"`
+	VirtualMemory uint64 `json:"virtual_memory,omitempty"`
 
 	// The command (not the command line), zombie processes get an extra <defunct> annotation at
 	// the end, a la ps.
-	Cmd string `json:"cmd"`
+	Cmd string `json:"cmd,omitempty"`
 
 	// Process ID, zero is used for rolled-up processes.
-	Pid uint64 `json:"pid"`
+	Pid uint64 `json:"pid,omitempty"`
 
 	// Parent-process ID.
-	ParentPid uint64 `json:"ppid"`
+	ParentPid uint64 `json:"ppid,omitempty"`
 
 	// The running average CPU percentage over the true lifetime of the process as reported
 	// by the operating system. 100.0 corresponds to "one full core's worth of computation".
 	// See notes.
-	CpuAvg float64 `json:"cpu_avg"`
+	CpuAvg float64 `json:"cpu_avg,omitempty"`
 
 	// The current sampled CPU utilization of the process, 100.0 corresponds to "one full core's
 	// worth of computation". See notes.
-	CpuUtil float64 `json:"cpu_util"`
+	CpuUtil float64 `json:"cpu_util,omitempty"`
 
 	// Cumulative CPU time in seconds for the process over its lifetime. See notes.
-	CpuTime uint64 `json:"cpu_time"`
+	CpuTime uint64 `json:"cpu_time,omitempty"`
 
 	// The number of additional processes in the same cmd and no child processes that have been
 	// rolled into this one. That is, if the value is 1, the record represents the sum of the data
 	// for two processes.
-	Rolledup int `json:"rolledup"`
+	Rolledup int `json:"rolledup,omitempty"`
 
 	// GPU sample data for all cards used by the process.
-	Gpus []SampleProcessGpu `json:"gpus"`
+	Gpus []SampleProcessGpu `json:"gpus,omitempty"`
 }
 
 // Per-process per-gpu sample data.
@@ -673,13 +681,13 @@ type SampleProcessGpu struct {
 	//
 	// (The "gpu_" prefix here and below is sort of redundant but have been retained since it makes
 	// the fields analogous to the "cpu_" fields.)
-	GpuUtil float64 `json:"gpu_util"`
+	GpuUtil float64 `json:"gpu_util,omitempty"`
 
 	// The current GPU memory used in kilobytes for the process on the card. See notes.
-	GpuMemory uint64 `json:"gpu_memory"`
+	GpuMemory uint64 `json:"gpu_memory,omitempty"`
 
 	// The current GPU memory usage percentage for the process on the card. See notes.
-	GpuMemoryUtil float64 `json:"gpu_memory_util"`
+	GpuMemoryUtil float64 `json:"gpu_memory_util,omitempty"`
 }
 
 // Jobs data are extracted from a single always-up master node on the cluster, and describe jobs
@@ -696,10 +704,10 @@ type JobsEnvelope struct {
 	Meta MetadataObject `json:"meta"`
 
 	// Jobs data, for successful probes
-	Data *JobsData `json:"data"`
+	Data *JobsData `json:"data,omitempty"`
 
 	// Error information, for unsuccessful probes
-	Errors []ErrorObject `json:"errors"`
+	Errors []ErrorObject `json:"errors,omitempty"`
 }
 
 // Jobs data, for successful jobs probes
@@ -723,7 +731,7 @@ type JobsAttributes struct {
 	Cluster Hostname `json:"cluster"`
 
 	// Individual job records.  There may be multiple records per job, one per job step.
-	SlurmJobs []SlurmJob `json:"slurm_jobs"`
+	SlurmJobs []SlurmJob `json:"slurm_jobs,omitempty"`
 }
 
 // See extensive discussion in the postamble for what motivates the following spec.  In particular,
@@ -764,14 +772,14 @@ type SlurmJob struct {
 	// sacct: the part of `JobIDRaw` after the separator.
 	//
 	// slurm: via jobs: `Job.STEP_STEP.name`, probably.
-	JobStep string `json:"job_step"`
+	JobStep string `json:"job_step,omitempty"`
 
 	// The name of the job.
 	//
 	// sacct: `JobName`.
 	//
 	// slurm: `JOB_INFO.name`.
-	JobName string `json:"job_name"`
+	JobName string `json:"job_name,omitempty"`
 
 	// The state of the job described by the record, an all-uppercase word from the set PENDING,
 	// RUNNING, CANCELLED, COMPLETED, DEADLINE, FAILED, OUT_OF_MEMORY, TIMEOUT.
@@ -787,7 +795,7 @@ type SlurmJob struct {
 	// sacct: the n of a `JobID` of the form `n_m.s`
 	//
 	// slurm: `JOB_INFO.array_job_id`.
-	ArrayJobID NonzeroUint `json:"array_job_id"`
+	ArrayJobID uint64 `json:"array_job_id,omitempty"`
 
 	// if `array_job_id` is not zero, the array element's index.  Individual elements of an array
 	// job have their own plain job_id; the `array_job_id` identifies these as part of the same array
@@ -796,35 +804,35 @@ type SlurmJob struct {
 	// sacct: the m of a `JobID` of the form `n_m.s`.
 	//
 	// slurm: `JOB_INFO.array_task_id`.
-	ArrayTaskID uint64 `json:"array_task_id"`
+	ArrayTaskID uint64 `json:"array_task_id,omitempty"`
 
 	// If not zero, the overarching ID of a heterogenous job.
 	//
 	// sacct: the n of a `JobID` of the form `n+m.s`
 	//
 	// slurm: `JOB_INFO.het_job_id`
-	HetJobID NonzeroUint `json:"het_job_id"`
+	HetJobID uint64 `json:"het_job_id,omitempty"`
 
 	// If `het_job_id` is not zero, the het job element's index.
 	//
 	// sacct: the m of a `JobID` of the form `n+m.s`
 	//
 	// slurm: `JOB_INFO.het_job_offset`.
-	HetJobOffset uint64 `json:"het_job_offset"`
+	HetJobOffset uint64 `json:"het_job_offset,omitempty"`
 
 	// The name of the user running the job.  Important for tracking resources by user.
 	//
 	// sacct: `User`
 	//
 	// slurm: `JOB_INFO.user_name`
-	UserName string `json:"user_name"`
+	UserName string `json:"user_name,omitempty"`
 
 	// The name of the user's account.  Important for tracking resources by account.
 	//
 	// sacct: `Account`
 	//
 	// slurm: `JOB_INFO.account`
-	Account string `json:"account"`
+	Account string `json:"account,omitempty"`
 
 	// The time the job was submitted.
 	//
@@ -838,42 +846,42 @@ type SlurmJob struct {
 	// sacct: `TimelimitRaw`
 	//
 	// slurm: `JOB_INFO.time_limit`
-	Timelimit ExtendedUint `json:"time_limit"`
+	Timelimit ExtendedUint `json:"time_limit,omitempty"`
 
 	// The name of the partition to use.
 	//
 	// sacct: `Partition`
 	//
 	// slurm: `JOB_INFO.partiton`
-	Partition string `json:"partition"`
+	Partition string `json:"partition,omitempty"`
 
 	// The name of the reservation.
 	//
 	// sacct: `Reservation`
 	//
 	// slurm: `JOB_INFO.resv_name`
-	Reservation string `json:"reservation"`
+	Reservation string `json:"reservation,omitempty"`
 
 	// The nodes allocated to the job or step.
 	//
 	// sacct: `NodeList`
 	//
 	// slurm: `JOB_INFO.nodes`
-	NodeList []string `json:"nodes"`
+	NodeList []string `json:"nodes,omitempty"`
 
 	// The job priority.
 	//
 	// sacct: `Priority`
 	//
 	// slurm: `JOB_INFO.priority`
-	Priority ExtendedUint `json:"priority"`
+	Priority ExtendedUint `json:"priority,omitempty"`
 
 	// Requested layout.
 	//
 	// sacct: `Layout`
 	//
 	// slurm: `JOB_INFO.steps[i].task.distribution`
-	Layout string `json:"distribution"`
+	Layout string `json:"distribution,omitempty"`
 
 	// Requested resources. For running jobs, the data can in part be synthesized from process
 	// samples: we'll know the resources that are being used.
@@ -881,7 +889,7 @@ type SlurmJob struct {
 	// sacct: TBD - TODO (possibly unavailable or maybe only when RUNNING).
 	//
 	// slurm: `JOB_INFO.gres_detail`
-	GRESDetail []string `json:"gres_detail"`
+	GRESDetail []string `json:"gres_detail,omitempty"`
 
 	// Number of requested CPUs.
 	//
@@ -890,28 +898,28 @@ type SlurmJob struct {
 	// slurm: `JOB_INFO.cpus`
 	//
 	// TODO: Is this per node?  If so, change the name of the field.
-	ReqCPUS uint64 `json:"requested_cpus"`
+	ReqCPUS uint64 `json:"requested_cpus,omitempty"`
 
 	// TODO: Description.  This may be the same as requested_cpus?
 	//
 	// sacct: TODO - TBD.
 	//
 	// slurm: `JOB_INFO.minimum_cpus_per_node`
-	MinCPUSPerNode uint64 `json:"minimum_cpus_per_node"`
+	MinCPUSPerNode uint64 `json:"minimum_cpus_per_node,omitempty"`
 
 	// Amount of requested memory.
 	//
 	// sacct: `ReqMem`
 	//
 	// slurm: `JOB_INFO.memory_per_node`
-	ReqMemoryPerNode uint64 `json:"requested_memory_per_node"`
+	ReqMemoryPerNode uint64 `json:"requested_memory_per_node,omitempty"`
 
 	// Number of requested nodes.
 	//
 	// sacct: `ReqNodes`
 	//
 	// slurm: `JOB_INFO.node_count`
-	ReqNodes uint64 `json:"requested_node_count"`
+	ReqNodes uint64 `json:"requested_node_count,omitempty"`
 
 	// Time the job started, if started
 	//
@@ -925,7 +933,7 @@ type SlurmJob struct {
 	// sacct: `Suspended`
 	//
 	// slurm: `JOB_INFO.suspend_time`
-	Suspended uint64 `json:"suspend_time"`
+	Suspended uint64 `json:"suspend_time,omitempty"`
 
 	// Time the job ended (or was cancelled), if ended
 	//
@@ -939,10 +947,10 @@ type SlurmJob struct {
 	// sacct: `ExitCode`
 	//
 	// slurm: `JOB_INFO.exit_code.return_code`
-	ExitCode uint64 `json:"exit_code"`
+	ExitCode uint64 `json:"exit_code,omitempty"`
 
 	// Data specific to sacct output
-	Sacct *SacctData `json:"sacct"`
+	Sacct *SacctData `json:"sacct,omitempty"`
 }
 
 // SacctData are data aggregated by sacct and available if the sampling was done by sacct (as
@@ -950,41 +958,41 @@ type SlurmJob struct {
 // the field documentation is mostly copied from the sacct man page.
 type SacctData struct {
 	// Minimum (system + user) CPU time of all tasks in job.
-	MinCPU uint64 `json:"MinCPU"`
+	MinCPU uint64 `json:"MinCPU,omitempty"`
 
 	// Requested resources.  These are the resources allocated to the job/step after the job
 	// started running.
-	AllocTRES string `json:"AllocTRES"`
+	AllocTRES string `json:"AllocTRES,omitempty"`
 
 	// Average (system + user) CPU time of all tasks in job.
-	AveCPU uint64 `json:"AveCPU"`
+	AveCPU uint64 `json:"AveCPU,omitempty"`
 
 	// Average number of bytes read by all tasks in job.
-	AveDiskRead uint64 `json:"AveDiskRead"`
+	AveDiskRead uint64 `json:"AveDiskRead,omitempty"`
 
 	// Average number of bytes written by all tasks in job.
-	AveDiskWrite uint64 `json:"AveDiskWrite"`
+	AveDiskWrite uint64 `json:"AveDiskWrite,omitempty"`
 
 	// Average resident set size of all tasks in job.
-	AveRSS uint64 `json:"AveRSS"`
+	AveRSS uint64 `json:"AveRSS,omitempty"`
 
 	// Average Virtual Memory size of all tasks in job.
-	AveVMSize uint64 `json:"AveVMSize"`
+	AveVMSize uint64 `json:"AveVMSize,omitempty"`
 
 	// The job's elapsed time in seconds.
-	ElapsedRaw uint64 `json:"ElapsedRaw"`
+	ElapsedRaw uint64 `json:"ElapsedRaw,omitempty"`
 
 	// The amount of system CPU time used by the job or job step.
-	SystemCPU uint64 `json:"SystemCPU"`
+	SystemCPU uint64 `json:"SystemCPU,omitempty"`
 
 	// The amount of user CPU time used by the job or job step.
-	UserCPU uint64 `json:"UserCPU"`
+	UserCPU uint64 `json:"UserCPU,omitempty"`
 
 	// Maximum resident set size of all tasks in job.
-	MaxRSS uint64 `json:"MaxRSS"`
+	MaxRSS uint64 `json:"MaxRSS,omitempty"`
 
 	// Maximum Virtual Memory size of all tasks in job.
-	MaxVMSize uint64 `json:"MaxVMSize"`
+	MaxVMSize uint64 `json:"MaxVMSize,omitempty"`
 }
 
 // On clusters that have centralized cluster management (eg Slurm), the Cluster data reveal
@@ -997,10 +1005,10 @@ type ClusterEnvelope struct {
 	Meta MetadataObject `json:"meta"`
 
 	// Node data, for successful probes
-	Data *ClusterData `json:"data"`
+	Data *ClusterData `json:"data,omitempty"`
 
 	// Error information, for unsuccessful probes
-	Errors []ErrorObject `json:"errors"`
+	Errors []ErrorObject `json:"errors,omitempty"`
 }
 
 // Cluster data, for successful cluster probes
@@ -1023,13 +1031,13 @@ type ClusterAttributes struct {
 	Cluster Hostname `json:"cluster"`
 
 	// The `slurm` attribute is true if at least some nodes are under Slurm management.
-	Slurm bool `json:"slurm"`
+	Slurm bool `json:"slurm,omitempty"`
 
 	// Descriptions of the partitions on the cluster
-	Partitions []ClusterPartition `json:"partitions"`
+	Partitions []ClusterPartition `json:"partitions,omitempty"`
 
 	// Descriptions of the managed nodes on the cluster
-	Nodes []ClusterNodes `json:"nodes"`
+	Nodes []ClusterNodes `json:"nodes,omitempty"`
 }
 
 // A Partition has a unique name and some nodes.  Nodes may be in multiple partitions.
@@ -1038,7 +1046,7 @@ type ClusterPartition struct {
 	Name NonemptyString `json:"name"`
 
 	// Nodes in the partition
-	Nodes []NodeRange `json:"nodes"`
+	Nodes []NodeRange `json:"nodes,omitempty"`
 }
 
 // A managed node is always on some state.  A node may be multiple states, in cluster-dependent
@@ -1047,12 +1055,12 @@ type ClusterPartition struct {
 // NOTE: Node state depends on the cluster type.  For Slurm, see sinfo(1), it's a long list.
 type ClusterNodes struct {
 	// Constraint: The array of names may not be empty
-	Names []NodeRange `json:"names"`
+	Names []NodeRange `json:"names,omitempty"`
 
 	// The state(s) of the nodes in the range.  This is the output of sinfo as for the
 	// StateComplete specifier, split into individual states, and the state names are always folded
 	// to upper case.
-	States []string `json:"states"`
+	States []string `json:"states,omitempty"`
 }
 
 // A NodeRange is a nonempty-string representing a list of hostnames compactly using a simple

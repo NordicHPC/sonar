@@ -3,7 +3,7 @@
 use crate::gpuapi;
 use crate::json_tags::*;
 use crate::output;
-use crate::ps::{ProcInfo, PsOptions, SampleData, EPOCH_TIME_BASE};
+use crate::ps::{ProcInfo, PsOptions, SampleData};
 use crate::systemapi;
 use crate::util::three_places;
 

@@ -1,9 +1,9 @@
 use crate::gpuapi;
 use crate::jobsapi;
+use crate::json_tags;
 use crate::mockfs;
 use crate::mockgpu;
 use crate::procfsapi;
-use crate::ps;
 use crate::systemapi;
 use crate::time;
 
@@ -178,7 +178,7 @@ impl MockSystemBuilder {
             boot_time: if let Some(x) = self.boot_time {
                 x
             } else {
-                ps::EPOCH_TIME_BASE + 1
+                json_tags::EPOCH_TIME_BASE + 1
             },
             gpus: mockgpu::MockGpuAPI::new(self.cards.take()),
             pid: 1337,

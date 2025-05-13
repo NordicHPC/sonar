@@ -2,8 +2,9 @@
 #![allow(clippy::comparison_to_empty)]
 
 use crate::gpuapi;
+use crate::json_tags;
 use crate::output;
-use crate::ps::{GpuStatus, ProcInfo, PsOptions, SampleData, EPOCH_TIME_BASE};
+use crate::ps::{GpuStatus, ProcInfo, PsOptions, SampleData};
 use crate::systemapi;
 use crate::util::three_places;
 
@@ -68,7 +69,7 @@ fn format_oldfmt_sample(proc_info: &ProcInfo, system: &dyn systemapi::SystemAPI)
         fields.push_u("job", proc_info.job_id as u64);
     }
     if !proc_info.is_slurm {
-        fields.push_u("epoch", system.get_boot_time() - EPOCH_TIME_BASE);
+        fields.push_u("epoch", system.get_boot_time() - json_tags::EPOCH_TIME_BASE);
     }
     if proc_info.rolledup == 0 && proc_info.pid != 0 {
         // pid must be 0 for rolledup > 0 as there is no guarantee that there is any fixed
