@@ -57,10 +57,10 @@ import (
 //
 // The working hypothesis is that:
 //
-// - all necessary Slurm data can be extracted from a single node in the cluster, as they only
-//   include data that Slurm collects and stores for itself
-// - the Slurm data collection can be performed by sampling, ie, by running data collection
-//   periodically using externally available Slurm tools, and not by getting callbacks from Slurm
+//   - all necessary Slurm data can be extracted from a single node in the cluster, as they only
+//     include data that Slurm collects and stores for itself
+//   - the Slurm data collection can be performed by sampling, ie, by running data collection
+//     periodically using externally available Slurm tools, and not by getting callbacks from Slurm
 //
 // That does not remove performance constraints, as the Slurm system is already busy and does not
 // need an extra load from a polling client that runs often.  It does ease performance constraints,
