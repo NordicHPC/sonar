@@ -1,0 +1,24 @@
+name: Test Go code formatting
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Display Go version
+      run: go version
+
+    - name: Format code
+      run: |
+        cd tests
+        ./go-format.sh
