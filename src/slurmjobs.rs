@@ -1,7 +1,5 @@
 #![allow(clippy::comparison_to_empty)]
-
 // Run sacct, extract output and reformat as CSV or JSON on stdout.
-
 #![allow(clippy::vec_box)]
 #![allow(clippy::len_zero)]
 #![allow(clippy::comparison_to_empty)]
@@ -503,7 +501,11 @@ fn render_jobs_newfmt(jobs: Vec<Box<JobAll>>) -> output::Array {
         push_string(&mut o, SLURM_JOB_GRESDETAIL, j.gres_detail);
         push_uint(&mut o, SLURM_JOB_REQ_CPUS, j.requested_cpus);
         push_uint(&mut o, SLURM_JOB_MIN_CPUSPER_NODE, j.minimum_cpus_per_node);
-        push_uint(&mut o, SLURM_JOB_REQ_MEMORY_PER_NODE, j.requested_memory_per_node);
+        push_uint(
+            &mut o,
+            SLURM_JOB_REQ_MEMORY_PER_NODE,
+            j.requested_memory_per_node,
+        );
         push_uint(&mut o, SLURM_JOB_REQ_NODES, j.requested_node_count);
         push_string(&mut o, SLURM_JOB_START, j.start_time);
         push_uint(&mut o, SLURM_JOB_SUSPENDED, j.suspend_time);

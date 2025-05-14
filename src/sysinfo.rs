@@ -69,9 +69,18 @@ fn layout_sysinfo_newfmt(
     attrs.push_s(SYSINFO_ATTRIBUTES_OS_NAME, system.get_os_name());
     attrs.push_s(SYSINFO_ATTRIBUTES_OS_RELEASE, system.get_os_release());
     attrs.push_u(SYSINFO_ATTRIBUTES_SOCKETS, node_info.sockets);
-    attrs.push_u(SYSINFO_ATTRIBUTES_CORES_PER_SOCKET, node_info.cores_per_socket);
-    attrs.push_u(SYSINFO_ATTRIBUTES_THREADS_PER_CORE, node_info.threads_per_core);
-    attrs.push_s(SYSINFO_ATTRIBUTES_CPU_MODEL, node_info.cores[0].model_name.clone());
+    attrs.push_u(
+        SYSINFO_ATTRIBUTES_CORES_PER_SOCKET,
+        node_info.cores_per_socket,
+    );
+    attrs.push_u(
+        SYSINFO_ATTRIBUTES_THREADS_PER_CORE,
+        node_info.threads_per_core,
+    );
+    attrs.push_s(
+        SYSINFO_ATTRIBUTES_CPU_MODEL,
+        node_info.cores[0].model_name.clone(),
+    );
     attrs.push_s(SYSINFO_ATTRIBUTES_ARCHITECTURE, system.get_architecture());
     attrs.push_u(SYSINFO_ATTRIBUTES_MEMORY, node_info.mem_kb);
     let topo_svg = "".to_string(); // TODO: should be in node_info
@@ -135,15 +144,24 @@ fn layout_card_info_newfmt(node_info: &NodeInfo) -> output::Array {
         gpu.push_s(SYSINFO_GPU_CARD_ADDRESS, bus_addr.to_string());
         gpu.push_i(SYSINFO_GPU_CARD_INDEX, device.index as i64);
         gpu.push_s(SYSINFO_GPU_CARD_UUID, device.uuid.to_string());
-        gpu.push_s(SYSINFO_GPU_CARD_MANUFACTURER, node_info.card_manufacturer.clone());
+        gpu.push_s(
+            SYSINFO_GPU_CARD_MANUFACTURER,
+            node_info.card_manufacturer.clone(),
+        );
         gpu.push_s(SYSINFO_GPU_CARD_MODEL, model.to_string());
         gpu.push_s(SYSINFO_GPU_CARD_ARCHITECTURE, arch.to_string());
         gpu.push_s(SYSINFO_GPU_CARD_DRIVER, driver.to_string());
         gpu.push_s(SYSINFO_GPU_CARD_FIRMWARE, firmware.to_string());
         gpu.push_u(SYSINFO_GPU_CARD_MEMORY, *mem_size_kib);
         gpu.push_i(SYSINFO_GPU_CARD_POWER_LIMIT, *power_limit_watt as i64);
-        gpu.push_i(SYSINFO_GPU_CARD_MAX_POWER_LIMIT, *max_power_limit_watt as i64);
-        gpu.push_i(SYSINFO_GPU_CARD_MIN_POWER_LIMIT, *min_power_limit_watt as i64);
+        gpu.push_i(
+            SYSINFO_GPU_CARD_MAX_POWER_LIMIT,
+            *max_power_limit_watt as i64,
+        );
+        gpu.push_i(
+            SYSINFO_GPU_CARD_MIN_POWER_LIMIT,
+            *min_power_limit_watt as i64,
+        );
         gpu.push_i(SYSINFO_GPU_CARD_MAX_CECLOCK, *max_ce_clock_mhz as i64);
         gpu.push_i(SYSINFO_GPU_CARD_MAX_MEMORY_CLOCK, *max_mem_clock_mhz as i64);
         gpu_info.push_o(gpu);

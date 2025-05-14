@@ -62,10 +62,7 @@ fn control_message_reader(control_topic: String, sender: mpsc::Sender<daemon::Op
                                 value = value + " " + f;
                             }
                             if sender
-                                .send(daemon::Operation::Incoming(
-                                    key.to_string(),
-                                    value,
-                                ))
+                                .send(daemon::Operation::Incoming(key.to_string(), value))
                                 .is_err()
                             {
                                 return;
