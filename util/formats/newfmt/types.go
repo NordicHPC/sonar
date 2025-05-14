@@ -148,7 +148,7 @@ type NonemptyString string
 // Uint64 value where zero is an error, not simply absence of datga
 type NonzeroUint uint64
 
-// RFC3999 localtime+TZO with no sub-second precision: yyyy-mm-ddThh:mm:ss+hh:mm, "Z" for +00:00.
+// RFC3339 localtime+TZO with no sub-second precision: yyyy-mm-ddThh:mm:ss+hh:mm, "Z" for +00:00.
 type Timestamp NonemptyString
 
 // Timestamp, or empty string for missing data
@@ -173,6 +173,13 @@ const (
 	ExtendedUintBase ExtendedUint = 2
 )
 
+func (e ExtendedUint) ToUint() (uint64, error) {
+	if e >= ExtendedUintBase {
+		return uint64(e - ExtendedUintBase), nil
+	}
+	return 0, errors.New("Not a finite numeric value")
+}
+
 const (
 	// The bias that we subtract from a timestamp to represent the epoch (it saves a few bytes per data
 	// item).  This is technically not part of the spec, but it's hard for it not to be, because it is
@@ -180,13 +187,6 @@ const (
 	// The value represents 2020-01-01T00:00:00Z, somewhat arbitrarily.
 	EpochTimeBase uint64 = 1577836800
 )
-
-func (e ExtendedUint) ToUint() (uint64, error) {
-	if e >= ExtendedUintBase {
-		return uint64(e - ExtendedUintBase), nil
-	}
-	return 0, errors.New("Not a finite numeric value")
-}
 
 // String-valued enum tag for the record type
 type DataType NonemptyString
