@@ -61,10 +61,11 @@ Policy for changing the minimum Rust version:
 Not all testing is automated.  In addition to automated tests, these tests need to be run before
 release:
 
-- on a node with no GPUs, run `make test` (this usually happens on github, as the github
+- on an x86_64 node with no GPUs, run `make test` (this usually happens on github, as the github
   runners have no GPUs)
-- on a node with NVIDIA GPUs, run `make test`
-- on a node with AMD GPUs, run `make test`
+- on an arm64 node with no GPUs, run `make test`
+- on an x86_64 node with NVIDIA GPUs, run `make test`; the nvidia test should not say "No device"
+- on an x86_64 node with AMD GPUs, run `make test`; the amd test should not say "No device"
 - on a node with a local Kafka install, go to `tests/kafka` and run the tests as described
   in `tests/kafka/README.md`
 

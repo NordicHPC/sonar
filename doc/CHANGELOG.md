@@ -2,14 +2,22 @@
 
 ## Changes in v0.13.x-devel (on `main`)
 
+**Kafka exfiltration**.  Data can be sent via the Kafka protocol (with SSL encryption and SASL
+authentication) to a network broker, rather than relying on an external agents for communication.
+(v0.13.0)
+
+**Daemon mode**.  In this mode, Sonar will stay memory-resident and perform sampling and information
+gathering according to a configuration file, normally exfiltrating the data over a network channel
+using built-in exfiltration.  This aims to reduce the overhead of running Sonar.  (v0.13.0)
+
 **New JSON format**.  The new format is obtained using `--json` for all command and is a clean
 format described in prose in [doc/NEW-FORMAT.md](NEW-FORMAT.md) and in executable form in
-[util/formats/newfmt/types.go](../util/formats/newfmt/types.go).
+[util/formats/newfmt/types.go](../util/formats/newfmt/types.go).  (v0.13.0)
 
-**New cluster command introduced**.  For clusters under Slurm control, this will produce data about
-the cluster configuration (partitions, nodes).
+**`sonar cluster` command introduced**.  For clusters under Slurm control, this will produce data about
+the cluster configuration (partitions, nodes).  (v0.13.0)
 
-**Many new data fields in the new data format**.  Too many to summarize here.
+**Many new data fields in the new data format**.  Too many to summarize here.  (v0.13.0)
 
 **All commands can emit JSON or CSV under a command-line switch**.  The defaults remain the same for now:
 CSV for `ps` and `slurm`, JSON for `sysinfo`.  (v0.13.0)
