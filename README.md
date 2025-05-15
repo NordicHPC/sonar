@@ -4,28 +4,34 @@
 
 # sonar
 
-Tool to profile usage of HPC resources by regularly probing processes.
+Sonar is a tool to profile usage of HPC resources by regularly sampling processes, nodes, queues,
+and clusters.
 
-Sonar examines `/proc` and runs some diagnostic programs and filters and groups the output and
-prints it to stdout.  There are two output formats, [the old format](doc/OLD-FORMAT.md) and [the new
-format](doc/NEW-FORMAT.md), currently coexisting but the old format will be phased out.  Sonar can
-also probe the system and reports on its overall configuration.
+Sonar examines `/proc` and/or runs some diagnostic programs, filters and groups the information, and
+prints it to stdout or sends it to a remote collector (via Kafka).
 
 ![image of a fish swarm](img/sonar-small.png)
 
 Image: [Midjourney](https://midjourney.com/), [CC BY-NC 4.0](https://creativecommons.org/licenses/by-nc/4.0/legalcode)
 
+For more about the motivation and design, and other considerations, see [doc/DESIGN.md](doc/DESIGN.md).
 
 ## Subcommands
 
 Sonar has several subcommands that collect information about nodes, jobs, clusters, and processes
 and print it on stdout:
 
-- `sonar ps` takes a snapshot of the currently running processes
+- `sonar ps` takes a snapshot of the currently running processes on the node
 - `sonar sysinfo` extracts hardware information about the node
 - `sonar slurm` extracts information about overall job state from the slurm databases
 - `sonar cluster` extracts information about partitions and node state from the slurm databases
-- `sonar help` prints some useful help
+
+Those subcommands are all run-once: Sonar exits after producing output.  Additionally, however,
+`sonar daemon` starts Sonar and keeps it memory-resident, running subprograms at intervals specified
+by a configuration file.  In this mode, exfiltration of data in production normally happens via
+Kafka.
+
+Finally, `sonar help` prints some useful help.
 
 
 ## Compilation and installation
@@ -42,9 +48,12 @@ this can be a problem on eg RHEL9.  See comments in `gpuapi/Makefile` for how to
 
 ## Output format options
 
+There are two output formats, [the old format](doc/OLD-FORMAT.md) and [the new
+format](doc/NEW-FORMAT.md), currently coexisting but the old format will be phased out.
+
 The recommended output format is the "new" JSON format.  Use the command line switch `--json` with
 all commands to force this format.  Most subcommands currently default to either CSV or an older
-JSON format.
+JSON format, but in daemon mode, only the new format is available.
 
 
 ## Collect processes with `sonar ps`
@@ -90,7 +99,7 @@ Options for `ps`:
 `/var/run`, `/run`, or a tmpfs, and ideally it is a directory on a disk local to the node, not a
 shared disk.
 
-Here is an example output (with the default CSV output format):
+Here is an example output (with the default older CSV output format):
 ```console
 $ sonar ps --exclude-system-jobs --min-cpu-time=10 --rollup
 
@@ -105,7 +114,7 @@ v=0.7.0,time=2023-08-10T11:09:41+02:00,host=somehost,cores=8,user=someone,job=0,
 ## Collect system information with `sonar sysinfo`
 
 The `sysinfo` subcommand collects information about the system and prints it in JSON form on stdout
-(this is the older JSON format):
+(this is the default older JSON format):
 
 ```console
 $ sonar sysinfo
@@ -126,97 +135,44 @@ VMs) once every 24 hours, and to aggregate the information in some database.
 The `sysinfo` subcommand currently has no options.
 
 
-## Collecting job information with `sonar slurm`
+## Collecting job information with `sonar slurm` (incomplete)
 
 To be written.
 
 This command exists partly to allow clusters to always push data, partly to collect the data for
 long-term storage, partly to offload the Slurm database manager during query processing.
 
-## Collecting partition and node information with `sonar cluster`
+
+## Collecting partition and node information with `sonar cluster` (incomplete)
 
 To be written.
 
 This command exists partly to allow clusters to always push data, partly to collect the data for
 long-term storage.
 
+
 ## Collect and analyze results
 
 Sonar data are used by two other tools:
 
-* [JobGraph](https://github.com/NordicHPC/jobgraph) provides high-level plots of system activity. Mapping
-  files for JobGraph can be found in the [data](data) folder.
-* [JobAnalyzer](https://github.com/NAICNO/Jobanalyzer) allows sonar logs to be queried and analyzed, and
+* [JobAnalyzer](https://github.com/NAICNO/Jobanalyzer) allows Sonar logs to be queried and analyzed, and
   provides dashboards, interactive and batch queries, and reporting of system activity, policy violations,
-  hung jobs, and more.
-
-
-## Output formats
-
-See [doc/OLD-FORMAT.md](doc/OLD-FORMAT.md) and [doc/NEW-FORMAT.md](doc/NEW-FORMAT.md) for
-specifications of the output data formats and the semantics of individual fields.
+  hung jobs, and more.  It is under active development.
+* [JobGraph](https://github.com/NordicHPC/jobgraph) provides high-level plots of system activity. Mapping
+  files for JobGraph can be found in the [data](data) folder.  Its development has been dormant for some
+  time.
 
 
 ## Versions and release procedures
 
-### Version numbers
-
-The following basic versioning rules are new with v0.8.0.
-
 We use semantic versioning.  The major version is expected to remain at zero for the foreseeable
 future, reflecting the experimental nature of Sonar.
-
-The minor version is updated with changes that alter the output format deliberately: fields are
-added, removed, or are given a new meaning (this has been avoided so far), or the record format
-itself changes.  For example, v0.8.0 both added fields and stopped printing fields that are zero.
-
-The bugfix version is updated for changes that do not alter the output format per se but that might
-affect the output nevertheless, ie, most changes not covered by changes to the minor version number.
-
-
-### Release branches, uplifts and backports
-
-The following branching scheme is new with v0.12.x.
-
-The `main` branch is used for development and has a version number of the form `M.N.O-PRE` where
-"PRE" is some arbitrary string, eg "devel", "rc4".  Note that this version number form will also be
-present in the output of `sonar ps`, to properly tag those data.  If clients are exposed to
-prerelease `ps` data they must be prepared to deal with this.
-
-For every freeze of the the minor release number, a new release branch is created in the repo with
-the name `release_<major>_<minor>`, again we expect `<major>` to remain `0` for the foreseeable
-future, ergo, `release_0_12` is the v0.12.x release branch.  At branching time, the minor release
-number is incremented on main (so when we created `release_0_12` for v0.12.1, the version number on
-`main` went to `0.13.0-devel`).  The version number on a release branch is strictly of the form
-M.N.O.
-
-When a release `M.N.O` is to be made from a release branch, a tag is created of the form
-`release_M_N_O` on that branch and the release is built from that changeset.  Once the release has
-shipped, the bugfix version number on the branch is incremented.
-
-With the branches come some additional rules for how to move patches around:
-
-- If a bugfix is made to any release branch and the bug is present on main then the PR shall be
-  tagged "uplift-required"; the PR shall subsequently be uplifted main; and following uplift the tag
-  shall be changed to "uplifted-to-main".
-- If a bugfix is made to main it shall be considered whether it should be backported the most recent
-  release branch.  If so, the PR shall be tagged "backport-required"; the PR shall subsequently be
-  cherry-picked or backported to the release branch; and following backport the tag shall be changed
-  to "backported-to-release".  No older release branches shall automatically be considered for
-  backports.
-
-
-### Policies for changing Rust edition and minimum Rust version
 
 At the time of writing we require:
 - 2021 edition of Rust
 - Rust 1.72.1 (can be found with `cargo msrv find`)
 
-Policy for changing the minimum Rust version:
-- Open a GitHub issue and motivate the change
-- Once we reach agreement in the issue discussion:
-  - Update the version inside the test workflow [test-minimal.yml](.github/workflows/test-minimal.yml)
-  - Update the documentation (this section)
+For all other versioning information, see [doc/VERSIONING.md](doc/VERSIONING.md).
 
 
 ## Authors
@@ -227,76 +183,7 @@ Policy for changing the minimum Rust version:
 - Henrik Rojas Nagel
 
 
-## Early design goals and design decisions
-
-- Easy installation
-- Minimal overhead for recording
-- Can be used as health check tool
-- Does not need root permissions
-
-**Use `ps` instead of `top`**:
-We started using `top` but it turned out that `top` is dependent on locale, so
-it displays floats with comma instead of decimal point in many non-English
-locales. `ps` always uses decimal points. In addition, `ps` is (arguably) more
-versatile/configurable and does not print the header that `top` prints. All
-these properties make the `ps` output easier to parse than the `top` output.
-
-**Do not interact with the Slurm database at all**:
-The initial version correlated information we gathered from `ps` (what is
-actually running) with information from Slurm (what was requested). This was
-useful and nice to have but became complicated to maintain since Slurm could
-become unresponsive and then processes were piling up.
-
-**Why not also recording the `pid`**?:
-Because we sum over processes of the same name that may be running over many
-cores to have less output so that we can keep logs in plain text
-([csv](https://en.wikipedia.org/wiki/Comma-separated_values)) and don't have to
-maintain a database or such.
-
-
-## Later design goals and design decisions
-
-The needs of [Jobanalyzer](https://github.com/NAICNO/Jobanalyzer) and some bug fixes have led to
-some feature creep (more data are reported), a bit of redesign (go directly to `/proc`, do not run
-`ps`), and some quirky semantics (`cpu%` is only a good number for the first data point but is still
-always reported, and `cputime/sec` is reported to complement it; and there's a distinction between
-virtual and real memory that is possibly more useful on GPU-full and interactive systems than on HPC
-CPU-only compute nodes).
-
-
-## Security and robustness
-
-The tool does **not** need root permissions.  It does not modify anything and writes output to
-stdout (and errors to stderr).
-
-No external commands are called by `sonar ps` or `sonar sysinfo`: Sonar reads `/proc` and probes the
-GPUs via their manufacturers' SMI libraries to collect all data.
-
-The Slurm `sacct` command is currently run by `sonar slurm`.  A timeout mechanism is in place to
-prevent this command from hanging indefinitely.
-
-Optionally, `sonar` will use a lockfile to avoid a pile-up of processes.
-
-
-## Dependencies and updates
-
-Sonar runs everywhere and all the time, and even though it currently runs without privileges it
-strives to have as few dependencies as possible, so as not to become a target through a supply chain
-attack.  There are some rules:
-
-- It's OK to depend on libc and to incorporate new versions of libc
-- It's better to depend on something from the rust-lang organization than on something else
-- Every dependency needs to be justified
-- Every dependency must have a compatible license
-- Every dependency needs to be vetted as to active development, apparent quality, test cases
-- Every dependency update - even for security issues - is to be considered a code change that needs review
-- Remember that indirect dependencies are dependencies for us, too, and need to be treated the same way
-- If in doubt: copy the parts we need, vet them thoroughly, and maintain them separately
-
-There is a useful discussion of these matters [here](https://research.swtch.com/deps).
-
-
-## How we run sonar on a cluster
+## How we run sonar on a cluster (incomplete)
 
 We let cron execute the following script every 5 minutes on every compute node:
 
@@ -321,7 +208,7 @@ day on the UiO ML nodes (all interactive), with significant variation.  Being te
 compresses extremely well.
 
 
-## Similar and related tools
+## Similar and related tools (incomplete)
 
 - Reference implementation which serves as inspiration:
   <https://github.com/UNINETTSigma2/appusage>
