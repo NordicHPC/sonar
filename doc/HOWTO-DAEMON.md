@@ -6,8 +6,8 @@ command line parameter is the name of a config file.
 The daemon is a multi-threaded system that performs system sampling, communicates with the sink, and
 handles signals and lock files.
 
-If no other data sink is specified, the daemon prints output on stdout and reads control messages
-from stdin, see later sections.
+If a sink is configured (currently only Kafka) then that is used for all data and control messages.
+Otherwise, data are printed on stdout and control messages are read from stdin.
 
 ## CONFIG FILE
 
@@ -24,10 +24,11 @@ divide an hour evenly and < 60, and hour values must divide a day evenly or be a
 of 24.  (Some sensible cadences such as 90m aka 1h30m are not currently expressible.)
 
 The config file has `[global]` and `[debug]` sections that control general operation; an optional
-section for the transport type chosen, currently none; and a section each for the sonar operations,
-controlling their cadence and operation in the same way as normal command line switches.  For the
-Sonar operations, the cadence setting is required for the operation to be run, the command will be
-run at a time that is zero mod the cadence.
+section for the transport type chosen, currently `[kafka]` (otherwise terminal I/O is used for
+transport); and a section each for the sonar operations, controlling their cadence and operation in
+the same way as normal command line switches.  For the Sonar operations, the cadence setting is
+required for the operation to be run, the command will be run at a time that is zero mod the
+cadence.
 
 ### `[global]` section
 
@@ -51,6 +52,24 @@ relinquished temporarily (and the restarted config file may name a different loc
 If there is a `topic-prefix` then it is prefixed to each data packet's topic.  A popular value would
 be `test` to tag the data coming from test setups.  (See "DATA MESSAGE FORMATS" below for more about
 topics.)
+
+### `[kafka]` section
+
+```
+broker-address = <hostname and port>
+sending-window = <duration value>               # default 5m
+ca-file = <filename>                            # default none
+sasl-password = <string>                        # default none
+```
+
+The `broker-address` is required and names the address of the broker.  For Kafka it's usually
+host:port, eg `localhost:9092` for a local broker on the standard port.
+
+All available data are sent to the data sink at some random time within the `sending-window`, which
+starts at the point when data become available to send.
+
+The `ca-file` and `sasl-password` are explained in [HOWTO-KAFKA](HOWTO-KAFKA.md), basically the
+former triggers the use of TLS for the connection and the latter additionally adds authentication.
 
 ### `[sample]` section aka `[ps]` section
 
@@ -103,7 +122,7 @@ verbose = bool                                  # default false
 ```
 
 Setting `verbose` to true will cause the daemon to print somewhat informative messages about what
-it's doing at important points during the run.
+it's doing at important points during the run to stderr.
 
 ## DATA MESSAGE FORMATS
 
