@@ -68,6 +68,7 @@ impl RdKafka {
                 .as_ref()
                 .map(|password| (global.cluster.clone(), password.clone()));
             let sending_window = ini.kafka.sending_window.to_seconds();
+            let timeout = ini.kafka.timeout.to_seconds();
             let verbose = debug.verbose;
             thread::spawn(move || {
                 kafka_producer(
@@ -76,6 +77,7 @@ impl RdKafka {
                     ca_file,
                     sasl_identity,
                     sending_window,
+                    timeout,
                     incoming_message_queue,
                     control_and_errors,
                     verbose,
@@ -112,10 +114,11 @@ impl DataSink for RdKafka {
 // Sending logic works like this:
 //
 // We use a ThreadedProducer to send messages.  In this scheme, we enqueue messages and a background
-// thread will poll the Kafka subsystem as necessary to make sure they are sent.  We set the message
-// timeout to 30m and that is our main means of controlling the backlog.  When a message fails to be
-// sent for reasons of timeout, we simply drop it.  There may be other reasons for not sending
-// it, but we're not exploring that yet.
+// thread will poll the Kafka subsystem as necessary to make sure they are sent.  We set a message
+// timeout and that is our main means of controlling the backlog.  When a message fails to be sent
+// for reasons of timeout, we simply drop it.  There may be other reasons for not sending it, but
+// we're not exploring that yet.  The default is 30m, long enough for interesting things to happen
+// on the broker side.
 //
 // Compression is set to "snappy" as it's believed it's an OK choice for JSON data.
 //
@@ -136,6 +139,7 @@ fn kafka_producer(
     ca_file: Option<String>,
     sasl_identity: Option<(String, String)>,
     sending_window: u64,
+    timeout: u64,
     incoming_message_queue: mpsc::Receiver<Message>,
     control_and_errors: mpsc::Sender<Operation>,
     verbose: bool,
@@ -144,7 +148,7 @@ fn kafka_producer(
     cfg.set("bootstrap.servers", &broker)
         .set("client.id", &client_id)
         .set("queue.buffering.max.ms", "1000")
-        .set("message.timeout.ms", "1800000") // 30 minutes
+        .set("message.timeout.ms", &format!("{}", timeout * 1000))
         .set("compression.codec", "snappy");
     if let Some(ref filename) = ca_file {
         cfg.set("ssl.ca.location", filename)
