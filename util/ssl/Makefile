@@ -1,4 +1,5 @@
 .PHONY: default all clean
+HOSTNAME ?= $(shell hostname)
 
 default:
 	@echo "Use an explicit target"
@@ -15,7 +16,7 @@ server-key.pem server-cert.pem: Makefile
 	-days 365 \
 	-nodes \
 	-subj "/CN=$(USER).$(HOSTNAME)" \
-	-addext "subjectAltName=DNS:$(HOSTNAME),DNS:localhost,IP:127.0.0.1"
+	-addext "subjectAltName=DNS:$(HOSTNAME),DNS:localhost,IP:127.0.0.1,DNS:kafka-broker"
 
 # CA private key.
 sonar-ca-key.pem: Makefile
@@ -26,13 +27,13 @@ sonar-ca-key.pem: Makefile
 sonar-ca.crt: sonar-ca-key.pem Makefile
 	openssl req -new -x509 -key sonar-ca-key.pem -out sonar-ca.crt \
 	-subj "/CN=$(USER).$(HOSTNAME) CA" \
-	-addext "subjectAltName=DNS:$(HOSTNAME),DNS:localhost,IP:127.0.0.1"
+	-addext "subjectAltName=DNS:$(HOSTNAME),DNS:localhost,IP:127.0.0.1,DNS:kafka-broker"
 
 # Server certificate signing request
 server-key.csr: server-key.pem Makefile
 	openssl req -new -key server-key.pem -out server-key.csr \
 	-subj "/CN=$(USER).$(HOSTNAME)" \
-	-addext "subjectAltName=DNS:$(HOSTNAME),DNS:localhost,IP:127.0.0.1"
+	-addext "subjectAltName=DNS:$(HOSTNAME),DNS:localhost,IP:127.0.0.1,DNS:kafka-broker"
 
 # Server signed certificate
 server-cert-signed.crt: server-key.csr sonar-ca.crt sonar-ca-key.pem Makefile

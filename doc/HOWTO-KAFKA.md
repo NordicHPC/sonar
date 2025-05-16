@@ -37,9 +37,14 @@ Test notes with standard Kafka server, see https://kafka.apache.org/quickstart.
 
 #### Setup
 
+Download a [Kafka Binary Release](https://dlcdn.apache.org/kafka/3.9.0/kafka_2.13-3.9.0.tgz) and unpack it:
+```
+    tar xvf kafka_2.13-3.9.0.tgz
+```
+
 You're going to be running several shells, let's call them Zookeeper, Server, Consumer, Work, and Sonar.
 
-The working directory for the following is the root directory of the unpacked Kafka distribution, eg
+The working directory for the following is the root directory of the unpacked Kafka distribution, e.g.,
 `kafka_2.13-3.9.0/`.
 
 NOTE!  Currently Sonar has only been tested with Kafka 3.9.0.  Kafka 4.0.0 may or may not work, it removed
