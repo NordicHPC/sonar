@@ -1,6 +1,6 @@
 # Sonar change log
 
-## Changes in v0.13.x-devel (on `main`)
+## Changes in v0.13.x (on `release_0_13`)
 
 **Kafka exfiltration**.  Data can be sent via the Kafka protocol (with SSL encryption and SASL
 authentication) to a network broker, rather than relying on an external agents for communication.
