@@ -36,14 +36,24 @@ Finally, `sonar help` prints some useful help.
 
 ## Compilation and installation
 
+In principle you just do this:
+
 - Make sure you have [Rust installed](https://www.rust-lang.org/learn/get-started) (I install Rust through `rustup`)
 - Clone this project
 - Build it: `cargo build --release`
 - The binary is then located at `target/release/sonar`
 - Copy it to wherever it needs to be
 
-If the build results in a link error for `libsonar-<something>.a` then your binutils are too old,
-this can be a problem on eg RHEL9.  See comments in `gpuapi/Makefile` for how to resolve this.
+In practice it is a little harder:
+
+- First, Kafka requires `cmake` to compile, so make sure you have that
+- Second, the binutils you have need to be new enough for the assembler to understand `--gdwarf5`
+  (for Kafka) and some other things (to link the GPU probe libraries)
+- Third, some of the tests in `util/` (if you are going to be running those) require `go`
+
+Some distros, notably RHEL9, have binutils that are too old.  Binutils 2.32 are new enough for the
+GPU probe libraries but may not be new enough for Kafka.  Binutils 2.40 are known to work for both.
+Also see comments in `gpuapi/Makefile`.
 
 
 ## Output format options
