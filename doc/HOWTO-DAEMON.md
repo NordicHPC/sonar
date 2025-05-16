@@ -58,6 +58,7 @@ topics.)
 ```
 broker-address = <hostname and port>
 sending-window = <duration value>               # default 5m
+timeout = <duration value>                      # default 30m
 ca-file = <filename>                            # default none
 sasl-password = <string>                        # default none
 ```
@@ -67,6 +68,10 @@ host:port, eg `localhost:9092` for a local broker on the standard port.
 
 All available data are sent to the data sink at some random time within the `sending-window`, which
 starts at the point when data become available to send.
+
+The `timeout` is how long a message is held internally without being able to be sent before it is
+dropped.  The reason for sending failure could be that the broker is down, that the network is down,
+and that Sonar is misconfigured.  A short timeout may be useful during debugging.
 
 The `ca-file` and `sasl-password` are explained in [HOWTO-KAFKA](HOWTO-KAFKA.md), basically the
 former triggers the use of TLS for the connection and the latter additionally adds authentication.

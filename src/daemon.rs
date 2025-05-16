@@ -50,6 +50,7 @@ pub struct GlobalIni {
 pub struct KafkaIni {
     pub broker_address: String,
     pub sending_window: Dur,
+    pub timeout: Dur,
     pub ca_file: Option<String>,
     pub sasl_password: Option<String>,
 }
@@ -559,6 +560,7 @@ fn parse_config(config_file: &str) -> Result<Ini, String> {
         kafka: KafkaIni {
             broker_address: "".to_string(),
             sending_window: Dur::Minutes(5),
+            timeout: Dur::Minutes(30),
             ca_file: None,
             sasl_password: None,
         },
@@ -683,6 +685,9 @@ fn parse_config(config_file: &str) -> Result<Ini, String> {
                 "sending-window" => {
                     ini.kafka.sending_window =
                         parse_duration("kafka.sending-window", &value, true)?;
+                }
+                "timeout" => {
+                    ini.kafka.timeout = parse_duration("kafka.timeout", &value, true)?;
                 }
                 "ca-file" => {
                     ini.kafka.ca_file = Some(value);
