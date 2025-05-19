@@ -9,13 +9,18 @@ use std::thread;
 
 pub struct DirectorySink {
     data_dir: String,
+    control_and_errors: mpsc::Sender<daemon::Operation>,
 }
 
 impl DirectorySink {
     pub fn new(
         data_dir: &str,
+        control_and_errors: mpsc::Sender<daemon::Operation>,
     ) -> DirectorySink {
-        DirectorySink { data_dir: data_dir.to_string() }
+        DirectorySink {
+            data_dir: data_dir.to_string(),
+            control_and_errors,
+        }
     }
 }
 

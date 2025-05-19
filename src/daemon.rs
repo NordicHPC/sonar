@@ -237,7 +237,7 @@ pub fn daemon_mode(
     let data_sink: Box<dyn DataSink> = if ini.kafka.broker_address != "" {
         Box::new(RdKafka::new(&ini, client_id, control_topic, event_sender))
     } else if let Some(ref data_dir) = ini.directory.data_dir {
-        Box::new(DirectorySink::new(data_dir))
+        Box::new(DirectorySink::new(data_dir, event_sender))
     } else {
         Box::new(StdioSink::new(client_id, control_topic, event_sender))
     };
