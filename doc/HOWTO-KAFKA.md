@@ -37,7 +37,10 @@ Test notes with standard Kafka server, see https://kafka.apache.org/quickstart.
 
 #### Setup
 
-Download a [Kafka Binary Release](https://dlcdn.apache.org/kafka/3.9.0/kafka_2.13-3.9.0.tgz) and unpack it:
+Download the [Kafka Binary Release](https://kafka.apache.org/downloads) (.tgz).
+You should download the release for scala version 2.13 and kafka version 3.9.0, since that is the only release tested with sonar.
+Unpack it, once downloaded:
+
 ```
     tar xvf kafka_2.13-3.9.0.tgz
 ```
