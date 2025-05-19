@@ -8,6 +8,8 @@ mod command;
 mod daemon;
 #[cfg(feature = "daemon")]
 mod datasink;
+#[cfg(feature = "daemon")]
+mod directorysink;
 mod gpuapi;
 mod hostname;
 mod interrupt;

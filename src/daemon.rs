@@ -23,6 +23,7 @@
 
 use crate::cluster;
 use crate::datasink::DataSink;
+use crate::directorysink::DirectorySink;
 use crate::jobsapi;
 use crate::json_tags;
 #[cfg(feature = "kafka")]
@@ -60,6 +61,10 @@ pub struct DebugIni {
     pub verbose: bool,
 }
 
+pub struct DirectoryIni {
+    pub data_dir: Option<String>,
+}
+
 pub struct SampleIni {
     pub cadence: Option<Dur>,
     pub exclude_system_jobs: bool,
@@ -88,6 +93,7 @@ pub struct Ini {
     pub global: GlobalIni,
     #[cfg(feature = "kafka")]
     pub kafka: KafkaIni,
+    pub directory: DirectoryIni,
     pub debug: DebugIni,
     pub sample: SampleIni,
     pub sysinfo: SysinfoIni,
@@ -221,12 +227,17 @@ pub fn daemon_mode(
     }
 
     #[cfg(not(feature = "kafka"))]
-    let data_sink: Box<dyn DataSink> =
-        Box::new(StdioSink::new(client_id, control_topic, event_sender));
+    let data_sink: Box<dyn DataSink> = if let Some(ref data_dir) = ini.directory.data_dir {
+        Box::new(DirectorySink::new(data_dir))
+    } else {
+        Box::new(StdioSink::new(client_id, control_topic, event_sender))
+    };
 
     #[cfg(feature = "kafka")]
     let data_sink: Box<dyn DataSink> = if ini.kafka.broker_address != "" {
         Box::new(RdKafka::new(&ini, client_id, control_topic, event_sender))
+    } else if let Some(ref data_dir) = ini.directory.data_dir {
+        Box::new(DirectorySink::new(data_dir))
     } else {
         Box::new(StdioSink::new(client_id, control_topic, event_sender))
     };
@@ -565,6 +576,9 @@ fn parse_config(config_file: &str) -> Result<Ini, String> {
             ca_file: None,
             sasl_password: None,
         },
+        directory: DirectoryIni {
+            data_dir: None,
+        },
         debug: DebugIni { verbose: false },
         sample: SampleIni {
             cadence: None,
@@ -591,6 +605,7 @@ fn parse_config(config_file: &str) -> Result<Ini, String> {
         Global,
         #[cfg(feature = "kafka")]
         Kafka,
+        Directory,
         Debug,
         Sample,
         Sysinfo,
@@ -602,6 +617,7 @@ fn parse_config(config_file: &str) -> Result<Ini, String> {
     let mut have_kafka = false;
     #[cfg(feature = "kafka")]
     let mut have_kafka_remote = false;
+    let mut have_directory = false;
     let file = match std::fs::File::open(config_file) {
         Ok(f) => f,
         Err(e) => {
@@ -630,6 +646,10 @@ fn parse_config(config_file: &str) -> Result<Ini, String> {
         if l == "[kafka]" {
             curr_section = Section::Kafka;
             have_kafka = true;
+            continue;
+        }
+        if l == "[directory]" {
+            curr_section = Section::Directory;
             continue;
         }
         if l == "[debug]" {
@@ -698,6 +718,13 @@ fn parse_config(config_file: &str) -> Result<Ini, String> {
                 }
                 _ => return Err(format!("Invalid [kafka] setting name `{name}`")),
             },
+            Section::Directory => match name.as_str() {
+                "data-directory" => {
+                    ini.directory.data_dir = Some(value);
+                    have_directory = true;
+                }
+                _ => return Err(format!("Invalid [directory] setting name `{name}`")),
+            }
             Section::Debug => match name.as_str() {
                 "verbose" => {
                     ini.debug.verbose = parse_bool(&value)?;
@@ -768,6 +795,9 @@ fn parse_config(config_file: &str) -> Result<Ini, String> {
 
     #[cfg(feature = "kafka")]
     if have_kafka {
+        if have_directory {
+            return Err("Both kafka and data directory configured".to_string());
+        }
         if !have_kafka_remote {
             return Err("Missing kafka.remote-host setting".to_string());
         }
