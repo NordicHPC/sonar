@@ -22,7 +22,7 @@
 // Signal handlers place signals in the daemon's channel as events.
 
 use crate::cluster;
-use crate::datasink::{DataSink, StdioSink};
+use crate::datasink::DataSink;
 use crate::jobsapi;
 use crate::json_tags;
 #[cfg(feature = "kafka")]
@@ -31,6 +31,7 @@ use crate::log;
 use crate::ps;
 use crate::realsystem;
 use crate::slurmjobs;
+use crate::stdiosink::StdioSink;
 use crate::sysinfo;
 use crate::systemapi::SystemAPI;
 use crate::time::{unix_now, unix_time_components};

@@ -44,6 +44,8 @@ mod realprocfs;
 mod realsystem;
 mod slurm;
 mod slurmjobs;
+#[cfg(feature = "daemon")]
+mod stdiosink;
 mod sysinfo;
 #[cfg(test)]
 mod sysinfo_test;
