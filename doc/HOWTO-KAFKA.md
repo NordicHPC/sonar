@@ -37,9 +37,17 @@ Test notes with standard Kafka server, see https://kafka.apache.org/quickstart.
 
 #### Setup
 
+Download the [Kafka Binary Release](https://kafka.apache.org/downloads) (.tgz).
+You should download the release for scala version 2.13 and kafka version 3.9.0, since that is the only release tested with sonar.
+Unpack it, once downloaded:
+
+```
+    tar xvf kafka_2.13-3.9.0.tgz
+```
+
 You're going to be running several shells, let's call them Zookeeper, Server, Consumer, Work, and Sonar.
 
-The working directory for the following is the root directory of the unpacked Kafka distribution, eg
+The working directory for the following is the root directory of the unpacked Kafka distribution, e.g.,
 `kafka_2.13-3.9.0/`.
 
 NOTE!  Currently Sonar has only been tested with Kafka 3.9.0.  Kafka 4.0.0 may or may not work, it removed

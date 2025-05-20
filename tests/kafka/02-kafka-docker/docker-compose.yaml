@@ -1,0 +1,72 @@
+services:
+  kafka-broker:
+    image: apache/kafka:3.9.0
+    hostname: kafka-broker
+    container_name: kafka-broker
+    ports:
+      - 29093:29093
+      - 9099:9099
+      - 9093:9093
+    environment:
+      KAFKA_OPTS: -Djava.security.auth.login.config=/sasl/kafka-jaas.conf
+      KAFKA_BROKER_ID: 1
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CLIENT:SASL_SSL,CONSUMER:PLAINTEXT,CONTROLLER:PLAINTEXT,DOCKER_CLIENT:SASL_SSL
+      KAFKA_ADVERTISED_LISTENERS: CONTROLLER://${HOSTNAME}:29093,CLIENT://${HOSTNAME}:9093,CONSUMER://${HOSTNAME}:9099,DOCKER_CLIENT://kafka-broker:9094
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_NODE_ID: 1
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka-broker:29093
+
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_LISTENERS: CONTROLLER://:29093,CLIENT://:9093,CONSUMER://:9099,DOCKER_CLIENT://:9094
+
+
+      KAFKA_INTER_BROKER_LISTENER_NAME: CONSUMER
+
+      KAFKA_SECURITY_PROTOCOL: SASL_SSL
+      KAFKA_SSL_KEYSTORE_TYPE: PEM
+      KAFKA_SSL_KEYSTORE_LOCATION: /ssl/sonar-kafka-keystore.pem
+      KAFKA_SSL_TRUSTSTORE_TYPE: PEM
+      KAFKA_SSL_TRUSTSTORE_LOCATION: /ssl/sonar-ca.crt
+      KAFKA_ENDPOINT_IDENTIFICATION_ALGORITHM:
+
+
+      KAFKA_SASL_MECHANISMS: PLAIN
+      KAFKA_SASL_ENABLED_MECHANISMS: PLAIN
+      KAFKA_NUM_NETWORK_THREADS: 3
+
+      #KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_LOG_DIRS: /tmp/kafka-combined-logs
+      CLUSTER_ID: test-cluster
+    volumes:
+      - ./ssl:/ssl
+      - ./sasl:/sasl
+  kafka-ui:
+    image: provectuslabs/kafka-ui
+    hostname: kafka-ui
+    container_name: kafka-ui
+    ports:
+      - 10090:8080
+    restart: always
+    environment:
+      JAVA_OPTS: -Djava.security.auth.login.config=/sasl/kafka-jaas.conf
+      # Alternatively to providing JAVA_OPTS can credentials also directly be specified here
+      #KAFKA_CLUSTERS_0_PROPERTIES_SASL_JAAS_CONFIG: 'org.apache.kafka.common.security.plain.PlainLoginModule required username="test-cluster.hpc.uio.no" password="test-password";'
+      KAFKA_CLUSTERS_0_NAME: test-cluster
+      # IMPORTANT: kafka-broker need to be mentioned as Subject Alternative Name (SAN) in the generated certificates
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka-broker:9094
+      KAFKA_CLUSTERS_0_PROPERTIES_SECURITY_PROTOCOL: SASL_SSL
+      KAFKA_CLUSTERS_0_PROPERTIES_SASL_MECHANISM: PLAIN
+      #DYNAMIC_CONFIG_ENABLED: true # not necessary for sasl auth, added for tests
+      KAFKA_CLUSTERS_0_PROPERTIES_SSL_KEYSTORE_TYPE: PEM
+      KAFKA_CLUSTERS_0_PROPERTIES_SSL_KEYSTORE_LOCATION: /ssl/sonar-kafka-keystore.pem
+      KAFKA_CLUSTERS_0_PROPERTIES_SSL_TRUSTSTORE_TYPE: PEM
+      KAFKA_CLUSTERS_0_PROPERTIES_SSL_TRUSTSTORE_LOCATION: /ssl/sonar-ca.crt
+    volumes:
+      - ./ssl:/ssl
+      - ./sasl:/sasl
+
