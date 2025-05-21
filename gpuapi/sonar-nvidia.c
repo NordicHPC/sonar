@@ -118,37 +118,43 @@ static int load_nvml() {
         return -1;
     }
 
-    /* /usr/lib64 is the location of the CUDA SMI library on all the UiO ML nodes and on the Fox GPU
-       nodes (RHEL9).  The Web also seems to think this is the right spot.  However older CUDA
-       libraries (eg, for CUDA 430 on SRL login3, Ubuntu 18) have been found in other locations.
+    /* /usr/lib64 is the location of the CUDA SMI library on all the UiO ML nodes (RHEL8) and on the
+       Fox GPU nodes (RHEL9).  The Web also seems to think this is the right spot.  However older
+       CUDA libraries (eg, for CUDA 430 on SRL login3, Ubuntu 18) have been found in other
+       locations.
 
        According to the Filesystem Hierarchy Standard, we're going to be looking at /lib, /usr/lib,
        /lib64, and /usr/lib64.  But in practice things are also found in /lib/<arch>-linux-gnu and
        /usr/lib/<arch>-linux-gnu where <arch> is as in `uname -m`.
 
        Instead of being clever, just try one after the other.
+
+       Another wrinkle is that sometimes the plain .so symlink does not exist, we need to ask for
+       the .so.1 version explicitly.  I don't know why there is this variation, I found it on an
+       RHEL8 system with newer NVIDIA versions.  It's probably good to be specific about the version
+       always.
     */
     if (sizeof(void*) == 8) {
         if (lib == NULL) {
-            lib = dlopen("/usr/lib64/libnvidia-ml.so", RTLD_NOW);
+            lib = dlopen("/usr/lib64/libnvidia-ml.so.1", RTLD_NOW);
         }
         if (lib == NULL) {
-            lib = dlopen("/lib64/libnvidia-ml.so", RTLD_NOW);
+            lib = dlopen("/lib64/libnvidia-ml.so.1", RTLD_NOW);
         }
     }
     if (lib == NULL) {
-        lib = dlopen("/usr/lib/libnvidia-ml.so", RTLD_NOW);
+        lib = dlopen("/usr/lib/libnvidia-ml.so.1", RTLD_NOW);
     }
     if (lib == NULL) {
-        lib = dlopen("/lib/libnvidia-ml.so", RTLD_NOW);
+        lib = dlopen("/lib/libnvidia-ml.so.1", RTLD_NOW);
     }
     if (lib == NULL) {
-        snprintf(pathbuf, sizeof(pathbuf), "/usr/lib/%s-linux-gnu/libnvidia-ml.so",
+        snprintf(pathbuf, sizeof(pathbuf), "/usr/lib/%s-linux-gnu/libnvidia-ml.so.1",
                  sysinfo.machine);
         lib = dlopen(pathbuf, RTLD_NOW);
     }
     if (lib == NULL) {
-        snprintf(pathbuf, sizeof(pathbuf), "/lib/%s-linux-gnu/libnvidia-ml.so", sysinfo.machine);
+        snprintf(pathbuf, sizeof(pathbuf), "/lib/%s-linux-gnu/libnvidia-ml.so.1", sysinfo.machine);
         lib = dlopen(pathbuf, RTLD_NOW);
     }
     if (lib == NULL) {
