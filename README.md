@@ -40,6 +40,9 @@ In principle you just do this:
 
 - Make sure you have [Rust installed](https://www.rust-lang.org/learn/get-started) (I install Rust through `rustup`)
 - Clone this project
+- If building with Kafka support (the default), you must have the OpenSSL development libraries installed,
+  [as noted here](https://docs.rs/rdkafka/0.37.0/rdkafka/#installation).
+  On Ubuntu, this is libssl-dev, on Fedora it is openssl-devel.
 - Build it: `cargo build --release`
 - The binary is then located at `target/release/sonar`
 - Copy it to wherever it needs to be
