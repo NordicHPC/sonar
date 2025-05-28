@@ -128,28 +128,33 @@ static int load_nvml() {
        /usr/lib/<arch>-linux-gnu where <arch> is as in `uname -m`.
 
        Instead of being clever, just try one after the other.
+
+       Another wrinkle is that sometimes the plain .so symlink does not exist, we need to ask for
+       the .so.1 version explicitly.  I don't know why there is this variation, I found it on an
+       RHEL8 system with newer NVIDIA versions.  It's probably good to be specific about the version
+       always.
     */
     if (sizeof(void*) == 8) {
         if (lib == NULL) {
-            lib = dlopen("/usr/lib64/libnvidia-ml.so", RTLD_NOW);
+            lib = dlopen("/usr/lib64/libnvidia-ml.so.1", RTLD_NOW);
         }
         if (lib == NULL) {
-            lib = dlopen("/lib64/libnvidia-ml.so", RTLD_NOW);
+            lib = dlopen("/lib64/libnvidia-ml.so.1", RTLD_NOW);
         }
     }
     if (lib == NULL) {
-        lib = dlopen("/usr/lib/libnvidia-ml.so", RTLD_NOW);
+        lib = dlopen("/usr/lib/libnvidia-ml.so.1", RTLD_NOW);
     }
     if (lib == NULL) {
-        lib = dlopen("/lib/libnvidia-ml.so", RTLD_NOW);
+        lib = dlopen("/lib/libnvidia-ml.so.1", RTLD_NOW);
     }
     if (lib == NULL) {
-        snprintf(pathbuf, sizeof(pathbuf), "/usr/lib/%s-linux-gnu/libnvidia-ml.so",
+        snprintf(pathbuf, sizeof(pathbuf), "/usr/lib/%s-linux-gnu/libnvidia-ml.so.1",
                  sysinfo.machine);
         lib = dlopen(pathbuf, RTLD_NOW);
     }
     if (lib == NULL) {
-        snprintf(pathbuf, sizeof(pathbuf), "/lib/%s-linux-gnu/libnvidia-ml.so", sysinfo.machine);
+        snprintf(pathbuf, sizeof(pathbuf), "/lib/%s-linux-gnu/libnvidia-ml.so.1", sysinfo.machine);
         lib = dlopen(pathbuf, RTLD_NOW);
     }
     if (lib == NULL) {
