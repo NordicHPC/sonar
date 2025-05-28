@@ -25,8 +25,8 @@
 # IMPORTANT:
 #
 # The .a files and the .o files in them *must* be created on systems that have binutils 2.32 or
-# newer.  Most systems do, but eg plain RHEL9 does not - it (currently) has binutils 2.30 by default
-# (along with gcc8.5).  On plain RHEL9 systems used for building the .a files or for building Sonar
+# newer.  Most systems do, but eg plain RHEL8 does not - it (currently) has binutils 2.30 by default
+# (along with gcc8.5).  On plain RHEL8 systems used for building the .a files or for building Sonar
 # it is therefore necessary to upgrade binutils in some way or to `module load` something that
 # forces this upgrade.  For example, newer gcc come with newer binutils, so upgrading gcc upgrades
 # binutils.
