@@ -1,7 +1,11 @@
-.PHONY: all test
+.PHONY: debug release test
+ARCH=$(shell uname -m)
 
-all:
-	@echo "Select a specific target"
+debug:
+	CARGO_TARGET_DIR=target/$(ARCH) cargo build
+
+release:
+	CARGO_TARGET_DIR=target/$(ARCH) cargo build --release
 
 test:
 	cargo test
