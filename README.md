@@ -46,14 +46,14 @@ In principle you just do this:
 
 In practice it is a little harder:
 
-- First, Kafka requires `cmake` to compile, so make sure you have that
-- Second, the binutils you have need to be new enough for the assembler to understand `--gdwarf5`
+- The binutils you have need to be new enough for the assembler to understand `--gdwarf5`
   (for Kafka) and some other things (to link the GPU probe libraries)
-- Third, some of the tests in `util/` (if you are going to be running those) require `go`
+- Some of the tests in `util/` (if you are going to be running those) require `go`
 
-Some distros, notably RHEL9, have binutils that are too old.  Binutils 2.32 are new enough for the
-GPU probe libraries but may not be new enough for Kafka.  Binutils 2.40 are known to work for both.
-Also see comments in `gpuapi/Makefile`.
+Some distros, notably RHEL8, have binutils that are too old, you can check by running e.g. `as --version`,
+the major version number is also the version number of binutils.  Binutils 2.32 are new
+enough for the GPU probe libraries but may not be new enough for Kafka.  Binutils 2.40 are known to
+work for both.  Also see comments in `gpuapi/Makefile`.
 
 
 ## Output format options
