@@ -366,7 +366,7 @@ pub fn get_process_information(
             // surprising zero values; one has to be careful when dividing.
             //
             // In particular for Z, field 5 "tpgid" has been observed to be -1.  For X, many of the
-            // fields are -1.
+            // fields are -1.  parse_usize_field() handles -1 specially, folding it to 0.
 
             // Zombie jobs cannot be ignored, because they are indicative of system health and the
             // information about their presence is used in consumers.
@@ -663,6 +663,10 @@ fn parse_usize_field(
     if let Ok(n) = fields[ix].parse::<usize>() {
         return Ok(n);
     }
+    if fields[ix] == "-1" {
+        // Special "no data" value, we just fold it to zero
+        return Ok(0);
+    }
     if pid == 0 {
         Err(format!(
             "Could not parse {fieldname} in /proc/{file}: {line}"
@@ -672,6 +676,14 @@ fn parse_usize_field(
             "Could not parse {fieldname} from /proc/{pid}/{file}: {line}"
         ))
     }
+}
+
+#[test]
+pub fn parse_usize_field_test() {
+    let xs = ["37", "-1", "42"];
+    assert!(parse_usize_field(&xs, 0, "", "", 0, "x").unwrap() == 37);
+    assert!(parse_usize_field(&xs, 1, "", "", 0, "x").unwrap() == 0);
+    assert!(parse_usize_field(&xs, 2, "", "", 0, "x").unwrap() == 42);
 }
 
 // The UserTable optimizes uid -> name lookup.
