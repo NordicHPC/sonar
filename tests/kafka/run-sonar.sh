@@ -5,4 +5,4 @@
 
 ( cd ../.. ; cargo build )
 ( cd ../../util/ssl ; make all )
-../../target/debug/sonar daemon sonar-nonslurm-node-ssl-sasl.ini
+../../target/debug/sonar daemon sonar-nonslurm-node-ssl-saslfile.ini
