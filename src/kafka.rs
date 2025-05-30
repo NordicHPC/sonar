@@ -151,6 +151,8 @@ fn kafka_producer(
         .set("message.timeout.ms", &format!("{}", timeout * 1000))
         .set("compression.codec", "snappy");
     if let Some(ref filename) = ca_file {
+        // Setting the filename will work also when the filename is `probe`, which is the signal to
+        // use the system CA store.
         cfg.set("ssl.ca.location", filename)
             .set("ssl.endpoint.identification.algorithm", "none");
         if let Some((ref username, ref password)) = sasl_identity {
