@@ -75,6 +75,8 @@ and that Sonar is misconfigured.  A short timeout may be useful during debugging
 
 The `ca-file` and `sasl-password` are explained in [HOWTO-KAFKA](HOWTO-KAFKA.md), basically the
 former triggers the use of TLS for the connection and the latter additionally adds authentication.
+A special value of `ca-file`, `probe`, states that the server's certificate can be verified using
+the node's certificate chain database and no special cert is installed on the node.
 
 ### `[sample]` section aka `[ps]` section
 
