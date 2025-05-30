@@ -160,6 +160,7 @@ pub fn daemon_mode(
     mut system: realsystem::RealSystemBuilder,
     force_slurm: bool,
 ) -> Result<(), String> {
+    #[allow(unused_mut)]
     let mut ini = parse_config(config_file)?;
 
     #[cfg(feature = "kafka")]
