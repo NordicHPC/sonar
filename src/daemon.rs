@@ -53,6 +53,7 @@ pub struct KafkaIni {
     pub timeout: Dur,
     pub ca_file: Option<String>,
     pub sasl_password: Option<String>,
+    pub sasl_password_file: Option<String>,
 }
 
 pub struct DebugIni {
@@ -159,7 +160,17 @@ pub fn daemon_mode(
     mut system: realsystem::RealSystemBuilder,
     force_slurm: bool,
 ) -> Result<(), String> {
-    let ini = parse_config(config_file)?;
+    let mut ini = parse_config(config_file)?;
+
+    #[cfg(feature = "kafka")]
+    if let Some(ref pwfile) = ini.kafka.sasl_password_file {
+        match std::fs::read_to_string(pwfile) {
+            Ok(s) => {
+                ini.kafka.sasl_password = Some(s.trim().to_string());
+            }
+            Err(e) => return Err(format!("Failed to read password file: {e}")),
+        }
+    }
 
     if ini.sample.cadence.is_some() {
         system = system.with_jobmanager(Box::new(jobsapi::AnyJobManager::new(force_slurm)));
@@ -563,6 +574,7 @@ fn parse_config(config_file: &str) -> Result<Ini, String> {
             timeout: Dur::Minutes(30),
             ca_file: None,
             sasl_password: None,
+            sasl_password_file: None,
         },
         debug: DebugIni { verbose: false },
         sample: SampleIni {
@@ -695,6 +707,9 @@ fn parse_config(config_file: &str) -> Result<Ini, String> {
                 "sasl-password" => {
                     ini.kafka.sasl_password = Some(value);
                 }
+                "sasl-password-file" => {
+                    ini.kafka.sasl_password_file = Some(value);
+                }
                 _ => return Err(format!("Invalid [kafka] setting name `{name}`")),
             },
             Section::Debug => match name.as_str() {
@@ -770,12 +785,25 @@ fn parse_config(config_file: &str) -> Result<Ini, String> {
         if !have_kafka_remote {
             return Err("Missing kafka.remote-host setting".to_string());
         }
-        if ini.kafka.sasl_password.is_some() {
+        if ini.kafka.sasl_password.is_some() || ini.kafka.sasl_password_file.is_some() {
+            if ini.kafka.sasl_password.is_some() && ini.kafka.sasl_password_file.is_some() {
+                return Err(
+                    "kafka.sasl_password and kafka.sasl_password_file are mutually exclusive"
+                        .to_string(),
+                );
+            }
             if ini.kafka.ca_file.is_none()
-                || (ini.kafka.sasl_password.as_ref().unwrap() != ""
+                || (ini.kafka.sasl_password.is_some()
+                    && ini.kafka.sasl_password.as_ref().unwrap() != ""
+                    && ini.kafka.ca_file.as_ref().unwrap() == "")
+                || (ini.kafka.sasl_password_file.is_some()
+                    && ini.kafka.sasl_password_file.as_ref().unwrap() != ""
                     && ini.kafka.ca_file.as_ref().unwrap() == "")
             {
-                return Err("kafka.sasl_password requires kafka.ca_file".to_string());
+                return Err(
+                    "kafka.sasl_password and kafka.sasl_password_file require kafka.ca_file"
+                        .to_string(),
+                );
             }
         }
     }
