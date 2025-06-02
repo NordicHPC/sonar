@@ -165,6 +165,8 @@ We will need a CA certificate (to be used by both Kafka and Sonar) and a key sto
 server's public and private keys (to be used by Kafka).  NOTE, the server keys will be tied to a
 particular server name.
 
+##### Testing
+
 For testing, we will generate our own CA and key materials.  In `util/ssl`, there is a Makefile that
 will generate the necessary files: `sonar-ca.crt` is the CA certificate, and
 `sonar-kafka-keystore.pem` is the key store.  Just run `make all` to make the files for the local
@@ -178,9 +180,13 @@ The diff specifies that Kafka will continue to communicate in plaintext on port 
 convenience) but will communicate over TLS on port 9093.  The default port 9092 is no longer active, to
 avoid confusion.
 
-Finally, the daemon's .ini file must be updated to point to the CA certificate.  See
+Finally, the daemon's .ini file must be updated to point the `ca-file` property to the CA certificate.  See
 e.g. `tests/kafka/sonar-nonslurm-node-ssl.ini` for an example of this. **NOTE** paths may have to be
 updated for your system.
+
+##### Production
+
+(TBD)
 
 #### Authentication
 
