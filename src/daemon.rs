@@ -356,7 +356,7 @@ pub fn daemon_mode(
                     log::verbose(&msg);
                 }
                 log::error(&msg);
-                break 'messageloop;
+                continue 'messageloop;
             }
         }
 
