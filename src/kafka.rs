@@ -20,7 +20,7 @@
 use crate::daemon::{Dur, Ini, Operation};
 use crate::datasink::DataSink;
 use crate::log;
-use crate::time;
+use crate::systemapi::SystemAPI;
 use crate::util;
 
 use std::sync::mpsc;
@@ -92,12 +92,25 @@ impl RdKafka {
 }
 
 impl DataSink for RdKafka {
-    fn post(&self, topic: String, key: String, value: String) {
+    fn post(
+        &self,
+        system: &dyn SystemAPI,
+        topic_prefix: &Option<String>,
+        cluster: &str,
+        data_tag: &str,
+        hostname: &str,
+        value: String,
+    ) {
         // The send can really only fail if the Kafka producer thread has closed the channel, and
         // that will only happen if stop() has been called, and post() should never be called after
         // stop(), so in that case ignore the error here.
+        let mut topic = cluster.to_string() + "." + data_tag;
+        if let Some(ref prefix) = topic_prefix {
+            topic = prefix.clone() + "." + &topic;
+        }
+        let key = hostname.to_string();
         let _ignored = self.outgoing_message_queue.send(Message {
-            timestamp: time::unix_now(),
+            timestamp: system.get_now_in_secs_since_epoch(),
             topic,
             key,
             value,

@@ -22,7 +22,8 @@
 // Signal handlers place signals in the daemon's channel as events.
 
 use crate::cluster;
-use crate::datasink::{DataSink, StdioSink};
+use crate::datasink::DataSink;
+use crate::directorysink::DirectorySink;
 use crate::jobsapi;
 use crate::json_tags;
 #[cfg(feature = "kafka")]
@@ -31,6 +32,7 @@ use crate::log;
 use crate::ps;
 use crate::realsystem;
 use crate::slurmjobs;
+use crate::stdiosink::StdioSink;
 use crate::sysinfo;
 use crate::systemapi::SystemAPI;
 use crate::time::{unix_now, unix_time_components};
@@ -58,6 +60,11 @@ pub struct KafkaIni {
 
 pub struct DebugIni {
     pub verbose: bool,
+    pub time_limit: Option<Dur>,
+}
+
+pub struct DirectoryIni {
+    pub data_dir: Option<String>,
 }
 
 pub struct SampleIni {
@@ -88,6 +95,7 @@ pub struct Ini {
     pub global: GlobalIni,
     #[cfg(feature = "kafka")]
     pub kafka: KafkaIni,
+    pub directory: DirectoryIni,
     pub debug: DebugIni,
     pub sample: SampleIni,
     pub sysinfo: SysinfoIni,
@@ -232,12 +240,17 @@ pub fn daemon_mode(
     }
 
     #[cfg(not(feature = "kafka"))]
-    let data_sink: Box<dyn DataSink> =
-        Box::new(StdioSink::new(client_id, control_topic, event_sender));
+    let data_sink: Box<dyn DataSink> = if let Some(ref data_dir) = ini.directory.data_dir {
+        Box::new(DirectorySink::new(data_dir, event_sender))
+    } else {
+        Box::new(StdioSink::new(client_id, control_topic, event_sender))
+    };
 
     #[cfg(feature = "kafka")]
     let data_sink: Box<dyn DataSink> = if ini.kafka.broker_address != "" {
         Box::new(RdKafka::new(&ini, client_id, control_topic, event_sender))
+    } else if let Some(ref data_dir) = ini.directory.data_dir {
+        Box::new(DirectorySink::new(data_dir, event_sender))
     } else {
         Box::new(StdioSink::new(client_id, control_topic, event_sender))
     };
@@ -275,43 +288,56 @@ pub fn daemon_mode(
         api_token.clone(),
     );
 
+    let cutoff = ini
+        .debug
+        .time_limit
+        .map(|d| system.get_now_in_secs_since_epoch() + d.to_seconds());
     let mut fatal_msg = "".to_string();
     'messageloop: loop {
+        if let Some(cutoff) = cutoff {
+            if system.get_now_in_secs_since_epoch() > cutoff {
+                if ini.debug.verbose {
+                    log::verbose("Time limit reached");
+                }
+                break 'messageloop;
+            }
+        }
+
         let mut output = Vec::new();
 
         // Nobody gets to close this channel, so panic on error
         let op = event_receiver.recv().expect("Event queue receive");
 
         system.update_time();
-        let topic: &'static str;
+        let data_tag: &'static str;
         match op {
             Operation::Sample => {
                 if ini.debug.verbose {
                     log::verbose("Sample");
                 }
                 sample_extractor.run(&mut output);
-                topic = json_tags::DATA_TAG_SAMPLE;
+                data_tag = json_tags::DATA_TAG_SAMPLE;
             }
             Operation::Sysinfo => {
                 if ini.debug.verbose {
                     log::verbose("Sysinfo");
                 }
                 sysinfo_extractor.run(&mut output);
-                topic = json_tags::DATA_TAG_SYSINFO;
+                data_tag = json_tags::DATA_TAG_SYSINFO;
             }
             Operation::Jobs => {
                 if ini.debug.verbose {
                     log::verbose("Jobs");
                 }
                 slurm_extractor.run(&mut output);
-                topic = json_tags::DATA_TAG_JOBS;
+                data_tag = json_tags::DATA_TAG_JOBS;
             }
             Operation::Cluster => {
                 if ini.debug.verbose {
                     log::verbose("Cluster");
                 }
                 cluster_extractor.run(&mut output);
-                topic = json_tags::DATA_TAG_CLUSTER;
+                data_tag = json_tags::DATA_TAG_CLUSTER;
             }
             Operation::Signal(s) => {
                 if ini.debug.verbose {
@@ -360,14 +386,16 @@ pub fn daemon_mode(
             }
         }
 
-        let mut topic = ini.global.cluster.clone() + "." + topic;
-        if let Some(ref prefix) = ini.global.topic_prefix {
-            topic = prefix.clone() + "." + &topic;
-        }
-        let key = hostname.clone();
         let value = String::from_utf8_lossy(&output).to_string();
 
-        data_sink.post(topic, key, value);
+        data_sink.post(
+            &system,
+            &ini.global.topic_prefix,
+            &ini.global.cluster,
+            data_tag,
+            &hostname,
+            value,
+        );
     }
 
     data_sink.stop();
@@ -577,7 +605,11 @@ fn parse_config(config_file: &str) -> Result<Ini, String> {
             sasl_password: None,
             sasl_password_file: None,
         },
-        debug: DebugIni { verbose: false },
+        directory: DirectoryIni { data_dir: None },
+        debug: DebugIni {
+            time_limit: None,
+            verbose: false,
+        },
         sample: SampleIni {
             cadence: None,
             exclude_system_jobs: true,
@@ -603,6 +635,7 @@ fn parse_config(config_file: &str) -> Result<Ini, String> {
         Global,
         #[cfg(feature = "kafka")]
         Kafka,
+        Directory,
         Debug,
         Sample,
         Sysinfo,
@@ -614,6 +647,8 @@ fn parse_config(config_file: &str) -> Result<Ini, String> {
     let mut have_kafka = false;
     #[cfg(feature = "kafka")]
     let mut have_kafka_remote = false;
+    let mut have_directory = false;
+    let mut have_prefix = false;
     let file = match std::fs::File::open(config_file) {
         Ok(f) => f,
         Err(e) => {
@@ -642,6 +677,10 @@ fn parse_config(config_file: &str) -> Result<Ini, String> {
         if l == "[kafka]" {
             curr_section = Section::Kafka;
             have_kafka = true;
+            continue;
+        }
+        if l == "[directory]" {
+            curr_section = Section::Directory;
             continue;
         }
         if l == "[debug]" {
@@ -686,6 +725,7 @@ fn parse_config(config_file: &str) -> Result<Ini, String> {
                 }
                 "topic-prefix" => {
                     ini.global.topic_prefix = Some(value);
+                    have_prefix = true;
                 }
                 _ => return Err(format!("Invalid [global] setting name `{name}`")),
             },
@@ -713,7 +753,17 @@ fn parse_config(config_file: &str) -> Result<Ini, String> {
                 }
                 _ => return Err(format!("Invalid [kafka] setting name `{name}`")),
             },
+            Section::Directory => match name.as_str() {
+                "data-directory" => {
+                    ini.directory.data_dir = Some(value);
+                    have_directory = true;
+                }
+                _ => return Err(format!("Invalid [directory] setting name `{name}`")),
+            },
             Section::Debug => match name.as_str() {
+                "time-limit" => {
+                    ini.debug.time_limit = Some(parse_duration("debug.time-limit", &value, true)?);
+                }
                 "verbose" => {
                     ini.debug.verbose = parse_bool(&value)?;
                 }
@@ -783,6 +833,9 @@ fn parse_config(config_file: &str) -> Result<Ini, String> {
 
     #[cfg(feature = "kafka")]
     if have_kafka {
+        if have_directory {
+            return Err("Both kafka and data directory configured".to_string());
+        }
         if !have_kafka_remote {
             return Err("Missing kafka.remote-host setting".to_string());
         }
@@ -807,6 +860,10 @@ fn parse_config(config_file: &str) -> Result<Ini, String> {
                 );
             }
         }
+    }
+
+    if have_directory && have_prefix {
+        return Err("Data directory does not allow a topic prefix".to_string());
     }
 
     Ok(ini)

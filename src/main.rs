@@ -8,6 +8,8 @@ mod command;
 mod daemon;
 #[cfg(feature = "daemon")]
 mod datasink;
+#[cfg(feature = "daemon")]
+mod directorysink;
 mod gpuapi;
 mod hostname;
 mod interrupt;
@@ -44,6 +46,8 @@ mod realprocfs;
 mod realsystem;
 mod slurm;
 mod slurmjobs;
+#[cfg(feature = "daemon")]
+mod stdiosink;
 mod sysinfo;
 #[cfg(test)]
 mod sysinfo_test;

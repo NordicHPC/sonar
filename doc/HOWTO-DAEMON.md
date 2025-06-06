@@ -6,8 +6,10 @@ command line parameter is the name of a config file.
 The daemon is a multi-threaded system that performs system sampling, communicates with the sink, and
 handles signals and lock files.
 
-If a sink is configured (currently only Kafka) then that is used for all data and control messages.
-Otherwise, data are printed on stdout and control messages are read from stdin.
+If a sink is configured - currently Kafka or a directory tree - then that is used for all data
+storage.  Otherwise, data are printed on stdout.
+
+The sink may also provide control messages.  The default sink reads control messages from stdin.
 
 ## CONFIG FILE
 
@@ -24,11 +26,11 @@ divide an hour evenly and < 60, and hour values must divide a day evenly or be a
 of 24.  (Some sensible cadences such as 90m aka 1h30m are not currently expressible.)
 
 The config file has `[global]` and `[debug]` sections that control general operation; an optional
-section for the transport type chosen, currently `[kafka]` (otherwise terminal I/O is used for
-transport); and a section each for the sonar operations, controlling their cadence and operation in
-the same way as normal command line switches.  For the Sonar operations, the cadence setting is
-required for the operation to be run, the command will be run at a time that is zero mod the
-cadence.
+section for the transport type chosen, currently `[kafka]` or `[directory]` (otherwise terminal I/O
+is used for transport); and a section each for the sonar operations, controlling their cadence and
+operation in the same way as normal command line switches.  For the Sonar operations, the cadence
+setting is required for the operation to be run, the command will be run at a time that is zero mod
+the cadence.
 
 ### `[global]` section
 
@@ -75,6 +77,26 @@ and that Sonar is misconfigured.  A short timeout may be useful during debugging
 
 The `ca-file` and `sasl-password` are explained in [HOWTO-KAFKA](HOWTO-KAFKA.md), basically the
 former triggers the use of TLS for the connection and the latter additionally adds authentication.
+
+### `[directory]` section
+
+```
+data-directory = <path>
+```
+
+The `data-directory` is required and names the root directory of the data store.  Within this
+directory, there will be subdirectories following the scheme `yyyy/mm/dd` and at the bottom will be
+data files for that date (as a UTC date).  The data files follow the Jobanalyzer scheme for
+new-format data files: `<version>+<type>-<hostname>.json` for `sample` and `sysinfo` types
+originating at node `<hostname>`; `<version>+<type>-slurm.json` for `job` (`[jobs]` section below)
+and `cluzter` (`[cluster]` section below) types.  The version is currently always `0`.  The format
+of the directory tree allows us to simply run Jobanalyzer on the tree later, and trees from
+different nodes can be combined by recursive copy - there will be no filename conflicts at the
+leaves, provided Slurm data extraction is only run on one master node, as it should be.
+
+If the `data-directory` does not exist, Sonar will attempt to create it when producing output.  If
+creation of the directory or the file fails, or a write fails, a soft error is signalled (same as if
+Kafka message delivery fails).
 
 ### `[sample]` section aka `[ps]` section
 
@@ -124,10 +146,15 @@ cadence = <duration value>
 
 ```
 verbose = bool                                  # default false
+time-limit = <duration value>                   # default none
 ```
 
 Setting `verbose` to true will cause the daemon to print somewhat informative messages about what
 it's doing at important points during the run to stderr.
+
+Setting `time-limit` to a duration will make the daemon exit after roughly that time (it may take
+longer, it will check the exit time before every sample, but not wake up from sleep just to handle
+the limit).
 
 ## DATA MESSAGE FORMATS
 
