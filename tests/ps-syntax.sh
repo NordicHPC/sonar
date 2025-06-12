@@ -113,11 +113,21 @@ if [[ $first != "null" ]]; then
     fi
 fi
 
-# Since we specified --load there should be a cpus field in the system object.
+# Since we specified --load there should be various fields in the system object.
 
+# cpus should really never be absent
 x=$(jq .data.attributes.system.cpus <<< $output)
 if [[ $x == "null" ]]; then
     echo "JSON system.cpus missing"
+    exit 1
+fi
+
+# The others can be zero/empty and thus absent.  What we need to check here is that
+# every field present has a known name.
+
+x=$(jq '.data.attributes.system | keys | map(in({"cpus":0,"existing_entities":0,"load1":0,"load15":0,"load5":0,"runnable_entities":0,"used_memory":0})) | all' <<< $output)
+if [[ $x != "true" ]]; then
+    echo "JSON bad - Unknown field in system: " $(jq .data.attributes.system <<< $output)
     exit 1
 fi
 

@@ -252,6 +252,34 @@ pub fn get_node_information(system: &dyn systemapi::SystemAPI) -> Result<(u64, V
     Ok((cpu_total_secs, per_cpu_secs))
 }
 
+pub fn get_loadavg(fs: &dyn procfsapi::ProcfsAPI) -> Result<(f64, f64, f64, u64, u64), String> {
+    let s = fs.read_to_string("loadavg")?;
+    let fields = s.split_ascii_whitespace().collect::<Vec<&str>>();
+    if fields.len() != 5 {
+        return Err(format!("Bad loadavg {s}"));
+    }
+    let load1 = fields[0]
+        .parse::<f64>()
+        .map_err(|_| format!("Bad loadavg {s}"))?;
+    let load5 = fields[1]
+        .parse::<f64>()
+        .map_err(|_| format!("Bad loadavg {s}"))?;
+    let load15 = fields[2]
+        .parse::<f64>()
+        .map_err(|_| format!("Bad loadavg {s}"))?;
+    let entities = fields[3].split('/').collect::<Vec<&str>>();
+    if entities.len() != 2 {
+        return Err(format!("Bad loadavg {s}"));
+    }
+    let runnable = entities[0]
+        .parse::<u64>()
+        .map_err(|_| format!("Bad loadavg {s}"))?;
+    let existing = entities[1]
+        .parse::<u64>()
+        .map_err(|_| format!("Bad loadavg {s}"))?;
+    Ok((load1, load5, load15, runnable, existing))
+}
+
 #[derive(PartialEq, Debug)]
 pub struct Process {
     pub pid: usize,
@@ -737,6 +765,10 @@ pub fn procfs_parse_test() {
         "1255967 185959 54972 200 0 316078 0".to_string(),
     );
     files.insert("4018/status".to_string(), "RssAnon: 12345 kB".to_string());
+    files.insert(
+        "loadavg".to_string(),
+        "1.75 2.125 10.5 128/10340 12345".to_string(),
+    );
 
     let ticks_per_sec = 100.0; // We define this
     let utime_ticks = 51361.0; // field(/proc/4018/stat, 14)
@@ -747,6 +779,11 @@ pub fn procfs_parse_test() {
     let memtotal = 16093776.0; // field(/proc/meminfo, "MemTotal:")
     let size = 316078 * 4; // pages_to_kib(field(/proc/4018/statm, 5))
     let rssanon = 12345; // field(/proc/4018/status, "RssAnon:")
+    let load1 = 1.75;
+    let load5 = 2.125;
+    let load15 = 10.5;
+    let runnable = 128;
+    let existing = 10340;
 
     // now = boot_time + start_time + utime_ticks + stime_ticks + arbitrary idle time
     let now = (boot_time
@@ -796,6 +833,25 @@ pub fn procfs_parse_test() {
     assert!(per_cpu_secs.len() == 8);
     assert!(per_cpu_secs[0] == (32528 + 189 + 19573 + 0 + 1149) / 100); // "cpu0 " line of "stat" data
     assert!(per_cpu_secs[7] == (27582 + 61 + 12558 + 0 + 426) / 100); // "cpu7 " line of "stat" data
+
+    let (l1, l5, l15, r, e) = get_loadavg(fs).unwrap();
+    assert!(load1 == l1);
+    assert!(load5 == l5);
+    assert!(load15 == l15);
+    assert!(runnable == r);
+    assert!(existing == e);
+}
+
+#[test]
+pub fn procfs_parse_errors() {
+    let mut files = HashMap::new();
+    files.insert(
+        "loadavg".to_string(),
+        "1.75 2.125 10.5 128/ 10340 12345".to_string(),
+    );
+    let system = mocksystem::MockSystem::new().with_files(files).freeze();
+    let fs = system.get_procfs();
+    assert!(get_loadavg(fs).is_err());
 }
 
 #[test]

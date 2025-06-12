@@ -50,10 +50,10 @@ performance data and information about resources that are observably used by the
 
 The working hypothesis is that:
 
-- all necessary Slurm data can be extracted from a single node in the cluster, as they only
-  include data that Slurm collects and stores for itself
-- the Slurm data collection can be performed by sampling, ie, by running data collection
-  periodically using externally available Slurm tools, and not by getting callbacks from Slurm
+  - all necessary Slurm data can be extracted from a single node in the cluster, as they only
+    include data that Slurm collects and stores for itself
+  - the Slurm data collection can be performed by sampling, ie, by running data collection
+    periodically using externally available Slurm tools, and not by getting callbacks from Slurm
 
 That does not remove performance constraints, as the Slurm system is already busy and does not
 need an extra load from a polling client that runs often.  It does ease performance constraints,
@@ -500,10 +500,11 @@ Recoverable errors, if any
 
 ### Type: `SampleSystem`
 
-This object describes the state of the node independently of the jobs running on it.
+This object describes the state of the node independently of the jobs running on it.  Generally
+these are independent of cgroup or other resource partitioning.
 
-NOTE: Other node-wide fields will be added (e.g. for other load averages, additional memory
-measures, for I/O and for energy).
+NOTE: Other node-wide fields will be added (e.g. for additional memory measures, for I/O and for
+energy).
 
 NOTE: The sysinfo for the node provides the total memory; available memory = total - used.
 
@@ -518,6 +519,26 @@ The state of individual GPU devices
 #### **`used_memory`** uint64
 
 The amount of primary memory in use in kilobytes
+
+#### **`load1`** float64
+
+One-minute load average
+
+#### **`load5`** float64
+
+Five-minute load average
+
+#### **`load15`** float64
+
+Fifteen-minute load average
+
+#### **`runnable_entities`** uint64
+
+Number of currently runnable scheduling entities (processes, threads)
+
+#### **`existing_entities`** uint64
+
+Number of currently existing sceduling entities
 
 ### Type: `SampleCpu`
 
