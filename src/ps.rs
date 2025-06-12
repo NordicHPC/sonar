@@ -287,6 +287,11 @@ pub struct SampleData {
     pub gpu_samples: Option<Vec<gpuapi::CardState>>,
     pub cpu_samples: Vec<u64>,
     pub used_memory: u64,
+    pub load1: f64,
+    pub load5: f64,
+    pub load15: f64,
+    pub runnable_entities: u64,
+    pub existing_entities: u64,
 }
 
 fn collect_sample_data(
@@ -301,6 +306,8 @@ fn collect_sample_data(
 
     let (_cpu_total_secs, per_cpu_secs) = procfs::get_node_information(system)?;
     let memory = procfs::get_memory(system.get_procfs())?;
+    let (load1, load5, load15, runnable_entities, existing_entities) =
+        procfs::get_loadavg(system.get_procfs())?;
     let (mut processes, per_pid_cpu_ticks) =
         procfs::get_process_information(system, memory.total as usize)?;
 
@@ -347,6 +354,11 @@ fn collect_sample_data(
         gpu_samples: gpu_info,
         cpu_samples: per_cpu_secs,
         used_memory: memory.total - memory.available,
+        load1,
+        load5,
+        load15,
+        runnable_entities,
+        existing_entities,
     }))
 }
 
