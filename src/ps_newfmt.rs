@@ -33,6 +33,11 @@ pub fn format_newfmt(
             sstate.push_a(SAMPLE_SYSTEM_GPUS, gpu_load);
         }
         sstate.push_u(SAMPLE_SYSTEM_USED_MEMORY, c.used_memory);
+        sstate.push_f(SAMPLE_SYSTEM_LOAD1, c.load1);
+        sstate.push_f(SAMPLE_SYSTEM_LOAD5, c.load5);
+        sstate.push_f(SAMPLE_SYSTEM_LOAD15, c.load15);
+        sstate.push_u(SAMPLE_SYSTEM_RUNNABLE_ENTITIES, c.runnable_entities);
+        sstate.push_u(SAMPLE_SYSTEM_EXISTING_ENTITIES, c.existing_entities);
         attrs.push_o(SAMPLE_ATTRIBUTES_SYSTEM, sstate);
     }
     // Group processes under (user, jobid) except for jobid 0.
