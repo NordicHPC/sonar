@@ -468,10 +468,11 @@ type SampleAttributes struct {
 	Errors []ErrorObject `json:"errors,omitempty"`
 }
 
-// This object describes the state of the node independently of the jobs running on it.
+// This object describes the state of the node independently of the jobs running on it.  Generally
+// these are independent of cgroup or other resource partitioning.
 //
-// NOTE: Other node-wide fields will be added (e.g. for other load averages, additional memory
-// measures, for I/O and for energy).
+// NOTE: Other node-wide fields will be added (e.g. for additional memory measures, for I/O and for
+// energy).
 //
 // NOTE: The sysinfo for the node provides the total memory; available memory = total - used.
 type SampleSystem struct {
@@ -483,6 +484,21 @@ type SampleSystem struct {
 
 	// The amount of primary memory in use in kilobytes
 	UsedMemory uint64 `json:"used_memory,omitempty"`
+
+	// One-minute load average
+	Load1 float64 `json:"load1,omitempty"`
+
+	// Five-minute load average
+	Load5 float64 `json:"load5,omitempty"`
+
+	// Fifteen-minute load average
+	Load15 float64 `json:"load15,omitempty"`
+
+	// Number of currently runnable scheduling entities (processes, threads)
+	RunnableEntities uint64 `json:"runnable_entities,omitempty"`
+
+	// Number of currently existing sceduling entities
+	ExistingEntities uint64 `json:"existing_entities,omitempty"`
 }
 
 // The number of CPU seconds used by the core since boot.
