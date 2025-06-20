@@ -690,11 +690,6 @@ the monitoring process (a little) and make it more expensive (a little), and the
 accurate (it's a sample, not an averaging over the entire interval). Possibly having either
 cpu_avg and cpu_time together or cpu_util on its own would be sufficient.
 
-NOTE: `rolledup` is a Sonar data-compression feature that should probably be removed or
-improved, as information is lost. It is employed only if sonar is invoked with --rollup.  At the
-same time, for a node running 128 (say) MPI processes for the same job it represents a real
-savings in data volume.
-
 #### **`resident_memory`** uint64
 
 Kilobytes of private resident memory.
@@ -710,7 +705,7 @@ the end, a la ps.
 
 #### **`pid`** uint64
 
-Process ID, zero is used for rolled-up processes.
+Process ID, zero is used for rolled-up samples (see below at "Rolledup").
 
 #### **`ppid`** uint64
 
@@ -738,9 +733,9 @@ Cumulative CPU time in seconds for the process over its lifetime. See notes.
 
 #### **`rolledup`** int
 
-The number of additional processes in the same cmd and no child processes that have been
-rolled into this one. That is, if the value is 1, the record represents the sum of the data
-for two processes.
+The number of additional samples for processes that are "the same" that have been rolled into
+this one. That is, if the value is 1, the record represents the sum of the sample data for
+two processes.  See postamble for more.
 
 #### **`gpus`** []SampleProcessGpu
 
@@ -1263,31 +1258,31 @@ job's step, and the array properties to additionally be set when it is an array 
 array_task_id=1.  Here's how we can get that with sacct:
 
 ```
-|  $ sacct --user ec-larstha -P -o User,JobID,JobIDRaw
-|  User        JobID             JobIDRaw
-|  ec-larstha  1467073_1         1467074
-|              1467073_1.batch   1467074.batch
-|              1467073_1.extern  1467074.extern
-|              1467073_1.0       1467074.0
-|  ec-larstha  1467073_3         1467075
-|              1467073_3.batch   1467075.batch
-|              1467073_3.extern  1467075.extern
-|              1467073_3.0       1467075.0
+$ sacct --user ec-larstha -P -o User,JobID,JobIDRaw
+User        JobID             JobIDRaw
+ec-larstha  1467073_1         1467074
+            1467073_1.batch   1467074.batch
+            1467073_1.extern  1467074.extern
+            1467073_1.0       1467074.0
+ec-larstha  1467073_3         1467075
+            1467073_3.batch   1467075.batch
+            1467073_3.extern  1467075.extern
+            1467073_3.0       1467075.0
 ```
 
 For heterogenous ("het") jobs, the situation is somewhat similar to array jobs, here's one with
 two groups:
 
 ```
-|  $ sacct --user ec-larstha -P -o User,JobID,JobIDRaw
-|  User        JobID               JobIDRaw
-|  ec-larstha  1467921+0           1467921
-|              1467921+0.batch     1467921.batch
-|              1467921+0.extern    1467921.extern
-|              1467921+0.0         1467921.0
-|  ec-larstha  1467921+1           1467922
-|              1467921+1.extern    1467922.extern
-|              1467921+1.0         1467922.0
+$ sacct --user ec-larstha -P -o User,JobID,JobIDRaw
+User        JobID               JobIDRaw
+ec-larstha  1467921+0           1467921
+            1467921+0.batch     1467921.batch
+            1467921+0.extern    1467921.extern
+            1467921+0.0         1467921.0
+ec-larstha  1467921+1           1467922
+            1467921+1.extern    1467922.extern
+            1467921+1.0         1467922.0
 ```
 
 The second hetjob gets its own raw Job ID 1467922.  (Weirdly, so far as I've seen this ID is not
@@ -1298,14 +1293,14 @@ something to do with how I run the jobs, het jobs are fairly involved.)
 For jobs with job steps (multiple srun lines in the batch script but nothing else fancy), we get this:
 
 ```
-|  $ sacct --user ec-larstha -P -o User,JobID,JobIDRaw
-|  User        JobID           JobIDRaw
-|  ec-larstha  1470478         1470478
-|              1470478.batch   1470478.batch
-|              1470478.extern  1470478.extern
-|              1470478.0       1470478.0
-|              1470478.1       1470478.1
-|              1470478.2       1470478.2
+$ sacct --user ec-larstha -P -o User,JobID,JobIDRaw
+User        JobID           JobIDRaw
+ec-larstha  1470478         1470478
+            1470478.batch   1470478.batch
+            1470478.extern  1470478.extern
+            1470478.0       1470478.0
+            1470478.1       1470478.1
+            1470478.2       1470478.2
 ```
 
 which is consistent with the previous cases, the step ID follows the . of the JobID or JobIDRaw.
@@ -1347,4 +1342,34 @@ A suitable value for t is probably on the order of a few hours, TBD.  Linux has 
 space typically around 4e6. Some systems running very many jobs (though not usually HPC systems)
 can wrap around pids in a matter of days.  We want t to be shorter than the shortest plausible
 wraparound time.
+
+## Rolled-up samples
+
+The ability to "roll up" processes / samples that are "the same" - that is, to pre-aggregate data
+on the sending side - is a data-compression feature that significantly reduces data volume for
+typical HPC jobs where a great number of MPI ranks per node are "the same" in the appropriate
+sense.  The precise conditions on processes that are aggregated are that they:
+
+  - must be under control of a batch system
+  - must have the same non-zero batch system Job ID
+  - must have the same command string
+  - must have the same parent process
+  - must have no child processes (ie only leaves are rolled up)
+
+Rolling-up only happens if the appropriate flag is passed to Sonar.
+
+The requirement that the rolled-up processes have the same parent process means that there can be
+several rolled-up records with the same Job ID and command name at the same timestamp at a given
+node; the records are distinguished by their ParentPid.
+
+The feature does not come without downsides.  Information about individual processes on the same
+node is lost, so intra-node imbalance is harder to diagnose, and resident memory figures can
+become especially skewed (the shared code is accounted for multiple times).  In general,
+postprocessing becomes harder because the data invariants are subtle and special cases and
+synthesized IDs have to be introduced.  Also, process filtering in Sonar is performed on the
+aggregated data, which can be confusing - the individual processes in an aggregate may all be
+insignificant, but the aggregation may still be transmitted.
+
+It is possible that simply applying standard data compression on the sending side would be
+equally effective and not have any of the downsides.
 
