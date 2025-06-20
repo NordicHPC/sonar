@@ -28,9 +28,9 @@ use crate::jobsapi;
 use crate::json_tags;
 #[cfg(feature = "kafka")]
 use crate::kafka::RdKafka;
+use crate::linux;
 use crate::log;
 use crate::ps;
-use crate::realsystem;
 use crate::slurmjobs;
 use crate::stdiosink::StdioSink;
 use crate::sysinfo;
@@ -165,7 +165,7 @@ impl Dur {
 
 pub fn daemon_mode(
     config_file: &str,
-    mut system: realsystem::RealSystemBuilder,
+    mut system: linux::system::Builder,
     force_slurm: bool,
 ) -> Result<(), String> {
     #[allow(unused_mut)]

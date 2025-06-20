@@ -1,9 +1,9 @@
 use crate::gpuapi;
 use crate::jobsapi;
 use crate::json_tags;
-use crate::mockfs;
+use crate::linux::procfs;
+use crate::linux::procfsapi;
 use crate::mockgpu;
-use crate::procfsapi;
 use crate::systemapi;
 use crate::time;
 
@@ -14,7 +14,7 @@ use std::io;
 use std::path;
 
 #[derive(Default)]
-pub struct MockSystemBuilder {
+pub struct Builder {
     files: Option<HashMap<String, String>>,
     pids: Option<Vec<(usize, u32)>>,
     users: Option<HashMap<u32, String>>,
@@ -32,92 +32,98 @@ pub struct MockSystemBuilder {
 }
 
 #[allow(dead_code)]
-impl MockSystemBuilder {
-    pub fn with_files(self, files: HashMap<String, String>) -> MockSystemBuilder {
-        MockSystemBuilder {
+impl Builder {
+    pub fn new() -> Builder {
+        Builder {
+            ..Default::default()
+        }
+    }
+
+    pub fn with_files(self, files: HashMap<String, String>) -> Builder {
+        Builder {
             files: Some(files),
             ..self
         }
     }
 
-    pub fn with_pids(self, pids: Vec<(usize, u32)>) -> MockSystemBuilder {
-        MockSystemBuilder {
+    pub fn with_pids(self, pids: Vec<(usize, u32)>) -> Builder {
+        Builder {
             pids: Some(pids),
             ..self
         }
     }
 
-    pub fn with_users(self, users: HashMap<u32, String>) -> MockSystemBuilder {
-        MockSystemBuilder {
+    pub fn with_users(self, users: HashMap<u32, String>) -> Builder {
+        Builder {
             users: Some(users),
             ..self
         }
     }
 
-    pub fn with_now(self, now: u64) -> MockSystemBuilder {
-        MockSystemBuilder {
+    pub fn with_now(self, now: u64) -> Builder {
+        Builder {
             now: Some(now),
             ..self
         }
     }
 
-    pub fn with_timestamp(self, timestamp: &str) -> MockSystemBuilder {
-        MockSystemBuilder {
+    pub fn with_timestamp(self, timestamp: &str) -> Builder {
+        Builder {
             timestamp: Some(timestamp.to_string()),
             ..self
         }
     }
 
-    pub fn with_hostname(self, hostname: &str) -> MockSystemBuilder {
-        MockSystemBuilder {
+    pub fn with_hostname(self, hostname: &str) -> Builder {
+        Builder {
             hostname: Some(hostname.to_string()),
             ..self
         }
     }
 
-    pub fn with_cluster(self, cluster: &str) -> MockSystemBuilder {
-        MockSystemBuilder {
+    pub fn with_cluster(self, cluster: &str) -> Builder {
+        Builder {
             cluster: Some(cluster.to_string()),
             ..self
         }
     }
 
-    pub fn with_os(self, name: &str, release: &str) -> MockSystemBuilder {
-        MockSystemBuilder {
+    pub fn with_os(self, name: &str, release: &str) -> Builder {
+        Builder {
             os_name: Some(name.to_string()),
             os_release: Some(release.to_string()),
             ..self
         }
     }
 
-    pub fn with_architecture(self, architecture: &str) -> MockSystemBuilder {
-        MockSystemBuilder {
+    pub fn with_architecture(self, architecture: &str) -> Builder {
+        Builder {
             architecture: Some(architecture.to_string()),
             ..self
         }
     }
 
-    pub fn with_jobmanager(self, jm: Box<dyn jobsapi::JobManager>) -> MockSystemBuilder {
-        MockSystemBuilder {
+    pub fn with_jobmanager(self, jm: Box<dyn jobsapi::JobManager>) -> Builder {
+        Builder {
             jm: Some(jm),
             ..self
         }
     }
 
-    pub fn with_version(self, version: &str) -> MockSystemBuilder {
-        MockSystemBuilder {
+    pub fn with_version(self, version: &str) -> Builder {
+        Builder {
             version: Some(version.to_string()),
             ..self
         }
     }
 
-    pub fn with_card(self, c: gpuapi::Card) -> MockSystemBuilder {
+    pub fn with_card(self, c: gpuapi::Card) -> Builder {
         self.cards.borrow_mut().push(c);
         self
     }
 
-    pub fn with_boot_time(self, boot_time: u64) -> MockSystemBuilder {
-        MockSystemBuilder {
+    pub fn with_boot_time(self, boot_time: u64) -> Builder {
+        Builder {
             boot_time: Some(boot_time),
             ..self
         }
@@ -168,7 +174,7 @@ impl MockSystemBuilder {
             fs: {
                 let files = self.files.unwrap_or_default();
                 let pids = self.pids.unwrap_or_default();
-                mockfs::MockFS::new(files, pids)
+                MockFS { files, pids }
             },
             now: if let Some(x) = self.now {
                 x
@@ -197,7 +203,7 @@ pub struct MockSystem {
     os_name: String,
     os_release: String,
     architecture: String,
-    fs: mockfs::MockFS,
+    fs: MockFS,
     gpus: mockgpu::MockGpuAPI,
     users: HashMap<u32, String>,
     pid: u32,
@@ -209,10 +215,8 @@ pub struct MockSystem {
 }
 
 impl MockSystem {
-    pub fn new() -> MockSystemBuilder {
-        MockSystemBuilder {
-            ..Default::default()
-        }
+    pub fn get_procfs(&self) -> &MockFS {
+        &self.fs
     }
 }
 
@@ -245,10 +249,6 @@ impl systemapi::SystemAPI for MockSystem {
         self.architecture.clone()
     }
 
-    fn get_procfs(&self) -> &dyn procfsapi::ProcfsAPI {
-        &self.fs
-    }
-
     fn get_gpus(&self) -> &dyn gpuapi::GpuAPI {
         &self.gpus
     }
@@ -275,6 +275,40 @@ impl systemapi::SystemAPI for MockSystem {
 
     fn get_boot_time(&self) -> u64 {
         self.boot_time
+    }
+
+    fn get_cpu_info(&self) -> Result<systemapi::CpuInfo, String> {
+        procfs::get_cpu_info(&self.fs)
+    }
+
+    fn get_memory(&self) -> Result<systemapi::Memory, String> {
+        procfs::get_memory(&self.fs)
+    }
+
+    fn get_node_information(&self) -> Result<(u64, Vec<u64>), String> {
+        procfs::get_node_information(self, &self.fs)
+    }
+
+    fn get_loadavg(&self) -> Result<(f64, f64, f64, u64, u64), String> {
+        procfs::get_loadavg(&self.fs)
+    }
+
+    fn get_process_information(
+        &self,
+    ) -> Result<(HashMap<usize, systemapi::Process>, Vec<(usize, u64)>), String> {
+        procfs::get_process_information(self, &self.fs)
+    }
+
+    fn get_cpu_utilization(
+        &self,
+        per_pid_cpu_ticks: &[(usize, u64)],
+        wait_time_ms: usize,
+    ) -> Result<Vec<(usize, f64)>, String> {
+        procfs::get_cpu_utilization(self, &self.fs, per_pid_cpu_ticks, wait_time_ms)
+    }
+
+    fn get_slurm_job_id(&self, _pid: usize) -> Option<usize> {
+        None
     }
 
     fn user_by_uid(&self, uid: u32) -> Option<String> {
@@ -314,5 +348,23 @@ impl systemapi::SystemAPI for MockSystem {
     fn is_interrupted(&self) -> bool {
         // Nothing yet
         false
+    }
+}
+
+pub struct MockFS {
+    files: HashMap<String, String>,
+    pids: Vec<(usize, u32)>,
+}
+
+impl procfsapi::ProcfsAPI for MockFS {
+    fn read_to_string(&self, path: &str) -> Result<String, String> {
+        match self.files.get(path) {
+            Some(s) => Ok(s.clone()),
+            None => Err(format!("Unable to read /proc/{path}")),
+        }
+    }
+
+    fn read_proc_pids(&self) -> Result<Vec<(usize, u32)>, String> {
+        Ok(self.pids.clone())
     }
 }

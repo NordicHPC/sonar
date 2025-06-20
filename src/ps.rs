@@ -4,7 +4,6 @@ use crate::gpuapi;
 use crate::json_tags::*;
 use crate::log;
 use crate::output;
-use crate::procfs;
 use crate::ps_newfmt::format_newfmt;
 use crate::ps_oldfmt::{format_oldfmt, make_oldfmt_heartbeat};
 use crate::systemapi;
@@ -212,7 +211,7 @@ pub struct ProcessTable {
 }
 
 impl ProcessTable {
-    pub fn from_processes<T>(procs: &HashMap<T, procfs::Process>) -> ProcessTable {
+    pub fn from_processes<T>(procs: &HashMap<T, systemapi::Process>) -> ProcessTable {
         let mut by_pid = HashMap::new();
         for proc in procs.values() {
             by_pid.insert(proc.pid, (proc.user.clone(), proc.uid));
@@ -304,15 +303,13 @@ fn collect_sample_data(
         return Ok(None);
     }
 
-    let (_cpu_total_secs, per_cpu_secs) = procfs::get_node_information(system)?;
-    let memory = procfs::get_memory(system.get_procfs())?;
-    let (load1, load5, load15, runnable_entities, existing_entities) =
-        procfs::get_loadavg(system.get_procfs())?;
-    let (mut processes, per_pid_cpu_ticks) =
-        procfs::get_process_information(system, memory.total as usize)?;
+    let (_cpu_total_secs, per_cpu_secs) = system.get_node_information()?;
+    let memory = system.get_memory()?;
+    let (load1, load5, load15, runnable_entities, existing_entities) = system.get_loadavg()?;
+    let (mut processes, per_pid_cpu_ticks) = system.get_process_information()?;
 
     if opts.cpu_util {
-        let utils = procfs::get_cpu_utilization(system, &per_pid_cpu_ticks, 100)?;
+        let utils = system.get_cpu_utilization(&per_pid_cpu_ticks, 100)?;
         for (pid, cpu_util) in utils.iter() {
             processes.entry(*pid).and_modify(|e| {
                 e.cpu_util = *cpu_util;
@@ -365,7 +362,7 @@ fn collect_sample_data(
 fn add_cpu_info(
     mut procinfo_by_pid: ProcInfoTable,
     system: &dyn systemapi::SystemAPI,
-    processes: &HashMap<Pid, procfs::Process>,
+    processes: &HashMap<Pid, systemapi::Process>,
 ) -> ProcInfoTable {
     for proc in processes.values() {
         procinfo_by_pid
@@ -409,7 +406,7 @@ fn add_cpu_info(
 fn add_gpu_info(
     mut procinfo_by_pid: ProcInfoTable,
     system: &dyn systemapi::SystemAPI,
-    processes: &HashMap<Pid, procfs::Process>,
+    processes: &HashMap<Pid, systemapi::Process>,
 ) -> (ProcInfoTable, Option<Vec<gpuapi::CardState>>) {
     // When a GPU fails it may be a transient error or a permanent error, but either way sonar does
     // not know.  We just record the failure.  This is a soft failure, surfaced through dashboards;
