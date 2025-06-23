@@ -297,8 +297,6 @@ fn collect_sample_data(
     system: &dyn systemapi::SystemAPI,
     opts: &PsOptions,
 ) -> Result<Option<SampleData>, String> {
-    let mut procinfo_by_pid = ProcInfoTable::new();
-
     if system.is_interrupted() {
         return Ok(None);
     }
@@ -319,7 +317,7 @@ fn collect_sample_data(
         }
     }
 
-    procinfo_by_pid = add_cpu_info(procinfo_by_pid, system, &processes);
+    let mut procinfo_by_pid = new_with_cpu_info(system, &processes);
 
     if system.is_interrupted() {
         return Ok(None);
@@ -359,46 +357,32 @@ fn collect_sample_data(
     }))
 }
 
-fn add_cpu_info(
-    mut procinfo_by_pid: ProcInfoTable,
+fn new_with_cpu_info(
     system: &dyn systemapi::SystemAPI,
     processes: &HashMap<Pid, systemapi::Process>,
 ) -> ProcInfoTable {
+    let mut procinfo_by_pid = ProcInfoTable::new();
     for proc in processes.values() {
-        procinfo_by_pid
-            .entry(proc.pid)
-            .and_modify(|e| {
-                e.cpu_percentage += proc.cpu_pct;
-                e.cpu_util += proc.cpu_util;
-                e.cputime_sec += proc.cputime_sec;
-                e.mem_percentage += proc.mem_pct;
-                e.mem_size_kib += proc.mem_size_kib;
-                e.rssanon_kib += proc.rssanon_kib;
-                assert!(proc.has_children == e.has_children);
-                assert!(proc.ppid == e.ppid);
-            })
-            .or_insert_with(|| {
-                let (job_id, is_slurm) = system
-                    .get_jobs()
-                    .job_id_from_pid(system, proc.pid, processes);
-                ProcInfo {
-                    user: proc.user.to_string(),
-                    command: proc.command.to_string(),
-                    pid: proc.pid,
-                    ppid: proc.ppid,
-                    is_system_job: proc.uid < 1000,
-                    has_children: proc.has_children,
-                    job_id,
-                    is_slurm,
-                    cpu_percentage: proc.cpu_pct,
-                    cpu_util: proc.cpu_util,
-                    cputime_sec: proc.cputime_sec,
-                    mem_percentage: proc.mem_pct,
-                    mem_size_kib: proc.mem_size_kib,
-                    rssanon_kib: proc.rssanon_kib,
-                    ..Default::default()
-                }
-            });
+        let (job_id, is_slurm) = system
+            .get_jobs()
+            .job_id_from_pid(system, proc.pid, processes);
+        procinfo_by_pid.insert(proc.pid, ProcInfo {
+            user: proc.user.to_string(),
+            command: proc.command.to_string(),
+            pid: proc.pid,
+            ppid: proc.ppid,
+            is_system_job: proc.uid < 1000,
+            has_children: proc.has_children,
+            job_id,
+            is_slurm,
+            cpu_percentage: proc.cpu_pct,
+            cpu_util: proc.cpu_util,
+            cputime_sec: proc.cputime_sec,
+            mem_percentage: proc.mem_pct,
+            mem_size_kib: proc.mem_size_kib,
+            rssanon_kib: proc.rssanon_kib,
+            ..Default::default()
+        });
     }
     procinfo_by_pid
 }
