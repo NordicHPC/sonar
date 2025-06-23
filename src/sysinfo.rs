@@ -4,7 +4,6 @@
 use crate::gpuapi;
 use crate::json_tags::*;
 use crate::output;
-use crate::procfs;
 use crate::systemapi;
 
 use std::io;
@@ -249,7 +248,7 @@ struct NodeInfo {
     sockets: u64,
     cores_per_socket: u64,
     threads_per_core: u64,
-    cores: Vec<procfs::CoreInfo>,
+    cores: Vec<systemapi::CoreInfo>,
     mem_kb: u64,
     card_manufacturer: String,
     gpu_cards: u64,
@@ -258,16 +257,15 @@ struct NodeInfo {
 }
 
 fn compute_nodeinfo(system: &dyn systemapi::SystemAPI) -> Result<NodeInfo, String> {
-    let fs = system.get_procfs();
     let gpus = system.get_gpus();
-    let procfs::CpuInfo {
+    let systemapi::CpuInfo {
         sockets,
         cores_per_socket,
         threads_per_core,
         cores,
-    } = procfs::get_cpu_info(fs)?;
+    } = system.get_cpu_info()?;
     let model_name = cores[0].model_name.clone(); // expedient
-    let memory = procfs::get_memory(fs)?;
+    let memory = system.get_memory()?;
     let mem_kb = memory.total;
     let mem_gb = (mem_kb as f64 / (1024.0 * 1024.0)).round() as u64;
     let (mut cards, manufacturer) = match gpus.probe() {

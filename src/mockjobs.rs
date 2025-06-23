@@ -1,5 +1,4 @@
 use crate::jobsapi;
-use crate::procfs;
 use crate::systemapi;
 
 use std::collections::HashMap;
@@ -11,7 +10,7 @@ impl jobsapi::JobManager for MockJobManager {
         &self,
         _system: &dyn systemapi::SystemAPI,
         pid: usize,
-        _processes: &HashMap<usize, procfs::Process>,
+        _processes: &HashMap<usize, systemapi::Process>,
     ) -> (usize, bool) {
         (pid, false)
     }

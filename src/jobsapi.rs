@@ -1,8 +1,6 @@
 // A "job manager" allows pids to be mapped to job numbers in a reliable way, this abstracts the job
 // queue (if any) away from the rest of sonar.
 
-use crate::procfs;
-use crate::slurm;
 use crate::systemapi;
 
 use std::collections::HashMap;
@@ -16,7 +14,7 @@ pub trait JobManager {
         &self,
         system: &dyn systemapi::SystemAPI,
         pid: usize,
-        processes: &HashMap<usize, procfs::Process>,
+        processes: &HashMap<usize, systemapi::Process>,
     ) -> (usize, bool);
 }
 
@@ -33,7 +31,7 @@ impl JobManager for NoJobManager {
         &self,
         _system: &dyn systemapi::SystemAPI,
         _pid: usize,
-        _processes: &HashMap<usize, procfs::Process>,
+        _processes: &HashMap<usize, systemapi::Process>,
     ) -> (usize, bool) {
         (0, false)
     }
@@ -54,9 +52,9 @@ impl JobManager for AnyJobManager {
         &self,
         system: &dyn systemapi::SystemAPI,
         pid: usize,
-        processes: &HashMap<usize, procfs::Process>,
+        processes: &HashMap<usize, systemapi::Process>,
     ) -> (usize, bool) {
-        if let Some(id) = slurm::get_job_id(system, pid) {
+        if let Some(id) = system.get_slurm_job_id(pid) {
             (id, id != 0)
         } else if let Some(p) = processes.get(&pid) {
             (p.pgrp, self.force_slurm)

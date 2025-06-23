@@ -1,9 +1,9 @@
-use crate::mocksystem;
+use crate::linux::mocksystem;
 use crate::ps;
 
 #[test]
 pub fn test_ps_no_meminfo() {
-    let system = mocksystem::MockSystem::new()
+    let system = mocksystem::Builder::new()
         .with_timestamp("2025-02-17T12:54:12+01:00")
         .with_cluster("cl.no")
         .with_hostname("yes.no")

@@ -17,15 +17,12 @@ mod jobsapi;
 mod json_tags;
 #[cfg(all(feature = "daemon", feature = "kafka"))]
 mod kafka;
+mod linux;
 mod log;
-#[cfg(test)]
-mod mockfs;
 #[cfg(test)]
 mod mockgpu;
 #[cfg(test)]
 mod mockjobs;
-#[cfg(test)]
-mod mocksystem;
 mod nodelist;
 #[cfg(feature = "nvidia")]
 mod nvidia;
@@ -34,17 +31,12 @@ mod nvidia_nvml;
 mod output;
 #[cfg(test)]
 mod output_test;
-mod procfs;
-mod procfsapi;
 mod ps;
 mod ps_newfmt;
 mod ps_oldfmt;
 #[cfg(test)]
 mod ps_test;
 mod realgpu;
-mod realprocfs;
-mod realsystem;
-mod slurm;
 mod slurmjobs;
 #[cfg(feature = "daemon")]
 mod stdiosink;
@@ -155,7 +147,7 @@ fn main() {
 
     let mut stdout = io::stdout();
     let writer: &mut dyn io::Write = &mut stdout;
-    let system = realsystem::RealSystem::new();
+    let system = linux::system::Builder::new();
     let token = "".to_string(); // API token, to be implemented
 
     #[cfg(debug_assertions)]

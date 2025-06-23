@@ -3,18 +3,20 @@ use crate::gpuapi;
 use crate::hostname;
 use crate::interrupt;
 use crate::jobsapi;
-use crate::procfs;
-use crate::procfsapi;
+use crate::linux::procfs;
+use crate::linux::procfsapi;
+use crate::linux::slurm;
 use crate::realgpu;
-use crate::realprocfs;
 use crate::systemapi;
 use crate::time;
 use crate::users;
 use crate::util;
 
 use std::cell::{Cell, RefCell};
+use std::collections::HashMap;
 use std::fs;
 use std::io;
+use std::os::linux::fs::MetadataExt;
 use std::path;
 
 // 3 minutes ought to be enough for anyone.
@@ -23,31 +25,38 @@ const SACCT_TIMEOUT_S: u64 = 180;
 // sinfo will normally be very quick
 const SINFO_TIMEOUT_S: u64 = 10;
 
-pub struct RealSystemBuilder {
+pub struct Builder {
     jm: Option<Box<dyn jobsapi::JobManager>>,
     cluster: String,
 }
 
-impl RealSystemBuilder {
+impl Builder {
+    pub fn new() -> Builder {
+        Builder {
+            jm: None,
+            cluster: "".to_string(),
+        }
+    }
+
     #[allow(dead_code)]
-    pub fn with_cluster(self, cluster: &str) -> RealSystemBuilder {
-        RealSystemBuilder {
+    pub fn with_cluster(self, cluster: &str) -> Builder {
+        Builder {
             cluster: cluster.to_string(),
             ..self
         }
     }
 
-    pub fn with_jobmanager(self, jm: Box<dyn jobsapi::JobManager>) -> RealSystemBuilder {
-        RealSystemBuilder {
+    pub fn with_jobmanager(self, jm: Box<dyn jobsapi::JobManager>) -> Builder {
+        Builder {
             jm: Some(jm),
             ..self
         }
     }
 
-    pub fn freeze(self) -> Result<RealSystem, String> {
-        let fs = realprocfs::RealProcFS::new();
+    pub fn freeze(self) -> Result<System, String> {
+        let fs = RealProcFS {};
         let boot_time = procfs::get_boot_time(&fs)?;
-        Ok(RealSystem {
+        Ok(System {
             hostname: hostname::get(),
             cluster: self.cluster,
             jm: if let Some(x) = self.jm {
@@ -73,10 +82,10 @@ const ARCHITECTURE: &'static str = "aarch64";
 // Otherwise, `ARCHITECTURE` will be undefined and we'll get a compile error; rustc is good about
 // notifying the user that there are ifdef'd cases that are inactive.
 
-pub struct RealSystem {
+pub struct System {
     hostname: String,
     cluster: String,
-    fs: realprocfs::RealProcFS,
+    fs: RealProcFS,
     gpus: realgpu::RealGpu,
     jm: Box<dyn jobsapi::JobManager>,
     timestamp: RefCell<String>,
@@ -84,14 +93,7 @@ pub struct RealSystem {
     boot_time: u64,
 }
 
-impl RealSystem {
-    pub fn new() -> RealSystemBuilder {
-        RealSystemBuilder {
-            jm: None,
-            cluster: "".to_string(),
-        }
-    }
-
+impl System {
     // We want the time to be stable (ie unchanging if we read it multiple times), but that also
     // means that when it must move we must move it specifically.  This is not yet part of the
     // SystemAPI because that's not been necessary.
@@ -102,7 +104,7 @@ impl RealSystem {
     }
 }
 
-impl systemapi::SystemAPI for RealSystem {
+impl systemapi::SystemAPI for System {
     fn get_version(&self) -> String {
         env!("CARGO_PKG_VERSION").to_string()
     }
@@ -143,10 +145,6 @@ impl systemapi::SystemAPI for RealSystem {
         ARCHITECTURE.to_string()
     }
 
-    fn get_procfs(&self) -> &dyn procfsapi::ProcfsAPI {
-        &self.fs
-    }
-
     fn get_gpus(&self) -> &dyn gpuapi::GpuAPI {
         &self.gpus
     }
@@ -175,6 +173,40 @@ impl systemapi::SystemAPI for RealSystem {
 
     fn get_now_in_secs_since_epoch(&self) -> u64 {
         self.now.get()
+    }
+
+    fn get_cpu_info(&self) -> Result<systemapi::CpuInfo, String> {
+        procfs::get_cpu_info(&self.fs)
+    }
+
+    fn get_memory(&self) -> Result<systemapi::Memory, String> {
+        procfs::get_memory(&self.fs)
+    }
+
+    fn get_node_information(&self) -> Result<(u64, Vec<u64>), String> {
+        procfs::get_node_information(self, &self.fs)
+    }
+
+    fn get_loadavg(&self) -> Result<(f64, f64, f64, u64, u64), String> {
+        procfs::get_loadavg(&self.fs)
+    }
+
+    fn get_process_information(
+        &self,
+    ) -> Result<(HashMap<usize, systemapi::Process>, Vec<(usize, u64)>), String> {
+        procfs::get_process_information(self, &self.fs)
+    }
+
+    fn get_cpu_utilization(
+        &self,
+        per_pid_cpu_ticks: &[(usize, u64)],
+        wait_time_ms: usize,
+    ) -> Result<Vec<(usize, f64)>, String> {
+        procfs::get_cpu_utilization(self, &self.fs, per_pid_cpu_ticks, wait_time_ms)
+    }
+
+    fn get_slurm_job_id(&self, pid: usize) -> Option<usize> {
+        slurm::get_job_id(&self.fs, pid)
     }
 
     fn user_by_uid(&self, uid: u32) -> Option<String> {
@@ -258,4 +290,35 @@ fn twofields(text: String) -> Result<Vec<(String, String)>, String> {
         v.push((a.to_string(), b.to_string()));
     }
     Ok(v)
+}
+
+struct RealProcFS {}
+
+impl procfsapi::ProcfsAPI for RealProcFS {
+    fn read_to_string(&self, path: &str) -> Result<String, String> {
+        let filename = format!("/proc/{path}");
+        match fs::read_to_string(path::Path::new(&filename)) {
+            Ok(s) => Ok(s),
+            Err(_) => Err(format!("Unable to read {filename}")),
+        }
+    }
+
+    fn read_proc_pids(&self) -> Result<Vec<(usize, u32)>, String> {
+        let mut pids = vec![];
+        if let Ok(dir) = fs::read_dir("/proc") {
+            for dirent in dir.flatten() {
+                if let Ok(meta) = dirent.metadata() {
+                    let uid = meta.st_uid();
+                    if let Some(name) = dirent.path().file_name() {
+                        if let Ok(pid) = name.to_string_lossy().parse::<usize>() {
+                            pids.push((pid, uid));
+                        }
+                    }
+                }
+            }
+        } else {
+            return Err("Could not open /proc".to_string());
+        };
+        Ok(pids)
+    }
 }

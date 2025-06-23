@@ -1,7 +1,7 @@
 #[allow(unused_imports)]
 use crate::gpuapi;
 #[allow(unused_imports)]
-use crate::mocksystem;
+use crate::linux::mocksystem;
 #[allow(unused_imports)]
 use crate::sysinfo;
 
@@ -10,19 +10,20 @@ use std::collections::HashMap;
 
 // Test that the output is the expected output
 
-#[cfg(target_arch = "x86_64")] // the mock cpuinfo files are x86_64-specific
+#[cfg(target_arch = "x86_64")] // the mock cpuinfo files are x86_64-specific and linux-specific
 #[test]
 pub fn sysinfo_output_test() {
+    // FIXME: Information leakage!!
     let mut files = HashMap::new();
     files.insert(
         "cpuinfo".to_string(),
-        std::include_str!("testdata/cpuinfo-x86_64.txt").to_string(),
+        std::include_str!("linux/testdata/cpuinfo-x86_64.txt").to_string(),
     );
     files.insert(
         "meminfo".to_string(),
         "MemTotal:       16093776 kB".to_string(),
     );
-    let system = mocksystem::MockSystem::new()
+    let system = mocksystem::Builder::new()
         .with_version("0.13.100")
         .with_timestamp("2025-02-11T08:47+01:00")
         .with_hostname("yes.no")
