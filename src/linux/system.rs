@@ -4,7 +4,6 @@ use crate::hostname;
 use crate::interrupt;
 use crate::jobsapi;
 use crate::linux::procfs;
-use crate::linux::procfsapi;
 use crate::linux::slurm;
 use crate::realgpu;
 use crate::systemapi;
@@ -294,7 +293,7 @@ fn twofields(text: String) -> Result<Vec<(String, String)>, String> {
 
 struct RealProcFS {}
 
-impl procfsapi::ProcfsAPI for RealProcFS {
+impl procfs::ProcfsAPI for RealProcFS {
     fn read_to_string(&self, path: &str) -> Result<String, String> {
         let filename = format!("/proc/{path}");
         match fs::read_to_string(path::Path::new(&filename)) {

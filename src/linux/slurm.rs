@@ -1,10 +1,10 @@
-use crate::linux::procfsapi;
+use crate::linux::procfs;
 
 // This returns Some(n) where n > 0 if we could parse the job ID, Some(0) if the overall pattern
 // matched but the ID was not parseable, or None otherwise.  Thus None is a signal to fall back to
 // other (non-Slurm) mechanisms.
 
-pub fn get_job_id(fs: &dyn procfsapi::ProcfsAPI, pid: usize) -> Option<usize> {
+pub fn get_job_id(fs: &dyn procfs::ProcfsAPI, pid: usize) -> Option<usize> {
     match fs.read_to_string(&format!("{pid}/cgroup")) {
         Ok(text) => {
             // We want \1 of the first line that matches "/job_(.*?)/"
