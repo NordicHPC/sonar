@@ -2,7 +2,6 @@ use crate::gpuapi;
 use crate::jobsapi;
 use crate::json_tags;
 use crate::linux::procfs;
-use crate::linux::procfsapi;
 use crate::mockgpu;
 use crate::systemapi;
 use crate::time;
@@ -370,7 +369,7 @@ pub struct MockFS {
     threads: HashMap<usize, Vec<(usize, u32)>>,
 }
 
-impl procfsapi::ProcfsAPI for MockFS {
+impl procfs::ProcfsAPI for MockFS {
     fn read_to_string(&self, path: &str) -> Result<String, String> {
         match self.files.get(path) {
             Some(s) => Ok(s.clone()),

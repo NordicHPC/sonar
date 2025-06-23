@@ -2,16 +2,30 @@
 
 // Collect CPU process information without GPU information, from files in /proc.
 
-use crate::linux::procfsapi;
 use crate::systemapi;
 
 use std::collections::{HashMap, HashSet};
 use std::thread;
 use std::time;
 
+// Abstraction to the directory tree below /proc, implemented differently by real systems and by
+// test harnesses.
+
+pub trait ProcfsAPI {
+    // Open /proc/<path> (which can have multiple path elements, eg, {PID}/filename), read it, and
+    // return its entire contents as a string.  Return a sensible error message if the file can't
+    // be opened or read.
+    fn read_to_string(&self, path: &str) -> Result<String, String>;
+
+    // Return (name,owner-uid) for every file /proc/<path>/{name} where path can be empty.  Return a
+    // sensible error message in case something goes really, really wrong, but otherwise try to make
+    // the best of it.
+    fn read_numeric_file_names(&self, path: &str) -> Result<Vec<(usize, u32)>, String>;
+}
+
 // Read the /proc/meminfo file from the fs and return the value for total installed memory.
 
-pub fn get_memory(fs: &dyn procfsapi::ProcfsAPI) -> Result<systemapi::Memory, String> {
+pub fn get_memory(fs: &dyn ProcfsAPI) -> Result<systemapi::Memory, String> {
     let mut memory = systemapi::Memory {
         total: 0,
         available: 0,
@@ -46,12 +60,12 @@ pub fn get_memory(fs: &dyn procfsapi::ProcfsAPI) -> Result<systemapi::Memory, St
 }
 
 #[cfg(target_arch = "x86_64")]
-pub fn get_cpu_info(fs: &dyn procfsapi::ProcfsAPI) -> Result<systemapi::CpuInfo, String> {
+pub fn get_cpu_info(fs: &dyn ProcfsAPI) -> Result<systemapi::CpuInfo, String> {
     get_cpu_info_x86_64(fs)
 }
 
 #[cfg(target_arch = "aarch64")]
-pub fn get_cpu_info(fs: &dyn procfsapi::ProcfsAPI) -> Result<systemapi::CpuInfo, String> {
+pub fn get_cpu_info(fs: &dyn ProcfsAPI) -> Result<systemapi::CpuInfo, String> {
     get_cpu_info_aarch64(fs)
 }
 
@@ -59,7 +73,7 @@ pub fn get_cpu_info(fs: &dyn procfsapi::ProcfsAPI) -> Result<systemapi::CpuInfo,
 // notifying the user that there are ifdef'd cases that are inactive.
 
 #[cfg(any(target_arch = "x86_64", test))]
-pub fn get_cpu_info_x86_64(fs: &dyn procfsapi::ProcfsAPI) -> Result<systemapi::CpuInfo, String> {
+pub fn get_cpu_info_x86_64(fs: &dyn ProcfsAPI) -> Result<systemapi::CpuInfo, String> {
     let mut physids = HashSet::new();
     let mut cores = vec![];
     let mut model_name = None;
@@ -120,7 +134,7 @@ pub fn get_cpu_info_x86_64(fs: &dyn procfsapi::ProcfsAPI) -> Result<systemapi::C
 }
 
 #[cfg(any(target_arch = "aarch64", test))]
-pub fn get_cpu_info_aarch64(fs: &dyn procfsapi::ProcfsAPI) -> Result<systemapi::CpuInfo, String> {
+pub fn get_cpu_info_aarch64(fs: &dyn ProcfsAPI) -> Result<systemapi::CpuInfo, String> {
     let mut processors = HashSet::<i32>::new();
     let mut model_major = 0i32;
     let mut model_minor = 0i32;
@@ -164,7 +178,7 @@ pub fn get_cpu_info_aarch64(fs: &dyn procfsapi::ProcfsAPI) -> Result<systemapi::
 // epoch.  We need this to compute the process's real time, which we need to compute ps-compatible
 // cpu utilization.
 
-pub fn get_boot_time(fs: &dyn procfsapi::ProcfsAPI) -> Result<u64, String> {
+pub fn get_boot_time(fs: &dyn ProcfsAPI) -> Result<u64, String> {
     let stat_s = fs.read_to_string("stat")?;
     for l in stat_s.split('\n') {
         if l.starts_with("btime ") {
@@ -183,7 +197,7 @@ pub fn get_boot_time(fs: &dyn procfsapi::ProcfsAPI) -> Result<u64, String> {
 
 pub fn get_node_information(
     system: &dyn systemapi::SystemAPI,
-    fs: &dyn procfsapi::ProcfsAPI,
+    fs: &dyn ProcfsAPI,
 ) -> Result<(u64, Vec<u64>), String> {
     let ticks_per_sec = system.get_clock_ticks_per_sec() as u64;
     if ticks_per_sec == 0 {
@@ -223,7 +237,7 @@ pub fn get_node_information(
     Ok((cpu_total_secs, per_cpu_secs))
 }
 
-pub fn get_loadavg(fs: &dyn procfsapi::ProcfsAPI) -> Result<(f64, f64, f64, u64, u64), String> {
+pub fn get_loadavg(fs: &dyn ProcfsAPI) -> Result<(f64, f64, f64, u64, u64), String> {
     let s = fs.read_to_string("loadavg")?;
     let fields = s.split_ascii_whitespace().collect::<Vec<&str>>();
     if fields.len() != 5 {
@@ -251,7 +265,7 @@ pub fn get_loadavg(fs: &dyn procfsapi::ProcfsAPI) -> Result<(f64, f64, f64, u64,
     Ok((load1, load5, load15, runnable, existing))
 }
 
-pub fn get_thread_count(fs: &dyn procfsapi::ProcfsAPI, pid: usize) -> Result<usize, String> {
+pub fn get_thread_count(fs: &dyn ProcfsAPI, pid: usize) -> Result<usize, String> {
     Ok(fs.read_numeric_file_names(&format!("{pid}/task"))?.len())
 }
 
@@ -268,7 +282,7 @@ pub fn get_thread_count(fs: &dyn procfsapi::ProcfsAPI, pid: usize) -> Result<usi
 
 pub fn get_process_information(
     system: &dyn systemapi::SystemAPI,
-    fs: &dyn procfsapi::ProcfsAPI,
+    fs: &dyn ProcfsAPI,
 ) -> Result<(HashMap<usize, systemapi::Process>, Vec<(usize, u64)>), String> {
     let memtotal_kib = system.get_memory()?.total;
 
@@ -556,7 +570,7 @@ pub fn get_process_information(
 
 pub fn get_cpu_utilization(
     system: &dyn systemapi::SystemAPI,
-    fs: &dyn procfsapi::ProcfsAPI,
+    fs: &dyn ProcfsAPI,
     per_pid_cpu_ticks: &[(usize, u64)],
     wait_time_ms: usize,
 ) -> Result<Vec<(usize, f64)>, String> {
