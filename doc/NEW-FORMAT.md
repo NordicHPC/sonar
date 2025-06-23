@@ -716,6 +716,11 @@ Process ID, zero is used for rolled-up processes.
 
 Parent-process ID.
 
+#### **`num_threads`** uint64
+
+The number of threads in the process, minus 1 - we don't count the process's main thread
+(allowing this fields to be omitted in transmission for most processes).
+
 #### **`cpu_avg`** float64
 
 The running average CPU percentage over the true lifetime of the process as reported

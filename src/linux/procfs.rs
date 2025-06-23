@@ -251,6 +251,10 @@ pub fn get_loadavg(fs: &dyn procfsapi::ProcfsAPI) -> Result<(f64, f64, f64, u64,
     Ok((load1, load5, load15, runnable, existing))
 }
 
+pub fn get_thread_count(fs: &dyn procfsapi::ProcfsAPI, pid: usize) -> Result<usize, String> {
+    Ok(fs.read_numeric_file_names(&format!("{pid}/task"))?.len())
+}
+
 // Obtain process information via /proc and return a hashmap of structures with all the information
 // we need, keyed by pid.  Pids uniquely tag the records.
 //
@@ -287,7 +291,7 @@ pub fn get_process_information(
     // Note that a pid may disappear between the time we see it here and the time we get around to
     // reading it, later, and that new pids may appear meanwhile.  We should ignore both issues.
 
-    let pids = fs.read_proc_pids()?;
+    let pids = fs.read_numeric_file_names("")?;
 
     // Collect remaining system data from /proc/{pid}/stat for the enumerated pids.
 
@@ -513,6 +517,8 @@ pub fn get_process_information(
             99.9,
         );
 
+        let num_threads = get_thread_count(fs, pid).unwrap_or(1);
+
         per_pid_cpu_ticks.push((pid, bsdtime_ticks));
         result.insert(
             pid,
@@ -530,6 +536,7 @@ pub fn get_process_information(
                 rssanon_kib,
                 command: comm,
                 has_children: false,
+                num_threads,
             },
         );
         ppids.insert(ppid);

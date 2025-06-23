@@ -649,6 +649,10 @@ type SampleProcess struct {
 	// Parent-process ID.
 	ParentPid uint64 `json:"ppid,omitempty"`
 
+	// The number of threads in the process, minus 1 - we don't count the process's main thread
+	// (allowing this fields to be omitted in transmission for most processes).
+	NumThreads uint64 `json:"num_threads,omitempty"`
+
 	// The running average CPU percentage over the true lifetime of the process as reported
 	// by the operating system. 100.0 corresponds to "one full core's worth of computation".
 	// See notes.

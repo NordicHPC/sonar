@@ -174,6 +174,9 @@ fn format_newfmt_sample(proc_info: &ProcInfo) -> output::Object {
     if proc_info.ppid != 0 {
         fields.push_u(SAMPLE_PROCESS_PARENT_PID, proc_info.ppid as u64);
     }
+    if proc_info.num_threads != 0 {
+        fields.push_u(SAMPLE_PROCESS_NUM_THREADS, proc_info.num_threads as u64);
+    }
     if proc_info.cpu_percentage != 0.0 {
         fields.push_f(
             SAMPLE_PROCESS_CPU_AVG,

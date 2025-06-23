@@ -98,6 +98,7 @@ pub const SAMPLE_PROCESS_VIRTUAL_MEMORY: &str = "virtual_memory"; // uint64
 pub const SAMPLE_PROCESS_CMD: &str = "cmd"; // string
 pub const SAMPLE_PROCESS_PID: &str = "pid"; // uint64
 pub const SAMPLE_PROCESS_PARENT_PID: &str = "ppid"; // uint64
+pub const SAMPLE_PROCESS_NUM_THREADS: &str = "num_threads"; // uint64
 pub const SAMPLE_PROCESS_CPU_AVG: &str = "cpu_avg"; // float64
 pub const SAMPLE_PROCESS_CPU_UTIL: &str = "cpu_util"; // float64
 pub const SAMPLE_PROCESS_CPU_TIME: &str = "cpu_time"; // uint64

@@ -303,21 +303,26 @@ impl procfsapi::ProcfsAPI for RealProcFS {
         }
     }
 
-    fn read_proc_pids(&self) -> Result<Vec<(usize, u32)>, String> {
+    fn read_numeric_file_names(&self, path: &str) -> Result<Vec<(usize, u32)>, String> {
         let mut pids = vec![];
-        if let Ok(dir) = fs::read_dir("/proc") {
+        let dir = if path == "" {
+            "/proc".to_string()
+        } else {
+            format!("/proc/{path}/")
+        };
+        if let Ok(dir) = fs::read_dir(&dir) {
             for dirent in dir.flatten() {
                 if let Ok(meta) = dirent.metadata() {
-                    let uid = meta.st_uid();
+                    let owner = meta.st_uid();
                     if let Some(name) = dirent.path().file_name() {
-                        if let Ok(pid) = name.to_string_lossy().parse::<usize>() {
-                            pids.push((pid, uid));
+                        if let Ok(name) = name.to_string_lossy().parse::<usize>() {
+                            pids.push((name, owner));
                         }
                     }
                 }
             }
         } else {
-            return Err("Could not open /proc".to_string());
+            return Err("Could not open {dir}".to_string());
         };
         Ok(pids)
     }

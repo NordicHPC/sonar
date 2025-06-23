@@ -242,6 +242,7 @@ pub struct ProcInfo {
     pub pid: Pid,
     pub ppid: Pid,
     pub rolledup: usize,
+    pub num_threads: usize,
     pub is_system_job: bool,
     pub has_children: bool,
     pub job_id: usize,
@@ -366,23 +367,31 @@ fn new_with_cpu_info(
         let (job_id, is_slurm) = system
             .get_jobs()
             .job_id_from_pid(system, proc.pid, processes);
-        procinfo_by_pid.insert(proc.pid, ProcInfo {
-            user: proc.user.to_string(),
-            command: proc.command.to_string(),
-            pid: proc.pid,
-            ppid: proc.ppid,
-            is_system_job: proc.uid < 1000,
-            has_children: proc.has_children,
-            job_id,
-            is_slurm,
-            cpu_percentage: proc.cpu_pct,
-            cpu_util: proc.cpu_util,
-            cputime_sec: proc.cputime_sec,
-            mem_percentage: proc.mem_pct,
-            mem_size_kib: proc.mem_size_kib,
-            rssanon_kib: proc.rssanon_kib,
-            ..Default::default()
-        });
+        procinfo_by_pid.insert(
+            proc.pid,
+            ProcInfo {
+                user: proc.user.to_string(),
+                command: proc.command.to_string(),
+                pid: proc.pid,
+                ppid: proc.ppid,
+                is_system_job: proc.uid < 1000,
+                has_children: proc.has_children,
+                num_threads: if proc.num_threads > 0 {
+                    proc.num_threads - 1
+                } else {
+                    0
+                },
+                job_id,
+                is_slurm,
+                cpu_percentage: proc.cpu_pct,
+                cpu_util: proc.cpu_util,
+                cputime_sec: proc.cputime_sec,
+                mem_percentage: proc.mem_pct,
+                mem_size_kib: proc.mem_size_kib,
+                rssanon_kib: proc.rssanon_kib,
+                ..Default::default()
+            },
+        );
     }
     procinfo_by_pid
 }
@@ -459,6 +468,11 @@ fn add_gpu_info(
                             e.gpu_mem_size_kib += proc.mem_size_kib as usize;
                         })
                         .or_insert_with(|| {
+                            // This is a process the card knows about but that we did not see during
+                            // the process scan.  It could be something that lingers in the card
+                            // information, or a completely new process.  Either way, just make the
+                            // best of it, if the process stays around we'll get good information
+                            // later, otherwise it was dead anyway.
                             let (job_id, is_slurm) = system
                                 .get_jobs()
                                 .job_id_from_pid(system, proc.pid, processes);
@@ -468,6 +482,7 @@ fn add_gpu_info(
                                 pid: proc.pid,
                                 ppid,
                                 is_system_job: proc.uid < 1000,
+                                num_threads: 0,
                                 has_children,
                                 job_id,
                                 is_slurm,
@@ -588,6 +603,7 @@ fn rollup_processes(procinfo_by_pid: ProcInfoTable) -> Vec<ProcInfo> {
             let key = (proc_info.job_id, proc_info.ppid, proc_info.command.as_str());
             if let Some(x) = index.get(&key) {
                 let p = &mut rolledup[*x];
+                p.num_threads += proc_info.num_threads;
                 p.cpu_percentage += proc_info.cpu_percentage;
                 p.cpu_util += proc_info.cpu_util;
                 p.cputime_sec += proc_info.cputime_sec;
