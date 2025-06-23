@@ -165,10 +165,14 @@ pub fn procfs_dead_and_undead_test() {
     files.insert("4019/status".to_string(), "RssAnon: 12345 kB".to_string());
     files.insert("4020/status".to_string(), "RssAnon: 12345 kB".to_string());
 
+    let mut threads = HashMap::new();
+    threads.insert(4018, vec![(4018, 1), (40181, 1), (40182, 1), (40183, 1)]);
+
     let system = mocksystem::Builder::new()
         .with_files(files)
         .with_pids(pids)
         .with_users(users)
+        .with_threads(threads)
         .freeze();
     let (mut info, _) = system
         .get_process_information()
@@ -185,8 +189,10 @@ pub fn procfs_dead_and_undead_test() {
     }
     assert!(p.pid == 4018);
     assert!(p.command == "firefox");
+    assert!(p.num_threads == 4);
     assert!(q.pid == 4019);
     assert!(q.command == "firefox <defunct>");
+    assert!(q.num_threads == 1);
 }
 
 #[test]

@@ -102,6 +102,7 @@ pub struct Process {
     pub rssanon_kib: usize,
     pub command: String,
     pub has_children: bool,
+    pub num_threads: usize, // including main thread
 }
 
 // Figures in KB.

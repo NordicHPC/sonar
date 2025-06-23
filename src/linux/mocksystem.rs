@@ -17,6 +17,7 @@ use std::path;
 pub struct Builder {
     files: Option<HashMap<String, String>>,
     pids: Option<Vec<(usize, u32)>>,
+    threads: Option<HashMap<usize, Vec<(usize, u32)>>>,
     users: Option<HashMap<u32, String>>,
     now: Option<u64>,
     boot_time: Option<u64>,
@@ -49,6 +50,13 @@ impl Builder {
     pub fn with_pids(self, pids: Vec<(usize, u32)>) -> Builder {
         Builder {
             pids: Some(pids),
+            ..self
+        }
+    }
+
+    pub fn with_threads(self, threads: HashMap<usize, Vec<(usize, u32)>>) -> Builder {
+        Builder {
+            threads: Some(threads),
             ..self
         }
     }
@@ -174,7 +182,12 @@ impl Builder {
             fs: {
                 let files = self.files.unwrap_or_default();
                 let pids = self.pids.unwrap_or_default();
-                MockFS { files, pids }
+                let threads = self.threads.unwrap_or_default();
+                MockFS {
+                    files,
+                    pids,
+                    threads,
+                }
             },
             now: if let Some(x) = self.now {
                 x
@@ -354,6 +367,7 @@ impl systemapi::SystemAPI for MockSystem {
 pub struct MockFS {
     files: HashMap<String, String>,
     pids: Vec<(usize, u32)>,
+    threads: HashMap<usize, Vec<(usize, u32)>>,
 }
 
 impl procfsapi::ProcfsAPI for MockFS {
@@ -364,7 +378,21 @@ impl procfsapi::ProcfsAPI for MockFS {
         }
     }
 
-    fn read_proc_pids(&self) -> Result<Vec<(usize, u32)>, String> {
-        Ok(self.pids.clone())
+    fn read_numeric_file_names(&self, path: &str) -> Result<Vec<(usize, u32)>, String> {
+        if path == "" {
+            Ok(self.pids.clone())
+        } else {
+            // We require the path to be <pid>/task, so parse the pid
+            match path.split_once('/') {
+                Some((a, _)) => match a.parse::<usize>() {
+                    Ok(pid) => match self.threads.get(&pid) {
+                        Some(v) => Ok(v.clone()),
+                        None => Ok(vec![(0, 0)]),
+                    },
+                    Err(_) => Err(format!("Unknown {path}")),
+                },
+                None => Err(format!("Unknown {path}")),
+            }
+        }
     }
 }
