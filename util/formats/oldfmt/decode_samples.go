@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+
 // Decode old sample (aka `sonar ps`) data.
 //
 // Old CSV data are delivered in batches where the first record can carry additional information

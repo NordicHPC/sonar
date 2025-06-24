@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+
 // Test the decoders for the old data format.  Currently we test only the dominant formats: JSON for
 // sysinfo, CSV for samples and slurmjobs.
 

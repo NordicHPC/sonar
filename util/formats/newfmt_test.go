@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+
 // The purpose of this test:
 //
 // - touch every defined data field at least once and make sure it has the expected value

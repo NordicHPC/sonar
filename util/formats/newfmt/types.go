@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+
 // This is a machine-processable and partly executable specification for the new JSON format for
 // Sonar output.  It is processable into Rust code and Markdown docs by code in ../../process-doc.
 //
