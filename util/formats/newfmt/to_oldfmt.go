@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+
 // The use case for this is transitional - when we receive new sysinfo but want to store it in old
 // data files.  Note there is no old format for cluster data.
 //

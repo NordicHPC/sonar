@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+
 // JSON and CSV field names were always the same.  Any comments here are meant to be informative,
 // the authoritative documentation is still doc/OLD-FORMAT.md.
 //
