@@ -5,7 +5,7 @@
 
 KAFKAROOT=$HOME/lib/kafka_2.13-3.9.0
 
-( cd ../../util/ssl ; make all )
+( cd ../../../util/ssl ; make all )
 cp $KAFKAROOT/config/zookeeper.properties .
 cp $KAFKAROOT/config/server.properties .
 patch -p1 server.properties < server.properties-with-ssl-sasl.diff

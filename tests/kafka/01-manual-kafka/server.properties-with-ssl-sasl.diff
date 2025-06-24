@@ -21,9 +21,9 @@
 + security.protocol=SASL_SSL
 + 
 + ssl.keystore.type=PEM
-+ ssl.keystore.location=../../util/ssl/sonar-kafka-keystore.pem
++ ssl.keystore.location=../../../util/ssl/sonar-kafka-keystore.pem
 + ssl.truststore.type=PEM
-+ ssl.truststore.location=../../util/ssl/sonar-ca.crt
++ ssl.truststore.location=../../../util/ssl/sonar-ca.crt
 + ssl.endpoint.identification.algorithm=
 + 
 + sasl.enabled.mechanisms=PLAIN

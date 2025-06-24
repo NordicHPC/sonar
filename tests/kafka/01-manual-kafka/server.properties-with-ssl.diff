@@ -21,9 +21,9 @@
 + security.protocol=SSL
 + 
 + ssl.keystore.type=PEM
-+ ssl.keystore.location=../../util/ssl/sonar-kafka-keystore.pem
++ ssl.keystore.location=../../../util/ssl/sonar-kafka-keystore.pem
 + ssl.truststore.type=PEM
-+ ssl.truststore.location=../../util/ssl/sonar-ca.crt
++ ssl.truststore.location=../../../util/ssl/sonar-ca.crt
 + ssl.endpoint.identification.algorithm=
   
   # The number of threads that the server uses for receiving requests from the network and sending responses to the network
