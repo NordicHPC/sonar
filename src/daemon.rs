@@ -72,6 +72,8 @@ pub struct SampleIni {
     pub exclude_system_jobs: bool,
     pub load: bool,
     pub batchless: bool,
+    pub rollup: bool,
+    pub min_cpu_time: Option<Dur>,
     pub exclude_commands: Vec<String>,
     pub exclude_users: Vec<String>,
 }
@@ -262,18 +264,18 @@ pub fn daemon_mode(
     let mut sample_extractor = ps::State::new(
         &system,
         &ps::PsOptions {
-            rollup: false,
-            min_cpu_percent: None,
-            min_mem_percent: None,
-            min_cpu_time: None,
+            rollup: ini.sample.rollup,
+            min_cpu_time: ini.sample.min_cpu_time.map(|d| d.to_minutes() as usize),
             exclude_system_jobs: ini.sample.exclude_system_jobs,
             load: ini.sample.load,
             exclude_users: ini.sample.exclude_users.clone(),
             exclude_commands: ini.sample.exclude_commands.clone(),
             lockdir: ini.global.lockdir.clone(),
+            token: api_token.clone(),
             new_json: true,
             cpu_util: true,
-            token: api_token.clone(),
+            min_cpu_percent: None, // Nonmonotonic, considered obsolete
+            min_mem_percent: None, // Nonmonotonic, considered obsolete
         },
     );
 
@@ -615,6 +617,8 @@ fn parse_config(config_file: &str) -> Result<Ini, String> {
             exclude_system_jobs: true,
             load: true,
             batchless: false,
+            rollup: false,
+            min_cpu_time: None,
             exclude_commands: vec![],
             exclude_users: vec![],
         },
@@ -720,7 +724,7 @@ fn parse_config(config_file: &str) -> Result<Ini, String> {
                     }
                     _ => return Err(format!("Invalid global.role value `{value}`")),
                 },
-                "lockdir" => {
+                "lockdir" | "lock-directory" => {
                     ini.global.lockdir = Some(value);
                 }
                 "topic-prefix" => {
@@ -787,6 +791,13 @@ fn parse_config(config_file: &str) -> Result<Ini, String> {
                 }
                 "batchless" => {
                     ini.sample.batchless = parse_bool(&value)?;
+                }
+                "rollup" => {
+                    ini.sample.rollup = parse_bool(&value)?;
+                }
+                "min-cpu-time" => {
+                    ini.sample.min_cpu_time =
+                        Some(parse_duration("sample.min-cpu-time", &value, true)?);
                 }
                 _ => return Err(format!("Invalid [sample]/[ps] setting name `{name}`")),
             },
@@ -1016,9 +1027,12 @@ pub fn test_parser() {
     let ini = parse_config("src/testdata/daemon-stdio-config.txt").unwrap();
     assert!(ini.global.cluster == "mlx.hpc.uio.no");
     assert!(ini.global.role == "node");
+    assert!(ini.global.lockdir == Some("/root".to_string()));
     assert!(ini.sample.cadence == Some(Dur::Minutes(5)));
     assert!(ini.sample.batchless);
     assert!(!ini.sample.load);
+    assert!(ini.sample.rollup);
+    assert!(ini.sample.min_cpu_time == Some(Dur::Minutes(1)));
     assert!(ini.sysinfo.cadence == Some(Dur::Hours(24)));
     assert!(ini.jobs.cadence == Some(Dur::Hours(1)));
     assert!(ini.jobs.window == Some(Dur::Minutes(90)));

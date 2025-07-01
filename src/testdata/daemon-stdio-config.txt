@@ -4,11 +4,14 @@
 [global]
 cluster = mlx.hpc.uio.no
 role=node
+lock-directory= /root
   
 [sample]
 cadence =5m
   batchless = true
 load = false  
+rollup = true
+min-cpu-time = 1m
 
 [sysinfo]
 cadence = 24h
