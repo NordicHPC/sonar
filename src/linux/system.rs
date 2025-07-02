@@ -245,7 +245,30 @@ impl systemapi::SystemAPI for System {
         )
     }
 
-    fn run_sinfo_partitions(&self) -> Result<Vec<(String, String)>, String> {
+    // Whether we try to run sinfo or run some code to look for the program in the path probably
+    // does not matter, and the former is easier.  We could/should cache this value in case the
+    // client wants it repeatedly.
+
+    fn cluster_kind(&self) -> Option<systemapi::ClusterKind> {
+        match runit("sinfo", &["--usage"], SINFO_TIMEOUT_S) {
+            Ok(_) => Some(systemapi::ClusterKind::Slurm),
+            Err(_) => None,
+        }
+    }
+
+    // Basically the `cluster` operations wrap `sinfo`:
+    //
+    //  - Run sinfo to list partitions.
+    //  - Run sinfo to get a list of nodes broken down by partition and their state.
+    //
+    // The same could have been had in a different form by:
+    //
+    //  scontrol -o show nodes
+    //  scontrol -o show partitions
+    //
+    // Anyway, we emit a list of partitions with their nodes and a list of nodes with their states.
+
+    fn cluster_partitions(&self) -> Result<Vec<(String, String)>, String> {
         twofields(runit(
             "sinfo",
             &["-h", "-a", "-O", "Partition:|,NodeList:|"],
@@ -253,7 +276,7 @@ impl systemapi::SystemAPI for System {
         )?)
     }
 
-    fn run_sinfo_nodes(&self) -> Result<Vec<(String, String)>, String> {
+    fn cluster_nodes(&self) -> Result<Vec<(String, String)>, String> {
         twofields(runit(
             "sinfo",
             &["-h", "-a", "-e", "-O", "NodeList:|,StateComplete:|"],

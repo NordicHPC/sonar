@@ -540,7 +540,7 @@ Commands:
   ps       Print process and load information
   sysinfo  Print system information
   slurm    Print Slurm job information for a [start,end) time interval
-  cluster  Print current Slurm partition information and node status
+  cluster  Print current batch cluster partition information and node status
   help     Print this message
 
 Options for `daemon`:
