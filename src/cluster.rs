@@ -1,16 +1,5 @@
-// Basically the `cluster` command is a wrapper around `sinfo`:
-//
-//  - Run sinfo to list partitions.
-//  - Run sinfo to get a list of nodes broken down by partition and their state.
-//
-// The same could have been had in a different form by:
-//
-//  scontrol -o show nodes
-//  scontrol -o show partitions
-//
-// Anyway, we emit a list of partitions with their nodes and a list of nodes with their states.
-//
-// If there is no sinfo, this emits an error.
+// On a batch system, obtain partitions+nodes and nodes+state and format them.  On non-batch
+// systems, this emits an error.
 
 use crate::json_tags::*;
 use crate::nodelist;
@@ -58,7 +47,7 @@ fn do_show_cluster(
     token: String,
 ) -> Result<output::Object, String> {
     let mut partitions = output::Array::new();
-    for (name, nodelist) in system.run_sinfo_partitions()? {
+    for (name, nodelist) in system.cluster_partitions()? {
         let mut p = output::Object::new();
         // The default partition is marked but of no interest to us.
         let name = if let Some(suffix) = name.strip_suffix('*') {
@@ -75,7 +64,7 @@ fn do_show_cluster(
     }
 
     let mut nodes = output::Array::new();
-    for (nodelist, statelist) in system.run_sinfo_nodes()? {
+    for (nodelist, statelist) in system.cluster_nodes()? {
         let mut p = output::Object::new();
         p.push_a(CLUSTER_NODES_NAMES, nodelist::parse_and_render(&nodelist)?);
         let mut states = output::Array::new();
@@ -88,7 +77,14 @@ fn do_show_cluster(
 
     let mut envelope = output::newfmt_envelope(system, token, &[]);
     let (mut data, mut attrs) = output::newfmt_data(system, DATA_TAG_CLUSTER);
-    attrs.push_b(CLUSTER_ATTRIBUTES_SLURM, true);
+    match system.cluster_kind() {
+        Some(systemapi::ClusterKind::Slurm) => {
+            attrs.push_b(CLUSTER_ATTRIBUTES_SLURM, true);
+        }
+        None => {
+            return Err("Unknown batch system".to_string());
+        }
+    }
     attrs.push_a(CLUSTER_ATTRIBUTES_PARTITIONS, partitions);
     attrs.push_a(CLUSTER_ATTRIBUTES_NODES, nodes);
     data.push_o(CLUSTER_DATA_ATTRIBUTES, attrs);

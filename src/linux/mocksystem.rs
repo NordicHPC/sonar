@@ -345,11 +345,15 @@ impl systemapi::SystemAPI for MockSystem {
         Ok("".to_string()) // Not in use yet
     }
 
-    fn run_sinfo_partitions(&self) -> Result<Vec<(String, String)>, String> {
+    fn cluster_kind(&self) -> Option<systemapi::ClusterKind> {
+        None
+    }
+
+    fn cluster_partitions(&self) -> Result<Vec<(String, String)>, String> {
         Ok(vec![]) // Not in use yet
     }
 
-    fn run_sinfo_nodes(&self) -> Result<Vec<(String, String)>, String> {
+    fn cluster_nodes(&self) -> Result<Vec<(String, String)>, String> {
         Ok(vec![]) // Not in use yet
     }
 

@@ -6,6 +6,10 @@ use std::fs;
 use std::io;
 use std::path;
 
+pub enum ClusterKind {
+    Slurm,
+}
+
 pub trait SystemAPI {
     // These `get_` methods always return the same values for every call.
     fn get_version(&self) -> String;
@@ -69,11 +73,14 @@ pub trait SystemAPI {
         to: &str,
     ) -> Result<String, String>;
 
-    // Run sinfo and return its output as a vector of partition name and unparsed nodelist.
-    fn run_sinfo_partitions(&self) -> Result<Vec<(String, String)>, String>;
+    fn cluster_kind(&self) -> Option<ClusterKind>;
 
-    // Run sinfo and return its output as a vector of unparsed nodelist and state list.
-    fn run_sinfo_nodes(&self) -> Result<Vec<(String, String)>, String>;
+    // On a batch system, return a vector of partition name and standard-format compressed nodelist.
+    fn cluster_partitions(&self) -> Result<Vec<(String, String)>, String>;
+
+    // On a batch system, return a vector of standard-format compressed nodelist and state name
+    // list.  State names are currently batch system specific.
+    fn cluster_nodes(&self) -> Result<Vec<(String, String)>, String>;
 
     // `create_lock_file` creates it atomically if it does not exist, returning Ok if so; if it does
     // exist, returns Err(io::ErrorKind::AlreadyExists), otherwise some other Err.
