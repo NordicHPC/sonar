@@ -1,6 +1,6 @@
-// Rust wrapper around ../gpuapi/sonar-nvidia.{c,h}.
+// Rust wrapper around ../../gpuapi/sonar-nvidia.{c,h}.
 
-use crate::gpuapi;
+use crate::gpu;
 use crate::ps;
 use crate::types::{Pid, Uid};
 use crate::util::cstrdup;
@@ -8,7 +8,7 @@ use crate::util::cstrdup;
 ////// C library API //////////////////////////////////////////////////////////////////////////////
 
 // The data structures and signatures defined here must be exactly those defined in the header file,
-// using types from `cty`.  See ../gpuapi/sonar-nvidia.h for all documentation of functionality and
+// using types from `cty`.  See ../../gpuapi/sonar-nvidia.h for all documentation of functionality and
 // units.
 //
 // TODO: We should use bindgen for this but not important at the moment.
@@ -109,7 +109,7 @@ extern "C" {
 
 ////// End C library API //////////////////////////////////////////////////////////////////////////
 
-pub fn get_card_configuration() -> Option<Vec<gpuapi::Card>> {
+pub fn get_card_configuration() -> Option<Vec<gpu::Card>> {
     let mut num_devices: cty::uint32_t = 0;
     if unsafe { nvml_device_get_count(&mut num_devices) } != 0 {
         return None;
@@ -119,9 +119,9 @@ pub fn get_card_configuration() -> Option<Vec<gpuapi::Card>> {
     let mut infobuf: NvmlCardInfo = Default::default();
     for dev in 0..num_devices {
         if unsafe { nvml_device_get_card_info(dev, &mut infobuf) } == 0 {
-            result.push(gpuapi::Card {
+            result.push(gpu::Card {
                 bus_addr: cstrdup(&infobuf.bus_addr),
-                device: gpuapi::GpuName {
+                device: gpu::Name {
                     index: dev,
                     uuid: cstrdup(&infobuf.uuid),
                 },
@@ -142,7 +142,7 @@ pub fn get_card_configuration() -> Option<Vec<gpuapi::Card>> {
     Some(result)
 }
 
-pub fn get_card_utilization() -> Option<Vec<gpuapi::CardState>> {
+pub fn get_card_utilization() -> Option<Vec<gpu::CardState>> {
     let mut num_devices: cty::uint32_t = 0;
     if unsafe { nvml_device_get_count(&mut num_devices) } != 0 {
         return None;
@@ -163,8 +163,8 @@ pub fn get_card_utilization() -> Option<Vec<gpuapi::CardState>> {
                 PERF_STATE_UNKNOWN => -1,
                 x => x,
             };
-            result.push(gpuapi::CardState {
-                device: gpuapi::GpuName {
+            result.push(gpu::CardState {
+                device: gpu::Name {
                     index: dev,
                     uuid: get_card_uuid(dev),
                 },
@@ -183,12 +183,12 @@ pub fn get_card_utilization() -> Option<Vec<gpuapi::CardState>> {
                 mem_clock_mhz: infobuf.mem_clock,
             })
         } else {
-            result.push(gpuapi::CardState {
-                device: gpuapi::GpuName {
+            result.push(gpu::CardState {
+                device: gpu::Name {
                     index: dev,
                     uuid: get_card_uuid(dev),
                 },
-                failing: gpuapi::GENERIC_FAILURE,
+                failing: gpu::GENERIC_FAILURE,
                 ..Default::default()
             })
         }
@@ -197,7 +197,7 @@ pub fn get_card_utilization() -> Option<Vec<gpuapi::CardState>> {
     Some(result)
 }
 
-pub fn get_process_utilization(ptable: &ps::ProcessTable) -> Option<Vec<gpuapi::Process>> {
+pub fn get_process_utilization(ptable: &ps::ProcessTable) -> Option<Vec<gpu::Process>> {
     let mut result = vec![];
 
     let mut num_devices: cty::uint32_t = 0;
@@ -218,8 +218,8 @@ pub fn get_process_utilization(ptable: &ps::ProcessTable) -> Option<Vec<gpuapi::
             }
 
             let (username, uid) = ptable.lookup(infobuf.pid as Pid);
-            result.push(gpuapi::Process {
-                devices: vec![gpuapi::GpuName {
+            result.push(gpu::Process {
+                devices: vec![gpu::Name {
                     index: dev,
                     uuid: get_card_uuid(dev),
                 }],

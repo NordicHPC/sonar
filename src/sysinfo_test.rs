@@ -1,5 +1,5 @@
 #[allow(unused_imports)]
-use crate::gpuapi;
+use crate::gpu;
 #[allow(unused_imports)]
 use crate::linux::mocksystem;
 #[allow(unused_imports)]
@@ -31,9 +31,9 @@ pub fn sysinfo_output_test() {
         .with_os("CP/M", "2.2")
         .with_architecture("Z80")
         .with_files(files)
-        .with_card(gpuapi::Card {
+        .with_card(gpu::Card {
             bus_addr: "12:14:16".to_string(),
-            device: gpuapi::GpuName {
+            device: gpu::Name {
                 index: 0,
                 uuid: "1234.5678".to_string(),
             },

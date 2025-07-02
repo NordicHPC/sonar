@@ -1,6 +1,6 @@
 #![allow(clippy::len_zero)]
 
-use crate::gpuapi;
+use crate::gpu;
 use crate::json_tags::*;
 use crate::log;
 use crate::output;
@@ -260,11 +260,11 @@ pub struct ProcInfo {
     pub gpu_status: GpuStatus,
 }
 
-pub type GpuProcInfos = HashMap<gpuapi::GpuName, GpuProcInfo>;
+pub type GpuProcInfos = HashMap<gpu::Name, GpuProcInfo>;
 
 #[derive(Clone, Default)]
 pub struct GpuProcInfo {
-    pub device: gpuapi::GpuName,
+    pub device: gpu::Name,
     pub gpu_util: u32,
     pub gpu_mem: u64,
     pub gpu_mem_util: u32,
@@ -284,7 +284,7 @@ impl Default for GpuStatus {
 
 pub struct SampleData {
     pub process_samples: Vec<ProcInfo>,
-    pub gpu_samples: Option<Vec<gpuapi::CardState>>,
+    pub gpu_samples: Option<Vec<gpu::CardState>>,
     pub cpu_samples: Vec<u64>,
     pub used_memory: u64,
     pub load1: f64,
@@ -324,7 +324,7 @@ fn collect_sample_data(
         return Ok(None);
     }
 
-    let gpu_info: Option<Vec<gpuapi::CardState>>;
+    let gpu_info: Option<Vec<gpu::CardState>>;
     (procinfo_by_pid, gpu_info) = add_gpu_info(procinfo_by_pid, system, &processes);
 
     if system.is_interrupted() {
@@ -400,7 +400,7 @@ fn add_gpu_info(
     mut procinfo_by_pid: ProcInfoTable,
     system: &dyn systemapi::SystemAPI,
     processes: &HashMap<Pid, systemapi::Process>,
-) -> (ProcInfoTable, Option<Vec<gpuapi::CardState>>) {
+) -> (ProcInfoTable, Option<Vec<gpu::CardState>>) {
     // When a GPU fails it may be a transient error or a permanent error, but either way sonar does
     // not know.  We just record the failure.  This is a soft failure, surfaced through dashboards;
     // we do not want mail about it under normal circumstances.
@@ -409,7 +409,7 @@ fn add_gpu_info(
     // better error information.
 
     let mut gpu_status = GpuStatus::Ok;
-    let mut gpu_info: Option<Vec<gpuapi::CardState>> = None;
+    let mut gpu_info: Option<Vec<gpu::CardState>> = None;
 
     if let Some(gpu) = system.get_gpus().probe() {
         match gpu.get_card_utilization() {
@@ -519,12 +519,7 @@ fn add_gpu_info(
     (procinfo_by_pid, gpu_info)
 }
 
-fn singleton_gpu(
-    device: &gpuapi::GpuName,
-    gpu_util: u32,
-    mem_util: u32,
-    mem_size: u64,
-) -> GpuProcInfos {
+fn singleton_gpu(device: &gpu::Name, gpu_util: u32, mem_util: u32, mem_size: u64) -> GpuProcInfos {
     let mut h = HashMap::new();
     h.insert(
         device.clone(),
@@ -540,7 +535,7 @@ fn singleton_gpu(
 
 fn aggregate_gpu(
     gpus: &mut GpuProcInfos,
-    device: &gpuapi::GpuName,
+    device: &gpu::Name,
     gpu_util: u32,
     mem_util: u32,
     mem_size: u64,

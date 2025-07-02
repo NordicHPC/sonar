@@ -1,11 +1,11 @@
-use crate::gpuapi::{Gpu, GpuAPI};
+use crate::gpu::{Gpu, GpuAPI};
 
 #[cfg(feature = "amd")]
-use crate::amd;
+use crate::gpu::amd;
 #[cfg(feature = "nvidia")]
-use crate::nvidia;
+use crate::gpu::nvidia;
 #[cfg(feature = "xpu")]
-use crate::xpu;
+use crate::gpu::xpu;
 
 pub struct RealGpu {}
 

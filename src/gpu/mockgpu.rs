@@ -1,4 +1,4 @@
-use crate::gpuapi::{Card, CardState, Gpu, GpuAPI, Process};
+use crate::gpu::{Card, CardState, Gpu, GpuAPI, Process};
 use crate::ps;
 
 pub struct MockGpuAPI {

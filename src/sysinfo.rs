@@ -1,7 +1,7 @@
 #![allow(clippy::len_zero)]
 #![allow(clippy::comparison_to_empty)]
 
-use crate::gpuapi;
+use crate::gpu;
 use crate::json_tags::*;
 use crate::output;
 use crate::systemapi;
@@ -125,7 +125,7 @@ fn layout_error_newfmt(
 fn layout_card_info_newfmt(node_info: &NodeInfo) -> output::Array {
     let mut gpu_info = output::Array::new();
     for c in &node_info.cards {
-        let gpuapi::Card {
+        let gpu::Card {
             device,
             bus_addr,
             model,
@@ -204,7 +204,7 @@ fn layout_error_oldfmt(system: &dyn systemapi::SystemAPI, error: String) -> outp
 fn layout_card_info_oldfmt(node_info: &NodeInfo) -> output::Array {
     let mut gpu_info = output::Array::new();
     for c in &node_info.cards {
-        let gpuapi::Card {
+        let gpu::Card {
             device,
             bus_addr,
             model,
@@ -253,7 +253,7 @@ struct NodeInfo {
     card_manufacturer: String,
     gpu_cards: u64,
     gpumem_kb: u64,
-    cards: Vec<gpuapi::Card>,
+    cards: Vec<gpu::Card>,
 }
 
 fn compute_nodeinfo(system: &dyn systemapi::SystemAPI) -> Result<NodeInfo, String> {
@@ -283,7 +283,7 @@ fn compute_nodeinfo(system: &dyn systemapi::SystemAPI) -> Result<NodeInfo, Strin
 
     let (gpu_desc, gpu_cards, gpumem_kb) = if !cards.is_empty() {
         // Sort cards
-        cards.sort_by(|a: &gpuapi::Card, b: &gpuapi::Card| {
+        cards.sort_by(|a: &gpu::Card, b: &gpu::Card| {
             if a.model == b.model {
                 a.mem_size_kib.cmp(&b.mem_size_kib)
             } else {

@@ -1,6 +1,6 @@
 #![allow(clippy::comparison_to_empty)]
 
-use crate::gpuapi;
+use crate::gpu;
 use crate::json_tags::*;
 use crate::output;
 use crate::ps::{ProcInfo, PsOptions, SampleData};
@@ -85,7 +85,7 @@ pub fn format_newfmt(
     envelope
 }
 
-fn format_newfmt_gpu_sample(c: &gpuapi::CardState) -> output::Object {
+fn format_newfmt_gpu_sample(c: &gpu::CardState) -> output::Object {
     let mut s = output::Object::new();
     if c.device.index != 0 {
         s.push_i(SAMPLE_GPU_INDEX, c.device.index as i64);

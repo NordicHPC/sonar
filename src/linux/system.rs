@@ -1,11 +1,11 @@
 use crate::command;
-use crate::gpuapi;
+use crate::gpu;
+use crate::gpu::realgpu;
 use crate::hostname;
 use crate::interrupt;
 use crate::jobsapi;
 use crate::linux::procfs;
 use crate::linux::slurm;
-use crate::realgpu;
 use crate::systemapi;
 use crate::time;
 use crate::users;
@@ -144,7 +144,7 @@ impl systemapi::SystemAPI for System {
         ARCHITECTURE.to_string()
     }
 
-    fn get_gpus(&self) -> &dyn gpuapi::GpuAPI {
+    fn get_gpus(&self) -> &dyn gpu::GpuAPI {
         &self.gpus
     }
 

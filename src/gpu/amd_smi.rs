@@ -1,6 +1,6 @@
 // Rust wrapper around ../gpuapi/sonar-amd.{c,h}.
 
-use crate::gpuapi;
+use crate::gpu;
 use crate::ps;
 use crate::types::Pid;
 use crate::util::cstrdup;
@@ -8,7 +8,7 @@ use crate::util::cstrdup;
 ////// C library API //////////////////////////////////////////////////////////////////////////////
 
 // The data structures and signatures defined here must be exactly those defined in the header file,
-// using types from `cty`.  See ../gpuapi/sonar-amd.h for all documentation of functionality and
+// using types from `cty`.  See ../../gpuapi/sonar-amd.h for all documentation of functionality and
 // units.
 //
 // TODO: We should use bindgen for this but not important at the moment.
@@ -103,7 +103,7 @@ extern "C" {
 
 ////// End C library API //////////////////////////////////////////////////////////////////////////
 
-pub fn get_card_configuration() -> Option<Vec<gpuapi::Card>> {
+pub fn get_card_configuration() -> Option<Vec<gpu::Card>> {
     let mut num_devices: cty::uint32_t = 0;
     if unsafe { amdml_device_get_count(&mut num_devices) } != 0 {
         return None;
@@ -124,9 +124,9 @@ pub fn get_card_configuration() -> Option<Vec<gpuapi::Card>> {
                     arch = "Radeon".to_string() + a;
                 }
             }
-            result.push(gpuapi::Card {
+            result.push(gpu::Card {
                 bus_addr: cstrdup(&infobuf.bus_addr),
-                device: gpuapi::GpuName {
+                device: gpu::Name {
                     index: dev,
                     uuid: cstrdup(&infobuf.uuid),
                 },
@@ -147,7 +147,7 @@ pub fn get_card_configuration() -> Option<Vec<gpuapi::Card>> {
     Some(result)
 }
 
-pub fn get_card_utilization() -> Option<Vec<gpuapi::CardState>> {
+pub fn get_card_utilization() -> Option<Vec<gpu::CardState>> {
     let mut num_devices: cty::uint32_t = 0;
     if unsafe { amdml_device_get_count(&mut num_devices) } != 0 {
         return None;
@@ -157,8 +157,8 @@ pub fn get_card_utilization() -> Option<Vec<gpuapi::CardState>> {
     let mut infobuf: AmdmlCardState = Default::default();
     for dev in 0..num_devices {
         if unsafe { amdml_device_get_card_state(dev, &mut infobuf) } == 0 {
-            result.push(gpuapi::CardState {
-                device: gpuapi::GpuName {
+            result.push(gpu::CardState {
+                device: gpu::Name {
                     index: dev,
                     uuid: get_card_uuid(dev),
                 },
@@ -177,12 +177,12 @@ pub fn get_card_utilization() -> Option<Vec<gpuapi::CardState>> {
                 mem_clock_mhz: infobuf.mem_clock,
             })
         } else {
-            result.push(gpuapi::CardState {
-                device: gpuapi::GpuName {
+            result.push(gpu::CardState {
+                device: gpu::Name {
                     index: dev,
                     uuid: get_card_uuid(dev),
                 },
-                failing: gpuapi::GENERIC_FAILURE,
+                failing: gpu::GENERIC_FAILURE,
                 ..Default::default()
             })
         }
@@ -191,7 +191,7 @@ pub fn get_card_utilization() -> Option<Vec<gpuapi::CardState>> {
     Some(result)
 }
 
-pub fn get_process_utilization(ptable: &ps::ProcessTable) -> Option<Vec<gpuapi::Process>> {
+pub fn get_process_utilization(ptable: &ps::ProcessTable) -> Option<Vec<gpu::Process>> {
     let mut result = vec![];
 
     let mut num_devices: cty::uint32_t = 0;
@@ -216,7 +216,7 @@ pub fn get_process_utilization(ptable: &ps::ProcessTable) -> Option<Vec<gpuapi::
         let mut devices = vec![];
         while indices != 0 {
             if (indices & 1) == 1 {
-                devices.push(gpuapi::GpuName {
+                devices.push(gpu::Name {
                     index: k,
                     uuid: get_card_uuid(k),
                 });
@@ -224,7 +224,7 @@ pub fn get_process_utilization(ptable: &ps::ProcessTable) -> Option<Vec<gpuapi::
             indices >>= 1;
             k += 1;
         }
-        result.push(gpuapi::Process {
+        result.push(gpu::Process {
             devices,
             pid: infobuf.pid as Pid,
             user: username,

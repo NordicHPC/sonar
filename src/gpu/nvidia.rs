@@ -1,12 +1,11 @@
-use crate::gpuapi;
-use crate::nvidia_nvml;
+use crate::gpu::{self, nvidia_nvml};
 use crate::ps;
 
 use std::path::Path;
 
 pub struct NvidiaGPU {}
 
-pub fn probe() -> Option<Box<dyn gpuapi::Gpu>> {
+pub fn probe() -> Option<Box<dyn gpu::Gpu>> {
     if nvidia_present() {
         Some(Box::new(NvidiaGPU {}))
     } else {
@@ -14,12 +13,12 @@ pub fn probe() -> Option<Box<dyn gpuapi::Gpu>> {
     }
 }
 
-impl gpuapi::Gpu for NvidiaGPU {
+impl gpu::Gpu for NvidiaGPU {
     fn get_manufacturer(&self) -> String {
         "NVIDIA".to_string()
     }
 
-    fn get_card_configuration(&self) -> Result<Vec<gpuapi::Card>, String> {
+    fn get_card_configuration(&self) -> Result<Vec<gpu::Card>, String> {
         if let Some(info) = nvidia_nvml::get_card_configuration() {
             Ok(info)
         } else {
@@ -30,7 +29,7 @@ impl gpuapi::Gpu for NvidiaGPU {
     fn get_process_utilization(
         &self,
         ptable: &ps::ProcessTable,
-    ) -> Result<Vec<gpuapi::Process>, String> {
+    ) -> Result<Vec<gpu::Process>, String> {
         if let Some(info) = nvidia_nvml::get_process_utilization(ptable) {
             Ok(info)
         } else {
@@ -38,7 +37,7 @@ impl gpuapi::Gpu for NvidiaGPU {
         }
     }
 
-    fn get_card_utilization(&self) -> Result<Vec<gpuapi::CardState>, String> {
+    fn get_card_utilization(&self) -> Result<Vec<gpu::CardState>, String> {
         if let Some(info) = nvidia_nvml::get_card_utilization() {
             Ok(info)
         } else {
