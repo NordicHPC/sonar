@@ -1,3 +1,8 @@
+pub mod directory;
+#[cfg(feature = "kafka")]
+pub mod kafka;
+pub mod stdio;
+
 use crate::systemapi::SystemAPI;
 
 // The DataSink hides the specific data sink we use.  It receives outgoing traffic by `post()` and

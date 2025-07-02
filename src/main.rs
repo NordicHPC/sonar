@@ -1,33 +1,19 @@
-#[cfg(feature = "amd")]
-mod amd;
-#[cfg(feature = "amd")]
-mod amd_smi;
 mod cluster;
 mod command;
 #[cfg(feature = "daemon")]
 mod daemon;
 #[cfg(feature = "daemon")]
 mod datasink;
-#[cfg(feature = "daemon")]
-mod directorysink;
-mod gpuapi;
+mod gpu;
 mod hostname;
 mod interrupt;
 mod jobsapi;
 mod json_tags;
-#[cfg(all(feature = "daemon", feature = "kafka"))]
-mod kafka;
 mod linux;
 mod log;
 #[cfg(test)]
-mod mockgpu;
-#[cfg(test)]
 mod mockjobs;
 mod nodelist;
-#[cfg(feature = "nvidia")]
-mod nvidia;
-#[cfg(feature = "nvidia")]
-mod nvidia_nvml;
 mod output;
 #[cfg(test)]
 mod output_test;
@@ -36,10 +22,7 @@ mod ps_newfmt;
 mod ps_oldfmt;
 #[cfg(test)]
 mod ps_test;
-mod realgpu;
 mod slurmjobs;
-#[cfg(feature = "daemon")]
-mod stdiosink;
 mod sysinfo;
 #[cfg(test)]
 mod sysinfo_test;
@@ -48,8 +31,6 @@ mod time;
 mod types;
 mod users;
 mod util;
-#[cfg(feature = "xpu")]
-mod xpu;
 
 use std::io;
 

@@ -1,8 +1,8 @@
-use crate::gpuapi;
+use crate::gpu;
+use crate::gpu::mockgpu;
 use crate::jobsapi;
 use crate::json_tags;
 use crate::linux::procfs;
-use crate::mockgpu;
 use crate::systemapi;
 use crate::time;
 
@@ -28,7 +28,7 @@ pub struct Builder {
     os_release: Option<String>,
     architecture: Option<String>,
     jm: Option<Box<dyn jobsapi::JobManager>>,
-    cards: cell::RefCell<Vec<gpuapi::Card>>,
+    cards: cell::RefCell<Vec<gpu::Card>>,
 }
 
 #[allow(dead_code)]
@@ -124,7 +124,7 @@ impl Builder {
         }
     }
 
-    pub fn with_card(self, c: gpuapi::Card) -> Builder {
+    pub fn with_card(self, c: gpu::Card) -> Builder {
         self.cards.borrow_mut().push(c);
         self
     }
@@ -261,7 +261,7 @@ impl systemapi::SystemAPI for MockSystem {
         self.architecture.clone()
     }
 
-    fn get_gpus(&self) -> &dyn gpuapi::GpuAPI {
+    fn get_gpus(&self) -> &dyn gpu::GpuAPI {
         &self.gpus
     }
 

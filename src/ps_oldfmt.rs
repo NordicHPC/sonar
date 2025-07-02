@@ -1,7 +1,7 @@
 #![allow(clippy::len_zero)]
 #![allow(clippy::comparison_to_empty)]
 
-use crate::gpuapi;
+use crate::gpu;
 use crate::json_tags;
 use crate::output;
 use crate::ps::{GpuStatus, ProcInfo, PsOptions, SampleData};
@@ -126,19 +126,19 @@ fn format_oldfmt_sample(proc_info: &ProcInfo, system: &dyn systemapi::SystemAPI)
 
 // This creates the sequence-of-attributes encoding for per-node GPU data for the old CSV format.
 
-fn format_gpu_samples_horizontally(cards: &[gpuapi::CardState]) -> Option<output::Object> {
+fn format_gpu_samples_horizontally(cards: &[gpu::CardState]) -> Option<output::Object> {
     let mut s = output::Object::new();
-    s = add_key(s, "fan%", cards, |c: &gpuapi::CardState| {
+    s = add_key(s, "fan%", cards, |c: &gpu::CardState| {
         nonzero(c.fan_speed_pct as i64)
     });
-    s = add_key(s, "mode", cards, |c: &gpuapi::CardState| {
+    s = add_key(s, "mode", cards, |c: &gpu::CardState| {
         if c.compute_mode == "" {
             output::Value::E()
         } else {
             output::Value::S(c.compute_mode.clone())
         }
     });
-    s = add_key(s, "perf", cards, |c: &gpuapi::CardState| {
+    s = add_key(s, "perf", cards, |c: &gpu::CardState| {
         output::Value::S(if c.perf_state == -1 {
             "".to_string()
         } else {
@@ -147,29 +147,29 @@ fn format_gpu_samples_horizontally(cards: &[gpuapi::CardState]) -> Option<output
     });
     // Reserved memory is really not interesting, it's possible it would have been
     // interesting as part of the card configuration.
-    //s = add_key(s, "mreskib", cards, |c: &gpuapi::CardState| nonzero(c.mem_reserved_kib));
-    s = add_key(s, "musekib", cards, |c: &gpuapi::CardState| {
+    //s = add_key(s, "mreskib", cards, |c: &gpu::CardState| nonzero(c.mem_reserved_kib));
+    s = add_key(s, "musekib", cards, |c: &gpu::CardState| {
         nonzero(c.mem_used_kib as i64)
     });
-    s = add_key(s, "cutil%", cards, |c: &gpuapi::CardState| {
+    s = add_key(s, "cutil%", cards, |c: &gpu::CardState| {
         nonzero(c.gpu_utilization_pct as i64)
     });
-    s = add_key(s, "mutil%", cards, |c: &gpuapi::CardState| {
+    s = add_key(s, "mutil%", cards, |c: &gpu::CardState| {
         nonzero(c.mem_utilization_pct as i64)
     });
-    s = add_key(s, "tempc", cards, |c: &gpuapi::CardState| {
+    s = add_key(s, "tempc", cards, |c: &gpu::CardState| {
         nonzero(c.temp_c.into())
     });
-    s = add_key(s, "poww", cards, |c: &gpuapi::CardState| {
+    s = add_key(s, "poww", cards, |c: &gpu::CardState| {
         nonzero(c.power_watt.into())
     });
-    s = add_key(s, "powlimw", cards, |c: &gpuapi::CardState| {
+    s = add_key(s, "powlimw", cards, |c: &gpu::CardState| {
         nonzero(c.power_limit_watt.into())
     });
-    s = add_key(s, "cez", cards, |c: &gpuapi::CardState| {
+    s = add_key(s, "cez", cards, |c: &gpu::CardState| {
         nonzero(c.ce_clock_mhz.into())
     });
-    s = add_key(s, "memz", cards, |c: &gpuapi::CardState| {
+    s = add_key(s, "memz", cards, |c: &gpu::CardState| {
         nonzero(c.mem_clock_mhz.into())
     });
     if !s.is_empty() {
@@ -182,8 +182,8 @@ fn format_gpu_samples_horizontally(cards: &[gpuapi::CardState]) -> Option<output
 fn add_key(
     mut s: output::Object,
     key: &str,
-    cards: &[gpuapi::CardState],
-    extract: fn(&gpuapi::CardState) -> output::Value,
+    cards: &[gpu::CardState],
+    extract: fn(&gpu::CardState) -> output::Value,
 ) -> output::Object {
     let mut vs = output::Array::new();
     let mut any_nonempty = false;

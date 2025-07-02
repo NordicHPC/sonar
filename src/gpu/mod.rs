@@ -1,3 +1,17 @@
+#[cfg(feature = "amd")]
+mod amd;
+#[cfg(feature = "amd")]
+mod amd_smi;
+#[cfg(test)]
+pub mod mockgpu;
+#[cfg(feature = "nvidia")]
+mod nvidia;
+#[cfg(feature = "nvidia")]
+mod nvidia_nvml;
+pub mod realgpu;
+#[cfg(feature = "xpu")]
+mod xpu;
+
 // Low-level but common API to performance data for cards installed on the node.
 use crate::ps;
 use crate::types::{Pid, Uid};
@@ -12,7 +26,7 @@ use crate::types::{Pid, Uid};
 // managing the uuid.
 
 #[derive(PartialEq, Eq, Hash, Default, Clone, Debug)]
-pub struct GpuName {
+pub struct Name {
     pub index: u32,   // May change at boot time
     pub uuid: String, // Forever immutable
 }
@@ -31,7 +45,7 @@ pub struct GpuName {
 
 #[derive(PartialEq, Default, Clone, Debug)]
 pub struct Process {
-    pub devices: Vec<GpuName>,   // Names are distinct
+    pub devices: Vec<Name>,      // Names are distinct
     pub pid: Pid,                // Process ID
     pub user: String,            // User name
     pub uid: Uid,                // User ID
@@ -46,7 +60,7 @@ pub struct Process {
 
 #[derive(PartialEq, Default, Clone, Debug)]
 pub struct Card {
-    pub device: GpuName,
+    pub device: Name,
     pub bus_addr: String,
     pub model: String,
     pub arch: String,
@@ -68,7 +82,7 @@ pub struct Card {
 
 #[derive(PartialEq, Default, Clone, Debug)]
 pub struct CardState {
-    pub device: GpuName,
+    pub device: Name,
     pub failing: u32,
     pub fan_speed_pct: f32,
     pub compute_mode: String,

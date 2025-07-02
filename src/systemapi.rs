@@ -1,4 +1,4 @@
-use crate::gpuapi;
+use crate::gpu;
 use crate::jobsapi;
 
 use std::collections::HashMap;
@@ -20,7 +20,7 @@ pub trait SystemAPI {
     fn get_now_in_secs_since_epoch(&self) -> u64;
     fn get_pid(&self) -> u32;
     fn get_boot_time(&self) -> u64;
-    fn get_gpus(&self) -> &dyn gpuapi::GpuAPI;
+    fn get_gpus(&self) -> &dyn gpu::GpuAPI;
     fn get_jobs(&self) -> &dyn jobsapi::JobManager;
     fn get_cpu_info(&self) -> Result<CpuInfo, String>;
     fn get_memory(&self) -> Result<Memory, String>;
