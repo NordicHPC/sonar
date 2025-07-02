@@ -8,15 +8,11 @@ mod command;
 mod daemon;
 #[cfg(feature = "daemon")]
 mod datasink;
-#[cfg(feature = "daemon")]
-mod directorysink;
 mod gpuapi;
 mod hostname;
 mod interrupt;
 mod jobsapi;
 mod json_tags;
-#[cfg(all(feature = "daemon", feature = "kafka"))]
-mod kafka;
 mod linux;
 mod log;
 #[cfg(test)]
@@ -38,8 +34,6 @@ mod ps_oldfmt;
 mod ps_test;
 mod realgpu;
 mod slurmjobs;
-#[cfg(feature = "daemon")]
-mod stdiosink;
 mod sysinfo;
 #[cfg(test)]
 mod sysinfo_test;
