@@ -37,7 +37,7 @@ the cadence.
 ```
 cluster = <canonical cluster name>
 role = node | master
-lockdir = <string>                              # default none
+lock-directory = <string>                       # default none
 topic-prefix = <string>                         # default none
 ```
 
@@ -47,9 +47,9 @@ The `role` determines how this daemon responds to control messages from a remote
 must be defined.  Only the string values listed are accepted.  A `node` typically provides sample
 and sysinfo data only, a `master` often only slurm and cluster data.
 
-If there is a `lockdir` then a lockfile in that directory is acquired when the daemon runs and stays
-acquired for the daemon's lifetime.  If the daemon is reloaded by remote command the lock is
-relinquished temporarily (and the restarted config file may name a different lockdir).
+If there is a `lock-directory` then a lockfile in that directory is acquired when the daemon runs
+and stays acquired for the daemon's lifetime.  If the daemon is reloaded by remote command the lock
+is relinquished temporarily (and the restarted config file may name a different lock directory).
 
 If there is a `topic-prefix` then it is prefixed to each data packet's topic.  A popular value would
 be `test` to tag the data coming from test setups.  (See "DATA MESSAGE FORMATS" below for more about
@@ -105,8 +105,10 @@ cadence = <duration value>
 exclude-system-jobs = <bool>                    # default true
 load = <bool>                                   # default true
 batchless = <bool>                              # default false
+rollup = <bool>                                 # default false
 exclude-users = <comma-separated strings>       # default []
 exclude-commands = <comma-separated strings>    # default []
+min-cpu-time = <duration value>                 # default none
 ```
 
 These are the normal options for `sonar ps`, see the Sonar documentation.
