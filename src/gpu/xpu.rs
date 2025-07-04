@@ -1,12 +1,14 @@
 // This is stub code, included to test the feature system, to be fleshed out later.
 // If you enable the xpu feature, you'll get a link error because there's no XPU gpuapi adapter.
 
-use crate::gpuapi;
+use crate::gpu::{self, xpu_smi};
 use crate::ps;
+
+use std::path::Path;
 
 pub struct XpuGPU {}
 
-pub fn probe() -> Option<Box<dyn gpuapi::GPU>> {
+pub fn probe() -> Option<Box<dyn gpu::Gpu>> {
     if xpu_present() {
         Some(Box::new(XpuGPU {}))
     } else {
@@ -14,12 +16,12 @@ pub fn probe() -> Option<Box<dyn gpuapi::GPU>> {
     }
 }
 
-impl gpuapi::GPU for XpuGPU {
-    fn get_manufacturer(&mut self) -> String {
+impl gpu::Gpu for XpuGPU {
+    fn get_manufacturer(&self) -> String {
         "Intel".to_string()
     }
 
-    fn get_card_configuration(&mut self) -> Result<Vec<gpuapi::Card>, String> {
+    fn get_card_configuration(&self) -> Result<Vec<gpu::Card>, String> {
         if let Some(info) = xpu_smi::get_card_configuration() {
             Ok(info)
         } else {
@@ -28,13 +30,13 @@ impl gpuapi::GPU for XpuGPU {
     }
 
     fn get_process_utilization(
-        &mut self,
+        &self,
         _ptable: &ps::ProcessTable,
-    ) -> Result<Vec<gpuapi::Process>, String> {
+    ) -> Result<Vec<gpu::Process>, String> {
         Ok(vec![])
     }
 
-    fn get_card_utilization(&mut self) -> Result<Vec<gpuapi::CardState>, String> {
+    fn get_card_utilization(&self) -> Result<Vec<gpu::CardState>, String> {
         Ok(vec![])
     }
 }

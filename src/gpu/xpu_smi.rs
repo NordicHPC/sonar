@@ -59,7 +59,7 @@ pub fn get_card_configuration() -> Option<Vec<gpu::Card>> {
                     index: dev,
                     uuid: cstrdup(&infobuf.uuid),
                 },
-                ..default::Default()
+                ..Default::default()
             })
         }
     }
