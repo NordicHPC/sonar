@@ -128,7 +128,7 @@ pub fn get_card_configuration() -> Option<Vec<gpu::Card>> {
                 bus_addr: cstrdup(&infobuf.bus_addr),
                 device: gpu::Name {
                     index: dev,
-                    uuid: cstrdup(&infobuf.uuid),
+                    uuid: get_card_uuid_from_info(&infobuf),
                 },
                 model,
                 arch,
@@ -245,8 +245,12 @@ fn get_card_uuid(dev: u32) -> String {
     // TODO: Not the most efficient way to do it, but OK for now?
     let mut infobuf: AmdmlCardInfo = Default::default();
     if unsafe { amdml_device_get_card_info(dev, &mut infobuf) } == 0 {
-        cstrdup(&infobuf.uuid)
+        get_card_uuid_from_info(&infobuf)
     } else {
         "".to_string()
     }
+}
+
+fn get_card_uuid_from_info(infobuf: &AmdmlCardInfo) -> String {
+    cstrdup(&infobuf.uuid)
 }

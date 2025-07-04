@@ -10,9 +10,10 @@ repository = "https://github.com/NordicHPC/sonar"
 nvidia = []
 amd = []
 xpu = []
+habana = []
 daemon = []
 kafka = [ "dep:rdkafka" ]
-default = [ "nvidia", "amd", "daemon", "kafka" ]
+default = [ "nvidia", "amd", "xpu", "habana", "daemon", "kafka" ]
 
 [dependencies]
 cty = "0.2.2"

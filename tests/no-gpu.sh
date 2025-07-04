@@ -9,7 +9,7 @@
 # Add other GPU types here when we add support for them, the tests below should start failing when
 # that happens.
 set -e
-if [[ -e /sys/module/amdgpu || -e /sys/module/nvidia ]]; then
+if [[ -e /sys/module/amdgpu || -e /sys/module/nvidia || -e /sys/module/i915 ]]; then
     echo " GPUs detected"
     exit 0
 fi

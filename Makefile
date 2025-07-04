@@ -1,4 +1,4 @@
-.PHONY: debug release test
+.PHONY: debug release test format
 ARCH=$(shell uname -m)
 
 debug:
@@ -11,3 +11,7 @@ test: debug release
 	cargo test
 	( cd util ; $(MAKE) test )
 	( cd tests; ./run_tests.sh )
+
+format:
+	cargo fmt
+	( cd util ; $(MAKE) format )

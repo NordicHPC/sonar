@@ -133,8 +133,8 @@ import (
 // compatible, there may be some minor problems translating between them.
 //
 // If a device does not expose a UUID, one will be constructed for it by the monitoring component.
-// This UUID will never be confusable with another device but it may change, eg at reboot, creating
-// a larger population of devices than there is in actuality.
+// This UUID will never be confusable with another device within the same cluster but it may change,
+// eg at reboot, creating a larger population of devices than there is in actuality.
 //
 // ## Data format versions
 //

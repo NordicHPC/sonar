@@ -1,12 +1,11 @@
-// This is stub code, included to test the feature system, to be fleshed out later.
-// If you enable the xpu feature, you'll get a link error because there's no XPU gpuapi adapter.
-
-use crate::gpuapi;
+use crate::gpu::{self, xpu_smi};
 use crate::ps;
+
+use std::path::Path;
 
 pub struct XpuGPU {}
 
-pub fn probe() -> Option<Box<dyn gpuapi::GPU>> {
+pub fn probe() -> Option<Box<dyn gpu::Gpu>> {
     if xpu_present() {
         Some(Box::new(XpuGPU {}))
     } else {
@@ -14,36 +13,43 @@ pub fn probe() -> Option<Box<dyn gpuapi::GPU>> {
     }
 }
 
-impl gpuapi::GPU for XpuGPU {
-    fn get_manufacturer(&mut self) -> String {
+impl gpu::Gpu for XpuGPU {
+    fn get_manufacturer(&self) -> String {
         "Intel".to_string()
     }
 
-    fn get_card_configuration(&mut self) -> Result<Vec<gpuapi::Card>, String> {
-        let mut num_devices: cty::uint32_t = 0;
-        if unsafe { xpu_device_get_count(&mut num_devices) } != 0 {
-            return Ok(vec![]);
+    fn get_card_configuration(&self) -> Result<Vec<gpu::Card>, String> {
+        if let Some(info) = xpu_smi::get_card_configuration() {
+            Ok(info)
+        } else {
+            Ok(vec![])
         }
-        return Ok(vec![]);
     }
 
     fn get_process_utilization(
-        &mut self,
-        _ptable: &ps::ProcessTable,
-    ) -> Result<Vec<gpuapi::Process>, String> {
-        Ok(vec![])
+        &self,
+        ptable: &ps::ProcessTable,
+    ) -> Result<Vec<gpu::Process>, String> {
+        if let Some(info) = xpu_smi::get_process_utilization(ptable) {
+            Ok(info)
+        } else {
+            Ok(vec![])
+        }
     }
 
-    fn get_card_utilization(&mut self) -> Result<Vec<gpuapi::CardState>, String> {
-        Ok(vec![])
+    fn get_card_utilization(&self) -> Result<Vec<gpu::CardState>, String> {
+        if let Some(info) = xpu_smi::get_card_utilization() {
+            Ok(info)
+        } else {
+            Ok(vec![])
+        }
     }
 }
+
+// Probably this, though actually hard to figure out exactly.  Looking at strings in the smi
+// library, i915 is definitely being looked for, and some other output also indicates this is what
+// we want.
 
 fn xpu_present() -> bool {
-    false
-}
-
-#[link(name = "sonar-xpu", kind = "static")]
-extern "C" {
-    pub fn xpu_device_get_count(count: *mut cty::uint32_t) -> cty::c_int;
+    Path::new("/sys/module/i915").exists()
 }
