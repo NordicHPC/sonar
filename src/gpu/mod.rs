@@ -11,6 +11,8 @@ mod nvidia_nvml;
 pub mod realgpu;
 #[cfg(feature = "xpu")]
 mod xpu;
+#[cfg(feature = "xpu")]
+mod xpu_smi;
 
 // Low-level but common API to performance data for cards installed on the node.
 use crate::ps;
@@ -107,7 +109,9 @@ pub trait Gpu {
     // GPU object as a whole and not per-card, we are currently assuming that nodes don't have cards
     // from multiple manufacturers.
     //
-    // Names, once defined, will never change.  Current names: "NVIDIA", "AMD".
+    // Names, once defined, will never change.  Current names: "NVIDIA", "AMD", "Intel".  Note some
+    // manufacturers may have several very different cards (Intel has XPU and Habana); the
+    // distinction must be encoded in the model or arch fields of the card configuration.
     fn get_manufacturer(&self) -> String;
 
     // Get static (or nearly static) information about the installed cards.
