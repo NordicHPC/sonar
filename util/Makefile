@@ -4,5 +4,5 @@ all:
 	@echo "Select a specific target"
 
 test:
-	( cd formats ; go test )
-	( cd ingest-files ; go test )
+	( cd formats ; $(MAKE) test )
+	( cd ingest-files ; $(MAKE) test )

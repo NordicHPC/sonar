@@ -33,13 +33,28 @@ for d in "" ",daemon"; do
     ( cd .. ; cargo build --no-default-features --features nvidia,amd$d )
     output=$(../target/debug/sonar sysinfo)
     jq . <<< $output > /dev/null
+
+    echo " amd,xpu$d"
+    ( cd .. ; cargo build --no-default-features --features amd,xpu$d )
+    output=$(../target/debug/sonar sysinfo)
+    jq . <<< $output > /dev/null
+
+    echo " nvidia,xpu$d"
+    ( cd .. ; cargo build --no-default-features --features nvidia,xpu$d )
+    output=$(../target/debug/sonar sysinfo)
+    jq . <<< $output > /dev/null
+
+    echo " nvidia,amd,xpu$d"
+    ( cd .. ; cargo build --no-default-features --features nvidia,amd,xpu$d )
+    output=$(../target/debug/sonar sysinfo)
+    jq . <<< $output > /dev/null
 done
 
-# No XPU library yet so this feature should cause link failure
+# No Habana library yet so this feature should cause link failure
 
-echo " XPU"
-if [[ $( cd .. ; cargo build --no-default-features --features xpu 2> /dev/null ) ]]; then
-    echo "XPU test should have failed but did not"
+echo " HABANA"
+if [[ $( cd .. ; cargo build --no-default-features --features habana 2> /dev/null ) ]]; then
+    echo "Habana test should have failed but did not"
     exit 1
 fi
 

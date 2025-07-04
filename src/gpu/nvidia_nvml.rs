@@ -121,6 +121,7 @@ pub fn get_card_configuration() -> Option<Vec<gpu::Card>> {
         if unsafe { nvml_device_get_card_info(dev, &mut infobuf) } == 0 {
             result.push(gpu::Card {
                 bus_addr: cstrdup(&infobuf.bus_addr),
+		// FIXME: UUID
                 device: gpu::Name {
                     index: dev,
                     uuid: cstrdup(&infobuf.uuid),
