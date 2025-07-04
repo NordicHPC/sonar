@@ -67,7 +67,7 @@ static void probe_gpus() {
     }
 }
 
-static int load_rsmi() {
+static int load_smi() {
     static void* lib;
 
     if (lib != NULL) {
@@ -151,6 +151,10 @@ int xpu_device_get_count(uint32_t* count) {
 #endif /* SONAR_XPU_GPU */
 }
 
+#ifdef SONAR_XPU_GPU
+static xpum_device_basic_info *devs;
+#endif
+
 int xpu_device_get_card_info(uint32_t device, struct xpu_card_info_t* infobuf) {
 #ifdef SONAR_XPU_GPU
     load_smi();
@@ -160,21 +164,27 @@ int xpu_device_get_card_info(uint32_t device, struct xpu_card_info_t* infobuf) {
     if (device >= (uint32_t)num_gpus) {
         return -1;
     }
-    memset(infobuf, 0, sizeof(*infobuf));
 
-    /* be wasteful for now */
-    xpum_device_basic_info* devs = calloc(num_gpus, sizeof(xpum_device_basic_info));
     if (devs == NULL) {
+      devs = calloc(num_gpus, sizeof(xpum_device_basic_info));
+      if (devs == NULL) {
         return -1;
-    }
-    if (xpi_get_device_list(devs, num_gpus) != 0) {
+      }
+      int count = num_gpus;
+      if (xpu_get_device_list(devs, &count) != 0) {
         free(devs);
+	devs = NULL;
         return -1;
+      }
     }
-    strlcpy(infobuf.bus_addr, devs[device].PCIBDFAddress, sizeof(xpu_card_info_t.bus_addr));
-    strlcpy(infobuf.uuid, devs[device].uuid, sizeof(xpu_card_info_t.uuid));
 
-    free(devs);
+    // TODO: At least on the eX3 node, the uuid is just the bus address, which is not unique enough.
+
+    memset(infobuf, 0, sizeof(*infobuf));
+    strncpy(infobuf->bus_addr, devs[device].PCIBDFAddress, sizeof(infobuf->bus_addr));
+    strncpy(infobuf->uuid, devs[device].uuid, sizeof(infobuf->uuid));
+    strncpy(infobuf->model, devs[device].deviceName, sizeof(infobuf->model));
+
     return 0;
 #else
     return -1;

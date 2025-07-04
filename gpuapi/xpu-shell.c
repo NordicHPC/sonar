@@ -62,8 +62,8 @@ int main(int argc, char** argv) {
               }
               printf("\nDEVICE %u\n", dev);
               printf("  bus %s\n", info.bus_addr);
-#if 0
               printf("  model %s\n", info.model);
+#if 0
               printf("  arch %s\n", info.architecture);
               printf("  driver %s\n", info.driver);
               printf("  firmware %s\n", info.firmware);

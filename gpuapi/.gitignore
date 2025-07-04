@@ -1,3 +1,4 @@
 nvidia-shell
 amd-shell
+xpu-shell
 *.o

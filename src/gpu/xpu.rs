@@ -40,6 +40,6 @@ impl gpuapi::GPU for XpuGPU {
 }
 
 fn xpu_present() -> bool {
-    // Probably
+    // Probably this, though actually hard to figure out.
     Path::new("/sys/module/i915").exists()
 }

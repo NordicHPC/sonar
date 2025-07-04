@@ -20,15 +20,17 @@ extern "C" {
 
 #[repr(C)]
 pub struct XpuCardInfo {
-    bus_addr: [cty::c_char; 80],
-    uuid: [cty::c_char; 96],
+    bus_addr: [cty::c_char; 256],
+    model: [cty::c_char; 256],
+    uuid: [cty::c_char; 256],
 }
 
 impl Default for XpuCardInfo {
     fn default() -> Self {
         Self {
-            bus_addr: [0; 80],
-            uuid: [0; 96],
+            bus_addr: [0; 256],
+            model: [0; 256],
+            uuid: [0; 256],
         }
     }
 }

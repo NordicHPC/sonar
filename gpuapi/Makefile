@@ -47,11 +47,13 @@ default:
 	@echo " libsonar-nvidia-stub.a"
 	@echo " libsonar-amd.a          the ROCM/hip SDK must be installed or loaded"
 	@echo " libsonar-amd-stub.a"
+	@echo " libsonar-xpu.a          the XPU SDK must be installed or loaded"
+	@echo " libsonar-xpu-stub.a"
 	@echo ""
 	@echo "See comments in Makefile for more information."
 
 clean:
-	rm -f *.o *.a *~ nvidia-shell amd-shell
+	rm -f *.o *.a *~ nvidia-shell amd-shell xpu-shell
 
 realclean:
 	$(MAKE) clean
@@ -80,6 +82,19 @@ libsonar-amd-stub.a: sonar-amd-stub.o Makefile
 	ar rs $@ $<
 
 sonar-amd-stub.o: sonar-amd.c sonar-amd.h Makefile
+	$(CC) -c $(CFLAGS) -o $@ $<
+
+
+libsonar-xpu.a: sonar-xpu.o Makefile
+	ar rs $@ $<
+
+sonar-xpu.o: sonar-xpu.c sonar-xpu.h Makefile
+	$(CC) -c $(CFLAGS) -DSONAR_XPU_GPU -I/opt/rocm/include -o $@ $<
+
+libsonar-xpu-stub.a: sonar-xpu-stub.o Makefile
+	ar rs $@ $<
+
+sonar-xpu-stub.o: sonar-xpu.c sonar-xpu.h Makefile
 	$(CC) -c $(CFLAGS) -o $@ $<
 
 # Various test code.
