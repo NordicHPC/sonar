@@ -57,6 +57,7 @@ static rsmi_status_t (*xrsmi_utilization_count_get)(uint32_t,
 static xpum_result_t (*xpu_init)(void);
 static xpum_result_t (*xpu_shut_down)(void);
 static xpum_result_t (*xpu_get_device_list)(xpum_device_basic_info* devices, int* count);
+static xpum_result_t (*xpu_get_device_properties)(xpum_device_id_t device, xpum_device_properties_t* props);
 
 static int num_gpus = -1;
 
@@ -120,6 +121,7 @@ static int load_smi() {
     DLSYM(xpu_init, "xpumInit");
     DLSYM(xpu_shut_down, "xpumShutdown");
     DLSYM(xpu_get_device_list, "xpumGetDeviceList");
+    DLSYM(xpu_get_device_properties, "xpumGetDeviceProperties");
 
     /* You'd think that passing parameters would be better, but no. */
     setenv("XPUM_DISABLE_PERIODIC_METRIC_MONITOR", "1", 1);
@@ -194,11 +196,36 @@ int xpu_device_get_card_info(uint32_t device, struct xpu_card_info_t* infobuf) {
     }
 
     // TODO: At least on the eX3 node, the uuid is just the bus address, which is not unique enough.
-
+    // TODO: This assumes that the device at offset `device` has that device ID, but this is not
+    // documented anywhere; it would be more meaningful to either sort the table above or to search
+    // it unsorted (it's going to be short, and even if sorted I guess it might need to be searched
+    // since there's no documentation saying that it's dense).
+    // TODO: Possibly instead of using get_device_list we could use get_device_properties, or the
+    // specific device property getters.
     memset(infobuf, 0, sizeof(*infobuf));
+#if 0
     strncpy(infobuf->bus_addr, devs[device].PCIBDFAddress, sizeof(infobuf->bus_addr));
     strncpy(infobuf->uuid, devs[device].uuid, sizeof(infobuf->uuid));
     strncpy(infobuf->model, devs[device].deviceName, sizeof(infobuf->model));
+#else
+    xpum_device_properties_t props;
+    xpu_get_device_properties(device, &props);
+    for (int i=0 ; i < props.propertyLen ; i++ ) {
+      switch (props.properties[i].name) {
+	  case XPUM_DEVICE_PROPERTY_DEVICE_NAME:
+	    strncpy(infobuf->model, props.properties[i].value, sizeof(infobuf->model));
+	    break;
+	  case XPUM_DEVICE_PROPERTY_UUID:
+	    strncpy(infobuf->uuid, props.properties[i].value, sizeof(infobuf->uuid));
+	    break;
+	  case XPUM_DEVICE_PROPERTY_PCI_BDF_ADDRESS:
+	    strncpy(infobuf->bus_addr, props.properties[i].value, sizeof(infobuf->bus_addr));
+	    break;
+          default:
+	    break;
+	}
+    }
+#endif
 
     return 0;
 #else
