@@ -20,11 +20,11 @@ impl gpuapi::GPU for XpuGPU {
     }
 
     fn get_card_configuration(&mut self) -> Result<Vec<gpuapi::Card>, String> {
-        let mut num_devices: cty::uint32_t = 0;
-        if unsafe { xpu_device_get_count(&mut num_devices) } != 0 {
-            return Ok(vec![]);
+        if let Some(info) = xpu_smi::get_card_configuration() {
+            Ok(info)
+        } else {
+            Ok(vec![])
         }
-        return Ok(vec![]);
     }
 
     fn get_process_utilization(
@@ -40,10 +40,6 @@ impl gpuapi::GPU for XpuGPU {
 }
 
 fn xpu_present() -> bool {
-    false
-}
-
-#[link(name = "sonar-xpu", kind = "static")]
-extern "C" {
-    pub fn xpu_device_get_count(count: *mut cty::uint32_t) -> cty::c_int;
+    // Probably
+    Path::new("/sys/module/i915").exists()
 }

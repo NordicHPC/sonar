@@ -87,8 +87,11 @@ sonar-amd-stub.o: sonar-amd.c sonar-amd.h Makefile
 # Remember that it may be necessary to `module load` things first, see the build-*.bash scripts in
 # this directory.
 
-nvidia-shell: nvidia-shell.c sonar-nvidia.c sonar-nvidia.h
+nvidia-shell: nvidia-shell.c sonar-nvidia.c sonar-nvidia.h Makefile
 	$(CC) $(CFLAGS) -DSONAR_NVIDIA_GPU -DLOGGING -o nvidia-shell nvidia-shell.c sonar-nvidia.c -ldl
 
-amd-shell: amd-shell.c sonar-amd.c sonar-amd.h
+amd-shell: amd-shell.c sonar-amd.c sonar-amd.h Makefile
 	$(CC) $(CFLAGS) -DSONAR_AMD_GPU -DLOGGING -I/opt/rocm/include -o amd-shell amd-shell.c sonar-amd.c -ldl
+
+xpu-shell: xpu-shell.c sonar-xpu.c sonar-xpu.h Makefile
+	$(CC) $(CFLAGS) -DSONAR_XPU_GPU -DLOGGING -o xpu-shell xpu-shell.c sonar-xpu.c -ldl

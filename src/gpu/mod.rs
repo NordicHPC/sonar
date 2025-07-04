@@ -11,6 +11,8 @@ mod nvidia_nvml;
 pub mod realgpu;
 #[cfg(feature = "xpu")]
 mod xpu;
+#[cfg(feature = "xpu")]
+mod xpu_smi;
 
 // Low-level but common API to performance data for cards installed on the node.
 use crate::ps;
