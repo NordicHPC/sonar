@@ -150,7 +150,7 @@ type NonemptyString string
 // Uint64 value where zero is an error, not simply absence of datga
 type NonzeroUint uint64
 
-// RFC3999 localtime+TZO with no sub-second precision: yyyy-mm-ddThh:mm:ss+hh:mm, "Z" for +00:00.
+// RFC3339 localtime+TZO with no sub-second precision: yyyy-mm-ddThh:mm:ss+hh:mm, "Z" for +00:00.
 type Timestamp NonemptyString
 
 // Timestamp, or empty string for missing data
