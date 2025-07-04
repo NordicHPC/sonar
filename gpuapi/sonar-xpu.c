@@ -83,7 +83,7 @@ static int load_smi() {
         return -1;
     }
 
-#define DLSYM(var, str) \
+#define DLSYM(var, str)                         \
     if ((var = dlsym(lib, str)) == NULL) {      \
         /*puts(str);*/                          \
         lib = NULL;                             \
@@ -179,18 +179,18 @@ int xpu_device_get_card_info(uint32_t device, struct xpu_card_info_t* infobuf) {
     }
 
     if (devs == NULL) {
-      devs = calloc(num_gpus, sizeof(xpum_device_basic_info));
-      if (devs == NULL) {
-        return -1;
-      }
-      //printf("STARTING PROBE\n");
-      int count = num_gpus;
-      if (xpu_get_device_list(devs, &count) != 0) {
-        free(devs);
-	devs = NULL;
-        return -1;
-      }
-      //printf("ENDING PROBE");
+        devs = calloc(num_gpus, sizeof(xpum_device_basic_info));
+        if (devs == NULL) {
+            return -1;
+        }
+        //printf("STARTING PROBE\n");
+        int count = num_gpus;
+        if (xpu_get_device_list(devs, &count) != 0) {
+            free(devs);
+            devs = NULL;
+            return -1;
+        }
+        //printf("ENDING PROBE");
     }
 
     // TODO: At least on the eX3 node, the uuid is just the bus address, which is not unique enough.

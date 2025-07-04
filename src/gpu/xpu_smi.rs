@@ -2,7 +2,6 @@
 
 use crate::gpu;
 use crate::ps;
-use crate::types::Pid;
 use crate::util::cstrdup;
 
 ////// C library API //////////////////////////////////////////////////////////////////////////////
@@ -37,8 +36,7 @@ impl Default for XpuCardInfo {
 
 #[link(name = "sonar-xpu", kind = "static")]
 extern "C" {
-    pub fn xpu_device_get_card_info(device: cty::uint32_t, buf: *mut XpuCardInfo)
-        -> cty::c_int;
+    pub fn xpu_device_get_card_info(device: cty::uint32_t, buf: *mut XpuCardInfo) -> cty::c_int;
 }
 
 ////// End C library API //////////////////////////////////////////////////////////////////////////
@@ -55,6 +53,7 @@ pub fn get_card_configuration() -> Option<Vec<gpu::Card>> {
         if unsafe { xpu_device_get_card_info(dev, &mut infobuf) } == 0 {
             result.push(gpu::Card {
                 bus_addr: cstrdup(&infobuf.bus_addr),
+                model: cstrdup(&infobuf.model),
                 device: gpu::Name {
                     index: dev,
                     uuid: cstrdup(&infobuf.uuid),
@@ -66,3 +65,12 @@ pub fn get_card_configuration() -> Option<Vec<gpu::Card>> {
 
     Some(result)
 }
+
+pub fn get_card_utilization() -> Option<Vec<gpu::CardState>> {
+    None
+}
+
+pub fn get_process_utilization(_ptable: &ps::ProcessTable) -> Option<Vec<gpu::Process>> {
+    None
+}
+

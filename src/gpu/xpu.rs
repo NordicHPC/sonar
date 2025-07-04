@@ -1,6 +1,3 @@
-// This is stub code, included to test the feature system, to be fleshed out later.
-// If you enable the xpu feature, you'll get a link error because there's no XPU gpuapi adapter.
-
 use crate::gpu::{self, xpu_smi};
 use crate::ps;
 
@@ -31,17 +28,28 @@ impl gpu::Gpu for XpuGPU {
 
     fn get_process_utilization(
         &self,
-        _ptable: &ps::ProcessTable,
+        ptable: &ps::ProcessTable,
     ) -> Result<Vec<gpu::Process>, String> {
-        Ok(vec![])
+        if let Some(info) = xpu_smi::get_process_utilization(ptable) {
+            Ok(info)
+        } else {
+            Ok(vec![])
+        }
     }
 
     fn get_card_utilization(&self) -> Result<Vec<gpu::CardState>, String> {
-        Ok(vec![])
+        if let Some(info) = xpu_smi::get_card_utilization() {
+            Ok(info)
+        } else {
+            Ok(vec![])
+        }
     }
 }
 
+// Probably this, though actually hard to figure out exactly.  Looking at strings in the smi
+// library, i915 is definitely being looked for, and some other output also indicates this is what
+// we want.
+
 fn xpu_present() -> bool {
-    // Probably this, though actually hard to figure out.
     Path::new("/sys/module/i915").exists()
 }

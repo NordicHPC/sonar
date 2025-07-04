@@ -239,7 +239,7 @@ pub fn get_process_utilization(ptable: &ps::ProcessTable) -> Option<Vec<gpu::Pro
     Some(result)
 }
 
-pub fn get_card_uuid(dev: u32) -> String {
+fn get_card_uuid(dev: u32) -> String {
     // TODO: Not the most efficient way to do it, but OK for now?
     let mut infobuf: NvmlCardInfo = Default::default();
     if unsafe { nvml_device_get_card_info(dev, &mut infobuf) } == 0 {
