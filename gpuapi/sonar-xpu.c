@@ -11,6 +11,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
+#include <fcntl.h>
 
 #include "sonar-xpu.h"
 
@@ -119,11 +121,22 @@ static int load_smi() {
     DLSYM(xpu_shut_down, "xpumShutdown");
     DLSYM(xpu_get_device_list, "xpumGetDeviceList");
 
+    /* You'd think that passing parameters would be better, but no. */
+    setenv("XPUM_DISABLE_PERIODIC_METRIC_MONITOR", "1", 1);
+    setenv("XPUM_METRICS", "0,4,6,7,8,9", 1);
+    //printf("STARTING INIT\n");
+    /* Silence logging during init */
+    int tmp = dup(1);
+    int null = open("/dev/null", O_WRONLY);
+    dup2(null, 1);
     if (xpu_init() != 0) {
         printf("Could not init library\n");
         lib = NULL;
         return -1;
     }
+    dup2(tmp, 1);
+    close(tmp);
+    //printf("ENDING INIT\n");
 
     probe_gpus();
     if (num_gpus == -1) {
@@ -170,12 +183,14 @@ int xpu_device_get_card_info(uint32_t device, struct xpu_card_info_t* infobuf) {
       if (devs == NULL) {
         return -1;
       }
+      //printf("STARTING PROBE\n");
       int count = num_gpus;
       if (xpu_get_device_list(devs, &count) != 0) {
         free(devs);
 	devs = NULL;
         return -1;
       }
+      //printf("ENDING PROBE");
     }
 
     // TODO: At least on the eX3 node, the uuid is just the bus address, which is not unique enough.
