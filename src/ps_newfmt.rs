@@ -164,6 +164,18 @@ fn format_newfmt_sample(proc_info: &ProcInfo) -> output::Object {
     if proc_info.mem_size_kib != 0 {
         fields.push_u(SAMPLE_PROCESS_VIRTUAL_MEMORY, proc_info.mem_size_kib as u64);
     }
+    if proc_info.data_read_kib != 0 {
+        fields.push_u(SAMPLE_PROCESS_READ, proc_info.data_read_kib as u64);
+    }
+    if proc_info.data_written_kib != 0 {
+        fields.push_u(SAMPLE_PROCESS_WRITTEN, proc_info.data_written_kib as u64);
+    }
+    if proc_info.data_cancelled_kib != 0 {
+        fields.push_u(
+            SAMPLE_PROCESS_CANCELLED,
+            proc_info.data_cancelled_kib as u64,
+        );
+    }
     fields.push_s(SAMPLE_PROCESS_CMD, proc_info.command.to_string());
     if proc_info.rolledup == 0 && proc_info.pid != 0 {
         // pid must be 0 for rolledup > 0 as there is no guarantee that there is any fixed

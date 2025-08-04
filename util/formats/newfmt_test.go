@@ -158,6 +158,9 @@ func TestNewJSONSamples(t *testing.T) {
 			assert(t, p.CpuAvg == 1.2, "#0 cpu avg")
 			assert(t, p.CpuUtil == 0.1, "#0 cpu util")
 			assert(t, p.CpuTime == 120, "#0 cpu time")
+			assert(t, p.Read == 102, "#0 data read")
+			assert(t, p.Written == 12, "#0 data written")
+			assert(t, p.Cancelled == 7, "#0 data cancelled")
 		case 1:
 			// ml6
 			a := info.Data.Attributes

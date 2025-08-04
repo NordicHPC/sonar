@@ -507,6 +507,37 @@ pub fn get_process_information(
             }
         }
 
+        let mut data_read_kib: usize = 0;
+        let mut data_written_kib: usize = 0;
+        let mut data_cancelled_kib: usize = 0;
+        if let Ok(s) = fs.read_to_string(&format!("{pid}/io")) {
+            for l in s.split('\n') {
+                let fields = l.split_ascii_whitespace().collect::<Vec<&str>>();
+                if !fields.is_empty() {
+                    match fields[0] {
+                        "read_bytes:" => {
+                            data_read_kib =
+                                (parse_usize_field(&fields, 1, l, "io", pid, "data read")? + 1023)
+                                    / 1024;
+                        }
+                        "write_bytes:" => {
+                            data_written_kib =
+                                (parse_usize_field(&fields, 1, l, "io", pid, "data written")?
+                                    + 1023)
+                                    / 1024;
+                        }
+                        "cancelled_write_bytes:" => {
+                            data_cancelled_kib =
+                                (parse_usize_field(&fields, 1, l, "io", pid, "data cancelled")?
+                                    + 1023)
+                                    / 1024;
+                        }
+                        _ => {}
+                    }
+                }
+            }
+        }
+
         // Now compute some derived quantities.
 
         // pcpu and pmem are rounded to ##.#.  We're going to get slightly different answers here
@@ -548,6 +579,9 @@ pub fn get_process_information(
                 cputime_sec: cputime_sec as usize,
                 mem_size_kib: size_kib,
                 rssanon_kib,
+                data_read_kib,
+                data_written_kib,
+                data_cancelled_kib,
                 command: comm,
                 has_children: false,
                 num_threads,

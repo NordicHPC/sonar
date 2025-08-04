@@ -252,6 +252,9 @@ pub struct ProcInfo {
     pub cputime_sec: usize,
     pub mem_percentage: f64,
     pub mem_size_kib: usize,
+    pub data_read_kib: usize,
+    pub data_written_kib: usize,
+    pub data_cancelled_kib: usize,
     pub rssanon_kib: usize,
     pub gpus: GpuProcInfos,
     pub gpu_percentage: f64,
@@ -389,6 +392,9 @@ fn new_with_cpu_info(
                 mem_percentage: proc.mem_pct,
                 mem_size_kib: proc.mem_size_kib,
                 rssanon_kib: proc.rssanon_kib,
+                data_read_kib: proc.data_read_kib,
+                data_written_kib: proc.data_written_kib,
+                data_cancelled_kib: proc.data_cancelled_kib,
                 ..Default::default()
             },
         );
@@ -605,6 +611,9 @@ fn rollup_processes(procinfo_by_pid: ProcInfoTable) -> Vec<ProcInfo> {
                 p.mem_percentage += proc_info.mem_percentage;
                 p.mem_size_kib += proc_info.mem_size_kib;
                 p.rssanon_kib += proc_info.rssanon_kib;
+                p.data_read_kib += proc_info.data_read_kib;
+                p.data_written_kib += proc_info.data_written_kib;
+                p.data_cancelled_kib += proc_info.data_cancelled_kib;
                 aggregate_gpus(&mut p.gpus, &proc_info.gpus);
                 p.gpu_percentage += proc_info.gpu_percentage;
                 p.gpu_mem_percentage += proc_info.gpu_mem_percentage;
