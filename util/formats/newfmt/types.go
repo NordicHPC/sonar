@@ -1106,64 +1106,49 @@ type NodeRange NonemptyString
 //
 // In the data above, we want the job_id to be the "true" underlying ID, the step to be the "true"
 // job's step, and the array properties to additionally be set when it is an array job.  Hence for
-// 1467073_1.extern we want job_id=1467074, jobs_step=extern, array_job_id=1467073, and
+// 1467073_1.extern we want job_id=1467074, job_step=extern, array_job_id=1467073, and
 // array_task_id=1.  Here's how we can get that with sacct:
 //
-// ```
-// $ sacct --user ec-larstha -P -o User,JobID,JobIDRaw
-// User        JobID             JobIDRaw
-// ec-larstha  1467073_1         1467074
-//
-//	1467073_1.batch   1467074.batch
-//	1467073_1.extern  1467074.extern
-//	1467073_1.0       1467074.0
-//
-// ec-larstha  1467073_3         1467075
-//
-//	1467073_3.batch   1467075.batch
-//	1467073_3.extern  1467075.extern
-//	1467073_3.0       1467075.0
-//
-// ```
+//	$ sacct --user ec-larstha -P -o User,JobID,JobIDRaw
+//	User        JobID             JobIDRaw
+//	ec-larstha  1467073_1         1467074
+//	            1467073_1.batch   1467074.batch
+//	            1467073_1.extern  1467074.extern
+//	            1467073_1.0       1467074.0
+//	ec-larstha  1467073_3         1467075
+//	            1467073_3.batch   1467075.batch
+//	            1467073_3.extern  1467075.extern
+//	            1467073_3.0       1467075.0
 //
 // For heterogenous ("het") jobs, the situation is somewhat similar to array jobs, here's one with
 // two groups:
 //
-// ```
-// $ sacct --user ec-larstha -P -o User,JobID,JobIDRaw
-// User        JobID               JobIDRaw
-// ec-larstha  1467921+0           1467921
-//
-//	1467921+0.batch     1467921.batch
-//	1467921+0.extern    1467921.extern
-//	1467921+0.0         1467921.0
-//
-// ec-larstha  1467921+1           1467922
-//
-//	1467921+1.extern    1467922.extern
-//	1467921+1.0         1467922.0
-//
-// ```
+//	$ sacct --user ec-larstha -P -o User,JobID,JobIDRaw
+//	User        JobID               JobIDRaw
+//	ec-larstha  1467921+0           1467921
+//	            1467921+0.batch     1467921.batch
+//	            1467921+0.extern    1467921.extern
+//	            1467921+0.0         1467921.0
+//	ec-larstha  1467921+1           1467922
+//	            1467921+1.extern    1467922.extern
+//	            1467921+1.0         1467922.0
 //
 // The second hetjob gets its own raw Job ID 1467922.  (Weirdly, so far as I've seen this ID is not
 // properly exposed in the environment variables that the job sees.  Indeed there seems to be no
 // way to distinguish from environment variables which hetgroup the job is in.  But this could have
 // something to do with how I run the jobs, het jobs are fairly involved.)
 //
-// For jobs with job steps (multiple srun lines in the batch script but nothing else fancy), we get this:
+// For jobs with job steps (multiple srun lines in the batch script but nothing else fancy), we get
+// this:
 //
-// ```
-// $ sacct --user ec-larstha -P -o User,JobID,JobIDRaw
-// User        JobID           JobIDRaw
-// ec-larstha  1470478         1470478
-//
-//	1470478.batch   1470478.batch
-//	1470478.extern  1470478.extern
-//	1470478.0       1470478.0
-//	1470478.1       1470478.1
-//	1470478.2       1470478.2
-//
-// ```
+//	$ sacct --user ec-larstha -P -o User,JobID,JobIDRaw
+//	User        JobID           JobIDRaw
+//	ec-larstha  1470478         1470478
+//	            1470478.batch   1470478.batch
+//	            1470478.extern  1470478.extern
+//	            1470478.0       1470478.0
+//	            1470478.1       1470478.1
+//	            1470478.2       1470478.2
 //
 // which is consistent with the previous cases, the step ID follows the . of the JobID or JobIDRaw.
 //
