@@ -731,6 +731,19 @@ worth of computation". See notes.
 
 Cumulative CPU time in seconds for the process over its lifetime. See notes.
 
+#### **`data_read`** uint64
+
+Kilobytes read with all sorts of read calls (rounded up).
+
+#### **`data_written`** uint64
+
+Kilobytes written with all sorts of write calls (rounded up).
+
+#### **`data_cancelled`** uint64
+
+Kilobytes written but never flushed to physical media (i.e., held in RAM but then made
+obsolete by overwriting or file deletion or similar) (rounded up).
+
 #### **`rolledup`** int
 
 The number of additional samples for processes that are "the same" that have been rolled into
@@ -1349,7 +1362,7 @@ sense.  The precise conditions on processes that are aggregated are that they:
   - must have the same non-zero batch system Job ID
   - must have the same command string
   - must have the same parent process
-  - must have no child processes (ie only leaves are rolled up)
+  - must have no child processes (i.e., only leaves are rolled up)
 
 Rolling-up only happens if the appropriate flag is passed to Sonar.
 

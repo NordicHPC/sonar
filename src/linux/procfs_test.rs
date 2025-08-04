@@ -37,6 +37,10 @@ pub fn procfs_parse_test() {
     );
     files.insert("4018/status".to_string(), "RssAnon: 12345 kB".to_string());
     files.insert(
+        "4018/io".to_string(),
+        std::include_str!("testdata/io.txt").to_string(),
+    );
+    files.insert(
         "loadavg".to_string(),
         "1.75 2.125 10.5 128/10340 12345".to_string(),
     );
@@ -50,6 +54,9 @@ pub fn procfs_parse_test() {
     let memtotal = 16093776.0; // field(/proc/meminfo, "MemTotal:")
     let size = 316078 * 4; // pages_to_kib(field(/proc/4018/statm, 5))
     let rssanon = 12345; // field(/proc/4018/status, "RssAnon:")
+    let data_read = (31858688 + 1023) / 1024;
+    let data_written = (11223040 + 1023) / 1024;
+    let data_cancelled = (1433600 + 1023) / 1024;
     let load1 = 1.75;
     let load5 = 2.125;
     let load15 = 10.5;
@@ -100,6 +107,9 @@ pub fn procfs_parse_test() {
 
     assert!(p.mem_size_kib == size);
     assert!(p.rssanon_kib == rssanon);
+    assert!(p.data_read_kib == data_read);
+    assert!(p.data_written_kib == data_written);
+    assert!(p.data_cancelled_kib == data_cancelled);
 
     assert!(total_secs == (241155 + 582 + 127006 + 0 + 3816) / 100); // "cpu " line of "stat" data
     assert!(per_cpu_secs.len() == 8);

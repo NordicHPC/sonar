@@ -662,6 +662,16 @@ type SampleProcess struct {
 	// Cumulative CPU time in seconds for the process over its lifetime. See notes.
 	CpuTime uint64 `json:"cpu_time,omitempty"`
 
+	// Kilobytes read with all sorts of read calls (rounded up).
+	Read uint64 `json:"data_read,omitempty"`
+
+	// Kilobytes written with all sorts of write calls (rounded up).
+	Written uint64 `json:"data_written,omitempty"`
+
+	// Kilobytes written but never flushed to physical media (i.e., held in RAM but then made
+	// obsolete by overwriting or file deletion or similar) (rounded up).
+	Cancelled uint64 `json:"data_cancelled,omitempty"`
+
 	// The number of additional samples for processes that are "the same" that have been rolled into
 	// this one. That is, if the value is 1, the record represents the sum of the sample data for
 	// two processes.  See postamble for more.
@@ -1201,7 +1211,7 @@ type NodeRange NonemptyString
 //   - must have the same non-zero batch system Job ID
 //   - must have the same command string
 //   - must have the same parent process
-//   - must have no child processes (ie only leaves are rolled up)
+//   - must have no child processes (i.e., only leaves are rolled up)
 //
 // Rolling-up only happens if the appropriate flag is passed to Sonar.
 //

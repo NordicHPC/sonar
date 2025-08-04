@@ -106,6 +106,9 @@ pub struct Process {
     pub cpu_util: f64, // Sample (over a short time period), slurm-monitor uses it
     pub cputime_sec: usize,
     pub mem_size_kib: usize,
+    pub data_read_kib: usize,
+    pub data_written_kib: usize,
+    pub data_cancelled_kib: usize,
     pub rssanon_kib: usize,
     pub command: String,
     pub has_children: bool,

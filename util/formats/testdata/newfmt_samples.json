@@ -85,7 +85,10 @@
               "ppid": 2569,
               "cpu_avg": 1.2,
               "cpu_util": 0.1,
-              "cpu_time": 120
+              "cpu_time": 120,
+              "data_read": 102,
+              "data_written": 12,
+              "data_cancelled": 7
             }
           ]
         }
