@@ -126,19 +126,21 @@ static int load_smi() {
     /* You'd think that passing parameters would be better, but no. */
     setenv("XPUM_DISABLE_PERIODIC_METRIC_MONITOR", "1", 1);
     setenv("XPUM_METRICS", "0,4,6,7,8,9", 1);
-    //printf("STARTING INIT\n");
+
     /* Silence logging during init */
     int tmp = dup(1);
     int null = open("/dev/null", O_WRONLY);
     dup2(null, 1);
-    if (xpu_init() != 0) {
+    int init_result = xpu_init();
+    dup2(tmp, 1);
+    close(tmp);
+    /* Init done */
+
+    if (init_result != 0) {
         printf("Could not init library\n");
         lib = NULL;
         return -1;
     }
-    dup2(tmp, 1);
-    close(tmp);
-    //printf("ENDING INIT\n");
 
     probe_gpus();
     if (num_gpus == -1) {
