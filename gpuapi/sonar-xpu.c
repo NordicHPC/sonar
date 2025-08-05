@@ -80,7 +80,7 @@ static int load_smi() {
     /* This is the location of the library on the only eX3 node that has XPU. */
     lib = dlopen("/lib/x86_64-linux-gnu/libxpum.so.1", RTLD_NOW);
     if (lib == NULL) {
-        printf("Could not load library\n");
+        /*printf("Could not load library\n");*/
         return -1;
     }
 
