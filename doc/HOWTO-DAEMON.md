@@ -63,6 +63,7 @@ sending-window = <duration value>               # default 5m
 timeout = <duration value>                      # default 30m
 ca-file = <filename>                            # default none
 sasl-password = <string>                        # default none
+sasl-password-file = <string>                   # default none
 ```
 
 The `broker-address` is required and names the address of the broker.  For Kafka it's usually
@@ -75,8 +76,9 @@ The `timeout` is how long a message is held internally without being able to be 
 dropped.  The reason for sending failure could be that the broker is down, that the network is down,
 and that Sonar is misconfigured.  A short timeout may be useful during debugging.
 
-The `ca-file` and `sasl-password` are explained in [HOWTO-KAFKA](HOWTO-KAFKA.md), basically the
-former triggers the use of TLS for the connection and the latter additionally adds authentication.
+The `ca-file`, `sasl-password` and `sasl-password-file` are explained in
+[HOWTO-KAFKA](HOWTO-KAFKA.md), basically the former triggers the use of TLS for the connection and
+the latter two additionally add authentication.
 
 ### `[directory]` section
 

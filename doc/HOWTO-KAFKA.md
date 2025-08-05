@@ -173,16 +173,16 @@ will generate the necessary files: `sonar-ca.crt` is the CA certificate, and
 hostname.
 
 Having generated those, update Kafka's `server.properties` by applying
-`tests/kafka/01-manual-kafka/server-properties-with-ssl.diff`.  **NOTE** you may have to supply proper paths for the
-keystore and CA.
+`tests/kafka/01-manual-kafka/server-properties-with-ssl.diff`.  **NOTE** you may have to supply
+proper paths for the keystore and CA.
 
 The diff specifies that Kafka will continue to communicate in plaintext on port 9099 (for testing
 convenience) but will communicate over TLS on port 9093.  The default port 9092 is no longer active, to
 avoid confusion.
 
-Finally, the daemon's .ini file must be updated to point the `ca-file` property to the CA certificate.  See
-e.g. `tests/kafka/01-manual-kafka/sonar-nonslurm-node-ssl.ini` for an example of this. **NOTE** paths may have to be
-updated for your system.
+Finally, the daemon's .ini file must be updated to point the `ca-file` property to the CA
+certificate.  See e.g. `tests/kafka/01-manual-kafka/sonar-nonslurm-node-ssl.ini` for an example of
+this. **NOTE** paths may have to be updated for your system.
 
 ##### Production
 
@@ -196,14 +196,14 @@ the principal name (this will come into play later when we implement authorizati
 
 We can use the same key materials we generated above for SSL, but there are additions to the config
 file and the daemon's .ini file, so the correct diff for `server.properties` is now
-`tests/kafka/01-manual-kafka/server-properties-with-ssl-sasl.diff`.  **NOTE** you may have to supply proper paths
-for the keystore and CA.
+`tests/kafka/01-manual-kafka/server-properties-with-ssl-sasl.diff`.  **NOTE** you may have to supply
+proper paths for the keystore and CA.
 
 The .ini file gets an addition in the `[kafka]` section: the new `sasl-password` property must hold
-the password for the cluster that is configured in the `[global]` section.  (This may change to
-point to a file with that password, eventually.)  See
-e.g. `tests/kafka/01-manual-kafka/sonar-nonslurm-node-ssl-sasl.ini` for an example of this. **NOTE** paths may have
-to be updated for your system.
+the password for the cluster that is configured in the `[global]` section.  To avoid placing the
+password in the config file, use `sasl-password-file` to point to a text file that holds the
+password.  See e.g. `tests/kafka/01-manual-kafka/sonar-nonslurm-node-ssl-sasl.ini` for an example of
+this. **NOTE** paths may have to be updated for your system.
 
 #### Authorization
 
