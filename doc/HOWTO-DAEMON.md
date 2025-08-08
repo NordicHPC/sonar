@@ -7,9 +7,12 @@ The daemon is a multi-threaded system that performs system sampling, communicate
 handles signals and lock files.
 
 If a sink is configured - currently Kafka or a directory tree - then that is used for all data
-storage.  Otherwise, data are printed on stdout.
+storage.  Otherwise, data are printed on stdout.  Data formats are defined later.
 
 The sink may also provide control messages.  The default sink reads control messages from stdin.
+The directory tree sink does not read control messages.  The Kafka sink currently does not read
+control messages, but this is mostly a matter of programming.  Control messages are described at the
+end of this file.
 
 ## CONFIG FILE
 
@@ -183,9 +186,9 @@ When using the stdio sink, the printed data messages are JSON objects with "topi
 ## CONTROL MESSAGE FORMATS
 
 Control messages are sent to Sonar under topics `<cluster>.control.<role>` where `<cluster>` is as
-configured in the `[global]` section and `<role>` is `node` or `master`.  If a topic-prefix has been set,
-the topics will also have to be `<prefix>.<cluster>.control.<role>`.  The messages will have key and
-value as follows (very much TBD):
+configured in the `[global]` section and `<role>` is `node` or `master`.  If a topic-prefix has been
+set, the topics will also have to be `<prefix>.<cluster>.control.<role>`.  The messages will have
+key and value as follows (very much TBD):
 
 ```
   Key     Value      Meaning
