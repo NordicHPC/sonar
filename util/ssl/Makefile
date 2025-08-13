@@ -1,5 +1,8 @@
+# Note the default expiration time for the artifacts produced here is 2 years.
+
 .PHONY: default all clean
 HOSTNAME ?= $(shell hostname)
+DAYS = 720
 
 default:
 	@echo "Use an explicit target"
@@ -13,7 +16,7 @@ clean:
 server-key.pem server-cert.pem: Makefile
 	openssl req -x509 -newkey rsa:4096 -keyout server-key.pem -out server-cert.pem \
 	-sha256 \
-	-days 365 \
+	-days $(DAYS) \
 	-nodes \
 	-subj "/CN=$(USER).$(HOSTNAME)" \
 	-addext "subjectAltName=DNS:$(HOSTNAME),DNS:localhost,IP:127.0.0.1"
@@ -26,6 +29,7 @@ sonar-ca-key.pem: Makefile
 # TODO: Totally not obvious why this would need to know about SAN.
 sonar-ca.crt: sonar-ca-key.pem Makefile
 	openssl req -new -x509 -key sonar-ca-key.pem -out sonar-ca.crt \
+	-days $(DAYS) \
 	-subj "/CN=$(USER).$(HOSTNAME) CA" \
 	-addext "subjectAltName=DNS:$(HOSTNAME),DNS:localhost,IP:127.0.0.1"
 
@@ -39,6 +43,7 @@ server-key.csr: server-key.pem Makefile
 server-cert-signed.crt: server-key.csr sonar-ca.crt sonar-ca-key.pem Makefile
 	openssl x509 -req \
 	-in server-key.csr \
+	-days $(DAYS) \
 	-CA sonar-ca.crt -CAkey sonar-ca-key.pem -CAcreateserial \
 	-out server-cert-signed.crt \
 	-copy_extensions copyall

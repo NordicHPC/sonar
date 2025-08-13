@@ -170,7 +170,7 @@ particular server name.
 For testing, we will generate our own CA and key materials.  In `util/ssl`, there is a Makefile that
 will generate the necessary files: `sonar-ca.crt` is the CA certificate, and
 `sonar-kafka-keystore.pem` is the key store.  Just run `make all` to make the files for the local
-hostname.
+hostname. **NOTE** The default expiration time for the artifacts produced is 2 years.
 
 Having generated those, update Kafka's `server.properties` by applying
 `tests/kafka/01-manual-kafka/server-properties-with-ssl.diff`.  **NOTE** you may have to supply
