@@ -270,7 +270,7 @@ dependencies = [
 
 [[package]]
 name = "sonar"
-version = "0.14.0-devel"
+version = "0.14.0"
 dependencies = [
  "cty",
  "libc",
