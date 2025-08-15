@@ -1,6 +1,21 @@
 # Sonar change log
 
+This is at best partial.
+
+
+## Changes in v0.14.x-devel (on `main`)
+
+**New fields in output**: Basic per-process I/O traffic, per-process thread counts, system load
+average.  (v0.14.0)
+
+**New output sink**: A 'directory' output sink for the daemon mode.  (v0.14.0)
+
+**Cleanup**: Documentation.  Code reorg and cleanup, abstracting out Linux support.  (v0.14.0)
+
+
 ## Changes in v0.13.x-devel (on `main`)
+
+**Bug fixes**.  Sundry daemon bug fixes (v0.13.1 and v0.13.2)
 
 **Kafka exfiltration**.  Data can be sent via the Kafka protocol (with SSL encryption and SASL
 authentication) to a network broker, rather than relying on an external agents for communication.

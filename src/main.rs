@@ -11,8 +11,8 @@ mod jobsapi;
 mod json_tags;
 mod linux;
 mod log;
-#[cfg(test)]
-mod mockjobs;
+//#[cfg(test)]
+//mod mockjobs;
 mod nodelist;
 mod output;
 #[cfg(test)]
