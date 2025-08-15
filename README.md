@@ -196,30 +196,9 @@ For all other versioning information, see [doc/VERSIONING.md](doc/VERSIONING.md)
 - Henrik Rojas Nagel
 
 
-## How we run sonar on a cluster (incomplete)
+## How we run sonar on a cluster
 
-We let cron execute the following script every 5 minutes on every compute node:
-
-```bash
-#!/usr/bin/env bash
-
-set -euf -o pipefail
-
-sonar_directory=/cluster/shared/sonar/data
-
-path=$(date '+%Y/%m/%d')
-output_directory=${sonar_directory}/${path}
-
-mkdir -p ${output_directory}
-
-/cluster/bin/sonar ps >> ${output_directory}/${HOSTNAME}.csv
-```
-
-This produces ca. 25-50 MB data per day on Saga (using mostly the old v0.5.0 output format), 5-20 MB
-on Fox (including login and interactive nodes), using the new v0.8.0 output format), and 10-20MB per
-day on the UiO ML nodes (all interactive), with significant variation.  Being text data, it
-compresses extremely well.
-
+See [doc/HOWTO-DEPLOY.md](doc/HOWTO-DEPLOY.md).
 
 ## Similar and related tools (incomplete)
 
