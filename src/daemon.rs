@@ -346,12 +346,8 @@ pub fn daemon_mode(
                     log::verbose(&format!("signal {s}"));
                 }
                 match s {
-                    libc::SIGINT | libc::SIGHUP => {
+                    libc::SIGINT | libc::SIGHUP | libc::SIGTERM => {
                         break 'messageloop;
-                    }
-                    libc::SIGTERM => {
-                        // TODO: reload
-                        continue 'messageloop;
                     }
                     _ => {
                         continue 'messageloop;

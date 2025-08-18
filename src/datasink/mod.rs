@@ -22,6 +22,9 @@ pub trait DataSink {
     );
 
     // Stop the sink. Nobody should be calling post() after calling stop().  Furthermore, the
-    // DataSink object should be dropped as soon as possible after being stopped.
+    // DataSink object should be dropped as soon as possible after being stopped.  The stop() method
+    // should attempt to flush any pending output it has queued, but it is valid behavior to just
+    // drop it on the floor, as sometimes the output can't be sent to the receiver because the
+    // receiver is not reachable.
     fn stop(&self);
 }

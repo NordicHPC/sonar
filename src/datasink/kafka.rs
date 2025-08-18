@@ -121,6 +121,9 @@ impl DataSink for RdKafka {
         // Nothing happens here.  The owner of the DataSink should drop it after calling stop().
         // Eventually all clones of outgoing_message_queue are dropped and the receive in the
         // producer will error out, and the producer will exit.
+        //
+        // TODO: Anything to do to flush output?  It would be useful to at least try.  To do that,
+        // we may need to wake up the Kafka thread, and it may need to be told that we are flushing.
     }
 }
 
