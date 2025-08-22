@@ -19,7 +19,7 @@ fi
 rm -f daemon-output.txt
 before=$(date +%s)
 ( echo "exit exit exit" ; sleep 10 ; echo "zappa.hpc.axis-of-eval.org.control.node exit" ) | \
-    ../target/debug/sonar daemon daemon-test.ini > daemon-output.txt
+    ../target/debug/sonar daemon daemon.ini > daemon-output.txt
 after=$(date +%s)
 
 if (( $after - $before < 5 )); then

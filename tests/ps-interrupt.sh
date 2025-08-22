@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #
-# Test the interrupt logic in sonar.  A TERM or HUP signal can be sent and the process will exit in
-# an orderly way with a message on stderr.
+# Test the ps interrupt logic in sonar.  A TERM or HUP signal can be sent and the process will exit
+# in an orderly way with a message on stderr.
 
 set -e
 echo " This takes about 15s"

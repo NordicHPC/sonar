@@ -2,10 +2,11 @@ use crate::command;
 use crate::gpu;
 use crate::gpu::realgpu;
 use crate::hostname;
-use crate::interrupt;
 use crate::jobsapi;
 use crate::linux::procfs;
 use crate::linux::slurm;
+#[cfg(debug_assertions)]
+use crate::log;
 use crate::systemapi;
 use crate::time;
 use crate::users;
@@ -17,6 +18,11 @@ use std::fs;
 use std::io;
 use std::os::linux::fs::MetadataExt;
 use std::path;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
+
+use signal_hook::consts::signal;
+use signal_hook::flag;
 
 // 3 minutes ought to be enough for anyone.
 const SACCT_TIMEOUT_S: u64 = 180;
@@ -68,6 +74,7 @@ impl Builder {
             timestamp: RefCell::new(time::now_iso8601()),
             now: Cell::new(time::unix_now()),
             boot_time,
+            interrupted: Arc::new(AtomicBool::new(false)),
         })
     }
 }
@@ -90,6 +97,7 @@ pub struct System {
     timestamp: RefCell<String>,
     now: Cell<u64>,
     boot_time: u64,
+    interrupted: Arc<AtomicBool>,
 }
 
 impl System {
@@ -284,12 +292,33 @@ impl systemapi::SystemAPI for System {
         )?)
     }
 
+    // Assuming no bugs, the interesting interrupt signals are SIGHUP, SIGTERM, SIGINT, and SIGQUIT.
+    // Of these, only SIGHUP and SIGTERM are really interesting because they are sent by the OS or
+    // by job control (and will often be followed by SIGKILL if not honored within some reasonable
+    // time); INT/QUIT are sent by a user in response to keyboard action and more typical during
+    // development/debugging.
+
     fn handle_interruptions(&self) {
-        interrupt::handle_interruptions();
+        let _ = flag::register(signal::SIGTERM, Arc::clone(&self.interrupted));
+        let _ = flag::register(signal::SIGHUP, Arc::clone(&self.interrupted));
     }
 
+    #[cfg(not(debug_assertions))]
     fn is_interrupted(&self) -> bool {
-        interrupt::is_interrupted()
+        self.interrupted.load(Ordering::Relaxed)
+    }
+
+    #[cfg(debug_assertions)]
+    fn is_interrupted(&self) -> bool {
+        if std::env::var("SONARTEST_WAIT_INTERRUPT").is_ok() {
+            std::thread::sleep(std::time::Duration::new(10, 0));
+        }
+        let flag = self.interrupted.load(Ordering::Relaxed);
+        if flag {
+            // Test cases depend on this exact output.
+            log::info("Interrupt flag was set!")
+        }
+        flag
     }
 }
 
