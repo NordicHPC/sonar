@@ -10,7 +10,7 @@
 // library.  Both are backed by Confluent, a big player in the Kafka space.  This is far from a
 // "pure Rust" solution but the current pure Rust Kafka libraries leave a lot to be desired.
 //
-// See TODOs throughout.
+// See TODOs throughout for minor issues around error handling, especially.
 
 #![allow(clippy::comparison_to_empty)]
 #![allow(unused_imports)]
@@ -21,27 +21,36 @@ use crate::daemon::{Dur, Ini, Operation};
 use crate::datasink::DataSink;
 use crate::log;
 use crate::systemapi::SystemAPI;
+#[cfg(debug_assertions)]
+use crate::time::unix_now;
 use crate::util;
 
-use std::sync::mpsc;
 use std::thread;
-use std::time::Duration;
+use std::time::{Duration, Instant};
+
+use crossbeam::channel;
 
 use rdkafka::client::ClientContext;
 use rdkafka::config::ClientConfig;
 use rdkafka::message::DeliveryResult;
 use rdkafka::producer::base_producer::ThreadedProducer;
-use rdkafka::producer::{BaseRecord, NoCustomPartitioner, ProducerContext};
+use rdkafka::producer::{BaseProducer, BaseRecord, NoCustomPartitioner, ProducerContext};
 
-struct Message {
+struct Msg {
     timestamp: u64,
     topic: String,
     key: String,
     value: String,
 }
 
+enum Message {
+    Stop,
+    M(Msg),
+}
+
 pub struct RdKafka {
-    outgoing_message_queue: mpsc::Sender<Message>,
+    outgoing_message_queue: channel::Sender<Message>,
+    producer: Option<thread::JoinHandle<()>>,
 }
 
 // `control_and_errors` is the channel on which incoming control messages from the broker and any
@@ -53,14 +62,13 @@ impl RdKafka {
         ini: &Ini,
         client_id: String,
         control_topic: String,
-        control_and_errors: mpsc::Sender<Operation>,
+        control_and_errors: channel::Sender<Operation>,
     ) -> RdKafka {
         let global = &ini.global;
         let kafka = &ini.kafka;
         let debug = &ini.debug;
-        let (outgoing_message_queue, incoming_message_queue) = mpsc::channel();
-
-        {
+        let (outgoing_message_queue, incoming_message_queue) = channel::unbounded();
+        let producer = {
             let broker = kafka.broker_address.clone();
             let ca_file = kafka.ca_file.clone();
             let sasl_identity = kafka
@@ -82,18 +90,19 @@ impl RdKafka {
                     control_and_errors,
                     verbose,
                 );
-            });
-        }
+            })
+        };
 
         RdKafka {
             outgoing_message_queue,
+            producer: Some(producer),
         }
     }
 }
 
 impl DataSink for RdKafka {
     fn post(
-        &self,
+        &mut self,
         system: &dyn SystemAPI,
         topic_prefix: &Option<String>,
         cluster: &str,
@@ -109,18 +118,19 @@ impl DataSink for RdKafka {
             topic = prefix.clone() + "." + &topic;
         }
         let key = hostname.to_string();
-        let _ignored = self.outgoing_message_queue.send(Message {
+        let _ignored = self.outgoing_message_queue.send(Message::M(Msg {
             timestamp: system.get_now_in_secs_since_epoch(),
             topic,
             key,
             value,
-        });
+        }));
     }
 
-    fn stop(&self) {
-        // Nothing happens here.  The owner of the DataSink should drop it after calling stop().
-        // Eventually all clones of outgoing_message_queue are dropped and the receive in the
-        // producer will error out, and the producer will exit.
+    fn stop(&mut self, _system: &dyn SystemAPI) {
+        let _ = self.outgoing_message_queue.send(Message::Stop);
+        let mut producer = None;
+        std::mem::swap(&mut producer, &mut self.producer);
+        let _ = producer.unwrap().join();
     }
 }
 
@@ -135,16 +145,18 @@ impl DataSink for RdKafka {
 //
 // Compression is set to "snappy" as it's believed it's an OK choice for JSON data.
 //
-// Batching time is set to 1s as that will give us enough time to batch everything that's queued up,
-// but in normal operation the sending window will be shorter than the cadence and there will not
-// be a queue.
+// Buffering time is set to 1000ms as that will give us enough time to batch everything that's
+// queued up, but in normal operation the sending window will be shorter than the cadence and there
+// will not be a queue.
 
 struct SonarProducerContext {
     verbose: bool,
-    control_and_errors: mpsc::Sender<Operation>,
+    control_and_errors: channel::Sender<Operation>,
 }
 
 impl ClientContext for SonarProducerContext {}
+
+const KAFKA_BUFFER_MS: usize = 1000;
 
 fn kafka_producer(
     broker: String,
@@ -153,15 +165,15 @@ fn kafka_producer(
     sasl_identity: Option<(String, String)>,
     sending_window: u64,
     timeout: u64,
-    incoming_message_queue: mpsc::Receiver<Message>,
-    control_and_errors: mpsc::Sender<Operation>,
+    incoming_message_queue: channel::Receiver<Message>,
+    control_and_errors: channel::Sender<Operation>,
     verbose: bool,
 ) {
     let mut cfg = ClientConfig::new();
     cfg.set("bootstrap.servers", &broker)
         .set("client.id", &client_id)
-        .set("queue.buffering.max.ms", "1000")
-        .set("message.timeout.ms", &format!("{}", timeout * 1000))
+        .set("queue.buffering.max.ms", format!("{}", KAFKA_BUFFER_MS))
+        .set("message.timeout.ms", format!("{}", timeout * 1000))
         .set("compression.codec", "snappy");
     if let Some(ref filename) = ca_file {
         cfg.set("ssl.ca.location", filename)
@@ -175,78 +187,80 @@ fn kafka_producer(
             cfg.set("security.protocol", "ssl");
         }
     }
-    let producer: &ThreadedProducer<SonarProducerContext, NoCustomPartitioner> = {
-        let control_and_errors = control_and_errors.clone();
-        &cfg
-            .create_with_context::<SonarProducerContext,
-                                   ThreadedProducer<SonarProducerContext, NoCustomPartitioner>>(
-                SonarProducerContext { verbose, control_and_errors },
-            )
-            .expect("Producer creation error")
-    };
+    let producer = make_sender_adapter(cfg, control_and_errors.clone(), verbose)
+        .expect("Producer creation error");
 
-    let mut id = 0;
+    let mut id = 0usize;
     let mut rng = util::Rng::new();
+    let mut timeout: channel::Receiver<Instant> = channel::never();
+    let mut armed = false;
+    let mut must_arm = false;
+    let mut backlog = Vec::new();
+
     'producer_loop: loop {
-        if verbose {
-            log::verbose("Waiting for stuff to send");
-        }
-        match incoming_message_queue.recv() {
-            Err(_) => {
-                // Channel was closed, so exit.
-                break 'producer_loop;
+        if must_arm {
+            // Logically we clear must_arm here but it is redundant at the moment, as all paths that
+            // continue the loop update must_arm without examining the current value.
+            assert!(!armed);
+            let sleep = rng.next() as u64 % sending_window;
+            if verbose {
+                log::verbose(&format!("Sleeping {sleep} before sending"));
             }
-            Ok(mut msg) => {
-                if sending_window > 1 {
-                    let sleep = rng.next() as u64 % sending_window;
-                    if verbose {
-                        log::verbose(&format!("Sleeping {sleep} before sending"));
-                    }
-                    // TODO: This is really not ideal.  We should be setting up a timer and then
-                    // sending the message when the timer expires.  But we won't fix this until we
-                    // move from mpsc to crossbeam.
-                    thread::sleep(Duration::from_secs(sleep));
+            timeout = channel::after(Duration::from_secs(sleep));
+            armed = true;
+        }
+        channel::select! {
+            recv(timeout) -> _ => {
+                armed = false;
+                id = send_messages(&*producer, &control_and_errors, id, &backlog, verbose);
+            }
+            recv(incoming_message_queue) -> msg => match msg {
+                Ok(Message::M(msg)) => {
+                    backlog.push(msg);
+                    must_arm = !armed;
                 }
-
-                'sender_loop: loop {
-                    id += 1;
-                    if verbose {
-                        log::verbose(&format!("Sending to topic: {} with id {id}", msg.topic));
-                    }
-                    match producer.send(
-                        BaseRecord::with_opaque_to(&msg.topic, id)
-                            .payload(&msg.value)
-                            .key(&msg.key),
-                    ) {
-                        Ok(()) => {}
-                        Err((m, e)) => {
-                            // TODO: There are various problems with sending here that we should
-                            // maybe try to figure out and signal in a sensible way.  For now,
-                            // drop the message, and go back to the slow loop, do not flush the
-                            // message queue.
-                            let msg = format!("Message production error {:?} {}", e, m);
-                            let _ = control_and_errors.send(Operation::MessageDeliveryError(msg));
-                            continue 'producer_loop;
-                        }
-                    }
-
-                    // Once we're sending, send everything we've got, or we may get backed up if the
-                    // production cadence is higher than the sending cadence.
-                    match incoming_message_queue.try_recv() {
-                        Err(mpsc::TryRecvError::Empty) => {
-                            break 'sender_loop;
-                        }
-                        Err(mpsc::TryRecvError::Disconnected) => {
-                            break 'producer_loop;
-                        }
-                        Ok(m) => {
-                            msg = m;
-                        }
-                    }
+                Ok(Message::Stop) | Err(_) => {
+                    _ = send_messages(&*producer, &control_and_errors, id, &backlog, verbose);
+                    break 'producer_loop;
                 }
             }
         }
     }
+
+    // Best effort: give the Kafka thread an opportunity to send what it has.
+    thread::sleep(Duration::from_millis(2 * KAFKA_BUFFER_MS as u64));
+}
+
+fn send_messages(
+    producer: &dyn SenderAdapter,
+    control_and_errors: &channel::Sender<Operation>,
+    mut id: usize,
+    backlog: &[Msg],
+    verbose: bool,
+) -> usize {
+    // We always try to send everything.  Messages that fail are dropped, because the only failure
+    // is failure to be enqueued - in that case, the message is probably fatally flawed.
+    for msg in backlog.iter() {
+        id += 1; // Always give it a new ID, even if it is later dropped.
+        if verbose {
+            log::verbose(&format!("Sending to topic: {} with id {id}", msg.topic));
+        }
+        match producer.send(
+            BaseRecord::with_opaque_to(&msg.topic, id)
+                .payload(&msg.value)
+                .key(&msg.key),
+        ) {
+            Ok(()) => {}
+            Err(m) => {
+                // An error here only means that the message could not be enqueued; sending errors
+                // are discovered in the ProducerContext.  So an error here is pretty much fatal for
+                // the message, hence we drop it.
+                let msg = format!("Message production error {m}");
+                let _ = control_and_errors.send(Operation::MessageDeliveryError(msg));
+            }
+        }
+    }
+    id
 }
 
 impl ProducerContext for SonarProducerContext {
@@ -272,4 +286,109 @@ impl ProducerContext for SonarProducerContext {
             }
         }
     }
+}
+
+// The SenderAdapter hides the low level output path from higher-level logic, for the purposes of
+// testing: during testing, output can go to stdout and be inspected.  There's a small cost of
+// indirection here during production, but we won't really notice.
+
+trait SenderAdapter {
+    fn send(&self, r: BaseRecord<String, String, usize>) -> Result<(), String>;
+}
+
+struct KafkaSender {
+    producer: ThreadedProducer<SonarProducerContext, NoCustomPartitioner>,
+}
+
+impl KafkaSender {
+    fn new(
+        cfg: ClientConfig,
+        control_and_errors: channel::Sender<Operation>,
+        verbose: bool,
+    ) -> Result<KafkaSender, String> {
+        let producer: ThreadedProducer<SonarProducerContext, NoCustomPartitioner> =
+            cfg
+                .create_with_context::<SonarProducerContext,
+                                       ThreadedProducer<SonarProducerContext, NoCustomPartitioner>>(
+                    SonarProducerContext { verbose, control_and_errors },
+                )
+                .map_err(|_| "Producer creation error".to_string())?;
+        Ok(KafkaSender { producer })
+    }
+}
+
+impl SenderAdapter for KafkaSender {
+    fn send(&self, r: BaseRecord<String, String, usize>) -> Result<(), String> {
+        self.producer
+            .send::<String, String>(r)
+            .map_err(|_| "Could not send".to_string())
+    }
+}
+
+#[cfg(debug_assertions)]
+struct StdoutSender {
+    fail_odd_messages: bool,
+}
+
+#[cfg(debug_assertions)]
+impl StdoutSender {
+    fn new() -> StdoutSender {
+        StdoutSender {
+            fail_odd_messages: std::env::var("SONARTEST_MOCK_KAFKA")
+                == Ok("fail-all-odd-messages".to_string()),
+        }
+    }
+}
+
+#[cfg(debug_assertions)]
+impl SenderAdapter for StdoutSender {
+    fn send(&self, r: BaseRecord<String, String, usize>) -> Result<(), String> {
+        if self.fail_odd_messages && (r.delivery_opaque & 1) == 1 {
+            println!(
+                "{{\"id\":{}, \"sent\":{}, \"error\":\"Failing record\"}}",
+                r.delivery_opaque,
+                unix_now(),
+            );
+            return Err("Synthetic failure".to_string());
+        }
+        println!(
+            "{{\"id\":{}, \"sent\":{}, \"topic\":\"{}\", \"key\":\"{}\", \"value\":{}}}",
+            r.delivery_opaque,
+            unix_now(),
+            r.topic,
+            r.key.unwrap(),
+            r.payload.unwrap(),
+        );
+        Ok(())
+    }
+}
+
+#[cfg(debug_assertions)]
+fn make_sender_adapter(
+    cfg: ClientConfig,
+    control_and_errors: channel::Sender<Operation>,
+    verbose: bool,
+) -> Result<Box<dyn SenderAdapter>, String> {
+    if std::env::var("SONARTEST_MOCK_KAFKA").is_ok() {
+        Ok(Box::new(StdoutSender::new()))
+    } else {
+        Ok(Box::new(KafkaSender::new(
+            cfg,
+            control_and_errors.clone(),
+            verbose,
+        )?))
+    }
+}
+
+#[cfg(not(debug_assertions))]
+fn make_sender_adapter(
+    cfg: ClientConfig,
+    control_and_errors: channel::Sender<Operation>,
+    verbose: bool,
+) -> Result<Box<dyn SenderAdapter>, String> {
+    Ok(Box::new(KafkaSender::new(
+        cfg,
+        control_and_errors.clone(),
+        verbose,
+    )?))
 }

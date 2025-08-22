@@ -4,18 +4,19 @@ use crate::systemapi::SystemAPI;
 use crate::time;
 
 use std::io::Write;
-use std::sync::mpsc;
+
+use crossbeam::channel;
 
 // Data sink that dumps the output as JSON into a date-keyed directory tree.  It reads no command
 // messages.
 
 pub struct DirectorySink {
     data_dir: String,
-    control_and_errors: mpsc::Sender<Operation>,
+    control_and_errors: channel::Sender<Operation>,
 }
 
 impl DirectorySink {
-    pub fn new(data_dir: &str, control_and_errors: mpsc::Sender<Operation>) -> DirectorySink {
+    pub fn new(data_dir: &str, control_and_errors: channel::Sender<Operation>) -> DirectorySink {
         DirectorySink {
             data_dir: data_dir.to_string(),
             control_and_errors,
@@ -25,7 +26,7 @@ impl DirectorySink {
 
 impl DataSink for DirectorySink {
     fn post(
-        &self,
+        &mut self,
         system: &dyn SystemAPI,
         _topic_prefix: &Option<String>,
         _cluster: &str,
@@ -84,7 +85,7 @@ impl DataSink for DirectorySink {
         }
     }
 
-    fn stop(&self) {
+    fn stop(&mut self, _system: &dyn SystemAPI) {
         // Nothing to do
     }
 }

@@ -5,9 +5,9 @@
 Testing is divided between white box automated tests embedded in the code, the black box automated
 tests in this directory, and some interactive/manual tests in some subdirectories of this directory.
 
-To run the white box automated tests, run `cargo test` in this directory's parent directory.
-
-To run the black box automated tests, run `./run_tests.sh` in this directory.
+To run the white box automated tests, run `cargo test` in this directory's parent directory.  To run
+the black box automated tests, run `run_tests.sh` in this directory.  Both will be run if you run
+`make test` in the parent directory.
 
 To run the interactive tests, cd to the various subdirectories of this directory and inspect the
 README.md files for instructions.  (Also see below.)
@@ -34,5 +34,4 @@ configuration is needed.
 
 The interactive tests are:
 
-- `directory` tests Sonar's output-to-directory-tree functionality
-- `kafka` tests Sonar's output-to-Kafka-broker functionality
+- `kafka-interactive` tests Sonar's output-to-Kafka-broker functionality with a live broker
