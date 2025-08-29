@@ -212,9 +212,7 @@ fn kafka_producer(
         channel::select! {
             recv(timeout) -> _ => {
                 armed = false;
-                let failed;
-                (id, backlog, failed) = send_messages(&producer, &control_and_errors, id, backlog, false, verbose);
-                must_arm = failed;
+                id = send_messages(&producer, &control_and_errors, id, &backlog, verbose);
             }
             recv(incoming_message_queue) -> msg => match msg {
                 Ok(Message::M(msg)) => {
@@ -222,9 +220,7 @@ fn kafka_producer(
                     must_arm = !armed;
                 }
                 Ok(Message::Stop) | Err(_) => {
-                    // FIXME: Should tell send_messages that it should not stop on errors, but must
-                    // drain the backlog.
-                    (_, _, _) = send_messages(&producer, &control_and_errors, id, backlog, true, verbose);
+                    _ = send_messages(&producer, &control_and_errors, id, &backlog, verbose);
                     break 'producer_loop;
                 }
             }
@@ -239,14 +235,12 @@ fn send_messages(
     producer: &Box<dyn SenderAdapter>,
     control_and_errors: &channel::Sender<Operation>,
     mut id: usize,
-    mut backlog: Vec<Msg>,
-    flushing: bool,
+    backlog: &[Msg],
     verbose: bool,
-) -> (usize, Vec<Msg>, bool) {
-    let mut i = 0;
-    'sender_loop: while i < backlog.len() {
-        let msg = &backlog[i];
-        i += 1; // Always consume it, see below.
+) -> usize {
+    // We always try to send everything.  Messages that fail are dropped, because the only failure
+    // is failure to be enqueued - in that case, the message is probably fatally flawed.
+    for msg in backlog.iter() {
         id += 1; // Always give it a new ID, even if it is later dropped.
         if verbose {
             log::verbose(&format!("Sending to topic: {} with id {id}", msg.topic));
@@ -263,20 +257,10 @@ fn send_messages(
                 // the message, hence we drop it.
                 let msg = format!("Message production error {m}");
                 let _ = control_and_errors.send(Operation::MessageDeliveryError(msg));
-                if !flushing {
-                    break 'sender_loop;
-                }
             }
         }
     }
-    let failed = i < backlog.len();
-    if failed {
-        backlog.rotate_left(i);
-        backlog.truncate(backlog.len() - i);
-    } else {
-        backlog.clear();
-    }
-    (id, backlog, failed)
+    id
 }
 
 impl ProducerContext for SonarProducerContext {
