@@ -19,18 +19,21 @@ for test in amd-gpu \
                 cluster-syntax \
                 command-line \
                 daemon \
+                daemon-directory \
+                daemon-interrupt \
+                daemon-kafka \
                 exclude-commands \
                 exclude-system-jobs \
                 exclude-users \
                 features \
                 gpuinfo \
                 hostname \
-                interrupt \
                 load \
                 lockfile \
                 min-cpu-time \
                 no-gpu \
                 nvidia-gpu \
+                ps-interrupt \
                 ps-syntax \
                 rollup \
                 rollup2 \

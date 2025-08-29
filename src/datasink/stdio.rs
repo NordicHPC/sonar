@@ -3,8 +3,9 @@ use crate::datasink::DataSink;
 use crate::systemapi::SystemAPI;
 
 use std::io;
-use std::sync::mpsc;
 use std::thread;
+
+use crossbeam::channel;
 
 // Trivial data sink.  This dumps the output as JSON on stdout, and reads command messages from
 // stdin, on the form /target\s+key\s+value/.
@@ -17,7 +18,7 @@ impl StdioSink {
     pub fn new(
         client_id: String,
         control_topic: String,
-        control_and_errors: mpsc::Sender<daemon::Operation>,
+        control_and_errors: channel::Sender<daemon::Operation>,
     ) -> StdioSink {
         thread::spawn(move || {
             control_message_reader(control_topic, control_and_errors);
@@ -28,7 +29,7 @@ impl StdioSink {
 
 impl DataSink for StdioSink {
     fn post(
-        &self,
+        &mut self,
         _system: &dyn SystemAPI,
         topic_prefix: &Option<String>,
         cluster: &str,
@@ -47,7 +48,7 @@ impl DataSink for StdioSink {
         );
     }
 
-    fn stop(&self) {
+    fn stop(&mut self, _system: &dyn SystemAPI) {
         // TODO: This (maybe) needs to kill the stdin thread.  But it's probably doesn't need to
         // happen, and it's not clear how it could happen, there's no obvious signalling facility
         // for threads.
@@ -56,7 +57,7 @@ impl DataSink for StdioSink {
 
 fn control_message_reader(
     control_topic: String,
-    control_and_errors: mpsc::Sender<daemon::Operation>,
+    control_and_errors: channel::Sender<daemon::Operation>,
 ) {
     for line in io::stdin().lines() {
         match line {

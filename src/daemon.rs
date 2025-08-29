@@ -1,14 +1,11 @@
 #![allow(clippy::comparison_to_empty)]
 #![allow(clippy::len_zero)]
+#![allow(clippy::manual_div_ceil)] // .div_ceil() is Rust 1.73
 
 // TODO in this file, all marked:
 //
 // Low pri
-//  - lock file
-//  - signal handling to deal properly with with lock file
-//  - reload config under signal + remote control (exiting and restarting via systemd is
-//    just fine for starters)
-//  - maybe pause / restart remote control
+//  - lock file (mostly obsolete with systemd controlling things)
 //  - more flexible cadence computation
 //  - more test cases for the cadence computation
 
@@ -22,6 +19,7 @@
 // Signal handlers place signals in the daemon's channel as events.
 
 use crate::cluster;
+use crate::datasink::delay::DelaySink;
 use crate::datasink::directory::DirectorySink;
 #[cfg(feature = "kafka")]
 use crate::datasink::kafka::RdKafka;
@@ -38,8 +36,12 @@ use crate::systemapi::SystemAPI;
 use crate::time::{unix_now, unix_time_components};
 
 use std::io::BufRead;
-use std::sync::mpsc;
 use std::thread;
+use std::time::Duration;
+
+use crossbeam::{channel, select};
+use signal_hook::consts::signal;
+use signal_hook::iterator::Signals;
 
 pub struct GlobalIni {
     pub cluster: String,
@@ -61,6 +63,7 @@ pub struct KafkaIni {
 pub struct DebugIni {
     pub verbose: bool,
     pub time_limit: Option<Dur>,
+    pub output_delay: Option<Dur>,
 }
 
 pub struct DirectoryIni {
@@ -191,16 +194,28 @@ pub fn daemon_mode(
     let hostname = system.get_hostname();
     let api_token = "".to_string();
 
-    if ini.global.lockdir.is_some() {
-        // TODO: Acquire lockdir here
-        // TODO: Set up interrupt handling
-        todo!();
-    }
-
     // For communicating with the main thread.  event_sender is used to send timer ticks (from timer
     // threads), incoming messages (from the data sink), signals (from the signal handling thread),
     // and errors (from anywhere); event_receiver receives those events in the main thread.
-    let (event_sender, event_receiver) = mpsc::channel();
+    let (event_sender, event_receiver) = channel::unbounded();
+
+    let signal_handlers = {
+        let mut signals = Signals::new([signal::SIGINT, signal::SIGTERM, signal::SIGHUP])
+            .map_err(|_| "Signal handling setup".to_string())?;
+        let signal_handlers = signals.handle();
+        let sender = event_sender.clone();
+        thread::spawn(move || {
+            for signal in signals.forever() {
+                let _ = sender.send(Operation::Signal(signal));
+            }
+        });
+        signal_handlers
+    };
+
+    if ini.global.lockdir.is_some() {
+        // TODO: Acquire lockdir here
+        todo!();
+    }
 
     // If sysinfo runs on startup then post a message to ourselves.  Should never fail.
     if ini.sysinfo.cadence.is_some() && ini.sysinfo.on_startup {
@@ -242,20 +257,24 @@ pub fn daemon_mode(
     }
 
     #[cfg(not(feature = "kafka"))]
-    let data_sink: Box<dyn DataSink> = if let Some(ref data_dir) = ini.directory.data_dir {
+    let mut data_sink: Box<dyn DataSink> = if let Some(ref data_dir) = ini.directory.data_dir {
         Box::new(DirectorySink::new(data_dir, event_sender))
     } else {
         Box::new(StdioSink::new(client_id, control_topic, event_sender))
     };
 
     #[cfg(feature = "kafka")]
-    let data_sink: Box<dyn DataSink> = if ini.kafka.broker_address != "" {
+    let mut data_sink: Box<dyn DataSink> = if ini.kafka.broker_address != "" {
         Box::new(RdKafka::new(&ini, client_id, control_topic, event_sender))
     } else if let Some(ref data_dir) = ini.directory.data_dir {
         Box::new(DirectorySink::new(data_dir, event_sender))
     } else {
         Box::new(StdioSink::new(client_id, control_topic, event_sender))
     };
+
+    if let Some(delay) = ini.debug.output_delay {
+        data_sink = Box::new(DelaySink::new(delay, data_sink));
+    }
 
     if ini.debug.verbose {
         log::verbose("Initialization succeeded");
@@ -290,117 +309,119 @@ pub fn daemon_mode(
         api_token.clone(),
     );
 
-    let cutoff = ini
-        .debug
-        .time_limit
-        .map(|d| system.get_now_in_secs_since_epoch() + d.to_seconds());
+    let cutoff = if let Some(limit) = ini.debug.time_limit {
+        channel::after(Duration::from_secs(limit.to_seconds()))
+    } else {
+        channel::never()
+    };
     let mut fatal_msg = "".to_string();
     'messageloop: loop {
-        if let Some(cutoff) = cutoff {
-            if system.get_now_in_secs_since_epoch() > cutoff {
+        select! {
+            recv(cutoff) -> _ => {
                 if ini.debug.verbose {
                     log::verbose("Time limit reached");
                 }
                 break 'messageloop;
             }
+            recv(event_receiver) -> msg => match msg {
+                Err(_) => {
+                    // Nobody gets to close this channel, so panic on error
+                    panic!("Event queue receive");
+                }
+                Ok(op) => {
+                    let mut output = Vec::new();
+
+                    system.update_time();
+                    let data_tag: &'static str;
+                    match op {
+                        Operation::Sample => {
+                            if ini.debug.verbose {
+                                log::verbose("Sample");
+                            }
+                            sample_extractor.run(&mut output);
+                            data_tag = json_tags::DATA_TAG_SAMPLE;
+                        }
+                        Operation::Sysinfo => {
+                            if ini.debug.verbose {
+                                log::verbose("Sysinfo");
+                            }
+                            sysinfo_extractor.run(&mut output);
+                            data_tag = json_tags::DATA_TAG_SYSINFO;
+                        }
+                        Operation::Jobs => {
+                            if ini.debug.verbose {
+                                log::verbose("Jobs");
+                            }
+                            slurm_extractor.run(&mut output);
+                            data_tag = json_tags::DATA_TAG_JOBS;
+                        }
+                        Operation::Cluster => {
+                            if ini.debug.verbose {
+                                log::verbose("Cluster");
+                            }
+                            cluster_extractor.run(&mut output);
+                            data_tag = json_tags::DATA_TAG_CLUSTER;
+                        }
+                        Operation::Signal(s) => {
+                            if ini.debug.verbose {
+                                log::verbose(&format!("signal {s}"));
+                            }
+                            match s {
+                                signal::SIGINT | signal::SIGHUP | signal::SIGTERM => {
+                                    log::verbose(&format!("Received signal {s}"));
+                                    break 'messageloop;
+                                }
+                                _ => {
+                                    continue 'messageloop;
+                                }
+                            }
+                        }
+                        Operation::Incoming(key, value) => {
+                            if ini.debug.verbose {
+                                log::verbose("Incoming");
+                            }
+                            // TODO: Maybe a reload function
+                            // TODO: Maybe pause / restart functions
+                            match (key.as_str(), value.as_str()) {
+                                ("exit", _) => {
+                                    break 'messageloop;
+                                }
+                                _ => {}
+                            }
+                            continue 'messageloop;
+                        }
+                        Operation::Fatal(msg) => {
+                            if ini.debug.verbose {
+                                log::verbose(&format!("Fatal error: {msg}"));
+                            }
+                            fatal_msg = msg;
+                            break 'messageloop;
+                        }
+                        Operation::MessageDeliveryError(msg) => {
+                            if ini.debug.verbose {
+                                log::verbose(&msg);
+                            }
+                            log::error(&msg);
+                            continue 'messageloop;
+                        }
+                    }
+
+                    let value = String::from_utf8_lossy(&output).to_string();
+                    data_sink.post(
+                        &system,
+                        &ini.global.topic_prefix,
+                        &ini.global.cluster,
+                        data_tag,
+                        &hostname,
+                        value,
+                    );
+                }
+            }
         }
-
-        let mut output = Vec::new();
-
-        // Nobody gets to close this channel, so panic on error
-        let op = event_receiver.recv().expect("Event queue receive");
-
-        system.update_time();
-        let data_tag: &'static str;
-        match op {
-            Operation::Sample => {
-                if ini.debug.verbose {
-                    log::verbose("Sample");
-                }
-                sample_extractor.run(&mut output);
-                data_tag = json_tags::DATA_TAG_SAMPLE;
-            }
-            Operation::Sysinfo => {
-                if ini.debug.verbose {
-                    log::verbose("Sysinfo");
-                }
-                sysinfo_extractor.run(&mut output);
-                data_tag = json_tags::DATA_TAG_SYSINFO;
-            }
-            Operation::Jobs => {
-                if ini.debug.verbose {
-                    log::verbose("Jobs");
-                }
-                slurm_extractor.run(&mut output);
-                data_tag = json_tags::DATA_TAG_JOBS;
-            }
-            Operation::Cluster => {
-                if ini.debug.verbose {
-                    log::verbose("Cluster");
-                }
-                cluster_extractor.run(&mut output);
-                data_tag = json_tags::DATA_TAG_CLUSTER;
-            }
-            Operation::Signal(s) => {
-                if ini.debug.verbose {
-                    log::verbose(&format!("signal {s}"));
-                }
-                match s {
-                    libc::SIGINT | libc::SIGHUP => {
-                        break 'messageloop;
-                    }
-                    libc::SIGTERM => {
-                        // TODO: reload
-                        continue 'messageloop;
-                    }
-                    _ => {
-                        continue 'messageloop;
-                    }
-                }
-            }
-            Operation::Incoming(key, value) => {
-                if ini.debug.verbose {
-                    log::verbose("Incoming");
-                }
-                // TODO: Maybe a reload function
-                // TODO: Maybe pause / restart functions
-                match (key.as_str(), value.as_str()) {
-                    ("exit", _) => {
-                        break 'messageloop;
-                    }
-                    _ => {}
-                }
-                continue 'messageloop;
-            }
-            Operation::Fatal(msg) => {
-                if ini.debug.verbose {
-                    log::verbose(&format!("Fatal error: {msg}"));
-                }
-                fatal_msg = msg;
-                break 'messageloop;
-            }
-            Operation::MessageDeliveryError(msg) => {
-                if ini.debug.verbose {
-                    log::verbose(&msg);
-                }
-                log::error(&msg);
-                continue 'messageloop;
-            }
-        }
-
-        let value = String::from_utf8_lossy(&output).to_string();
-
-        data_sink.post(
-            &system,
-            &ini.global.topic_prefix,
-            &ini.global.cluster,
-            data_tag,
-            &hostname,
-            value,
-        );
     }
 
-    data_sink.stop();
+    data_sink.stop(&system);
+    drop(data_sink);
 
     // Other threads will need to not panic when they are killed on shutdown, but otherwise there's
     // nothing special to be done here for the repeater threads or even the signal processing
@@ -408,9 +429,10 @@ pub fn daemon_mode(
 
     if ini.global.lockdir.is_some() {
         // TODO: Relinquish lockdir here
-        // TODO: Maybe tear down interrupt handling?
         todo!();
     }
+
+    signal_handlers.close();
 
     if fatal_msg != "" {
         Err(fatal_msg)
@@ -423,7 +445,11 @@ pub fn daemon_mode(
 //
 // Alarms and cadences.
 
-fn repeated_event(_whoami: &str, sender: mpsc::Sender<Operation>, op: Operation, cadence: Dur) {
+fn repeated_event(_whoami: &str, sender: channel::Sender<Operation>, op: Operation, cadence: Dur) {
+    // We could maybe use crossbeam::channel::tick here, but apart from possibly reducing the number
+    // of live threads it probably doesn't offer any advantages, as we'd still need to deal with the
+    // initial delay and worry about clock drift.
+
     let now = unix_now();
     let first = time_at_next_cadence_point(now, cadence);
     let initial_delay = first as i64 - now as i64;
@@ -610,6 +636,7 @@ fn parse_config(config_file: &str) -> Result<Ini, String> {
         directory: DirectoryIni { data_dir: None },
         debug: DebugIni {
             time_limit: None,
+            output_delay: None,
             verbose: false,
         },
         sample: SampleIni {
@@ -767,6 +794,10 @@ fn parse_config(config_file: &str) -> Result<Ini, String> {
             Section::Debug => match name.as_str() {
                 "time-limit" => {
                     ini.debug.time_limit = Some(parse_duration("debug.time-limit", &value, true)?);
+                }
+                "output-delay" => {
+                    ini.debug.output_delay =
+                        Some(parse_duration("debug.output-delay", &value, true)?);
                 }
                 "verbose" => {
                     ini.debug.verbose = parse_bool(&value)?;

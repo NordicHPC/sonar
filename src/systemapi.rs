@@ -89,7 +89,8 @@ pub trait SystemAPI {
     fn remove_lock_file(&self, p: path::PathBuf) -> io::Result<()>;
 
     // `handle_interruptions` enables interrupt checking; `is_interrupted` returns true if an
-    // interrupt has been received.
+    // interrupt has been received.  The specific interrupt signals are system-dependent; see the
+    // implementations for more.
     fn handle_interruptions(&self);
     fn is_interrupted(&self) -> bool;
 }
