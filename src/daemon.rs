@@ -1,5 +1,6 @@
 #![allow(clippy::comparison_to_empty)]
 #![allow(clippy::len_zero)]
+#![allow(clippy::manual_div_ceil)] // .div_ceil() is Rust 1.73
 
 // TODO in this file, all marked:
 //
@@ -199,7 +200,7 @@ pub fn daemon_mode(
     let (event_sender, event_receiver) = channel::unbounded();
 
     let signal_handlers = {
-        let mut signals = Signals::new(&[signal::SIGINT, signal::SIGTERM, signal::SIGHUP])
+        let mut signals = Signals::new([signal::SIGINT, signal::SIGTERM, signal::SIGHUP])
             .map_err(|_| "Signal handling setup".to_string())?;
         let signal_handlers = signals.handle();
         let sender = event_sender.clone();

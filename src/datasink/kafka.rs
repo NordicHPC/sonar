@@ -172,8 +172,8 @@ fn kafka_producer(
     let mut cfg = ClientConfig::new();
     cfg.set("bootstrap.servers", &broker)
         .set("client.id", &client_id)
-        .set("queue.buffering.max.ms", &format!("{}", KAFKA_BUFFER_MS))
-        .set("message.timeout.ms", &format!("{}", timeout * 1000))
+        .set("queue.buffering.max.ms", format!("{}", KAFKA_BUFFER_MS))
+        .set("message.timeout.ms", format!("{}", timeout * 1000))
         .set("compression.codec", "snappy");
     if let Some(ref filename) = ca_file {
         cfg.set("ssl.ca.location", filename)
@@ -212,7 +212,7 @@ fn kafka_producer(
         channel::select! {
             recv(timeout) -> _ => {
                 armed = false;
-                id = send_messages(&producer, &control_and_errors, id, &backlog, verbose);
+                id = send_messages(&*producer, &control_and_errors, id, &backlog, verbose);
             }
             recv(incoming_message_queue) -> msg => match msg {
                 Ok(Message::M(msg)) => {
@@ -220,7 +220,7 @@ fn kafka_producer(
                     must_arm = !armed;
                 }
                 Ok(Message::Stop) | Err(_) => {
-                    _ = send_messages(&producer, &control_and_errors, id, &backlog, verbose);
+                    _ = send_messages(&*producer, &control_and_errors, id, &backlog, verbose);
                     break 'producer_loop;
                 }
             }
@@ -232,7 +232,7 @@ fn kafka_producer(
 }
 
 fn send_messages(
-    producer: &Box<dyn SenderAdapter>,
+    producer: &dyn SenderAdapter,
     control_and_errors: &channel::Sender<Operation>,
     mut id: usize,
     backlog: &[Msg],

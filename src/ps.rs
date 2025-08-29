@@ -273,16 +273,11 @@ pub struct GpuProcInfo {
     pub gpu_mem_util: u32,
 }
 
-#[derive(Copy, Clone, PartialEq, Eq)]
+#[derive(Copy, Clone, Default, PartialEq, Eq)]
 pub enum GpuStatus {
+    #[default]
     Ok = 0,
     UnknownFailure = 1,
-}
-
-impl Default for GpuStatus {
-    fn default() -> GpuStatus {
-        GpuStatus::Ok
-    }
 }
 
 pub struct SampleData {
@@ -669,7 +664,7 @@ fn filter_proc(proc_info: &ProcInfo, opts: &PsOptions) -> bool {
     if opts.exclude_system_jobs && proc_info.is_system_job {
         included = false;
     }
-    if !opts.exclude_users.is_empty() && opts.exclude_users.iter().any(|x| *x == proc_info.user) {
+    if !opts.exclude_users.is_empty() && opts.exclude_users.contains(&proc_info.user) {
         included = false;
     }
     if !opts.exclude_commands.is_empty()
