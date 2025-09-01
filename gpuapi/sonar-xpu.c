@@ -15,6 +15,7 @@
 #include <fcntl.h>
 
 #include "sonar-xpu.h"
+#include "strtcpy.h"
 
 #ifdef SONAR_XPU_GPU
 
@@ -206,22 +207,22 @@ int xpu_device_get_card_info(uint32_t device, struct xpu_card_info_t* infobuf) {
     // specific device property getters.
     memset(infobuf, 0, sizeof(*infobuf));
 #if 0
-    strncpy(infobuf->bus_addr, devs[device].PCIBDFAddress, sizeof(infobuf->bus_addr));
-    strncpy(infobuf->uuid, devs[device].uuid, sizeof(infobuf->uuid));
-    strncpy(infobuf->model, devs[device].deviceName, sizeof(infobuf->model));
+    strtcpy(infobuf->bus_addr, devs[device].PCIBDFAddress, sizeof(infobuf->bus_addr));
+    strtcpy(infobuf->uuid, devs[device].uuid, sizeof(infobuf->uuid));
+    strtcpy(infobuf->model, devs[device].deviceName, sizeof(infobuf->model));
 #else
     xpum_device_properties_t props;
     xpu_get_device_properties(device, &props);
     for (int i=0 ; i < props.propertyLen ; i++ ) {
       switch (props.properties[i].name) {
 	  case XPUM_DEVICE_PROPERTY_DEVICE_NAME:
-	    strncpy(infobuf->model, props.properties[i].value, sizeof(infobuf->model));
+	    strtcpy(infobuf->model, props.properties[i].value, sizeof(infobuf->model)-1);
 	    break;
 	  case XPUM_DEVICE_PROPERTY_UUID:
-	    strncpy(infobuf->uuid, props.properties[i].value, sizeof(infobuf->uuid));
+	    strtcpy(infobuf->uuid, props.properties[i].value, sizeof(infobuf->uuid)-1);
 	    break;
 	  case XPUM_DEVICE_PROPERTY_PCI_BDF_ADDRESS:
-	    strncpy(infobuf->bus_addr, props.properties[i].value, sizeof(infobuf->bus_addr));
+	    strtcpy(infobuf->bus_addr, props.properties[i].value, sizeof(infobuf->bus_addr)-1);
 	    break;
           default:
 	    break;

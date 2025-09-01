@@ -62,7 +62,7 @@ realclean:
 libsonar-nvidia.a: sonar-nvidia.o Makefile
 	ar rs $@ $<
 
-sonar-nvidia.o: sonar-nvidia.c sonar-nvidia.h Makefile
+sonar-nvidia.o: sonar-nvidia.c sonar-nvidia.h strtcpy.h Makefile
 	$(CC) -c $(CFLAGS) -DSONAR_NVIDIA_GPU -o $@ $<
 
 libsonar-nvidia-stub.a: sonar-nvidia-stub.o Makefile
@@ -88,7 +88,7 @@ sonar-amd-stub.o: sonar-amd.c sonar-amd.h Makefile
 libsonar-xpu.a: sonar-xpu.o Makefile
 	ar rs $@ $<
 
-sonar-xpu.o: sonar-xpu.c sonar-xpu.h Makefile
+sonar-xpu.o: sonar-xpu.c sonar-xpu.h strtcpy.h Makefile
 	$(CC) -c $(CFLAGS) -DSONAR_XPU_GPU -o $@ $<
 
 libsonar-xpu-stub.a: sonar-xpu-stub.o Makefile
