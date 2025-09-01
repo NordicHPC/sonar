@@ -1,4 +1,4 @@
-# Versioning
+# Versioning and tagging
 
 ## Version numbers
 
@@ -15,7 +15,9 @@ The bugfix version is updated for changes that do not alter the output format pe
 affect the output nevertheless, ie, most changes not covered by changes to the minor version number.
 
 
-## Release branches, uplifts and backports
+## Release branches, tags, uplifts, and backports
+
+### Branches
 
 The following branching scheme is new with v0.12.x.
 
@@ -31,20 +33,27 @@ number is incremented on main (so when we created `release_0_12` for v0.12.1, th
 `main` went to `0.13.0-devel`).  The version number on a release branch is strictly of the form
 M.N.O.
 
-When a release `M.N.O` is to be made from a release branch, a tag is created of the form
-`release_M_N_O` on that branch and the release is built from that changeset.  Once the release has
+### Tagging
+
+When a release `M.N.O` is to be made from a release branch, a primary version tag must be created of
+the form `vM.N.O` on that branch and the release is built from that changeset.  Once the release has
 shipped, the bugfix version number on the branch is incremented.
+
+Additionally, the tag `util/formats/vM.N.O` must be created in order for the Go modules system to be
+able to reference that version of the Go package `util/formats` (inside Sonar) from other programs.
+
+### Uplifts and backports
 
 With the branches come some additional rules for how to move patches around:
 
 - If a bugfix is made to any release branch and the bug is present on main then the PR shall be
-  tagged "uplift-required"; the PR shall subsequently be uplifted main; and following uplift the tag
-  shall be changed to "uplifted-to-main".
+  labelled "uplift-required"; the PR shall subsequently be uplifted main; and following uplift the
+  label shall be changed to "uplifted-to-main".
 - If a bugfix is made to main it shall be considered whether it should be backported the most recent
-  release branch.  If so, the PR shall be tagged "backport-required"; the PR shall subsequently be
-  cherry-picked or backported to the release branch; and following backport the tag shall be changed
-  to "backported-to-release".  No older release branches shall automatically be considered for
-  backports.
+  release branch.  If so, the PR shall be labelled "backport-required"; the PR shall subsequently be
+  cherry-picked or backported to the release branch; and following backport the label shall be
+  changed to "backported-to-release".  No older release branches shall automatically be considered
+  for backports.
 
 
 ## Policies for changing Rust edition and minimum Rust version
