@@ -6,7 +6,6 @@ mod daemon;
 mod datasink;
 mod gpu;
 mod hostname;
-mod interrupt;
 mod jobsapi;
 mod json_tags;
 mod linux;

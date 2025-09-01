@@ -331,7 +331,7 @@ fn compute_nodeinfo(system: &dyn systemapi::SystemAPI) -> Result<NodeInfo, Strin
         cores_per_socket: cores_per_socket as u64,
         threads_per_core: threads_per_core as u64,
         cores,
-        mem_kb: mem_kb as u64,
+        mem_kb,
         card_manufacturer: manufacturer,
         gpu_cards: gpu_cards as u64,
         gpumem_kb,

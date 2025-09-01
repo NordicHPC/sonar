@@ -7,7 +7,7 @@ debug:
 release:
 	CARGO_TARGET_DIR=target/$(ARCH) cargo build --release
 
-test:
+test: debug release
 	cargo test
 	( cd util ; $(MAKE) test )
 	( cd tests; ./run_tests.sh )

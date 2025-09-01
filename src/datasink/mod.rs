@@ -1,3 +1,4 @@
+pub mod delay;
 pub mod directory;
 #[cfg(feature = "kafka")]
 pub mod kafka;
@@ -10,9 +11,9 @@ use crate::systemapi::SystemAPI;
 // network connection - if there is one - may go up and down, and so on.
 
 pub trait DataSink {
-    // Queue the message for sending, to be sent within the sending window (if applicable).
+    // Queue the message for sending, to be sent within the sending window (when applicable).
     fn post(
-        &self,
+        &mut self,
         system: &dyn SystemAPI,
         topic_prefix: &Option<String>,
         cluster: &str,
@@ -21,7 +22,10 @@ pub trait DataSink {
         value: String,
     );
 
-    // Stop the sink. Nobody should be calling post() after calling stop().  Furthermore, the
-    // DataSink object should be dropped as soon as possible after being stopped.
-    fn stop(&self);
+    // Stop the sink, attempt to send any queued messages, and wait for those sends to complete or
+    // time out.  Nobody should be calling post() after calling stop().  Furthermore, the DataSink
+    // object should be dropped as soon as possible after being stopped.  The flushing should be
+    // best-effort, stop() should not block for a long time.  Sometimes the output can't be sent
+    // because the receiver is not reachable; in that case, and others, output may be lost.
+    fn stop(&mut self, system: &dyn SystemAPI);
 }

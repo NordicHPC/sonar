@@ -1,3 +1,5 @@
+#![allow(clippy::manual_c_str_literals)] // The `c""` literals introduced in Rust 1.77
+
 // Miscellaneous time and date utilities that use libc to avoid pulling in Chrono.  These mostly
 // panic on errors, there should never be any except where input could plausibly come from a user.
 //
