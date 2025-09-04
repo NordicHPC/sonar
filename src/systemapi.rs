@@ -10,8 +10,9 @@ pub enum ClusterKind {
     Slurm,
 }
 
+// Naming: The `get_` methods always return the same values for every call.  The `compute_` methods
+// all recompute the data and the values may change.
 pub trait SystemAPI {
-    // These `get_` methods always return the same values for every call.
     fn get_version(&self) -> String;
     fn get_timestamp(&self) -> String;
     fn get_cluster(&self) -> String;
@@ -23,30 +24,28 @@ pub trait SystemAPI {
     fn get_page_size_in_kib(&self) -> usize;
     fn get_now_in_secs_since_epoch(&self) -> u64;
     fn get_pid(&self) -> u32;
-    fn get_boot_time(&self) -> u64;
+    fn get_boot_time_in_secs_since_epoch(&self) -> u64;
     fn get_gpus(&self) -> &dyn gpu::GpuAPI;
     fn get_jobs(&self) -> &dyn jobsapi::JobManager;
     fn get_cpu_info(&self) -> Result<CpuInfo, String>;
-    fn get_memory(&self) -> Result<Memory, String>;
-
-    // These `get_` methods may recompute the data.  TODO: Rename?
+    fn get_memory_in_kib(&self) -> Result<Memory, String>;
 
     // CPU usage data: total cpu seconds and per-cpu seconds.
-    fn get_node_information(&self) -> Result<(u64, Vec<u64>), String>;
+    fn compute_node_information(&self) -> Result<(u64, Vec<u64>), String>;
 
     // 1m, 5m, 15m load avg + current runnable and existing entities
-    fn get_loadavg(&self) -> Result<(f64, f64, f64, u64, u64), String>;
+    fn compute_loadavg(&self) -> Result<(f64, f64, f64, u64, u64), String>;
 
     // Return a hashmap of structures with process data, keyed by pid.  Pids uniquely tag the
     // records.  Also return a vector mapping pid to total cpu ticks for the process.
-    fn get_process_information(
+    fn compute_process_information(
         &self,
     ) -> Result<(HashMap<usize, Process>, Vec<(usize, u64)>), String>;
 
-    // Given the per-process CPU time computed by get_process_information, and a time to wait, wait for
-    // that time and then read the CPU time again.  The sampled process CPU utilization is the delta of
-    // CPU time divided by the delta of time.
-    fn get_cpu_utilization(
+    // Given the per-process CPU time computed by compute_process_information, and a time to wait,
+    // wait for that time and then read the CPU time again.  The sampled process CPU utilization is
+    // the delta of CPU time divided by the delta of time.
+    fn compute_cpu_utilization(
         &self,
         per_pid_cpu_ticks: &[(usize, u64)],
         wait_time_ms: usize,
@@ -55,12 +54,12 @@ pub trait SystemAPI {
     // This returns Some(n) where n > 0 if we could parse the job ID, Some(0) if the API is
     // available but the ID is not obtainable, or None otherwise.  Thus None is a signal to fall
     // back to other (non-Slurm) mechanisms.
-    fn get_slurm_job_id(&self, pid: usize) -> Option<usize>;
+    fn compute_slurm_job_id(&self, pid: usize) -> Option<usize>;
 
     // Try to figure out the user's name from system tables, this may be an expensive operation.
     // There's a tiny risk that the answer could change between two calls (if a user were added
     // and/or removed).
-    fn user_by_uid(&self, uid: u32) -> Option<String>;
+    fn compute_user_by_uid(&self, uid: u32) -> Option<String>;
 
     // Run sacct and return its output.  The arguments are passed on to sacct: `job_states` to `-s`,
     // `field_names` to `-o`, `from` to `-S` and `to` to `-E`.  This is only defined for state and
@@ -73,14 +72,14 @@ pub trait SystemAPI {
         to: &str,
     ) -> Result<String, String>;
 
-    fn cluster_kind(&self) -> Option<ClusterKind>;
+    fn compute_cluster_kind(&self) -> Option<ClusterKind>;
 
     // On a batch system, return a vector of partition name and standard-format compressed nodelist.
-    fn cluster_partitions(&self) -> Result<Vec<(String, String)>, String>;
+    fn compute_cluster_partitions(&self) -> Result<Vec<(String, String)>, String>;
 
     // On a batch system, return a vector of standard-format compressed nodelist and state name
     // list.  State names are currently batch system specific.
-    fn cluster_nodes(&self) -> Result<Vec<(String, String)>, String>;
+    fn compute_cluster_nodes(&self) -> Result<Vec<(String, String)>, String>;
 
     // `create_lock_file` creates it atomically if it does not exist, returning Ok if so; if it does
     // exist, returns Err(io::ErrorKind::AlreadyExists), otherwise some other Err.

@@ -47,7 +47,7 @@ fn do_show_cluster(
     token: String,
 ) -> Result<output::Object, String> {
     let mut partitions = output::Array::new();
-    for (name, nodelist) in system.cluster_partitions()? {
+    for (name, nodelist) in system.compute_cluster_partitions()? {
         let mut p = output::Object::new();
         // The default partition is marked but of no interest to us.
         let name = if let Some(suffix) = name.strip_suffix('*') {
@@ -64,7 +64,7 @@ fn do_show_cluster(
     }
 
     let mut nodes = output::Array::new();
-    for (nodelist, statelist) in system.cluster_nodes()? {
+    for (nodelist, statelist) in system.compute_cluster_nodes()? {
         let mut p = output::Object::new();
         p.push_a(CLUSTER_NODES_NAMES, nodelist::parse_and_render(&nodelist)?);
         let mut states = output::Array::new();
@@ -77,7 +77,7 @@ fn do_show_cluster(
 
     let mut envelope = output::newfmt_envelope(system, token, &[]);
     let (mut data, mut attrs) = output::newfmt_data(system, DATA_TAG_CLUSTER);
-    match system.cluster_kind() {
+    match system.compute_cluster_kind() {
         Some(systemapi::ClusterKind::Slurm) => {
             attrs.push_b(CLUSTER_ATTRIBUTES_SLURM, true);
         }

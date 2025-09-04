@@ -265,7 +265,7 @@ fn compute_nodeinfo(system: &dyn systemapi::SystemAPI) -> Result<NodeInfo, Strin
         cores,
     } = system.get_cpu_info()?;
     let model_name = cores[0].model_name.clone(); // expedient
-    let memory = system.get_memory()?;
+    let memory = system.get_memory_in_kib()?;
     let mem_kb = memory.total;
     let mem_gb = (mem_kb as f64 / (1024.0 * 1024.0)).round() as u64;
     let (mut cards, manufacturer) = match gpus.probe() {

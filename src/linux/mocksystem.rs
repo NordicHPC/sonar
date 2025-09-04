@@ -285,7 +285,7 @@ impl systemapi::SystemAPI for MockSystem {
         self.now
     }
 
-    fn get_boot_time(&self) -> u64 {
+    fn get_boot_time_in_secs_since_epoch(&self) -> u64 {
         self.boot_time
     }
 
@@ -293,37 +293,37 @@ impl systemapi::SystemAPI for MockSystem {
         procfs::get_cpu_info(&self.fs)
     }
 
-    fn get_memory(&self) -> Result<systemapi::Memory, String> {
-        procfs::get_memory(&self.fs)
+    fn get_memory_in_kib(&self) -> Result<systemapi::Memory, String> {
+        procfs::get_memory_in_kib(&self.fs)
     }
 
-    fn get_node_information(&self) -> Result<(u64, Vec<u64>), String> {
-        procfs::get_node_information(self, &self.fs)
+    fn compute_node_information(&self) -> Result<(u64, Vec<u64>), String> {
+        procfs::compute_node_information(self, &self.fs)
     }
 
-    fn get_loadavg(&self) -> Result<(f64, f64, f64, u64, u64), String> {
-        procfs::get_loadavg(&self.fs)
+    fn compute_loadavg(&self) -> Result<(f64, f64, f64, u64, u64), String> {
+        procfs::compute_loadavg(&self.fs)
     }
 
-    fn get_process_information(
+    fn compute_process_information(
         &self,
     ) -> Result<(HashMap<usize, systemapi::Process>, Vec<(usize, u64)>), String> {
-        procfs::get_process_information(self, &self.fs)
+        procfs::compute_process_information(self, &self.fs)
     }
 
-    fn get_cpu_utilization(
+    fn compute_cpu_utilization(
         &self,
         per_pid_cpu_ticks: &[(usize, u64)],
         wait_time_ms: usize,
     ) -> Result<Vec<(usize, f64)>, String> {
-        procfs::get_cpu_utilization(self, &self.fs, per_pid_cpu_ticks, wait_time_ms)
+        procfs::compute_cpu_utilization(self, &self.fs, per_pid_cpu_ticks, wait_time_ms)
     }
 
-    fn get_slurm_job_id(&self, _pid: usize) -> Option<usize> {
+    fn compute_slurm_job_id(&self, _pid: usize) -> Option<usize> {
         None
     }
 
-    fn user_by_uid(&self, uid: u32) -> Option<String> {
+    fn compute_user_by_uid(&self, uid: u32) -> Option<String> {
         self.users.get(&uid).map(|s| s.clone())
     }
 
@@ -345,15 +345,15 @@ impl systemapi::SystemAPI for MockSystem {
         Ok("".to_string()) // Not in use yet
     }
 
-    fn cluster_kind(&self) -> Option<systemapi::ClusterKind> {
+    fn compute_cluster_kind(&self) -> Option<systemapi::ClusterKind> {
         None
     }
 
-    fn cluster_partitions(&self) -> Result<Vec<(String, String)>, String> {
+    fn compute_cluster_partitions(&self) -> Result<Vec<(String, String)>, String> {
         Ok(vec![]) // Not in use yet
     }
 
-    fn cluster_nodes(&self) -> Result<Vec<(String, String)>, String> {
+    fn compute_cluster_nodes(&self) -> Result<Vec<(String, String)>, String> {
         Ok(vec![]) // Not in use yet
     }
 

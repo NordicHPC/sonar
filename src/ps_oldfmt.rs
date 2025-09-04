@@ -69,7 +69,10 @@ fn format_oldfmt_sample(proc_info: &ProcInfo, system: &dyn systemapi::SystemAPI)
         fields.push_u("job", proc_info.job_id as u64);
     }
     if !proc_info.is_slurm {
-        fields.push_u("epoch", system.get_boot_time() - json_tags::EPOCH_TIME_BASE);
+        fields.push_u(
+            "epoch",
+            system.get_boot_time_in_secs_since_epoch() - json_tags::EPOCH_TIME_BASE,
+        );
     }
     if proc_info.rolledup == 0 && proc_info.pid != 0 {
         // pid must be 0 for rolledup > 0 as there is no guarantee that there is any fixed

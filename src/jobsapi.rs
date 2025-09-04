@@ -54,7 +54,7 @@ impl JobManager for AnyJobManager {
         pid: usize,
         processes: &HashMap<usize, systemapi::Process>,
     ) -> (usize, bool) {
-        if let Some(id) = system.get_slurm_job_id(pid) {
+        if let Some(id) = system.compute_slurm_job_id(pid) {
             (id, id != 0)
         } else if let Some(p) = processes.get(&pid) {
             (p.pgrp, self.force_slurm)
