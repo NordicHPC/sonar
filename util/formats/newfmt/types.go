@@ -403,9 +403,9 @@ type SysinfoGpuCard struct {
 // always loaded and always available to all programs, or which can be loaded by any program but
 // may or may not be.
 //
-// NOTE: For GPU software: On NVIDIA systems, one can look in $CUDA_ROOT/version.json, where the
+// NOTE: For GPU software: On NVIDIA systems, one can look in `$CUDA_ROOT/version.json`, where the
 // key/name/version values are encoded directly.  On AMD systems, one can look in
-// $ROCm_ROOT/.info/.version*, where the file name encodes the component key and the file stores
+// `$ROCm_ROOT/.info/.version*`, where the file name encodes the component key and the file stores
 // the version number. Clearly other types of software could also be reported for the node (R,
 // Jupyter, etc), based on information from modules, say.
 type SysinfoSoftwareVersion struct {
