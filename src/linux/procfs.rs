@@ -26,7 +26,7 @@ pub trait ProcfsAPI {
 
 // Read the /proc/meminfo file from the fs and return the value for total installed memory.
 
-pub fn get_memory(fs: &dyn ProcfsAPI) -> Result<systemapi::Memory, String> {
+pub fn get_memory_in_kib(fs: &dyn ProcfsAPI) -> Result<systemapi::Memory, String> {
     let mut memory = systemapi::Memory {
         total: 0,
         available: 0,
@@ -179,7 +179,7 @@ pub fn get_cpu_info_aarch64(fs: &dyn ProcfsAPI) -> Result<systemapi::CpuInfo, St
 // epoch.  We need this to compute the process's real time, which we need to compute ps-compatible
 // cpu utilization.
 
-pub fn get_boot_time(fs: &dyn ProcfsAPI) -> Result<u64, String> {
+pub fn get_boot_time_in_secs_since_epoch(fs: &dyn ProcfsAPI) -> Result<u64, String> {
     let stat_s = fs.read_to_string("stat")?;
     for l in stat_s.split('\n') {
         if l.starts_with("btime ") {
@@ -196,7 +196,7 @@ pub fn get_boot_time(fs: &dyn ProcfsAPI) -> Result<u64, String> {
 // boot.  In addition there is an across-the-system line called simply `cpu` with the same
 // format.  These data are useful for analyzing core bindings.
 
-pub fn get_node_information(
+pub fn compute_node_information(
     system: &dyn systemapi::SystemAPI,
     fs: &dyn ProcfsAPI,
 ) -> Result<(u64, Vec<u64>), String> {
@@ -238,7 +238,7 @@ pub fn get_node_information(
     Ok((cpu_total_secs, per_cpu_secs))
 }
 
-pub fn get_loadavg(fs: &dyn ProcfsAPI) -> Result<(f64, f64, f64, u64, u64), String> {
+pub fn compute_loadavg(fs: &dyn ProcfsAPI) -> Result<(f64, f64, f64, u64, u64), String> {
     let s = fs.read_to_string("loadavg")?;
     let fields = s.split_ascii_whitespace().collect::<Vec<&str>>();
     if fields.len() != 5 {
@@ -274,18 +274,18 @@ pub fn get_thread_count(fs: &dyn ProcfsAPI, pid: usize) -> Result<usize, String>
 // we need, keyed by pid.  Pids uniquely tag the records.
 //
 // Also return a vector mapping pid to total cpu ticks for the process.  This will be used to
-// compute per-process CPU utilization in get_cpu_utilization(), below.
+// compute per-process CPU utilization in compute_cpu_utilization(), below.
 //
 // This returns Ok(data) on success, otherwise Err(msg).
 //
 // This function uniformly uses /proc, even though in some cases there are system calls that
 // provide the same information.
 
-pub fn get_process_information(
+pub fn compute_process_information(
     system: &dyn systemapi::SystemAPI,
     fs: &dyn ProcfsAPI,
 ) -> Result<(HashMap<usize, systemapi::Process>, Vec<(usize, u64)>), String> {
-    let memtotal_kib = system.get_memory()?.total;
+    let memtotal_kib = system.get_memory_in_kib()?.total;
 
     // We need this for a lot of things.  On x86 and x64 this is always 100 but in principle it
     // might be something else, so read the true value.
@@ -295,7 +295,7 @@ pub fn get_process_information(
         return Err("Could not get a sensible CLK_TCK".to_string());
     }
 
-    let boot_time = get_boot_time(fs)?;
+    let boot_time = get_boot_time_in_secs_since_epoch(fs)?;
 
     // Enumerate all pids, and collect the uids while we're here.
     //
@@ -599,11 +599,11 @@ pub fn get_process_information(
     Ok((result, per_pid_cpu_ticks))
 }
 
-// Given the per-process CPU time computed by get_process_information, and a time to wait, wait for
-// that time and then read the CPU time again.  The sampled process CPU utilization is the delta of
-// CPU time divided by the delta of time.
+// Given the per-process CPU time computed by compute_process_information, and a time to wait, wait
+// for that time and then read the CPU time again.  The sampled process CPU utilization is the delta
+// of CPU time divided by the delta of time.
 
-pub fn get_cpu_utilization(
+pub fn compute_cpu_utilization(
     system: &dyn systemapi::SystemAPI,
     fs: &dyn ProcfsAPI,
     per_pid_cpu_ticks: &[(usize, u64)],
@@ -739,7 +739,7 @@ impl UserTable {
     fn lookup(&mut self, system: &dyn systemapi::SystemAPI, uid: u32) -> String {
         if let Some(name) = self.ht.get(&uid) {
             name.clone()
-        } else if let Some(name) = system.user_by_uid(uid) {
+        } else if let Some(name) = system.compute_user_by_uid(uid) {
             self.ht.insert(uid, name.clone());
             name
         } else {

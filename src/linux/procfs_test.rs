@@ -77,12 +77,14 @@ pub fn procfs_parse_test() {
         .with_now(now)
         .freeze();
     let fs = system.get_procfs();
-    let memory = procfs::get_memory(fs).expect("Test: Must have data");
+    let memory = procfs::get_memory_in_kib(fs).expect("Test: Must have data");
     assert!(memory.total == 16093776);
     assert!(memory.available == 8162068);
-    let (total_secs, per_cpu_secs) = system.get_node_information().expect("Test: Must have data");
+    let (total_secs, per_cpu_secs) = system
+        .compute_node_information()
+        .expect("Test: Must have data");
     let (mut info, _) = system
-        .get_process_information()
+        .compute_process_information()
         .expect("Test: Must have data");
     assert!(info.len() == 1);
     let mut xs = info.drain();
@@ -116,7 +118,7 @@ pub fn procfs_parse_test() {
     assert!(per_cpu_secs[0] == (32528 + 189 + 19573 + 0 + 1149) / 100); // "cpu0 " line of "stat" data
     assert!(per_cpu_secs[7] == (27582 + 61 + 12558 + 0 + 426) / 100); // "cpu7 " line of "stat" data
 
-    let (l1, l5, l15, r, e) = procfs::get_loadavg(fs).unwrap();
+    let (l1, l5, l15, r, e) = procfs::compute_loadavg(fs).unwrap();
     assert!(load1 == l1);
     assert!(load5 == l5);
     assert!(load15 == l15);
@@ -133,7 +135,7 @@ pub fn procfs_parse_errors() {
     );
     let system = mocksystem::Builder::new().with_files(files).freeze();
     let fs = system.get_procfs();
-    assert!(procfs::get_loadavg(fs).is_err());
+    assert!(procfs::compute_loadavg(fs).is_err());
 }
 
 #[test]
@@ -185,7 +187,7 @@ pub fn procfs_dead_and_undead_test() {
         .with_threads(threads)
         .freeze();
     let (mut info, _) = system
-        .get_process_information()
+        .compute_process_information()
         .expect("Test: Must have data");
 
     // 4020 should be dropped - it's dead

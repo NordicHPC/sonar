@@ -300,13 +300,13 @@ fn collect_sample_data(
         return Ok(None);
     }
 
-    let (_cpu_total_secs, per_cpu_secs) = system.get_node_information()?;
-    let memory = system.get_memory()?;
-    let (load1, load5, load15, runnable_entities, existing_entities) = system.get_loadavg()?;
-    let (mut processes, per_pid_cpu_ticks) = system.get_process_information()?;
+    let (_cpu_total_secs, per_cpu_secs) = system.compute_node_information()?;
+    let memory = system.get_memory_in_kib()?;
+    let (load1, load5, load15, runnable_entities, existing_entities) = system.compute_loadavg()?;
+    let (mut processes, per_pid_cpu_ticks) = system.compute_process_information()?;
 
     if opts.cpu_util {
-        let utils = system.get_cpu_utilization(&per_pid_cpu_ticks, 100)?;
+        let utils = system.compute_cpu_utilization(&per_pid_cpu_ticks, 100)?;
         for (pid, cpu_util) in utils.iter() {
             processes.entry(*pid).and_modify(|e| {
                 e.cpu_util = *cpu_util;

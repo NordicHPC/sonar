@@ -42,7 +42,7 @@ use libc::uid_t;
 /// # libc functions used
 ///
 /// - [`getpwuid_r`](https://docs.rs/libc/*/libc/fn.getpwuid_r.html)
-pub fn get_user_by_uid(uid: uid_t) -> Option<OsString> {
+pub fn lookup_user_by_uid(uid: uid_t) -> Option<OsString> {
     let mut passwd = unsafe { mem::zeroed::<c_passwd>() };
     let mut buf = vec![0; 2048];
     let mut result = ptr::null_mut::<c_passwd>();

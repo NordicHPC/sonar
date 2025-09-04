@@ -145,7 +145,10 @@ fn format_newfmt_job(
     job.push_s(SAMPLE_JOB_USER, user.to_string());
     if !samples[ixs[0]].is_slurm {
         // Every sample in the job is either slurm or not, so it's enough to check the first.
-        job.push_u(SAMPLE_JOB_EPOCH, system.get_boot_time() - EPOCH_TIME_BASE);
+        job.push_u(
+            SAMPLE_JOB_EPOCH,
+            system.get_boot_time_in_secs_since_epoch() - EPOCH_TIME_BASE,
+        );
     }
     let mut procs = output::Array::new();
     for ix in ixs {
