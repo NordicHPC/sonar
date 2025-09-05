@@ -5,6 +5,8 @@
 
    Buffer sizes are a bit ad-hoc (and are partly inherited from the NVIDIA code).
 
+   Cards are identified by a device index i s.t. 0 <= i < device_count, ie, the range is dense.
+
    Functions uniformly return 0 for success (sometimes even when some data where not obtainable but
    the result makes sense) and -1 for failure.
 
@@ -35,7 +37,7 @@ struct amdml_card_info_t {
 };
 
 /* Clear the infobuf and fill it with available information. */
-int amdml_device_get_card_info(uint32_t device, struct amdml_card_info_t* infobuf);
+int amdml_device_get_card_info(uint32_t device_index, struct amdml_card_info_t* infobuf);
 
 struct amdml_card_state_t {
     float fan_speed_pct;        /* current speed, percent of max */
@@ -51,7 +53,7 @@ struct amdml_card_state_t {
 };
 
 /* Clear the infobuf and fill it with available information. */
-int amdml_device_get_card_state(uint32_t device, struct amdml_card_state_t* infobuf);
+int amdml_device_get_card_state(uint32_t device_index, struct amdml_card_state_t* infobuf);
 
 /* Probe the card's process tables and save the information in an internal data structure, returning
    the number of processes.  On success, the data structure is always allocated even if count = 0,
@@ -68,7 +70,7 @@ struct amdml_gpu_process_t {
 
 /* Get information for the index'th process from the internal buffers and store it into *infobuf.
    This will fail if the index is out of bounds. */
-int amdml_get_process(uint32_t index, struct amdml_gpu_process_t* infobuf);
+int amdml_get_process(uint32_t process_index, struct amdml_gpu_process_t* infobuf);
 
 /* Free any internal data structures. */
 void amdml_free_processes();

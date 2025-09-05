@@ -59,8 +59,17 @@ static xpum_result_t (*xpu_init)(void);
 static xpum_result_t (*xpu_shut_down)(void);
 static xpum_result_t (*xpu_get_device_list)(xpum_device_basic_info* devices, int* count);
 static xpum_result_t (*xpu_get_device_properties)(xpum_device_id_t device, xpum_device_properties_t* props);
+//static xpum_result_t (*xpu_get_health_config)(xpum_device_id_t device, xpum_health_config_type_t key, void* value);
+static xpum_result_t (*xpu_get_device_power_limits)(xpum_device_id_t device, int32_t tileId, xpum_power_limits_t* limits);
+static xpum_result_t (*xpu_get_stats)(xpum_device_id_t device, xpum_device_stats_t* dataList, uint32_t* count,
+                                      uint64_t* begin, uint64_t* end, uint64_t session_id);
 
 static int num_gpus = -1;
+
+#ifdef SONAR_XPU_GPU
+/* Canonical mapping from device index to device information */
+static xpum_device_basic_info *devs;
+#endif
 
 static void probe_gpus() {
     if (num_gpus != -1) {
@@ -68,6 +77,19 @@ static void probe_gpus() {
     }
     if (xpu_get_device_list(NULL, &num_gpus) != 0) {
         num_gpus = 0;
+    }
+
+    if (num_gpus > 0) {
+        devs = calloc(num_gpus, sizeof(xpum_device_basic_info));
+        if (devs == NULL) {
+            return;
+        }
+        int count = num_gpus;
+        if (xpu_get_device_list(devs, &count) != 0) {
+            free(devs);
+            devs = NULL;
+            return;
+        }
     }
 }
 
@@ -123,6 +145,9 @@ static int load_smi() {
     DLSYM(xpu_shut_down, "xpumShutdown");
     DLSYM(xpu_get_device_list, "xpumGetDeviceList");
     DLSYM(xpu_get_device_properties, "xpumGetDeviceProperties");
+//    DLSYM(xpu_get_health_config, "xpumGetHealthConfig");
+    DLSYM(xpu_get_device_power_limits, "xpumGetDevicePowerLimits");
+    DLSYM(xpu_get_stats, "xpumGetStats");
 
     /* You'd think that passing parameters would be better, but no. */
     setenv("XPUM_DISABLE_PERIODIC_METRIC_MONITOR", "1", 1);
@@ -144,7 +169,7 @@ static int load_smi() {
     }
 
     probe_gpus();
-    if (num_gpus == -1) {
+    if (num_gpus == -1 || (num_gpus > 0 && devs == NULL)) {
         printf("Could not probe GPUs\n");
         lib = NULL;
         return -1;
@@ -169,69 +194,154 @@ int xpu_device_get_count(uint32_t* count) {
 #endif /* SONAR_XPU_GPU */
 }
 
-#ifdef SONAR_XPU_GPU
-static xpum_device_basic_info *devs;
-#endif
-
-int xpu_device_get_card_info(uint32_t device, struct xpu_card_info_t* infobuf) {
+int xpu_device_get_card_info(uint32_t device_index, struct xpu_card_info_t* infobuf) {
 #ifdef SONAR_XPU_GPU
     load_smi();
     if (num_gpus == -1) {
         return -1;
     }
-    if (device >= (uint32_t)num_gpus) {
+    if (device_index >= (uint32_t)num_gpus) {
         return -1;
     }
 
-    if (devs == NULL) {
-        devs = calloc(num_gpus, sizeof(xpum_device_basic_info));
-        if (devs == NULL) {
-            return -1;
-        }
-        //printf("STARTING PROBE\n");
-        int count = num_gpus;
-        if (xpu_get_device_list(devs, &count) != 0) {
-            free(devs);
-            devs = NULL;
-            return -1;
-        }
-        //printf("ENDING PROBE");
-    }
-
-    // TODO: At least on the eX3 node, the uuid is just the bus address, which is not unique enough.
-    // TODO: This assumes that the device at offset `device` has that device ID, but this is not
-    // documented anywhere; it would be more meaningful to either sort the table above or to search
-    // it unsorted (it's going to be short, and even if sorted I guess it might need to be searched
-    // since there's no documentation saying that it's dense).
-    // TODO: Possibly instead of using get_device_list we could use get_device_properties, or the
-    // specific device property getters.
     memset(infobuf, 0, sizeof(*infobuf));
-#if 0
-    strtcpy(infobuf->bus_addr, devs[device].PCIBDFAddress, sizeof(infobuf->bus_addr));
-    strtcpy(infobuf->uuid, devs[device].uuid, sizeof(infobuf->uuid));
-    strtcpy(infobuf->model, devs[device].deviceName, sizeof(infobuf->model));
-#else
     xpum_device_properties_t props;
-    xpu_get_device_properties(device, &props);
+    xpu_get_device_properties(devs[device_index].deviceId, &props);
+    int firmware_name_index = -1;
+    int firmware_version_index = -1;
     for (int i=0 ; i < props.propertyLen ; i++ ) {
       switch (props.properties[i].name) {
-	  case XPUM_DEVICE_PROPERTY_DEVICE_NAME:
-	    strtcpy(infobuf->model, props.properties[i].value, sizeof(infobuf->model)-1);
-	    break;
-	  case XPUM_DEVICE_PROPERTY_UUID:
-	    strtcpy(infobuf->uuid, props.properties[i].value, sizeof(infobuf->uuid)-1);
-	    break;
-	  case XPUM_DEVICE_PROPERTY_PCI_BDF_ADDRESS:
-	    strtcpy(infobuf->bus_addr, props.properties[i].value, sizeof(infobuf->bus_addr)-1);
-	    break;
-          default:
-	    break;
-	}
+        /* The order here is as in the struct */
+        case XPUM_DEVICE_PROPERTY_PCI_BDF_ADDRESS:
+          strtcpy(infobuf->bus_addr, props.properties[i].value, sizeof(infobuf->bus_addr)-1);
+          break;
+        case XPUM_DEVICE_PROPERTY_DEVICE_NAME:
+          strtcpy(infobuf->model, props.properties[i].value, sizeof(infobuf->model)-1);
+          break;
+        case XPUM_DEVICE_PROPERTY_DRIVER_VERSION:
+          strtcpy(infobuf->driver, props.properties[i].value, sizeof(infobuf->driver)-1);
+          break;
+        case XPUM_DEVICE_PROPERTY_GFX_DATA_FIRMWARE_NAME:
+          firmware_name_index = i;
+          break;
+        case XPUM_DEVICE_PROPERTY_GFX_DATA_FIRMWARE_VERSION:
+          firmware_version_index = i;
+          break;
+        case XPUM_DEVICE_PROPERTY_UUID:
+          /* FIXME: At least on the eX3 node, the UUID is basically just the bus address, which is
+             not unique enough.  We could fall bak on XPUM_DEVICE_PROPERTY_SERIAL_NUMBER and/or
+             XPUM_DEVICE_PROPERTY_VENDOR_NAME but they too have non-unique / uninteresting values.
+             So we might use bus address + boot time, which will lead to a lot of different "cards"
+             over time but guarantees that there is no overlap in the identity, unlike now.  */
+          strtcpy(infobuf->uuid, props.properties[i].value, sizeof(infobuf->uuid)-1);
+          break;
+        case XPUM_DEVICE_PROPERTY_MEMORY_PHYSICAL_SIZE_BYTE:
+          infobuf->totalmem = (uint64_t)strtoull(props.properties[i].value, NULL, 10);
+          break;
+        case XPUM_DEVICE_PROPERTY_CORE_CLOCK_RATE_MHZ:
+          infobuf->max_ce_clock = (uint64_t)strtoull(props.properties[i].value, NULL, 10);
+          break;
+        default:
+          break;
+      }
+
+      /* The firmware info is basically not useful (not any of the other properties either, _AMC_
+       * and not _DATA_) on the devices I have access to.
+       */
+      if (firmware_name_index >= 0 && firmware_version_index >= 0) {
+          snprintf(infobuf->firmware,
+                   sizeof(infobuf->firmware),
+                   "%s @ %s",
+                   props.properties[firmware_name_index].value,
+                   props.properties[firmware_version_index].value);
+      } else if (firmware_name_index >= 0) {
+          strtcpy(infobuf->firmware, props.properties[firmware_name_index].value, sizeof(infobuf->firmware)-1);
+      } else if (firmware_version_index >= 0) {
+          strtcpy(infobuf->firmware, props.properties[firmware_version_index].value, sizeof(infobuf->firmware)-1);
+      }
+
+      {
+          xpum_power_limits_t limits;
+          xpu_get_device_power_limits(devs[device_index].deviceId, -1, &limits);
+          infobuf->max_power_limit = (unsigned)limits.sustained_limit.power / 1000;
+      }
     }
-#endif
 
     return 0;
 #else
     return -1;
 #endif /* SONAR_XPU_GPU */
 }
+
+int xpu_device_get_card_state(uint32_t device_index, struct xpu_card_state_t* infobuf) {
+#ifdef SONAR_XPU_GPU
+    load_smi();
+    if (num_gpus == -1) {
+        return -1;
+    }
+    if (device_index >= (uint32_t)num_gpus) {
+        return -1;
+    }
+
+    memset(infobuf, 0, sizeof(*infobuf));
+    uint32_t count;
+    uint64_t begin, end;
+    if (xpu_get_stats(devs[device_index].deviceId, NULL, &count, &begin, &end, 0) != 0) {
+        return -1;
+    }
+    xpum_device_stats_t *stats = calloc(count, sizeof(xpum_device_stats_t));
+    if (stats == NULL) {
+        return -1;
+    }
+    if (xpu_get_stats(devs[device_index].deviceId, stats, &count, &begin, &end, 0) != 0) {
+        free(stats);
+        return -1;
+    }
+
+    /* This is a fairly bizarre interface.  It's totally not obvious why there should ever be more
+       than one element in the outer array.  It may be a concession to xpumGetStatsEx() which can
+       take more than one device ID.
+
+       To make sense of this, we'll iterate over the outer array and take the first element that
+       matches our device ID.  This is probably overly cautious.
+    */
+    for (uint32_t c=0 ; c < count ; c++ ) {
+        if (stats[c].deviceId == devs[device_index].deviceId) {
+            xpum_device_stats_t *s = &stats[c];
+            for (int32_t i=0 ; i < s->count ; i++ ) {
+                xpum_device_stats_data_t *d = &s->dataList[i];
+                switch (d->metricsType) {
+                  case XPUM_STATS_GPU_UTILIZATION:
+                    infobuf->gpu_util = (float)((double)d->value / (double)d->scale);
+                    break;
+                  case XPUM_STATS_POWER:
+                    infobuf->power = (unsigned)(d->value / d->scale);
+                    break;
+                  case XPUM_STATS_GPU_FREQUENCY:
+                    infobuf->ce_clock = (unsigned)d->value;
+                    break;
+                  case XPUM_STATS_GPU_CORE_TEMPERATURE:
+                    /* Not available on the ex3 node I have */
+                    infobuf->temp = (unsigned)d->value;
+                    break;
+                  case XPUM_STATS_MEMORY_USED:
+                    infobuf->mem_used = d->value;
+                    break;
+                  case XPUM_STATS_MEMORY_UTILIZATION:
+                    infobuf->mem_util = (float)((double)d->value / (double)d->scale);
+                    break;
+                  default:
+                    break;
+                }
+            }
+            break;
+        }
+    }
+
+    free(stats);
+    return 0;
+#else
+    return -1;
+#endif /* SONAR_XPU_GPU */
+}
+

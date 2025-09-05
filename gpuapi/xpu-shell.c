@@ -63,47 +63,31 @@ int main(int argc, char** argv) {
               printf("\nDEVICE %u\n", dev);
               printf("  bus %s\n", info.bus_addr);
               printf("  model %s\n", info.model);
-#if 0
-              printf("  arch %s\n", info.architecture);
               printf("  driver %s\n", info.driver);
               printf("  firmware %s\n", info.firmware);
-#endif
               printf("  uuid %s\n", info.uuid);
-#if 0
               printf("  memory %llu\n", (unsigned long long)info.totalmem);
-              printf("  plim %u\n", info.power_limit);
-              printf("  min_plim %u\n", info.min_power_limit);
-              printf("  max_plim %u\n", info.max_power_limit);
               printf("  max_ce_clk %u\n", info.max_ce_clock);
-              printf("  max_mem_clk %u\n", info.max_mem_clock);
-#endif
+              printf("  max_plim %u\n", info.max_power_limit);
           }
           break;
       }
       case STATE: {
-#if 0
-          struct nvml_card_state info;
+          struct xpu_card_state_t info;
           for ( uint32_t dev = 0 ; dev < count ; dev++ ) {
               memset(&info, 0, sizeof(info));
-              int r = nvml_device_get_card_state(dev, &info);
+              int r = xpu_device_get_card_state(dev, &info);
               if (r == -1) {
                   panic("Failed to get card state for %u", dev);
               }
               printf("\nDEVICE %u\n", dev);
-              printf("  fan%% %u\n", info.fan_speed);
-              printf("  mode %d\n", info.compute_mode);
-              printf("  state %d\n", info.perf_state);
-              printf("  reserved %llu\n", (unsigned long long)info.mem_reserved);
               printf("  used %llu\n", (unsigned long long)info.mem_used);
               printf("  gpu%% %g\n", info.gpu_util);
               printf("  mem%% %g\n", info.mem_util);
               printf("  temp %u\n", info.temp);
               printf("  power %u\n", info.power);
-              printf("  plim %u\n", info.power_limit);
               printf("  ce_clk %u\n", info.ce_clock);
-              printf("  mem_clk %u\n", info.mem_clock);
           }
-#endif
           break;
       }
       case PROC: {
