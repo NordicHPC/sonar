@@ -25,45 +25,15 @@
 /* Note that these variably take size_t and uint32_t for the buffer length parameter, do not copy
    prototypes indiscriminately.
 */
-#if 0
-static rsmi_status_t (*xrsmi_compute_process_info_by_pid_get)(uint32_t, rsmi_process_info_t*);
-static rsmi_status_t (*xrsmi_compute_process_info_get)(rsmi_process_info_t*, uint32_t*);
-static rsmi_status_t (*xrsmi_compute_process_gpus_get)(uint32_t, uint32_t*, uint32_t*);
-static rsmi_status_t (*xrsmi_dev_busy_percent_get)(uint32_t, uint32_t*);
-static rsmi_status_t (*xrsmi_dev_current_socket_power_get)(uint32_t, uint64_t*);
-static rsmi_status_t (*xrsmi_dev_fan_speed_get)(uint32_t, uint32_t, int64_t*);
-static rsmi_status_t (*xrsmi_dev_firmware_version_get)(uint32_t, rsmi_fw_block_t, uint64_t*);
-static rsmi_status_t (*xrsmi_dev_gpu_clk_freq_get)(uint32_t, rsmi_clk_type_t, rsmi_frequencies_t*);
-static rsmi_status_t (*xrsmi_dev_guid_get)(uint32_t, uint64_t*);
-static rsmi_status_t (*xrsmi_dev_memory_busy_percent_get)(uint32_t, uint32_t*);
-static rsmi_status_t (*xrsmi_dev_memory_total_get)(uint32_t, rsmi_memory_type_t, uint64_t*);
-static rsmi_status_t (*xrsmi_dev_memory_usage_get)(uint32_t, rsmi_memory_type_t, uint64_t*);
-static rsmi_status_t (*xrsmi_dev_name_get)(uint32_t, char*, size_t);
-static rsmi_status_t (*xrsmi_dev_pci_id_get)(uint32_t, uint64_t*);
-static rsmi_status_t (*xrsmi_dev_perf_level_get)(uint32_t, rsmi_dev_perf_level_t*);
-static rsmi_status_t (*xrsmi_dev_power_cap_get)(uint32_t, uint32_t, uint64_t*);
-static rsmi_status_t (*xrsmi_dev_power_cap_range_get)(uint32_t, uint32_t, uint64_t*, uint64_t*);
-static rsmi_status_t (*xrsmi_dev_serial_number_get)(uint32_t, char*, uint32_t);
-static rsmi_status_t (*xrsmi_dev_temp_metric_get)(uint32_t, uint32_t, rsmi_temperature_metric_t, int64_t*);
-static rsmi_status_t (*xrsmi_dev_unique_id_get)(uint32_t, uint64_t*);
-static rsmi_status_t (*xrsmi_init)(uint64_t flags);
-static rsmi_status_t (*xrsmi_num_monitor_devices)(uint32_t*);
-static rsmi_status_t (*xrsmi_shut_down)(void);
-static rsmi_status_t (*xrsmi_version_str_get)(rsmi_sw_component_t, char*, uint32_t);
-static rsmi_status_t (*xrsmi_utilization_count_get)(uint32_t,
-                                                    rsmi_utilization_counter_t*,
-                                                    uint32_t,
-                                                    uint64_t*);
-#endif
 static xpum_result_t (*xpu_init)(void);
 static xpum_result_t (*xpu_shut_down)(void);
 static xpum_result_t (*xpu_get_device_list)(xpum_device_basic_info* devices, int* count);
 static xpum_result_t (*xpu_get_device_properties)(xpum_device_id_t device, xpum_device_properties_t* props);
-//static xpum_result_t (*xpu_get_health_config)(xpum_device_id_t device, xpum_health_config_type_t key, void* value);
-static xpum_result_t (*xpu_get_device_power_limits)(xpum_device_id_t device, int32_t tileId, xpum_power_limits_t* limits);
-static xpum_result_t (*xpu_get_stats)(xpum_device_id_t device, xpum_device_stats_t* dataList, uint32_t* count,
+static xpum_result_t (*xpu_get_device_power_limits)(xpum_device_id_t device, int32_t tile_id, xpum_power_limits_t* limits);
+static xpum_result_t (*xpu_get_stats)(xpum_device_id_t device, xpum_device_stats_t* data_list, uint32_t* count,
                                       uint64_t* begin, uint64_t* end, uint64_t session_id);
-
+static xpum_result_t (*xpu_get_device_utilization_by_process)(xpum_device_id_t device, uint32_t util_interval,
+                                                              xpum_device_util_by_process_t* data_array, uint32_t *count);
 static int num_gpus = -1;
 
 #ifdef SONAR_XPU_GPU
@@ -114,40 +84,13 @@ static int load_smi() {
         return -1;                              \
     }
 
-#if 0
-    DLSYM(xrsmi_compute_process_info_by_pid_get, "rsmi_compute_process_info_by_pid_get");
-    DLSYM(xrsmi_compute_process_info_get, "rsmi_compute_process_info_get");
-    DLSYM(xrsmi_compute_process_gpus_get, "rsmi_compute_process_gpus_get");
-    DLSYM(xrsmi_dev_busy_percent_get, "rsmi_dev_busy_percent_get");
-    DLSYM(xrsmi_dev_current_socket_power_get, "rsmi_dev_current_socket_power_get");
-    DLSYM(xrsmi_dev_fan_speed_get, "rsmi_dev_fan_speed_get");
-    DLSYM(xrsmi_dev_firmware_version_get, "rsmi_dev_firmware_version_get");
-    DLSYM(xrsmi_dev_gpu_clk_freq_get, "rsmi_dev_gpu_clk_freq_get");
-    DLSYM(xrsmi_dev_guid_get, "rsmi_dev_guid_get");
-    DLSYM(xrsmi_dev_memory_busy_percent_get, "rsmi_dev_memory_busy_percent_get");
-    DLSYM(xrsmi_dev_memory_total_get, "rsmi_dev_memory_total_get");
-    DLSYM(xrsmi_dev_memory_usage_get, "rsmi_dev_memory_usage_get");
-    DLSYM(xrsmi_dev_name_get, "rsmi_dev_name_get");
-    DLSYM(xrsmi_dev_pci_id_get, "rsmi_dev_pci_id_get");
-    DLSYM(xrsmi_dev_perf_level_get, "rsmi_dev_perf_level_get");
-    DLSYM(xrsmi_dev_power_cap_get, "rsmi_dev_power_cap_get");
-    DLSYM(xrsmi_dev_power_cap_range_get, "rsmi_dev_power_cap_range_get");
-    DLSYM(xrsmi_dev_serial_number_get, "rsmi_dev_serial_number_get");
-    DLSYM(xrsmi_dev_temp_metric_get, "rsmi_dev_temp_metric_get");
-    DLSYM(xrsmi_dev_unique_id_get, "rsmi_dev_unique_id_get");
-    DLSYM(xrsmi_init, "rsmi_init");
-    DLSYM(xrsmi_num_monitor_devices, "rsmi_num_monitor_devices");
-    DLSYM(xrsmi_shut_down, "rsmi_shut_down");
-    DLSYM(xrsmi_utilization_count_get, "rsmi_utilization_count_get");
-    DLSYM(xrsmi_version_str_get, "rsmi_version_str_get");
-#endif
     DLSYM(xpu_init, "xpumInit");
     DLSYM(xpu_shut_down, "xpumShutdown");
     DLSYM(xpu_get_device_list, "xpumGetDeviceList");
     DLSYM(xpu_get_device_properties, "xpumGetDeviceProperties");
-//    DLSYM(xpu_get_health_config, "xpumGetHealthConfig");
     DLSYM(xpu_get_device_power_limits, "xpumGetDevicePowerLimits");
     DLSYM(xpu_get_stats, "xpumGetStats");
+    DLSYM(xpu_get_device_utilization_by_process, "xpumGetDeviceUtilizationByProcess");
 
     /* You'd think that passing parameters would be better, but no. */
     setenv("XPUM_DISABLE_PERIODIC_METRIC_MONITOR", "1", 1);
@@ -344,4 +287,107 @@ int xpu_device_get_card_state(uint32_t device_index, struct xpu_card_state_t* in
     return -1;
 #endif /* SONAR_XPU_GPU */
 }
+
+#ifdef SONAR_XPU_GPU
+static struct xpu_gpu_process_t* infos;  /* NULL for no info yet */
+static unsigned info_count = 0;
+#endif
+
+int xpu_device_probe_processes(uint32_t device_index, uint32_t* count) {
+#ifdef SONAR_XPU_GPU
+    if (infos != NULL) {
+        return -1;
+    }
+    load_smi();
+    if (num_gpus == -1) {
+        return -1;
+    }
+    if (device_index >= (uint32_t)num_gpus) {
+        return -1;
+    }
+
+    xpum_device_properties_t props;
+    if (xpu_get_device_properties(devs[device_index].deviceId, &props) != 0) {
+        return -1;
+    }
+    uint64_t totalMem = 0;
+    for (int i=0 ; i < props.propertyLen ; i++) {
+        if (props.properties[i].name == XPUM_DEVICE_PROPERTY_MEMORY_PHYSICAL_SIZE_BYTE) {
+            totalMem = (uint64_t)strtoull(props.properties[i].value, NULL, 10);
+            break;
+        }
+    }
+    if (totalMem == 0) {
+        return -1;
+    }
+
+    /* The API is kafkaesque but I guess it's unavoidable */
+    uint32_t procCount = 0;
+    uint32_t try = 5;
+    xpum_device_util_by_process_t* stats;
+again:
+    procCount = try;
+    stats = calloc(procCount, sizeof(xpum_device_util_by_process_t));
+    if (stats == NULL) {
+        return -1;
+    }
+    xpum_result_t r = xpu_get_device_utilization_by_process(devs[device_index].deviceId, 100*1000, stats, &procCount);
+    switch (r) {
+      case XPUM_OK:
+        break;
+      case XPUM_BUFFER_TOO_SMALL:
+        try *= 2;
+        free(stats);
+        goto again;
+      default:
+        return -1;
+    }
+
+    infos = calloc(procCount, sizeof(struct xpu_gpu_process_t));
+    if (infos == NULL) {
+        free(stats);
+        return -1;
+    }
+    info_count = procCount;
+
+    for (uint32_t p = 0 ; p < procCount ; p++ ) {
+        infos[p].pid = stats[p].processId;
+        infos[p].gpu_util = stats[p].computeEngineUtil;
+        infos[p].mem_util = stats[p].memSize * 100 / totalMem;
+        infos[p].mem_size = stats[p].memSize / 1024;
+    }
+
+    *count = info_count;
+    free(stats);
+    return 0;
+#else
+    return -1;
+#endif
+}
+
+int xpu_get_process(uint32_t process_index, struct xpu_gpu_process_t* infobuf) {
+#ifdef SONAR_XPU_GPU
+    if (infos == NULL) {
+        return -1;
+    }
+    if (process_index >= info_count) {
+        return -1;
+    }
+    memcpy(infobuf, infos+process_index, sizeof(struct xpu_gpu_process_t));
+    return 0;
+#else
+    return -1;
+#endif
+}
+
+void xpu_free_processes() {
+#ifdef SONAR_XPU_GPU
+    if (infos != NULL) {
+        free(infos);
+        infos = NULL;
+    }
+#endif
+}
+
+
 

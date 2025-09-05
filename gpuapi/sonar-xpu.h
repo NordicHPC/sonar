@@ -45,4 +45,23 @@ struct xpu_card_state_t {
 /* Clear the infobuf and fill it with available information. */
 int xpu_device_get_card_state(uint32_t device_index, struct xpu_card_state_t* infobuf);
 
+/* Probe the card's process tables and save the information in an internal data structure, returning
+   the number of processes.  On success, the data structure is always allocated even if count = 0,
+   and the data structure must be freed with nvml_free_processes(). */
+int xpu_device_probe_processes(uint32_t device_index, uint32_t* count);
+
+struct xpu_gpu_process_t {
+    uint32_t pid;               /* Linux process ID */
+    uint32_t mem_util;          /* percent */
+    uint32_t gpu_util;          /* percent */
+    uint64_t mem_size;          /* KB */
+};
+
+/* Get information for the given process from the internal buffers and store it into *infobuf.  This
+   will fail if the index is out of bounds. */
+int xpu_get_process(uint32_t process_index, struct xpu_gpu_process_t* infobuf);
+
+/* Free any internal data structures. */
+void xpu_free_processes();
+
 #endif /* sonar_xpu_h_included */

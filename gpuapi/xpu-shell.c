@@ -91,18 +91,17 @@ int main(int argc, char** argv) {
           break;
       }
       case PROC: {
-#if 0
           for ( uint32_t dev = 0 ; dev < count ; dev++ ) {
-              struct nvml_gpu_process proc;
+              struct xpu_gpu_process_t proc;
               uint32_t pcount;
-              int r = nvml_device_probe_processes(dev, &pcount);
+              int r = xpu_device_probe_processes(dev, &pcount);
               if (r == -1) {
                   panic("Failed to get processes for %u\n", dev);
               }
               printf("\nDEVICE %u\n", dev);
               for ( uint32_t p = 0 ; p < pcount ; p++ ) {
                   memset(&proc, 0, sizeof(proc));
-                  r = nvml_get_process(p, &proc);
+                  r = xpu_get_process(p, &proc);
                   if (r == -1) {
                       panic("Failed to get process for %u: %u\n", dev, p);
                   }
@@ -112,9 +111,8 @@ int main(int argc, char** argv) {
                   printf("  gpu %u\n", proc.gpu_util);
                   printf("  sz %llu\n", (unsigned long long)proc.mem_size);
               }
-              nvml_free_processes();
+              xpu_free_processes();
           }
-#endif
           break;
       }
     }
