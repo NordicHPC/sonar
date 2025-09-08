@@ -22,6 +22,7 @@
 #include <sys/utsname.h>
 
 #include "sonar-nvidia.h"
+#include "strtcpy.h"
 
 #ifdef SONAR_NVIDIA_GPU
 
@@ -423,8 +424,7 @@ int nvml_device_get_card_info(uint32_t device, struct nvml_card_info* infobuf) {
 
     nvmlPciInfo_t pci;
     if (deviceGetPciInfo(dev, &pci) == 0) {
-        strncpy(infobuf->bus_addr, pci.busId, sizeof(infobuf->bus_addr));
-        infobuf->bus_addr[sizeof(infobuf->bus_addr)-1] = 0;
+        strtcpy(infobuf->bus_addr, pci.busId, sizeof(infobuf->bus_addr));
     }
 
     return 0;

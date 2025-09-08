@@ -1,6 +1,6 @@
-# This Makefile is used to build libsonar-nvidia.a and libsonar-amd.a, archives containing code
-# callable from Rust that will be statically linked into sonar and will support dynamically loaded
-# GPU management libraries.
+# This Makefile is used to build {x86_64,aarch64}/libsonar-*.a, gpu-specific archives containing
+# code callable from Rust that will be statically linked into sonar and will support dynamically
+# loaded GPU management libraries.
 #
 # The .a files must be built on systems that have the SDKs for the various GPUs available; in
 # practice, libsonar-amd.a is built on a system with an AMD GPU and toolchain, and libsonar-nvidia.a
@@ -11,8 +11,7 @@
 # the .a files are ultimately stored in architecture-specific subdirectories of this directory.
 #
 # To support systems where we have no capability to compile with appropriate GPU SDKs, this file can
-# also be used to build libsonar-nvidia-stub.a and libsonar-amd-stub.a, which have the same
-# interface but no GPU functionality.
+# also be used to build libsonar-*-stub.a, which have the same interface but no GPU functionality.
 #
 # On a particular build node with a particular GPU SDK (or no such SDK), we choose which library to
 # build and then build it.  The resulting .a file is then manually moved to the appropriate
@@ -60,7 +59,7 @@ realclean:
 libsonar-nvidia.a: sonar-nvidia.o Makefile
 	ar rs $@ $<
 
-sonar-nvidia.o: sonar-nvidia.c sonar-nvidia.h Makefile
+sonar-nvidia.o: sonar-nvidia.c sonar-nvidia.h strtcpy.h Makefile
 	$(CC) -c $(CFLAGS) -DSONAR_NVIDIA_GPU -o $@ $<
 
 libsonar-nvidia-stub.a: sonar-nvidia-stub.o Makefile
@@ -87,8 +86,8 @@ sonar-amd-stub.o: sonar-amd.c sonar-amd.h Makefile
 # Remember that it may be necessary to `module load` things first, see the build-*.bash scripts in
 # this directory.
 
-nvidia-shell: nvidia-shell.c sonar-nvidia.c sonar-nvidia.h
+nvidia-shell: nvidia-shell.c sonar-nvidia.c sonar-nvidia.h Makefile
 	$(CC) $(CFLAGS) -DSONAR_NVIDIA_GPU -DLOGGING -o nvidia-shell nvidia-shell.c sonar-nvidia.c -ldl
 
-amd-shell: amd-shell.c sonar-amd.c sonar-amd.h
+amd-shell: amd-shell.c sonar-amd.c sonar-amd.h Makefile
 	$(CC) $(CFLAGS) -DSONAR_AMD_GPU -DLOGGING -I/opt/rocm/include -o amd-shell amd-shell.c sonar-amd.c -ldl
