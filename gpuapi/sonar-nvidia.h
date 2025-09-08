@@ -5,6 +5,8 @@
 
    Most buffer sizes are mandated by the underlying NVML API; some are simply conservative.
 
+   Cards are identified by a device index i s.t. 0 <= i < device_count, ie, the range is dense.
+
    Functions uniformly return 0 for success (sometimes even when some data where not obtainable but
    the result makes sense) and -1 for failure.
 
@@ -36,7 +38,7 @@ struct nvml_card_info {
 };
 
 /* Clear the infobuf and fill it with available information. */
-int nvml_device_get_card_info(uint32_t device, struct nvml_card_info* infobuf);
+int nvml_device_get_card_info(uint32_t device_index, struct nvml_card_info* infobuf);
 
 #define COMP_MODE_UNKNOWN -1
 #define COMP_MODE_DEFAULT 0
@@ -62,12 +64,12 @@ struct nvml_card_state {
 };
 
 /* Clear the infobuf and fill it with available information. */
-int nvml_device_get_card_state(uint32_t device, struct nvml_card_state* infobuf);
+int nvml_device_get_card_state(uint32_t device_index, struct nvml_card_state* infobuf);
 
 /* Probe the card's process tables and save the information in an internal data structure, returning
    the number of processes.  On success, the data structure is always allocated even if count = 0,
    and the data structure must be freed with nvml_free_processes(). */
-int nvml_device_probe_processes(uint32_t device, uint32_t* count);
+int nvml_device_probe_processes(uint32_t device_index, uint32_t* count);
 
 struct nvml_gpu_process {
     uint32_t pid;               /* Linux process ID */
@@ -78,7 +80,7 @@ struct nvml_gpu_process {
 
 /* Get information for the given process from the internal buffers and store it into *infobuf.  This
    will fail if the index is out of bounds. */
-int nvml_get_process(uint32_t index, struct nvml_gpu_process* infobuf);
+int nvml_get_process(uint32_t process_index, struct nvml_gpu_process* infobuf);
 
 /* Free any internal data structures. */
 void nvml_free_processes();
