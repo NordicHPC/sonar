@@ -126,7 +126,7 @@ pub fn get_card_configuration() -> Option<Vec<gpu::Card>> {
             }
             result.push(gpu::Card {
                 bus_addr: cstrdup(&infobuf.bus_addr),
-		// FIXME: UUID
+                // FIXME: UUID
                 device: gpu::Name {
                     index: dev,
                     uuid: cstrdup(&infobuf.uuid),

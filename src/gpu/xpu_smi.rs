@@ -38,9 +38,9 @@ impl Default for XpuCardInfo {
             driver: [0; 256],
             firmware: [0; 256],
             uuid: [0; 256],
-	    totalmem: 0,
-	    max_ce_clock: 0,
-	    max_power_limit: 0,
+            totalmem: 0,
+            max_ce_clock: 0,
+            max_power_limit: 0,
         }
     }
 }
@@ -77,7 +77,10 @@ pub struct XpuGpuProcess {
 
 #[link(name = "sonar-xpu", kind = "static")]
 extern "C" {
-    pub fn xpu_device_probe_processes(device: cty::uint32_t, count: *mut cty::uint32_t) -> cty::c_int;
+    pub fn xpu_device_probe_processes(
+        device: cty::uint32_t,
+        count: *mut cty::uint32_t,
+    ) -> cty::c_int;
     pub fn xpu_get_process(process_index: cty::uint32_t, buf: *mut XpuGpuProcess) -> cty::c_int;
     pub fn xpu_free_processes();
 }
@@ -130,7 +133,7 @@ pub fn get_card_utilization() -> Option<Vec<gpu::CardState>> {
                 temp_c: infobuf.temp,
                 power_watt: (infobuf.power / 1000),
                 ce_clock_mhz: infobuf.ce_clock,
-		..Default::default()
+                ..Default::default()
             })
         } else {
             result.push(gpu::CardState {
