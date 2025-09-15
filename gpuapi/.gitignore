@@ -1,4 +1,5 @@
 nvidia-shell
 amd-shell
 xpu-shell
+habana-shell
 *.o

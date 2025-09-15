@@ -2,6 +2,8 @@ use crate::gpu::{Gpu, GpuAPI};
 
 #[cfg(feature = "amd")]
 use crate::gpu::amd;
+#[cfg(feature = "habana")]
+use crate::gpu::habana;
 #[cfg(feature = "nvidia")]
 use crate::gpu::nvidia;
 #[cfg(feature = "xpu")]
@@ -28,6 +30,10 @@ impl GpuAPI for RealGpu {
         #[cfg(feature = "xpu")]
         if let Some(xpu) = xpu::probe() {
             return Some(xpu);
+        }
+        #[cfg(feature = "habana")]
+        if let Some(habana) = habana::probe() {
+            return Some(habana);
         }
         None
     }
