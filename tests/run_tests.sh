@@ -41,6 +41,7 @@ for test in amd-gpu \
                 slurm-syntax \
                 sysinfo-syntax \
                 user \
+                xpu-gpu \
             ; do
     echo $test
     ./$test.sh

@@ -3,9 +3,10 @@
 # loaded GPU management libraries.
 #
 # The .a files must be built on systems that have the SDKs for the various GPUs available; in
-# practice, libsonar-amd.a is built on a system with an AMD GPU and toolchain, and libsonar-nvidia.a
-# is built on a system with an NVIDIA GPU and toolchain.  For this reason the .a files are checked
-# into the git repo, they cannot easily be rebuilt on CI and on random developer systems.
+# practice, libsonar-amd.a is built on a system with an AMD GPU and toolchain, libsonar-nvidia.a is
+# built on a system with an NVIDIA GPU and toolchain, and libsonar-xpu.a is built on a system with
+# an XPU and XPU toolchain.  For this reason the .a files are checked into the git repo, they cannot
+# easily be rebuilt on CI and on random developer systems.
 #
 # And of course, for each CPU architecture the build host must be of that architecture as well, and
 # the .a files are ultimately stored in architecture-specific subdirectories of this directory.
@@ -36,7 +37,8 @@
 #
 #   (build)   module load GCC/11.3.0
 
-CFLAGS=-g -O2 -Wall -fPIC
+# -Wformat-truncation is arguably a GCC misfeature.
+CFLAGS=-g -O2 -Wall -Wno-format-truncation -fPIC
 
 .PHONY: default clean realclean
 
@@ -46,11 +48,13 @@ default:
 	@echo " libsonar-nvidia-stub.a"
 	@echo " libsonar-amd.a          the ROCM/hip SDK must be installed or loaded"
 	@echo " libsonar-amd-stub.a"
+	@echo " libsonar-xpu.a          the XPU SDK must be installed or loaded"
+	@echo " libsonar-xpu-stub.a"
 	@echo ""
 	@echo "See comments in Makefile for more information."
 
 clean:
-	rm -f *.o *.a *~ nvidia-shell amd-shell
+	rm -f *.o *.a *~ nvidia-shell amd-shell xpu-shell
 
 realclean:
 	$(MAKE) clean
@@ -81,6 +85,19 @@ libsonar-amd-stub.a: sonar-amd-stub.o Makefile
 sonar-amd-stub.o: sonar-amd.c sonar-amd.h Makefile
 	$(CC) -c $(CFLAGS) -o $@ $<
 
+
+libsonar-xpu.a: sonar-xpu.o Makefile
+	ar rs $@ $<
+
+sonar-xpu.o: sonar-xpu.c sonar-xpu.h strtcpy.h Makefile
+	$(CC) -c $(CFLAGS) -DSONAR_XPU_GPU -o $@ $<
+
+libsonar-xpu-stub.a: sonar-xpu-stub.o Makefile
+	ar rs $@ $<
+
+sonar-xpu-stub.o: sonar-xpu.c sonar-xpu.h Makefile
+	$(CC) -c $(CFLAGS) -o $@ $<
+
 # Various test code.
 #
 # Remember that it may be necessary to `module load` things first, see the build-*.bash scripts in
@@ -91,3 +108,6 @@ nvidia-shell: nvidia-shell.c sonar-nvidia.c sonar-nvidia.h Makefile
 
 amd-shell: amd-shell.c sonar-amd.c sonar-amd.h Makefile
 	$(CC) $(CFLAGS) -DSONAR_AMD_GPU -DLOGGING -I/opt/rocm/include -o amd-shell amd-shell.c sonar-amd.c -ldl
+
+xpu-shell: xpu-shell.c sonar-xpu.c sonar-xpu.h Makefile
+	$(CC) $(CFLAGS) -DSONAR_XPU_GPU -DLOGGING -o xpu-shell xpu-shell.c sonar-xpu.c -ldl
