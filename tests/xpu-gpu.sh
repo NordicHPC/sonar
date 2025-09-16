@@ -7,18 +7,16 @@
 # Requirement: the `jq` utility.
 
 set -e
-if [[ ! -e /sys/module/i915 ]]; then
+if [[ ! -e /sys/module/i915 || $(command -v xpu-smi) == "" ]]; then
     echo " No device"
     exit 0
 fi
 
-# xpu is enabled by default
-( cd .. ; cargo build )
-
 # Test that sysinfo finds the cards.  This is also sufficient to test that the GPU SMI library has
 # been found and is loaded.
 
-output=$(../target/debug/sonar sysinfo)
+# xpu is enabled by default
+output=$(cargo run -- sysinfo)
 numcards=$(jq .gpu_cards <<< $output)
 if [[ ! ( $numcards =~ ^[0-9]+$ ) ]]; then
     echo "Bad output from jq: <$numcards>"
@@ -35,7 +33,7 @@ fi
 #
 # TODO: This will be cleaner once we have json output.
 
-output=$(../target/debug/sonar ps --load --exclude-system-jobs)
+output=$(cargo run -- ps --load --exclude-system-jobs)
 infos=$(grep -E 'gpuinfo=.*fan%=.*tempc=.*' <<< $output)
 lines=$(wc -l <<< $infos)
 if (( $lines != 1 )); then

@@ -3,8 +3,7 @@
 # Test that the --min-cpu-time switch works.
 
 set -e
-( cd .. ; cargo build )
-numbad=$(../target/debug/sonar ps --min-cpu-time 5 | \
+numbad=$(cargo run -- ps --min-cpu-time 5 | \
              awk '
 {
     s=substr($0, index($0, ",cputime_sec=")+13)

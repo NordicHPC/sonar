@@ -3,8 +3,7 @@
 # Test that the --exclude-commands switch works.
 
 set -e
-( cd .. ; cargo build )
-numbad=$(../target/debug/sonar ps --exclude-commands bash,sh,zsh,csh,ksh,tcsh,kworker | \
+numbad=$(cargo run -- ps --exclude-commands bash,sh,zsh,csh,ksh,tcsh,kworker | \
     awk "
 /,cmd=kworker/ { print }
 /,cmd=(ba|z|c|k|tc|)sh/ { print }

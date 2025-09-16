@@ -4,7 +4,6 @@
 # Requirement: the `jq` utility.
 
 set -e
-( cd .. ; cargo build )
 if [[ $(command -v jq) == "" ]]; then
     echo "Install jq first"
     exit 1
@@ -17,7 +16,7 @@ if [[ $(command -v sacct) != "" ]]; then
     exit 0
 fi
 
-output=$(../target/debug/sonar slurm --cluster x --json)
+output=$(cargo run -- slurm --cluster x --json)
 error=$(jq .errors <<< $output)
 if [[ ! ( $error =~ "sacct" ) ]]; then
     echo $output
@@ -25,7 +24,7 @@ if [[ ! ( $error =~ "sacct" ) ]]; then
     exit 1
 fi
 
-output=$(../target/debug/sonar slurm --csv)
+output=$(cargo run -- slurm --csv)
 if [[ ! ( $output =~ "error=sacct" ) ]]; then
     echo "Expected specific error string, got '$output'"
     exit 1

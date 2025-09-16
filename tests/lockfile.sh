@@ -7,14 +7,13 @@ set -e
 logfile=lockfile.output.txt
 
 echo " This takes about 15s"
-( cd .. ; cargo build )
 rm -f $logfile sonar-lock.*
-SONARTEST_WAIT_LOCKFILE=1 ../target/debug/sonar ps --lockdir . > /dev/null &
+SONARTEST_WAIT_LOCKFILE=1 cargo run -- ps --lockdir . > /dev/null &
 bgpid=$!
 # Wait for the first process to get going
 sleep 3
-../target/debug/sonar ps --lockdir . 2> $logfile
-if [[ $(cat $logfile) != 'Info: Lockfile present, exiting' ]]; then
+cargo run -- ps --lockdir . 2> $logfile
+if [[ $(tail -n 1 $logfile) != 'Info: Lockfile present, exiting' ]]; then
     echo "Unexpected output!"
     exit 1
 fi

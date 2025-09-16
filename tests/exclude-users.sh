@@ -3,8 +3,7 @@
 # Test that the --exclude-users switch works.
 
 set -e
-( cd .. ; cargo build )
-numbad=$(../target/debug/sonar ps --exclude-users root,root,root,$LOGNAME | \
+numbad=$(cargo run -- ps --exclude-users root,root,root,$LOGNAME | \
     awk "
 /,user=root,/ { print }
 /,user=$LOGNAME,/ { print }

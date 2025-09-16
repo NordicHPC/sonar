@@ -6,12 +6,11 @@
 
 set -e
 echo "This test takes about 20s"
-( cd .. ; cargo build )
 
 data_dir=daemon-directory-data
 logfile=daemon-directory-log.txt
 rm -rf $data_dir $logfile
-../target/debug/sonar daemon daemon-directory.ini 2>$logfile
+cargo run -- daemon daemon-directory.ini 2>$logfile
 
 if [[ ! -d $data_dir ]]; then
     echo "No data directory"

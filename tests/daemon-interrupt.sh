@@ -3,7 +3,6 @@
 # Check the interrupt handling for the daemon mode.
 
 set -e
-( cd .. ; cargo build )
 
 echo " This takes about 45s"
 
@@ -25,7 +24,7 @@ for signal in TERM INT HUP; do
 
     # Fork off the daemon in the background
 
-    ../target/debug/sonar daemon daemon-interrupt.ini > daemon-interrupt-output.txt 2> daemon-interrupt-log.txt &
+    cargo run -- daemon daemon-interrupt.ini > daemon-interrupt-output.txt 2> daemon-interrupt-log.txt &
     pid=$!
 
     # Wait for some output to accumulate in internal buffers
@@ -55,15 +54,17 @@ for signal in TERM INT HUP; do
     # At this point we should have 3 to 5 lines in daemon-interrupt-output.txt.  It's possible for
     # there to be 5 lines with a 3s cadence: on-startup sampling is enabled; and then we can have a
     # sample at 1/4/7/10 (indeed at 0/3/6/9).  I've seen this in practice.  Maybe on-startup
-    # sampling should be disabled to tighten the test.
+    # sampling should be disabled to tighten the test.  However, since `cargo run` is sort of slow
+    # we can have fewer...
 
     lines=$(grep '{"topic":' daemon-interrupt-output.txt | wc -l)
-    if (( $lines < 3 || $lines > 5 )); then
+    if (( $lines < 2 || $lines > 5 )); then
         echo "Output file is too short or too long, flushing did not work or something else is off"
         exit 1
     fi
 
     # daemon-interrupt-log.txt should have info about the current signal, from stderr
+    # But `cargo run` pollutes it, so look only at the last line.
 
     s="xxx"
     case $signal in
@@ -72,7 +73,7 @@ for signal in TERM INT HUP; do
         TERM) s=15 ;;
     esac
     expect="Info: Received signal $s"
-    if [[ $(cat daemon-interrupt-log.txt) != $expect ]]; then
+    if [[ $(tail -n 1 daemon-interrupt-log.txt) != $expect ]]; then
         echo "Incorrect signal information, expected \'$expect\'"
         exit 1
     fi

@@ -4,15 +4,14 @@
 # in an orderly way with a message on stderr.
 
 set -e
-echo " This takes about 15s"
-( cd .. ; cargo build )
+echo " This takes about 20s"
 rm -f interrupt.output.txt
-SONARTEST_WAIT_INTERRUPT=1 ../target/debug/sonar ps 2> interrupt.output.txt &
+SONARTEST_WAIT_INTERRUPT=1 cargo run -- ps 2> interrupt.output.txt &
 bgpid=$!
-sleep 3
+sleep 10
 kill -TERM $bgpid
 sleep 10
-if [[ $(cat interrupt.output.txt) != 'Info: Interrupt flag was set!' ]]; then
+if [[ $(tail -n 1 interrupt.output.txt) != 'Info: Interrupt flag was set!' ]]; then
     echo "Unexpected output!"
     exit 1
 fi
