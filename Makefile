@@ -1,11 +1,15 @@
 .PHONY: debug release test format
 ARCH=$(shell uname -m)
 
+ifeq (x86_64, $(ARCH))
+	FEATURES=--features xpu,habana
+endif
+
 debug:
-	CARGO_TARGET_DIR=target/$(ARCH) cargo build
+	CARGO_TARGET_DIR=target/$(ARCH) cargo build $(FEATURES)
 
 release:
-	CARGO_TARGET_DIR=target/$(ARCH) cargo build --release
+	CARGO_TARGET_DIR=target/$(ARCH) cargo build --release $(FEATURES)
 
 test: debug release
 	cargo test

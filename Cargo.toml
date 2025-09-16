@@ -13,7 +13,7 @@ xpu = []
 habana = []
 daemon = []
 kafka = [ "dep:rdkafka" ]
-default = [ "nvidia", "amd", "xpu", "habana", "daemon", "kafka" ]
+default = [ "nvidia", "amd", "daemon", "kafka" ]
 
 [dependencies]
 cty = "0.2.2"
