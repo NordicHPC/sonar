@@ -11,13 +11,12 @@
 
 set -e
 
-( cd .. ; cargo build )
 make --quiet
 
 echo " This takes about 10s"
 ./rollup 3 &
 sleep 3
-output=$(SONARTEST_ROLLUP=1 ../target/debug/sonar ps --rollup --exclude-system-jobs)
+output=$(SONARTEST_ROLLUP=1 cargo run -- ps --rollup --exclude-system-jobs)
 matches=$(grep ,cmd=rollup, <<< $output)
 rolled=$(grep ,rolledup=1 <<< $matches)
 rolled2=$(grep ,rolledup= <<< $matches)

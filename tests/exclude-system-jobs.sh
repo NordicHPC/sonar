@@ -5,8 +5,7 @@
 # list to get the uid, then collect the uids that are < 1000 - these are wrong.
 
 set -e
-( cd .. ; cargo build )
-numbad=$(../target/debug/sonar ps --exclude-system-jobs | \
+numbad=$(cargo run -- ps --exclude-system-jobs | \
              awk '
 {
     s=substr($0, index($0, ",user=")+6)

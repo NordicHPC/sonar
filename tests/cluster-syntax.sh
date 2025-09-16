@@ -4,7 +4,6 @@
 # Requirement: the `jq` utility.
 
 set -e
-( cd .. ; cargo build )
 if [[ $(command -v jq) == "" ]]; then
     echo "Install jq first"
     exit 1
@@ -19,7 +18,7 @@ fi
 
 # JSON - the only format available
 
-output=$(../target/debug/sonar cluster --cluster x --json)
+output=$(cargo run -- --cluster x --json)
 
 # Syntax check
 

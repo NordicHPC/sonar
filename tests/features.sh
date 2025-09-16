@@ -9,51 +9,36 @@ if [[ $(command -v jq) == "" ]]; then
 fi
 
 echo " Default"
-( cd .. ; cargo build )
-output=$(../target/debug/sonar sysinfo)
+output=$( cargo run -- sysinfo )
 jq . <<< $output > /dev/null
 
-for d in "" ",daemon"; do
-    echo " no-defaults$d"
-    ( cd .. ; cargo build --no-default-features --features "$d" )
-    output=$(../target/debug/sonar sysinfo)
-    jq . <<< $output > /dev/null
+join() {
+    local xs=$1
+    shift 1
+    while [[ $1 != "" ]]; do
+        xs="$xs,$1"
+        shift 1
+    done
+    echo $xs
+}
 
-    echo " amd$d"
-    ( cd .. ; cargo build --no-default-features --features amd$d )
-    output=$(../target/debug/sonar sysinfo)
-    jq . <<< $output > /dev/null
-
-    echo " nvidia$d"
-    ( cd .. ; cargo build --no-default-features --features nvidia$d )
-    output=$(../target/debug/sonar sysinfo)
-    jq . <<< $output > /dev/null
-
-    echo " nvidia,amd$d"
-    ( cd .. ; cargo build --no-default-features --features nvidia,amd$d )
-    output=$(../target/debug/sonar sysinfo)
-    jq . <<< $output > /dev/null
-
-    echo " amd,xpu$d"
-    ( cd .. ; cargo build --no-default-features --features amd,xpu$d )
-    output=$(../target/debug/sonar sysinfo)
-    jq . <<< $output > /dev/null
-
-    echo " nvidia,xpu$d"
-    ( cd .. ; cargo build --no-default-features --features nvidia,xpu$d )
-    output=$(../target/debug/sonar sysinfo)
-    jq . <<< $output > /dev/null
-
-    echo " nvidia,amd,xpu$d"
-    ( cd .. ; cargo build --no-default-features --features nvidia,amd,xpu$d )
-    output=$(../target/debug/sonar sysinfo)
-    jq . <<< $output > /dev/null
+for amd in "" "amd"; do
+    for nvidia in "" "nvidia"; do
+        for xpu in "" "xpu"; do
+            for daemon in "" "daemon"; do
+                features=$(join $amd $nvidia $xpu $daemon)
+                echo "no-defaults with features: $features"
+                output=$( cargo run --no-default-features --features="$features" -- sysinfo )
+                jq . <<< $output > /dev/null
+            done
+        done
+    done
 done
 
 # No Habana library yet so this feature should cause link failure
 
 echo " HABANA"
-if [[ $( cd .. ; cargo build --no-default-features --features habana 2> /dev/null ) ]]; then
+if [[ $( cargo run --no-default-features --features=habana 2> /dev/null ) ]]; then
     echo "Habana test should have failed but did not"
     exit 1
 fi

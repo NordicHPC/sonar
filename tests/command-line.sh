@@ -3,38 +3,39 @@
 # Check that command line parsing is somewhat sane.
 
 set -e
-( cd ..; cargo build )
 
 # Allow both forms of argument syntax
-../target/debug/sonar ps --exclude-users=root,$LOGNAME > /dev/null
-../target/debug/sonar ps --exclude-users root,$LOGNAME > /dev/null
+cargo run -- ps --exclude-users=root,$LOGNAME > /dev/null
+cargo run -- ps --exclude-users root,$LOGNAME > /dev/null
 
 # Test all arguments in combination without --rollup
-../target/debug/sonar ps \
-                      --min-cpu-percent 0.5 \
-                      --min-mem-percent 1.8 \
-                      --min-cpu-time 10 \
-                      --exclude-system-jobs \
-                      --exclude-users root \
-                      --exclude-commands emacs \
-                      --lockdir . \
-                      > /dev/null
+cargo run -- \
+      ps \
+      --min-cpu-percent 0.5 \
+      --min-mem-percent 1.8 \
+      --min-cpu-time 10 \
+      --exclude-system-jobs \
+      --exclude-users root \
+      --exclude-commands emacs \
+      --lockdir . \
+      > /dev/null
 
 # Test all arguments in combination with --rollup
-../target/debug/sonar ps \
-                      --rollup \
-                      --min-cpu-percent 0.5 \
-                      --min-mem-percent 1.8 \
-                      --min-cpu-time 10 \
-                      --exclude-system-jobs \
-                      --exclude-users root \
-                      --exclude-commands emacs \
-                      --lockdir . \
-                      > /dev/null
+cargo run -- \
+      ps \
+      --rollup \
+      --min-cpu-percent 0.5 \
+      --min-mem-percent 1.8 \
+      --min-cpu-time 10 \
+      --exclude-system-jobs \
+      --exclude-users root \
+      --exclude-commands emacs \
+      --lockdir . \
+      > /dev/null
 
 # Signal error with code 2 for unknown arguments
 set +e
-output=$(../target/debug/sonar ps --zappa 2>&1)
+output=$(cargo run -- ps --zappa 2>&1)
 exitcode=$?
 set -e
 if [[ $exitcode != 2 ]]; then
@@ -44,7 +45,7 @@ fi
 
 # Signal error with code 2 for invalid arguments: missing string
 set +e
-output=$(../target/debug/sonar ps --lockdir 2>&1)
+output=$(cargo run -- ps --lockdir 2>&1)
 exitcode=$?
 set -e
 if [[ $exitcode != 2 ]]; then
@@ -54,7 +55,7 @@ fi
 
 # Signal error with code 2 for invalid arguments: bad number
 set +e
-output=$(../target/debug/sonar ps --min-cpu-time 7hello 2>&1)
+output=$(cargo run -- ps --min-cpu-time 7hello 2>&1)
 exitcode=$?
 set -e
 if [[ $exitcode != 2 ]]; then

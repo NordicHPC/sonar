@@ -5,7 +5,6 @@
 
 set -e
 echo "This test takes about 30s"
-( cd .. ; cargo build )
 if [[ $(command -v jq) == "" ]]; then
     echo "Install jq first"
     exit 1
@@ -23,7 +22,7 @@ fi
 # and a message about this is printed on stdout (in addition to appearing in the log).
 
 if [[ $SKIP == "" ]]; then
-    SONARTEST_MOCK_KAFKA=fail-all-odd-messages ../target/debug/sonar daemon daemon-kafka.ini > $outfile 2> $logfile
+    SONARTEST_MOCK_KAFKA=fail-all-odd-messages cargo run -- daemon daemon-kafka.ini > $outfile 2> $logfile
 fi
 
 # The ini produces one record every second but has a 10s sending window and runs the daemon for 30s.

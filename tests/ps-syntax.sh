@@ -4,7 +4,6 @@
 # Requirement: the `jq` utility.
 
 set -e
-( cd .. ; cargo build )
 if [[ $(command -v jq) == "" ]]; then
     echo "Install jq first"
     exit 1
@@ -22,7 +21,7 @@ fi
 # We don't have the infra at the moment to check the CSV output, plus CSV is so flexible that it's
 # sort of hard to check it.
 
-output=$(../target/debug/sonar ps)
+output=$(cargo run -- ps)
 count=$(wc -l <<< $output)
 if [[ $count -le 0 ]]; then
     echo "Must have some number of output lines"
@@ -55,7 +54,7 @@ echo "CSV ok"
 
 # Check that it is syntactically sane
 
-output=$(../target/debug/sonar ps --load --exclude-system-jobs --cluster x --json)
+output=$(cargo run -- ps --load --exclude-system-jobs --cluster x --json)
 jq . <<< $output > /dev/null
 
 # Check that the envelope has required fields

@@ -5,7 +5,6 @@
 
 set -e
 echo " This takes about 15s"
-( cd .. ; cargo build )
 if [[ $(command -v jq) == "" ]]; then
     echo "Install jq first"
     exit 1
@@ -19,7 +18,7 @@ fi
 rm -f daemon-output.txt
 before=$(date +%s)
 ( echo "exit exit exit" ; sleep 10 ; echo "zappa.hpc.axis-of-eval.org.control.node exit" ) | \
-    ../target/debug/sonar daemon daemon.ini > daemon-output.txt
+    cargo run -- daemon daemon.ini > daemon-output.txt
 after=$(date +%s)
 
 if (( $after - $before < 5 )); then

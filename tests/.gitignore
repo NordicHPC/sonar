@@ -6,3 +6,4 @@ daemon-interrupt-*.txt
 daemon-kafka-*.txt
 daemon-directory-*.txt
 daemon-directory-data
+interrupt.output.txt

@@ -4,7 +4,6 @@
 # Requirement: the `jq` utility.
 
 set -e
-( cd .. ; cargo build )
 if [[ $(command -v jq) == "" ]]; then
     echo "Install jq first"
     exit 1
@@ -17,7 +16,7 @@ if [[ $(command -v sinfo) != "" ]]; then
     exit 0
 fi
 
-output=$(../target/debug/sonar cluster --cluster x --json)
+output=$(cargo run -- cluster --cluster x --json)
 error=$(jq .errors <<< $output)
 if [[ ! ( $error =~ "sinfo" ) ]]; then
     echo $output
@@ -27,7 +26,7 @@ fi
 
 # Default output is also "new json"
 
-output=$(../target/debug/sonar cluster --cluster x)
+output=$(cargo run -- cluster --cluster x)
 error=$(jq .errors <<< $output)
 if [[ ! ( $error =~ "sinfo" ) ]]; then
     echo $output

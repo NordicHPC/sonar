@@ -4,7 +4,6 @@
 # Requirement: the `jq` utility.
 
 set -e
-( cd .. ; cargo build )
 if [[ $(command -v jq) == "" ]]; then
     echo "Install jq first"
     exit 1
@@ -21,7 +20,7 @@ fi
 #
 # There's no guarantee that there is a record.
 
-output=$(../target/debug/sonar slurm)
+output=$(cargo run -- slurm)
 if [[ $output == "" ]]; then
     echo "No output"
     exit 0
@@ -38,7 +37,7 @@ echo "CSV ok"
 
 # JSON
 
-output=$(../target/debug/sonar slurm --cluster x --json)
+output=$(cargo run -- slurm --cluster x --json)
 
 # Syntax check
 
