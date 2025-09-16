@@ -86,20 +86,15 @@ pub fn sysinfo_output_test() {
 "memory":16093776,
 "cards":[
 {
-"address":"12:14:16",
 "index":0,
 "uuid":"1234.5678",
+"address":"12:14:16",
 "manufacturer":"Yoyodyne, Inc.",
 "model":"Yoyodyne 1",
-"architecture":"",
-"driver":"",
-"firmware":"",
 "memory":1048576,
 "power_limit":2000,
 "max_power_limit":3000,
-"min_power_limit":0,
-"max_ce_clock":100000,
-"max_memory_clock":0
+"max_ce_clock":100000
 }
 ]
 }

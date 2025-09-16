@@ -140,29 +140,53 @@ fn layout_card_info_newfmt(node_info: &NodeInfo) -> output::Array {
             max_mem_clock_mhz,
         } = c;
         let mut gpu = output::Object::new();
-        gpu.push_s(SYSINFO_GPU_CARD_ADDRESS, bus_addr.to_string());
         gpu.push_i(SYSINFO_GPU_CARD_INDEX, device.index as i64);
         gpu.push_s(SYSINFO_GPU_CARD_UUID, device.uuid.to_string());
-        gpu.push_s(
-            SYSINFO_GPU_CARD_MANUFACTURER,
-            node_info.card_manufacturer.clone(),
-        );
-        gpu.push_s(SYSINFO_GPU_CARD_MODEL, model.to_string());
-        gpu.push_s(SYSINFO_GPU_CARD_ARCHITECTURE, arch.to_string());
-        gpu.push_s(SYSINFO_GPU_CARD_DRIVER, driver.to_string());
-        gpu.push_s(SYSINFO_GPU_CARD_FIRMWARE, firmware.to_string());
-        gpu.push_u(SYSINFO_GPU_CARD_MEMORY, *mem_size_kib);
-        gpu.push_i(SYSINFO_GPU_CARD_POWER_LIMIT, *power_limit_watt as i64);
-        gpu.push_i(
-            SYSINFO_GPU_CARD_MAX_POWER_LIMIT,
-            *max_power_limit_watt as i64,
-        );
-        gpu.push_i(
-            SYSINFO_GPU_CARD_MIN_POWER_LIMIT,
-            *min_power_limit_watt as i64,
-        );
-        gpu.push_i(SYSINFO_GPU_CARD_MAX_CECLOCK, *max_ce_clock_mhz as i64);
-        gpu.push_i(SYSINFO_GPU_CARD_MAX_MEMORY_CLOCK, *max_mem_clock_mhz as i64);
+        if bus_addr != "" {
+            gpu.push_s(SYSINFO_GPU_CARD_ADDRESS, bus_addr.to_string());
+        }
+        if node_info.card_manufacturer != "" {
+            gpu.push_s(
+                SYSINFO_GPU_CARD_MANUFACTURER,
+                node_info.card_manufacturer.clone(),
+            );
+        }
+        if model != "" {
+            gpu.push_s(SYSINFO_GPU_CARD_MODEL, model.to_string());
+        }
+        if arch != "" {
+            gpu.push_s(SYSINFO_GPU_CARD_ARCHITECTURE, arch.to_string());
+        }
+        if driver != "" {
+            gpu.push_s(SYSINFO_GPU_CARD_DRIVER, driver.to_string());
+        }
+        if firmware != "" {
+            gpu.push_s(SYSINFO_GPU_CARD_FIRMWARE, firmware.to_string());
+        }
+        if *mem_size_kib != 0 {
+            gpu.push_u(SYSINFO_GPU_CARD_MEMORY, *mem_size_kib);
+        }
+        if *power_limit_watt != 0 {
+            gpu.push_i(SYSINFO_GPU_CARD_POWER_LIMIT, *power_limit_watt as i64);
+        }
+        if *max_power_limit_watt != 0 {
+            gpu.push_i(
+                SYSINFO_GPU_CARD_MAX_POWER_LIMIT,
+                *max_power_limit_watt as i64,
+            );
+        }
+        if *min_power_limit_watt != 0 {
+            gpu.push_i(
+                SYSINFO_GPU_CARD_MIN_POWER_LIMIT,
+                *min_power_limit_watt as i64,
+            );
+        }
+        if *max_ce_clock_mhz != 0 {
+            gpu.push_i(SYSINFO_GPU_CARD_MAX_CECLOCK, *max_ce_clock_mhz as i64);
+        }
+        if *max_mem_clock_mhz != 0 {
+            gpu.push_i(SYSINFO_GPU_CARD_MAX_MEMORY_CLOCK, *max_mem_clock_mhz as i64);
+        }
         gpu_info.push_o(gpu);
     }
     gpu_info
