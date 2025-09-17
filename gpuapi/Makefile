@@ -11,8 +11,9 @@
 # And of course, for each CPU architecture the build host must be of that architecture as well, and
 # the .a files are ultimately stored in architecture-specific subdirectories of this directory.
 #
-# To support systems where we have no capability to compile with appropriate GPU SDKs, this file can
-# also be used to build libsonar-*-stub.a, which have the same interface but no GPU functionality.
+# To support systems where we have no capability to compile with appropriate GPU SDKs, or where the
+# GPU simply does not exist (eg XPU on aarch64), this file can also be used to build 
+# libsonar-*-stub.a, which have the same interface but no GPU functionality.
 #
 # On a particular build node with a particular GPU SDK (or no such SDK), we choose which library to
 # build and then build it.  The resulting .a file is then manually moved to the appropriate
@@ -43,7 +44,8 @@ CFLAGS=-g -O2 -Wall -Wno-format-truncation -fPIC
 .PHONY: default clean realclean
 
 default:
-	@echo "Choose a specific target:"
+	@echo "Choose a specific target, often one of these:"
+	@echo ""
 	@echo " libsonar-nvidia.a       the CUDA SDK must be installed or loaded"
 	@echo " libsonar-nvidia-stub.a"
 	@echo " libsonar-amd.a          the ROCM/hip SDK must be installed or loaded"
