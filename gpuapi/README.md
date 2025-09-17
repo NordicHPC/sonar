@@ -1,1 +1,1 @@
-See Makefile for important comments.
+See Makefile for important instructions.
