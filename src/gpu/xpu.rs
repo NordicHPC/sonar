@@ -1,8 +1,6 @@
 use crate::gpu::{self, xpu_smi};
 use crate::ps;
 
-use std::path::Path;
-
 pub struct XpuGPU {}
 
 pub fn probe() -> Option<Box<dyn gpu::Gpu>> {
@@ -46,10 +44,6 @@ impl gpu::Gpu for XpuGPU {
     }
 }
 
-// Probably this, though actually hard to figure out exactly.  Looking at strings in the smi
-// library, i915 is definitely being looked for, and some other output also indicates this is what
-// we want.
-
 fn xpu_present() -> bool {
-    Path::new("/sys/module/i915").exists()
+    xpu_smi::xpu_detect()
 }

@@ -5,6 +5,8 @@ use crate::ps;
 use crate::types::{Pid, Uid};
 use crate::util::cstrdup;
 
+use std::path::Path;
+
 ////// C library API //////////////////////////////////////////////////////////////////////////////
 
 // The data structures and signatures defined here must be exactly those defined in the header file,
@@ -86,6 +88,15 @@ extern "C" {
 }
 
 ////// End C library API //////////////////////////////////////////////////////////////////////////
+
+pub fn xpu_detect() -> bool {
+    if Path::new("/sys/module/i915").exists() {
+        let mut num_devices: cty::uint32_t = 0;
+        unsafe { xpu_device_get_count(&mut num_devices) != -1 }
+    } else {
+        false
+    }
+}
 
 pub fn get_card_configuration() -> Option<Vec<gpu::Card>> {
     let mut num_devices: cty::uint32_t = 0;
