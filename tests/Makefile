@@ -12,4 +12,5 @@ clean:
 	daemon-interrupt-*.txt \
 	daemon-directory-*.txt daemon-directory-data \
 	daemon-kafka-*.txt \
+	regress-*.txt \
 	*~

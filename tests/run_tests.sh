@@ -37,6 +37,7 @@ for test in amd-gpu \
                 ps-syntax \
                 rollup \
                 rollup2 \
+                regress-369-kafka-pump \
                 slurm-no-sacct \
                 slurm-syntax \
                 sysinfo-syntax \

@@ -7,3 +7,4 @@ daemon-kafka-*.txt
 daemon-directory-*.txt
 daemon-directory-data
 interrupt.output.txt
+regress-*.txt

@@ -199,20 +199,25 @@ fn kafka_producer(
 
     'producer_loop: loop {
         if must_arm {
-            // Logically we clear must_arm here but it is redundant at the moment, as all paths that
-            // continue the loop update must_arm without examining the current value.
             assert!(!armed);
             let sleep = rng.next() as u64 % sending_window;
             if verbose {
+                // Note, the /Sleeping {} before sending/ pattern is used by regression tests.
                 log::verbose(&format!("Sleeping {sleep} before sending"));
             }
             timeout = channel::after(Duration::from_secs(sleep));
             armed = true;
+            must_arm = false;
         }
         channel::select! {
             recv(timeout) -> _ => {
                 armed = false;
+                if verbose {
+                    // Note, the /Sending {} items/ pattern is used by regression tests.
+                    log::verbose(&format!("Sending window open.  Sending {} items", backlog.len()));
+                }
                 id = send_messages(&*producer, &control_and_errors, id, &backlog, verbose);
+                backlog.clear();
             }
             recv(incoming_message_queue) -> msg => match msg {
                 Ok(Message::M(msg)) => {
