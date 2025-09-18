@@ -25,22 +25,16 @@ join() {
 for amd in "" "amd"; do
     for nvidia in "" "nvidia"; do
         for xpu in "" "xpu"; do
-            for daemon in "" "daemon"; do
-                features=$(join $amd $nvidia $xpu $daemon)
-                echo "no-defaults with features: $features"
-                output=$( cargo run --no-default-features --features="$features" -- sysinfo )
-                jq . <<< $output > /dev/null
+            for habana in "" "habana"; do
+                for daemon in "" "daemon"; do
+                    features=$(join $amd $nvidia $xpu $habana $daemon)
+                    echo "no-defaults with features: $features"
+                    output=$( cargo run --no-default-features --features="$features" -- sysinfo )
+                    jq . <<< $output > /dev/null
+                done
             done
         done
     done
 done
-
-# No Habana library yet so this feature should cause link failure
-
-echo " HABANA"
-if [[ $( cargo run --no-default-features --features=habana 2> /dev/null ) ]]; then
-    echo "Habana test should have failed but did not"
-    exit 1
-fi
 
 echo " OK"

@@ -2,6 +2,10 @@
 mod amd;
 #[cfg(feature = "amd")]
 mod amd_smi;
+#[cfg(feature = "habana")]
+mod habana;
+#[cfg(feature = "habana")]
+mod habana_smi;
 #[cfg(test)]
 pub mod mockgpu;
 #[cfg(feature = "nvidia")]
@@ -124,6 +128,9 @@ pub trait Gpu {
     // at `Process`, above, for more about the meaning of these data.
     //
     // The returned vector is unsorted.
+    //
+    // On some cards (currently Habana), there is no GPU per-process utilization information.
+    // In that case, this will return Err, and the caller must cope with that.
     fn get_process_utilization(
         &self,
         user_by_pid: &ps::ProcessTable,

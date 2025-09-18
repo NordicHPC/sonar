@@ -26,9 +26,7 @@ fi
 # should be strictly ascending in the output
 
 jq .value.data.attributes.time < $outfile > regress-369-timestamps.txt
-if sort --check=silent regress-369-timestamps.txt; then
-    true
-else
+if ! sort --check=silent regress-369-timestamps.txt; then
     echo "Timestamps are not ordered!"
     exit 1
 fi

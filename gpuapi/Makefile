@@ -4,9 +4,10 @@
 #
 # The .a files must be built on systems that have the SDKs for the various GPUs available; in
 # practice, libsonar-amd.a is built on a system with an AMD GPU and toolchain, libsonar-nvidia.a is
-# built on a system with an NVIDIA GPU and toolchain, and libsonar-xpu.a is built on a system with
-# an XPU and XPU toolchain.  For this reason the .a files are checked into the git repo, they cannot
-# easily be rebuilt on CI and on random developer systems.
+# built on a system with an NVIDIA GPU and toolchain, libsonar-xpu.a is built on a system with an
+# XPU and XPU toolchain, and libsonar-habana.a is built on a system with a Habana GPU and toolchain.
+# For this reason the .a files are checked into the git repo, they cannot easily be rebuilt on CI
+# and on random developer systems.
 #
 # And of course, for each CPU architecture the build host must be of that architecture as well, and
 # the .a files are ultimately stored in architecture-specific subdirectories of this directory.
@@ -52,11 +53,13 @@ default:
 	@echo " libsonar-amd-stub.a"
 	@echo " libsonar-xpu.a          the XPU SDK must be installed or loaded"
 	@echo " libsonar-xpu-stub.a"
+	@echo " libsonar-habana.a       the Habana SDK must be installed or loaded"
+	@echo " libsonar-habana-stub.a"
 	@echo ""
 	@echo "See comments in Makefile for more information."
 
 clean:
-	rm -f *.o *.a *~ nvidia-shell amd-shell xpu-shell
+	rm -f *.o *.a *~ nvidia-shell amd-shell xpu-shell habana-shell
 
 realclean:
 	$(MAKE) clean
@@ -100,6 +103,18 @@ libsonar-xpu-stub.a: sonar-xpu-stub.o Makefile
 sonar-xpu-stub.o: sonar-xpu.c sonar-xpu.h Makefile
 	$(CC) -c $(CFLAGS) -o $@ $<
 
+libsonar-habana.a: sonar-habana.o Makefile
+	ar rs $@ $<
+
+sonar-habana.o: sonar-habana.c sonar-habana.h strtcpy.h Makefile
+	$(CC) -c $(CFLAGS) -DSONAR_HABANA_GPU -o $@ $<
+
+libsonar-habana-stub.a: sonar-habana-stub.o Makefile
+	ar rs $@ $<
+
+sonar-habana-stub.o: sonar-habana.c sonar-habana.h Makefile
+	$(CC) -c $(CFLAGS) -o $@ $<
+
 # Various test code.
 #
 # Remember that it may be necessary to `module load` things first, see the build-*.bash scripts in
@@ -113,3 +128,6 @@ amd-shell: amd-shell.c sonar-amd.c sonar-amd.h Makefile
 
 xpu-shell: xpu-shell.c sonar-xpu.c sonar-xpu.h Makefile
 	$(CC) $(CFLAGS) -DSONAR_XPU_GPU -DLOGGING -o xpu-shell xpu-shell.c sonar-xpu.c -ldl
+
+habana-shell: habana-shell.c sonar-habana.c sonar-habana.h Makefile
+	$(CC) $(CFLAGS) -DSONAR_HABANA_GPU -DLOGGING -o habana-shell habana-shell.c sonar-habana.c -ldl
