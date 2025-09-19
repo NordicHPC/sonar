@@ -1,5 +1,4 @@
 #![allow(clippy::len_zero)]
-#![allow(clippy::manual_div_ceil)] // .div_ceil() is Rust 1.73
 
 // Collect CPU process information without GPU information, from files in /proc.
 
