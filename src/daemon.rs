@@ -1,6 +1,5 @@
 #![allow(clippy::comparison_to_empty)]
 #![allow(clippy::len_zero)]
-#![allow(clippy::manual_div_ceil)] // .div_ceil() is Rust 1.73
 
 // TODO in this file, all marked:
 //
@@ -149,7 +148,7 @@ impl Dur {
         match self {
             Dur::Hours(n) => n * 60,
             Dur::Minutes(n) => n,
-            Dur::Seconds(n) => (n + 59) / 60,
+            Dur::Seconds(n) => n.div_ceil(60),
         }
     }
 }

@@ -1,5 +1,3 @@
-#![allow(clippy::manual_c_str_literals)] // The `c""` literals introduced in Rust 1.77
-
 // Miscellaneous time and date utilities that use libc to avoid pulling in Chrono.  These mostly
 // panic on errors, there should never be any except where input could plausibly come from a user.
 //
@@ -8,7 +6,6 @@
 // So far it seems we've not needed to do this.
 
 use crate::util::cstrdup;
-use std::ffi::CStr;
 use std::num::ParseIntError;
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -132,13 +129,7 @@ pub fn format_iso8601(timebuf: &libc::tm) -> String {
     const SIZE: usize = 32; // We need 25 unless something is greatly off
     let mut buffer = vec![0 as cty::c_char; SIZE];
     let s = unsafe {
-        if libc::strftime(
-            buffer.as_mut_ptr(),
-            SIZE,
-            CStr::from_bytes_with_nul_unchecked(b"%FT%T%z\0").as_ptr(),
-            timebuf,
-        ) == 0
-        {
+        if libc::strftime(buffer.as_mut_ptr(), SIZE, c"%FT%T%z".as_ptr(), timebuf) == 0 {
             // strftime returns 0 if the buffer is too small for the result + NUL, but we should
             // have ensured above that this is never a problem.
             panic!("strftime");
