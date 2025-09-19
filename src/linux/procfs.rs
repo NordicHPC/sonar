@@ -517,20 +517,18 @@ pub fn compute_process_information(
                     match fields[0] {
                         "read_bytes:" => {
                             data_read_kib =
-                                (parse_usize_field(&fields, 1, l, "io", pid, "data read")? + 1023)
-                                    / 1024;
+                                parse_usize_field(&fields, 1, l, "io", pid, "data read")?
+                                    .div_ceil(1024);
                         }
                         "write_bytes:" => {
                             data_written_kib =
-                                (parse_usize_field(&fields, 1, l, "io", pid, "data written")?
-                                    + 1023)
-                                    / 1024;
+                                parse_usize_field(&fields, 1, l, "io", pid, "data written")?
+                                    .div_ceil(1024);
                         }
                         "cancelled_write_bytes:" => {
                             data_cancelled_kib =
-                                (parse_usize_field(&fields, 1, l, "io", pid, "data cancelled")?
-                                    + 1023)
-                                    / 1024;
+                                parse_usize_field(&fields, 1, l, "io", pid, "data cancelled")?
+                                    .div_ceil(1024);
                         }
                         _ => {}
                     }

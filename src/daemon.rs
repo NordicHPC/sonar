@@ -148,7 +148,7 @@ impl Dur {
         match self {
             Dur::Hours(n) => n * 60,
             Dur::Minutes(n) => n,
-            Dur::Seconds(n) => (n + 59) / 60,
+            Dur::Seconds(n) => n.div_ceil(60),
         }
     }
 }
