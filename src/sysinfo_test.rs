@@ -30,7 +30,7 @@ pub fn sysinfo_output_test() {
         .with_cluster("kain.uio.no")
         .with_os("CP/M", "2.2")
         .with_architecture("Z80")
-        .with_files(files)
+        .with_proc_files(files)
         .with_card(gpu::Card {
             bus_addr: "12:14:16".to_string(),
             device: gpu::Name {
@@ -84,6 +84,7 @@ pub fn sysinfo_output_test() {
 "cpu_model":"Intel(R) Xeon(R) CPU E5-2637 v4 @ 3.50GHz",
 "architecture":"Z80",
 "memory":16093776,
+"distances":[[10]],
 "cards":[
 {
 "index":0,

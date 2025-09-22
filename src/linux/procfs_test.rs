@@ -71,7 +71,7 @@ pub fn procfs_parse_test() {
         + 2000.0) as u64;
 
     let system = mocksystem::Builder::new()
-        .with_files(files)
+        .with_proc_files(files)
         .with_pids(pids)
         .with_users(users)
         .with_now(now)
@@ -133,7 +133,7 @@ pub fn procfs_parse_errors() {
         "loadavg".to_string(),
         "1.75 2.125 10.5 128/ 10340 12345".to_string(),
     );
-    let system = mocksystem::Builder::new().with_files(files).freeze();
+    let system = mocksystem::Builder::new().with_proc_files(files).freeze();
     let fs = system.get_procfs();
     assert!(procfs::compute_loadavg(fs).is_err());
 }
@@ -181,7 +181,7 @@ pub fn procfs_dead_and_undead_test() {
     threads.insert(4018, vec![(4018, 1), (40181, 1), (40182, 1), (40183, 1)]);
 
     let system = mocksystem::Builder::new()
-        .with_files(files)
+        .with_proc_files(files)
         .with_pids(pids)
         .with_users(users)
         .with_threads(threads)
@@ -214,7 +214,7 @@ pub fn procfs_cpuinfo_test_x86_64() {
         "cpuinfo".to_string(),
         std::include_str!("testdata/cpuinfo-x86_64.txt").to_string(),
     );
-    let system = mocksystem::Builder::new().with_files(files).freeze();
+    let system = mocksystem::Builder::new().with_proc_files(files).freeze();
     let systemapi::CpuInfo {
         sockets,
         cores_per_socket,
@@ -234,7 +234,7 @@ pub fn procfs_cpuinfo_test_aarch64() {
         "cpuinfo".to_string(),
         std::include_str!("testdata/cpuinfo-aarch64.txt").to_string(),
     );
-    let system = mocksystem::Builder::new().with_files(files).freeze();
+    let system = mocksystem::Builder::new().with_proc_files(files).freeze();
     let systemapi::CpuInfo {
         sockets,
         cores_per_socket,

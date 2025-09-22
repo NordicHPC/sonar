@@ -39,6 +39,7 @@ pub const SYSINFO_ATTRIBUTES_MEMORY: &str = "memory"; // NonzeroUint
 pub const SYSINFO_ATTRIBUTES_TOPO_SVG: &str = "topo_svg"; // string
 pub const SYSINFO_ATTRIBUTES_CARDS: &str = "cards"; // []SysinfoGpuCard
 pub const SYSINFO_ATTRIBUTES_SOFTWARE: &str = "software"; // []SysinfoSoftwareVersion
+pub const SYSINFO_ATTRIBUTES_DISTANCES: &str = "distances"; // [][]uint64
 pub const SYSINFO_GPU_CARD_INDEX: &str = "index"; // uint64
 pub const SYSINFO_GPU_CARD_UUID: &str = "uuid"; // string
 pub const SYSINFO_GPU_CARD_ADDRESS: &str = "address"; // string

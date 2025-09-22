@@ -29,6 +29,7 @@ pub trait SystemAPI {
     fn get_jobs(&self) -> &dyn jobsapi::JobManager;
     fn get_cpu_info(&self) -> Result<CpuInfo, String>;
     fn get_memory_in_kib(&self) -> Result<Memory, String>;
+    fn get_numa_distances(&self) -> Result<Vec<Vec<u32>>, String>;
 
     // CPU usage data: total cpu seconds and per-cpu seconds.
     fn compute_node_information(&self) -> Result<(u64, Vec<u64>), String>;
@@ -116,11 +117,13 @@ pub struct Process {
 }
 
 // Figures in KB.
+#[derive(Clone)]
 pub struct Memory {
     pub total: u64,
     pub available: u64,
 }
 
+#[derive(Clone)]
 pub struct CpuInfo {
     pub sockets: i32,
     pub cores_per_socket: i32,
@@ -128,6 +131,7 @@ pub struct CpuInfo {
     pub cores: Vec<CoreInfo>,
 }
 
+#[derive(Clone)]
 #[allow(dead_code)]
 pub struct CoreInfo {
     pub model_name: String,

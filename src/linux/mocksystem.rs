@@ -14,7 +14,7 @@ use std::path;
 
 #[derive(Default)]
 pub struct Builder {
-    files: Option<HashMap<String, String>>,
+    proc_files: Option<HashMap<String, String>>,
     pids: Option<Vec<(usize, u32)>>,
     threads: Option<HashMap<usize, Vec<(usize, u32)>>>,
     users: Option<HashMap<u32, String>>,
@@ -39,9 +39,9 @@ impl Builder {
         }
     }
 
-    pub fn with_files(self, files: HashMap<String, String>) -> Builder {
+    pub fn with_proc_files(self, files: HashMap<String, String>) -> Builder {
         Builder {
-            files: Some(files),
+            proc_files: Some(files),
             ..self
         }
     }
@@ -179,11 +179,11 @@ impl Builder {
                 "unknown-architecture".to_string()
             },
             fs: {
-                let files = self.files.unwrap_or_default();
+                let proc_files = self.proc_files.unwrap_or_default();
                 let pids = self.pids.unwrap_or_default();
                 let threads = self.threads.unwrap_or_default();
                 MockFS {
-                    files,
+                    proc_files,
                     pids,
                     threads,
                 }
@@ -297,6 +297,10 @@ impl systemapi::SystemAPI for MockSystem {
         procfs::get_memory_in_kib(&self.fs)
     }
 
+    fn get_numa_distances(&self) -> Result<Vec<Vec<u32>>, String> {
+        Ok(vec![vec![10u32]])
+    }
+
     fn compute_node_information(&self) -> Result<(u64, Vec<u64>), String> {
         procfs::compute_node_information(self, &self.fs)
     }
@@ -368,14 +372,14 @@ impl systemapi::SystemAPI for MockSystem {
 }
 
 pub struct MockFS {
-    files: HashMap<String, String>,
+    proc_files: HashMap<String, String>,
     pids: Vec<(usize, u32)>,
     threads: HashMap<usize, Vec<(usize, u32)>>,
 }
 
 impl procfs::ProcfsAPI for MockFS {
     fn read_to_string(&self, path: &str) -> Result<String, String> {
-        match self.files.get(path) {
+        match self.proc_files.get(path) {
             Some(s) => Ok(s.clone()),
             None => Err(format!("Unable to read /proc/{path}")),
         }

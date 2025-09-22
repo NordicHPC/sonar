@@ -75,6 +75,7 @@ impl Builder {
             now: Cell::new(time::unix_now()),
             boot_time,
             interrupted: Arc::new(AtomicBool::new(false)),
+            cpu_info: RefCell::new(None),
         })
     }
 }
@@ -98,6 +99,7 @@ pub struct System {
     now: Cell<u64>,
     boot_time: u64,
     interrupted: Arc<AtomicBool>,
+    cpu_info: RefCell<Option<systemapi::CpuInfo>>,
 }
 
 impl System {
@@ -183,11 +185,42 @@ impl systemapi::SystemAPI for System {
     }
 
     fn get_cpu_info(&self) -> Result<systemapi::CpuInfo, String> {
-        procfs::get_cpu_info(&self.fs)
+        if self.cpu_info.borrow().is_some() {
+            Ok(self.cpu_info.borrow().clone().unwrap())
+        } else {
+            let info = procfs::get_cpu_info(&self.fs)?;
+            self.cpu_info.replace(Some(info.clone()));
+            Ok(info)
+        }
     }
 
     fn get_memory_in_kib(&self) -> Result<systemapi::Memory, String> {
         procfs::get_memory_in_kib(&self.fs)
+    }
+
+    fn get_numa_distances(&self) -> Result<Vec<Vec<u32>>, String> {
+        let mut m = vec![];
+        for n in 0..self.get_cpu_info()?.sockets {
+            let filename = format!("/sys/devices/system/node/node{n}/distance");
+            match fs::read_to_string(path::Path::new(&filename)) {
+                Ok(s) => {
+                    let mut r = vec![];
+                    for v in s.trim().split(" ") {
+                        match v.parse::<u32>() {
+                            Ok(n) => r.push(n),
+                            Err(_) => {
+                                return Err(format!("Unable to parse {s}"));
+                            }
+                        }
+                    }
+                    m.push(r);
+                }
+                Err(_) => {
+                    return Err(format!("Unable to read {filename}"));
+                }
+            }
+        }
+        Ok(m)
     }
 
     fn compute_node_information(&self) -> Result<(u64, Vec<u64>), String> {

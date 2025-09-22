@@ -124,8 +124,8 @@ obsolete.  Some are here in a different form.  Therefore, while old and new data
 compatible, there may be some minor problems translating between them.
 
 If a device does not expose a UUID, one will be constructed for it by the monitoring component.
-This UUID will never be confusable with another device but it may change, eg at reboot, creating
-a larger population of devices than there is in actuality.
+This UUID will never be confusable with another device within the same cluster but it may change,
+eg at reboot, creating a larger population of devices than there is in actuality.
 
 ## Data format versions
 
@@ -337,6 +337,10 @@ Per-card information
 #### **`software`** []SysinfoSoftwareVersion
 
 Per-software-package information
+
+#### **`distances`** [][]uint64
+
+Square matrix of standard NUMA node-to-node distances (normalized to 10 for self distance)
 
 ### Type: `SysinfoGpuCard`
 

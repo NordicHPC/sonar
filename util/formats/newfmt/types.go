@@ -341,6 +341,9 @@ type SysinfoAttributes struct {
 
 	// Per-software-package information
 	Software []SysinfoSoftwareVersion `json:"software,omitempty"`
+
+	// Square matrix of standard NUMA node-to-node distances (normalized to 10 for self distance)
+	Distances [][]uint64 `json:"distances,omitempty"`
 }
 
 // Per-card information.
