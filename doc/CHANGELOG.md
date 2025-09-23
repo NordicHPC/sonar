@@ -2,18 +2,33 @@
 
 This is at best partial.
 
+Since v0.13.0, the output format is documented mainly by the file
+[util/formats/newfmt/types.go](../util/formats/newfmt/types.go), which specifies the new JSON output
+format in terms of a Go data structure with JSON annotations.  Changes to the output format can most
+easily be be seen by diffing this file against a desired tag, starting with "v0.13.0".  Such changes
+are therefore no longer mentioned specially below.
 
-## Changes in v0.14.x-devel (on `main`)
+The "old" output formats are for the most part not being extended with new fields and should not be
+relied upon.  Consumers should expect to see the "new" JSON format for new data, and all producers
+should ask for that format.
 
-**New fields in output**: Basic per-process I/O traffic, per-process thread counts, system load
-average.  (v0.14.0)
+## Changes in v0.15.0 (on `release_0_15`)
+
+* Feature (Rust/C): Support for XPU and Habana GPUs
+* Cleanup (Rust): Signal handling improvements
+* Cleanup (Rust): Rewrite daemon and Kafka message pumps
+* Testing (sundry): Many testing improvements
+* Rust: Dependency updates
+* Rust: Minimum Rust version is now 1.77
+
+## Changes in v0.14.x-devel (on `release_0_14`)
 
 **New output sink**: A 'directory' output sink for the daemon mode.  (v0.14.0)
 
 **Cleanup**: Documentation.  Code reorg and cleanup, abstracting out Linux support.  (v0.14.0)
 
 
-## Changes in v0.13.x-devel (on `main`)
+## Changes in v0.13.x (on `release_0_13`)
 
 **Bug fixes**.  Sundry daemon bug fixes (v0.13.1 and v0.13.2)
 
