@@ -82,6 +82,15 @@ fn layout_sysinfo_newfmt(
     );
     attrs.push_s(SYSINFO_ATTRIBUTES_ARCHITECTURE, system.get_architecture());
     attrs.push_u(SYSINFO_ATTRIBUTES_MEMORY, node_info.mem_kb);
+    let mut distances = output::Array::new();
+    for row in node_info.distances.iter() {
+        let mut r = output::Array::new();
+        for elt in row.iter() {
+            r.push_u(*elt as u64);
+        }
+        distances.push(output::Value::A(r));
+    }
+    attrs.push_a(SYSINFO_ATTRIBUTES_DISTANCES, distances);
     let topo_svg = "".to_string(); // TODO: should be in node_info
     if topo_svg != "" {
         attrs.push_s(SYSINFO_ATTRIBUTES_TOPO_SVG, topo_svg);
@@ -278,6 +287,7 @@ struct NodeInfo {
     gpu_cards: u64,
     gpumem_kb: u64,
     cards: Vec<gpu::Card>,
+    distances: Vec<Vec<u32>>, // square matrix
 }
 
 fn compute_nodeinfo(system: &dyn systemapi::SystemAPI) -> Result<NodeInfo, String> {
@@ -304,6 +314,7 @@ fn compute_nodeinfo(system: &dyn systemapi::SystemAPI) -> Result<NodeInfo, Strin
     } else {
         ""
     };
+    let distances = system.get_numa_distances()?;
 
     let (gpu_desc, gpu_cards, gpumem_kb) = if !cards.is_empty() {
         // Sort cards
@@ -360,5 +371,6 @@ fn compute_nodeinfo(system: &dyn systemapi::SystemAPI) -> Result<NodeInfo, Strin
         gpu_cards: gpu_cards as u64,
         gpumem_kb,
         cards,
+        distances,
     })
 }

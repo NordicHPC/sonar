@@ -133,6 +133,10 @@ SysinfoAttributes:
       type: '[]SysinfoSoftwareVersion'
       doc: >
         Per-software-package information
+    distances:
+      type: '[][]uint64'
+      doc: >
+        Square matrix of standard NUMA node-to-node distances (normalized to 10 for self distance)
 SysinfoGpuCard:
   fields:
     index:

@@ -60,7 +60,7 @@ fn test_get_job_id() {
     // Some garbage cases
     files.insert("1338/cgroup".to_string(), "random garbage\n".to_string());
     files.insert("1339/cgroup".to_string(), "/job_hello/\n".to_string());
-    let system = mocksystem::Builder::new().with_files(files).freeze();
+    let system = mocksystem::Builder::new().with_proc_files(files).freeze();
     let fs = system.get_procfs();
 
     let r = get_job_id(fs, 1337);
