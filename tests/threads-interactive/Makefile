@@ -1,4 +1,4 @@
-CFLAGS=-O1
-LDFLAGS=-lptread
+CFLAGS=-O1 -Wall
+LDFLAGS=-lpthread
 
 busybusy: busybusy.c
