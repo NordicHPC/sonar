@@ -34,7 +34,7 @@ fi
 # TODO: This will be cleaner once we have json output.
 
 output=$(cargo run -- ps --load --exclude-system-jobs)
-infos=$(grep -E 'gpuinfo=.*fan%=.*tempc=.*' <<< $output)
+infos=$(grep -E 'gpuinfo=.*musekib=.*' <<< $output)
 lines=$(wc -l <<< $infos)
 if (( $lines != 1 )); then
     echo "Number of matching output lines should be 1"
