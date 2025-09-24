@@ -102,7 +102,7 @@ fn format_newfmt_gpu_sample(c: &gpu::CardState) -> output::Object {
     if c.compute_mode != "" {
         s.push_s(SAMPLE_GPU_COMPUTE_MODE, c.compute_mode.clone());
     }
-    let perf = c.perf_state as u64 + 1; // extended-unsigned encoding
+    let perf = (c.perf_state + 1) as u64; // extended-unsigned encoding, perf_state may be -1 here.
     if perf != 0 {
         s.push_u(SAMPLE_GPU_PERFORMANCE_STATE, perf);
     }
