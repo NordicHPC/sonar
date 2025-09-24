@@ -52,6 +52,8 @@ extern "C" {
     pub fn xpu_device_get_card_info(device: cty::uint32_t, buf: *mut XpuCardInfo) -> cty::c_int;
 }
 
+const PERF_STATE_UNKNOWN: cty::c_int = -1;
+
 #[repr(C)]
 #[derive(Default)]
 pub struct XpuCardState {
@@ -110,12 +112,20 @@ pub fn get_card_configuration() -> Option<Vec<gpu::Card>> {
         if unsafe { xpu_device_get_card_info(dev, &mut infobuf) } == 0 {
             result.push(gpu::Card {
                 bus_addr: cstrdup(&infobuf.bus_addr),
-                model: cstrdup(&infobuf.model),
                 device: gpu::Name {
                     index: dev,
                     uuid: get_card_uuid(dev),
                 },
-                ..Default::default()
+                model: cstrdup(&infobuf.model),
+                driver: cstrdup(&infobuf.driver),
+                firmware: cstrdup(&infobuf.firmware),
+                arch: "Xpu".to_string(),
+                mem_size_kib: (infobuf.totalmem / 1024),
+                max_ce_clock_mhz: infobuf.max_ce_clock,
+                max_power_limit_watt: infobuf.max_power_limit,
+                max_mem_clock_mhz: 0,
+                power_limit_watt: 0,
+                min_power_limit_watt: 0,
             })
         }
     }
@@ -144,7 +154,13 @@ pub fn get_card_utilization() -> Option<Vec<gpu::CardState>> {
                 temp_c: infobuf.temp,
                 power_watt: (infobuf.power / 1000),
                 ce_clock_mhz: infobuf.ce_clock,
-                ..Default::default()
+                perf_state: PERF_STATE_UNKNOWN as i64,
+                compute_mode: "".to_string(),
+                fan_speed_pct: 0.0,
+                failing: 0,
+                mem_clock_mhz: 0,
+                mem_reserved_kib: 0,
+                power_limit_watt: 0,
             })
         } else {
             result.push(gpu::CardState {

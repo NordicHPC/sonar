@@ -7,4 +7,5 @@ daemon-kafka-*.txt
 daemon-directory-*.txt
 daemon-directory-data
 interrupt.output.txt
+lockfile.output.txt
 regress-*.txt
