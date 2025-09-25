@@ -303,7 +303,7 @@ fn parse_sacct_jobs_newfmt(sacct_output: &str, local: &libc::tm) -> Vec<Box<JobA
                     output_line.requested_cpus = parse_uint(&fieldvals[i]);
                 }
                 "ReqMem" => {
-                    output_line.requested_memory_per_node = parse_uint(&fieldvals[i]);
+                    output_line.requested_memory_per_node = parse_volume_kb(&fieldvals[i]);
                 }
                 "ReqNodes" => {
                     output_line.requested_node_count = parse_uint(&fieldvals[i]);
@@ -342,22 +342,22 @@ fn parse_sacct_jobs_newfmt(sacct_output: &str, local: &libc::tm) -> Vec<Box<JobA
                 }
 
                 "AveDiskRead" => {
-                    output_line.sacct_ave_disk_read = parse_volume(&fieldvals[i]);
+                    output_line.sacct_ave_disk_read = parse_volume_kb(&fieldvals[i]);
                 }
                 "AveDiskWrite" => {
-                    output_line.sacct_ave_disk_write = parse_volume(&fieldvals[i]);
+                    output_line.sacct_ave_disk_write = parse_volume_kb(&fieldvals[i]);
                 }
                 "AveRSS" => {
-                    output_line.sacct_ave_rss = parse_volume(&fieldvals[i]);
+                    output_line.sacct_ave_rss = parse_volume_kb(&fieldvals[i]);
                 }
                 "AveVMSize" => {
-                    output_line.sacct_ave_vmsize = parse_volume(&fieldvals[i]);
+                    output_line.sacct_ave_vmsize = parse_volume_kb(&fieldvals[i]);
                 }
                 "MaxRSS" => {
-                    output_line.sacct_max_rss = parse_volume(&fieldvals[i]);
+                    output_line.sacct_max_rss = parse_volume_kb(&fieldvals[i]);
                 }
                 "MaxVMSize" => {
-                    output_line.sacct_max_vmsize = parse_volume(&fieldvals[i]);
+                    output_line.sacct_max_vmsize = parse_volume_kb(&fieldvals[i]);
                 }
                 "AveCPU" => {
                     output_line.sacct_ave_cpu = parse_duration(&fieldvals[i]);
@@ -454,9 +454,9 @@ fn parse_duration(mut val: &str) -> u64 {
     }
 }
 
-fn parse_volume(val: &str) -> u64 {
+fn parse_volume_kb(val: &str) -> u64 {
     if val != "" {
-        let (val, _scale) = if let Some(suffix) = val.strip_suffix('K') {
+        let (val, scale) = if let Some(suffix) = val.strip_suffix('K') {
             (suffix, 1024)
         } else if let Some(suffix) = val.strip_suffix('M') {
             (suffix, 1024 * 1024)
@@ -465,7 +465,7 @@ fn parse_volume(val: &str) -> u64 {
         } else {
             (val, 1)
         };
-        val.parse::<u64>().unwrap_or(0)
+        (val.parse::<u64>().unwrap_or(0) * scale).div_ceil(1024)
     } else {
         0
     }
