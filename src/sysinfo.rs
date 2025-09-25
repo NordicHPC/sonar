@@ -1,27 +1,50 @@
 #![allow(clippy::len_zero)]
 #![allow(clippy::comparison_to_empty)]
 
+use crate::command;
 use crate::gpu;
 use crate::json_tags::*;
 use crate::output;
 use crate::systemapi;
+
+use base64::{engine::general_purpose::STANDARD, Engine as _};
 
 use std::io;
 
 #[cfg(feature = "daemon")]
 pub struct State<'a> {
     system: &'a dyn systemapi::SystemAPI,
+    topo_svg_cmd: Option<String>,
+    topo_text_cmd: Option<String>,
     token: String,
 }
 
 #[cfg(feature = "daemon")]
 impl<'a> State<'a> {
-    pub fn new(system: &'a dyn systemapi::SystemAPI, token: String) -> State<'a> {
-        State { system, token }
+    pub fn new(
+        system: &'a dyn systemapi::SystemAPI,
+        topo_svg_cmd: Option<String>,
+        topo_text_cmd: Option<String>,
+        token: String,
+    ) -> State<'a> {
+        State {
+            system,
+            topo_svg_cmd,
+            topo_text_cmd,
+            token,
+        }
     }
 
     pub fn run(&mut self, writer: &mut dyn io::Write) {
-        show_system(writer, self.system, self.token.clone(), false, true)
+        show_system(
+            writer,
+            self.system,
+            self.token.clone(),
+            false,
+            true,
+            self.topo_svg_cmd.clone(),
+            self.topo_text_cmd.clone(),
+        )
     }
 }
 
@@ -31,9 +54,21 @@ pub fn show_system(
     token: String,
     csv: bool,
     new_json: bool,
+    topo_svg_cmd: Option<String>,
+    topo_text_cmd: Option<String>,
 ) {
     let sysinfo = match compute_nodeinfo(system) {
-        Ok(info) => {
+        Ok(mut info) => {
+            if let Some(cmd) = topo_svg_cmd {
+                if let Some(output) = run_command_unsafely(cmd) {
+                    info.topo_svg = Some(output);
+                }
+            }
+            if let Some(cmd) = topo_text_cmd {
+                if let Some(output) = run_command_unsafely(cmd) {
+                    info.topo_text = Some(output);
+                }
+            }
             if !new_json {
                 layout_sysinfo_oldfmt(system, info)
             } else {
@@ -52,6 +87,22 @@ pub fn show_system(
         output::write_csv(writer, &output::Value::O(sysinfo));
     } else {
         output::write_json(writer, &output::Value::O(sysinfo));
+    }
+}
+
+// "Unsafely" because technically both the verb and args can contain spaces, but there's no way to
+// express that.
+fn run_command_unsafely(cmd: String) -> Option<String> {
+    let mut tokens = cmd.split_ascii_whitespace();
+    match tokens.next() {
+        Some(verb) => {
+            let args = tokens.collect::<Vec<&str>>();
+            match command::safe_command(verb, &args, 5) {
+                Ok(s) => Some(s),
+                Err(_) => None,
+            }
+        }
+        None => None,
     }
 }
 
@@ -91,9 +142,17 @@ fn layout_sysinfo_newfmt(
         distances.push(output::Value::A(r));
     }
     attrs.push_a(SYSINFO_ATTRIBUTES_DISTANCES, distances);
-    let topo_svg = "".to_string(); // TODO: should be in node_info
-    if topo_svg != "" {
-        attrs.push_s(SYSINFO_ATTRIBUTES_TOPO_SVG, topo_svg);
+    if let Some(ref topo_svg) = node_info.topo_svg {
+        attrs.push_s(
+            SYSINFO_ATTRIBUTES_TOPO_SVG,
+            STANDARD.encode(topo_svg.to_string()),
+        );
+    }
+    if let Some(ref topo_text) = node_info.topo_text {
+        attrs.push_s(
+            SYSINFO_ATTRIBUTES_TOPO_TEXT,
+            STANDARD.encode(topo_text.to_string()),
+        );
     }
     let gpu_info = layout_card_info_newfmt(&node_info);
     if gpu_info.len() > 0 {
@@ -288,6 +347,8 @@ struct NodeInfo {
     gpumem_kb: u64,
     cards: Vec<gpu::Card>,
     distances: Vec<Vec<u32>>, // square matrix
+    topo_svg: Option<String>,
+    topo_text: Option<String>,
 }
 
 fn compute_nodeinfo(system: &dyn systemapi::SystemAPI) -> Result<NodeInfo, String> {
@@ -356,6 +417,7 @@ fn compute_nodeinfo(system: &dyn systemapi::SystemAPI) -> Result<NodeInfo, Strin
     } else {
         ("".to_string(), 0, 0)
     };
+
     Ok(NodeInfo {
         node: system.get_hostname(),
         description: format!(
@@ -372,5 +434,7 @@ fn compute_nodeinfo(system: &dyn systemapi::SystemAPI) -> Result<NodeInfo, Strin
         gpumem_kb,
         cards,
         distances,
+        topo_svg: None,
+        topo_text: None,
     })
 }

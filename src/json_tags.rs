@@ -37,6 +37,7 @@ pub const SYSINFO_ATTRIBUTES_THREADS_PER_CORE: &str = "threads_per_core"; // Non
 pub const SYSINFO_ATTRIBUTES_CPU_MODEL: &str = "cpu_model"; // string
 pub const SYSINFO_ATTRIBUTES_MEMORY: &str = "memory"; // NonzeroUint
 pub const SYSINFO_ATTRIBUTES_TOPO_SVG: &str = "topo_svg"; // string
+pub const SYSINFO_ATTRIBUTES_TOPO_TEXT: &str = "topo_text"; // string
 pub const SYSINFO_ATTRIBUTES_CARDS: &str = "cards"; // []SysinfoGpuCard
 pub const SYSINFO_ATTRIBUTES_SOFTWARE: &str = "software"; // []SysinfoSoftwareVersion
 pub const SYSINFO_ATTRIBUTES_DISTANCES: &str = "distances"; // [][]uint64

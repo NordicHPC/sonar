@@ -23,3 +23,4 @@ subprocess = "0.2.9"
 rdkafka = { version = "0.38.0", optional = true, default-features = false, features = ["ssl"] }
 crossbeam = "0.8.4"
 signal-hook = "0.3.18"
+base64 = "0.22.1"

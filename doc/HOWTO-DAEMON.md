@@ -26,7 +26,8 @@ Boolean values are `true` or `false`.  Duration values express a time value usin
 `__m`, or `__s`, denoting hour, minute, or second values (uppercase HMS also allowed); values must
 be nonzero. For cadences, second values must divide a minute evently and be < 60, minute values must
 divide an hour evenly and < 60, and hour values must divide a day evenly or be a positive multiple
-of 24.  (Some sensible cadences such as 90m aka 1h30m are not currently expressible.)
+of 24.  (Some sensible cadences such as 80m aka 1h20m, which divides the day evenly, are not
+currently expressible.)
 
 The config file has `[global]` and `[debug]` sections that control general operation; an optional
 section for the transport type chosen, currently `[kafka]` or `[directory]` (otherwise terminal I/O
@@ -123,10 +124,26 @@ These are the normal options for `sonar ps`, see the Sonar documentation.
 ```
 cadence = <duration value>
 on-startup = <bool>                             # default true
+topo-svg-command = <string>                     # default none
+topo-text-command = <string>                    # default none
 ```
 
 If `on-startup` is `true` then a sysinfo operation will be executed every time the daemon is
 started, in addition to according to the cadence.
+
+The `topo-svg-command` value should be a command line that produces an SVG describing node topology
+on stdout, typically this would be "/path/to/lstopo --of svg".  The output of the command will be
+placed in the `topo_svg` field.
+
+The `topo-text-command` value should be a command line that produces text describing node topology
+on stdout, typically this would be "/path/to/hwloc-ls".  The output of the command will be placed in
+the `topo_text` field.
+
+Normally, at most one of `topo-svg-command` and `topo-text-command` is used.  If a command can't be
+executed, the directive is silently ignored.
+
+Note that on a serious node, the output of `lstopo` can be large, on the order of several
+hundred KB when base64-encoded, while the output for `hwloc-ls` is usually quite compact.
 
 ### `[jobs]` section aka `[slurm]` section
 

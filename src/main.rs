@@ -98,6 +98,12 @@ enum Commands {
 
         /// Cluster name
         cluster: Option<String>,
+
+        /// Command to execute for the topo_svg field
+        topo_svg_cmd: Option<String>,
+
+        /// Command to execute for the topo_text field
+        topo_text_cmd: Option<String>,
     },
     /// Extract slurm job information
     Slurmjobs {
@@ -198,7 +204,13 @@ fn main() {
                 &opts,
             );
         }
-        Commands::Sysinfo { csv, json, cluster } => {
+        Commands::Sysinfo {
+            csv,
+            json,
+            cluster,
+            topo_svg_cmd,
+            topo_text_cmd,
+        } => {
             let system = if cluster.is_some() {
                 system.with_cluster(cluster.as_ref().unwrap())
             } else {
@@ -210,6 +222,8 @@ fn main() {
                 token,
                 *csv,
                 *json,
+                topo_svg_cmd.clone(),
+                topo_text_cmd.clone(),
             );
         }
         Commands::Slurmjobs {
@@ -369,6 +383,8 @@ fn command_line() -> Commands {
                 let mut json = false;
                 let mut csv = false;
                 let mut cluster = None;
+                let mut topo_svg_cmd = None;
+                let mut topo_text_cmd = None;
                 while next < args.len() {
                     let arg = args[next].as_ref();
                     next += 1;
@@ -380,6 +396,14 @@ fn command_line() -> Commands {
                         string_arg(arg, &args, next, "--cluster")
                     {
                         (next, cluster) = (new_next, Some(value));
+                    } else if let Some((new_next, value)) =
+                        string_arg(arg, &args, next, "--topo-svg-cmd")
+                    {
+                        (next, topo_svg_cmd) = (new_next, Some(value));
+                    } else if let Some((new_next, value)) =
+                        string_arg(arg, &args, next, "--topo-text-cmd")
+                    {
+                        (next, topo_text_cmd) = (new_next, Some(value));
                     } else {
                         usage(true);
                     }
@@ -392,7 +416,13 @@ fn command_line() -> Commands {
                     eprintln!("--json requires --cluster");
                     std::process::exit(USAGE_ERROR);
                 }
-                Commands::Sysinfo { csv, json, cluster }
+                Commands::Sysinfo {
+                    csv,
+                    json,
+                    cluster,
+                    topo_svg_cmd,
+                    topo_text_cmd,
+                }
             }
             "slurm" => {
                 let mut window = None;
@@ -582,6 +612,12 @@ Options for `sysinfo`:
       Format output as new JSON, not the old JSON
   --cluster name
       Optional cluster name (required for --json) with which to tag output
+  --topo-svg-cmd
+      Optional command to execute to generate SVG source for the topo_svg field,
+      typically '/path/to/lstopo -of svg'
+  --topo-text-cmd
+      Optional command to execute to generate text for the topo_text field,
+      typically '/path/to/hwloc-ls'
 
 Options for `slurm`:
   --window minutes
