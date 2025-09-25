@@ -917,7 +917,7 @@ type SlurmJob struct {
 	// slurm: `JOB_INFO.minimum_cpus_per_node`
 	MinCPUSPerNode uint64 `json:"minimum_cpus_per_node,omitempty"`
 
-	// Amount of requested memory.
+	// Amount of requested memory in kilobytes.
 	//
 	// sacct: `ReqMem`
 	//
@@ -977,16 +977,16 @@ type SacctData struct {
 	// Average (system + user) CPU time of all tasks in job.
 	AveCPU uint64 `json:"AveCPU,omitempty"`
 
-	// Average number of bytes read by all tasks in job.
+	// Average number of kilobytes read by all tasks in job.
 	AveDiskRead uint64 `json:"AveDiskRead,omitempty"`
 
-	// Average number of bytes written by all tasks in job.
+	// Average number of kilobytes written by all tasks in job.
 	AveDiskWrite uint64 `json:"AveDiskWrite,omitempty"`
 
-	// Average resident set size of all tasks in job.
+	// Average resident set size of all tasks in job, in kilobytes.
 	AveRSS uint64 `json:"AveRSS,omitempty"`
 
-	// Average Virtual Memory size of all tasks in job.
+	// Average Virtual Memory size of all tasks in job, in kilobytes.
 	AveVMSize uint64 `json:"AveVMSize,omitempty"`
 
 	// The job's elapsed time in seconds.
@@ -998,10 +998,10 @@ type SacctData struct {
 	// The amount of user CPU time used by the job or job step.
 	UserCPU uint64 `json:"UserCPU,omitempty"`
 
-	// Maximum resident set size of all tasks in job.
+	// Maximum resident set size of all tasks in job, in kilobytes.
 	MaxRSS uint64 `json:"MaxRSS,omitempty"`
 
-	// Maximum Virtual Memory size of all tasks in job.
+	// Maximum Virtual Memory size of all tasks in job, in kilobytes.
 	MaxVMSize uint64 `json:"MaxVMSize,omitempty"`
 }
 

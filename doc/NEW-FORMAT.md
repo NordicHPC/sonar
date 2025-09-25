@@ -1026,7 +1026,7 @@ slurm: `JOB_INFO.minimum_cpus_per_node`
 
 #### **`requested_memory_per_node`** uint64
 
-Amount of requested memory.
+Amount of requested memory in kilobytes.
 
 sacct: `ReqMem`
 
@@ -1097,19 +1097,19 @@ Average (system + user) CPU time of all tasks in job.
 
 #### **`AveDiskRead`** uint64
 
-Average number of bytes read by all tasks in job.
+Average number of kilobytes read by all tasks in job.
 
 #### **`AveDiskWrite`** uint64
 
-Average number of bytes written by all tasks in job.
+Average number of kilobytes written by all tasks in job.
 
 #### **`AveRSS`** uint64
 
-Average resident set size of all tasks in job.
+Average resident set size of all tasks in job, in kilobytes.
 
 #### **`AveVMSize`** uint64
 
-Average Virtual Memory size of all tasks in job.
+Average Virtual Memory size of all tasks in job, in kilobytes.
 
 #### **`ElapsedRaw`** uint64
 
@@ -1125,11 +1125,11 @@ The amount of user CPU time used by the job or job step.
 
 #### **`MaxRSS`** uint64
 
-Maximum resident set size of all tasks in job.
+Maximum resident set size of all tasks in job, in kilobytes.
 
 #### **`MaxVMSize`** uint64
 
-Maximum Virtual Memory size of all tasks in job.
+Maximum Virtual Memory size of all tasks in job, in kilobytes.
 
 ### Type: `ClusterEnvelope`
 
