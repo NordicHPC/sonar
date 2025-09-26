@@ -481,11 +481,23 @@ fn repeated_event(_whoami: &str, sender: channel::Sender<Operation>, op: Operati
         // delay is always the number of seconds since the first event.  2^64 seconds is nearly 6e11
         // years.  The initial timestamp is some 32-bit value for the foreseeable future.
 
-        count += 1;
-        let next = first + count * delay;
-        let next_delay = next as i64 - unix_now() as i64;
-        if next_delay > 0 {
-            thread::sleep(std::time::Duration::from_secs(next_delay as u64));
+        let next = (first + (count + 1) * delay) as i64;
+        let now = unix_now() as i64;
+        let next_delay = next - now;
+        if next_delay >= 0 {
+            count += 1;
+            if next_delay > 0 {
+                thread::sleep(std::time::Duration::from_secs(next_delay as u64));
+            }
+        } else {
+            // We missed one or more deadlines.  We should send the message, but only one,
+            // so update count more.
+            // solve (first + (count + c) * delay) >= now for 'c'
+            // (count + c) * delay >= now-first
+            // count*delay + c*delay >= now-first
+            // c*delay >= now-first - count*delay
+            // c >= (now-first)/delay - count
+            count = (now - first).div_ceil(delay);
         }
     }
 }
