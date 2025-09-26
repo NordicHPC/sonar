@@ -6,13 +6,6 @@
 
 set -e
 
-# sysinfo-syntax.sh requires jq
-# check whether jq is available and exit if not
-if ! command -v jq &> /dev/null; then
-    echo "ERROR: jq is required for sysinfo-syntax.sh"
-    exit 1
-fi
-
 # keep tests alphabetical
 # later we could just iterate over all scripts that end with .sh
 tests="amd-gpu \
@@ -40,6 +33,8 @@ tests="amd-gpu \
      rollup \
      rollup2 \
      regress-369-kafka-pump \
+     sacct-parsing \
+     sinfo-parsing \
      slurm-no-sacct \
      slurm-syntax \
      sysinfo-syntax \

@@ -8,4 +8,6 @@ daemon-directory-*.txt
 daemon-directory-data
 interrupt.output.txt
 lockfile.output.txt
+*.tmp
 regress-*.txt
+testdata/*.bak

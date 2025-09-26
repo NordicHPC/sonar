@@ -35,3 +35,7 @@ configuration is needed.
 The interactive tests are:
 
 - `kafka-interactive` tests Sonar's output-to-Kafka-broker functionality with a live broker
+
+## Coding standards
+
+Most tests don't do this yet, but it's useful to name all temp files <test-name>-<something>.tmp.
