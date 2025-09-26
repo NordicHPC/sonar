@@ -344,9 +344,6 @@ type SysinfoAttributes struct {
 	// Per-card information
 	Cards []SysinfoGpuCard `json:"cards,omitempty"`
 
-	// Per-software-package information
-	Software []SysinfoSoftwareVersion `json:"software,omitempty"`
-
 	// Square matrix of standard NUMA node-to-node distances (normalized to 10 for self distance)
 	Distances [][]uint64 `json:"distances,omitempty"`
 }
@@ -403,28 +400,6 @@ type SysinfoGpuCard struct {
 
 	// Max clock of GPU memory
 	MaxMemoryClock uint64 `json:"max_memory_clock,omitempty"`
-}
-
-// The software versions are obtained by system-dependent means. As the monitoring component runs
-// outside the monitored processes' contexts and is not aware of software that has been loaded with
-// eg module load, the software reported in the software fields is thus software that is either
-// always loaded and always available to all programs, or which can be loaded by any program but
-// may or may not be.
-//
-// NOTE: For GPU software: On NVIDIA systems, one can look in `$CUDA_ROOT/version.json`, where the
-// key/name/version values are encoded directly.  On AMD systems, one can look in
-// `$ROCm_ROOT/.info/.version*`, where the file name encodes the component key and the file stores
-// the version number. Clearly other types of software could also be reported for the node (R,
-// Jupyter, etc), based on information from modules, say.
-type SysinfoSoftwareVersion struct {
-	// A unique identifier for the software package
-	Key NonemptyString `json:"key"`
-
-	// Human-readable name of the software package
-	Name string `json:"name,omitempty"`
-
-	// The package's version number, in some package-specific format
-	Version NonemptyString `json:"version"`
 }
 
 // The "sample" record is sent from each node at each sampling interval in the form of a top-level

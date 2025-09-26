@@ -158,20 +158,6 @@ fn layout_sysinfo_newfmt(
     if gpu_info.len() > 0 {
         attrs.push_a(SYSINFO_ATTRIBUTES_CARDS, gpu_info);
     }
-    let software = Vec::<(String, String, String)>::new(); // TODO: should be in node_info
-    if software.len() > 0 {
-        let mut sw = output::Array::new();
-        for (key, name, version) in software {
-            let mut s = output::Object::new();
-            s.push_s(SYSINFO_SOFTWARE_VERSION_KEY, key);
-            if name != "" {
-                s.push_s(SYSINFO_SOFTWARE_VERSION_NAME, name);
-            }
-            s.push_s(SYSINFO_SOFTWARE_VERSION_VERSION, version);
-            sw.push_o(s);
-        }
-        attrs.push_a(SYSINFO_ATTRIBUTES_SOFTWARE, sw);
-    }
     data.push_o(SYSINFO_DATA_ATTRIBUTES, attrs);
     envelope.push_o(SYSINFO_ENVELOPE_DATA, data);
     envelope

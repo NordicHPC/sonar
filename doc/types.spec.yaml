@@ -133,10 +133,6 @@ SysinfoAttributes:
       type: '[]SysinfoGpuCard'
       doc: >
         Per-card information
-    software:
-      type: '[]SysinfoSoftwareVersion'
-      doc: >
-        Per-software-package information
     distances:
       type: '[][]uint64'
       doc: >
@@ -199,20 +195,6 @@ SysinfoGpuCard:
       type: 'uint64'
       doc: >
         Max clock of GPU memory
-SysinfoSoftwareVersion:
-  fields:
-    key:
-      type: 'NonemptyString'
-      doc: >
-        A unique identifier for the software package
-    name:
-      type: 'string'
-      doc: >
-        Human-readable name of the software package
-    version:
-      type: 'NonemptyString'
-      doc: >
-        The package's version number, in some package-specific format
 SampleEnvelope:
   fields:
     meta:

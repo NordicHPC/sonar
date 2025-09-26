@@ -338,10 +338,6 @@ Base64-encoded text output (human-readable) of `hwloc-ls` or similar
 
 Per-card information
 
-#### **`software`** []SysinfoSoftwareVersion
-
-Per-software-package information
-
 #### **`distances`** [][]uint64
 
 Square matrix of standard NUMA node-to-node distances (normalized to 10 for self distance)
@@ -414,32 +410,6 @@ Max clock of compute element
 #### **`max_memory_clock`** uint64
 
 Max clock of GPU memory
-
-### Type: `SysinfoSoftwareVersion`
-
-The software versions are obtained by system-dependent means. As the monitoring component runs
-outside the monitored processes' contexts and is not aware of software that has been loaded with
-eg module load, the software reported in the software fields is thus software that is either
-always loaded and always available to all programs, or which can be loaded by any program but
-may or may not be.
-
-NOTE: For GPU software: On NVIDIA systems, one can look in `$CUDA_ROOT/version.json`, where the
-key/name/version values are encoded directly.  On AMD systems, one can look in
-`$ROCm_ROOT/.info/.version*`, where the file name encodes the component key and the file stores
-the version number. Clearly other types of software could also be reported for the node (R,
-Jupyter, etc), based on information from modules, say.
-
-#### **`key`** NonemptyString
-
-A unique identifier for the software package
-
-#### **`name`** string
-
-Human-readable name of the software package
-
-#### **`version`** NonemptyString
-
-The package's version number, in some package-specific format
 
 ### Type: `SampleEnvelope`
 

@@ -66,7 +66,6 @@ func TestNewJSONSysinfo(t *testing.T) {
 			assert(t, c.MinPowerLimit == 100, "#0 card min power limit")
 			assert(t, c.MaxCEClock == 2100, "#0 card max ce clock")
 			assert(t, c.MaxMemoryClock == 7000, "#0 card max memory clock")
-			assert(t, len(a.Software) == 0, "#0 software")
 		case 1:
 			a := info.Data.Attributes
 			assert(t, a.Cluster == "fox.educloud.no", "#1 cluster")
