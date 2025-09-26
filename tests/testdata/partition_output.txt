@@ -1,0 +1,13 @@
+normal*|c1-[5-28]|
+accel|gpu-[1-2,4-5,7-9,11-16]|
+accel_long|gpu-[1-2,8-9]|
+mig|gpu-10|
+autotekst|gpu-[10,13]|
+bigmem|bigmem-[1-2],c1-29|
+ifi_accel|gpu-[4-6,11]|
+ifi_dj_accel|gpu-12|
+ifi_bigmem|c1-29|
+pods|c1-[6-7]|
+fhi_bigmem|bigmem-[1-2]|
+hf_accel|gpu-[14-15]|
+klm_accel|gpu-16|

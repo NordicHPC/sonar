@@ -24,7 +24,7 @@ jobs:
     - name: Test
       run: cargo test --verbose
 
-      # one of the shell tests below needs jq
+      # many of the shell tests below need jq
     - name: Install jq
       run: |
         sudo apt-get update
