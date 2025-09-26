@@ -18,7 +18,7 @@ fi
 
 # JSON - the only format available
 
-output=$(cargo run -- --cluster x --json)
+output=$(cargo run -- cluster --cluster fox.educloud.no --json)
 
 # Syntax check
 

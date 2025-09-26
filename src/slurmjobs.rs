@@ -685,9 +685,9 @@ fn check_ymd(s: &str) -> bool {
 
 // There is a test case that the "error" field is generated correctly in ../tests/slurm-no-sacct.sh.
 
-// Test that known sacct output is formatted correctly.
+// Test that known sacct output is formatted correctly as old-style CSV.
 #[test]
-pub fn test_format_sacct_jobs() {
+pub fn test_format_sacct_jobs_old_csv() {
     // Actual sacct output from Fox, anonymized and with one command name replaced and Priority
     // added.
     let sacct_output = std::include_str!("testdata/sacct-output.txt");
