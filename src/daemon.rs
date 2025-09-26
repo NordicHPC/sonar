@@ -83,6 +83,8 @@ pub struct SampleIni {
 pub struct SysinfoIni {
     pub on_startup: bool,
     pub cadence: Option<Dur>,
+    pub topo_svg_cmd: Option<String>,
+    pub topo_text_cmd: Option<String>,
 }
 
 pub struct JobsIni {
@@ -297,7 +299,12 @@ pub fn daemon_mode(
         },
     );
 
-    let mut sysinfo_extractor = sysinfo::State::new(&system, api_token.clone());
+    let mut sysinfo_extractor = sysinfo::State::new(
+        &system,
+        ini.sysinfo.topo_svg_cmd.clone(),
+        ini.sysinfo.topo_text_cmd.clone(),
+        api_token.clone(),
+    );
 
     let mut cluster_extractor = cluster::State::new(&system, api_token.clone());
 
@@ -651,6 +658,8 @@ fn parse_config(config_file: &str) -> Result<Ini, String> {
         sysinfo: SysinfoIni {
             on_startup: true,
             cadence: None,
+            topo_svg_cmd: None,
+            topo_text_cmd: None,
         },
         jobs: JobsIni {
             cadence: None,
@@ -837,6 +846,12 @@ fn parse_config(config_file: &str) -> Result<Ini, String> {
                 }
                 "cadence" => {
                     ini.sysinfo.cadence = Some(parse_duration("sysinfo.cadence", &value, false)?);
+                }
+                "topo-svg-command" => {
+                    ini.sysinfo.topo_svg_cmd = Some(value);
+                }
+                "topo-text-command" => {
+                    ini.sysinfo.topo_text_cmd = Some(value);
                 }
                 _ => return Err(format!("Invalid [sysinfo] setting name `{name}`")),
             },

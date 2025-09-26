@@ -333,8 +333,13 @@ type SysinfoAttributes struct {
 	// Primary memory in kilobytes
 	Memory NonzeroUint `json:"memory"`
 
-	// Base64-encoded SVG output of `lstopo`
+	// Base64-encoded text output (SVG source text) of `lstopo` or similar, using the base64
+	// alphabet from RFC4648.
 	TopoSVG string `json:"topo_svg,omitempty"`
+
+	// Base64-encoded text output (human-readable) of `hwloc-ls` or similar, using the base64
+	// alphabet from RFC4648.
+	TopoText string `json:"topo_text,omitempty"`
 
 	// Per-card information
 	Cards []SysinfoGpuCard `json:"cards,omitempty"`

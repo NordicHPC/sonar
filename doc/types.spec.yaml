@@ -124,7 +124,11 @@ SysinfoAttributes:
     topo_svg:
       type: 'string'
       doc: >
-        Base64-encoded SVG output of `lstopo`
+        Base64-encoded text output (SVG source text) of `lstopo` or similar
+    topo_text:
+      type: 'string'
+      doc: >
+        Base64-encoded text output (human-readable) of `hwloc-ls` or similar
     cards:
       type: '[]SysinfoGpuCard'
       doc: >

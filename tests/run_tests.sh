@@ -43,6 +43,7 @@ tests="amd-gpu \
      slurm-no-sacct \
      slurm-syntax \
      sysinfo-syntax \
+     sysinfo-topo \
      user \
      xpu-gpu"
 
