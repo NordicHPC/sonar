@@ -411,8 +411,9 @@ fn parse_uint_full(val: &str, scale: u64, bias: u64) -> u64 {
 fn parse_date(val: &str, local: &libc::tm) -> String {
     if val != "" && val != "Unknown" {
         // Reformat timestamps.  The slurm date format is localtime without a time zone offset.
-        // This is bound to lead to problems eventually, so reformat.  If parsing fails, just
-        // transmit the date and let the consumer deal with it.
+        // This is bound to lead to problems eventually, so reformat with a time zone based on the
+        // local time, which is the best available information.  (If parsing fails, just transmit
+        // the date and let the consumer deal with it.)
         if let Ok(mut t) = time::parse_date_and_time_no_tzo(val) {
             t.tm_gmtoff = local.tm_gmtoff;
             t.tm_isdst = local.tm_isdst;
@@ -685,9 +686,9 @@ fn check_ymd(s: &str) -> bool {
 
 // There is a test case that the "error" field is generated correctly in ../tests/slurm-no-sacct.sh.
 
-// Test that known sacct output is formatted correctly.
+// Test that known sacct output is formatted correctly as old-style CSV.
 #[test]
-pub fn test_format_sacct_jobs() {
+pub fn test_format_sacct_jobs_old_csv() {
     // Actual sacct output from Fox, anonymized and with one command name replaced and Priority
     // added.
     let sacct_output = std::include_str!("testdata/sacct-output.txt");

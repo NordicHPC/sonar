@@ -16,8 +16,12 @@ use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
 use std::fs;
 use std::io;
+#[cfg(debug_assertions)]
+use std::io::{Read, Write};
 use std::os::linux::fs::MetadataExt;
 use std::path;
+#[cfg(debug_assertions)]
+use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
@@ -268,6 +272,10 @@ impl systemapi::SystemAPI for System {
         from: &str,
         to: &str,
     ) -> Result<String, String> {
+        #[cfg(debug_assertions)]
+        if let Ok(filename) = std::env::var("SONARTEST_MOCK_SACCT") {
+            return Ok(mock_input(filename));
+        }
         runit(
             "sacct",
             &[
@@ -291,6 +299,12 @@ impl systemapi::SystemAPI for System {
     // client wants it repeatedly.
 
     fn compute_cluster_kind(&self) -> Option<systemapi::ClusterKind> {
+        #[cfg(debug_assertions)]
+        if std::env::var("SONARTEST_MOCK_PARTITIONS").is_ok()
+            || std::env::var("SONARTEST_MOCK_NODES").is_ok()
+        {
+            return Some(systemapi::ClusterKind::Slurm);
+        }
         match runit("sinfo", &["--usage"], SINFO_TIMEOUT_S) {
             Ok(_) => Some(systemapi::ClusterKind::Slurm),
             Err(_) => None,
@@ -310,19 +324,35 @@ impl systemapi::SystemAPI for System {
     // Anyway, we emit a list of partitions with their nodes and a list of nodes with their states.
 
     fn compute_cluster_partitions(&self) -> Result<Vec<(String, String)>, String> {
-        twofields(runit(
-            "sinfo",
-            &["-h", "-a", "-O", "Partition:|,NodeList:|"],
-            SINFO_TIMEOUT_S,
-        )?)
+        let mut input = None;
+        #[cfg(debug_assertions)]
+        if let Ok(filename) = std::env::var("SONARTEST_MOCK_PARTITIONS") {
+            input = Some(mock_input(filename));
+        }
+        if input.is_none() {
+            input = Some(runit(
+                "sinfo",
+                &["-h", "-a", "-O", "Partition:|,NodeList:|"],
+                SINFO_TIMEOUT_S,
+            )?);
+        }
+        twofields(input.unwrap())
     }
 
     fn compute_cluster_nodes(&self) -> Result<Vec<(String, String)>, String> {
-        twofields(runit(
-            "sinfo",
-            &["-h", "-a", "-e", "-O", "NodeList:|,StateComplete:|"],
-            SINFO_TIMEOUT_S,
-        )?)
+        let mut input = None;
+        #[cfg(debug_assertions)]
+        if let Ok(filename) = std::env::var("SONARTEST_MOCK_NODES") {
+            input = Some(mock_input(filename));
+        }
+        if input.is_none() {
+            input = Some(runit(
+                "sinfo",
+                &["-h", "-a", "-e", "-O", "NodeList:|,StateComplete:|"],
+                SINFO_TIMEOUT_S,
+            )?);
+        }
+        twofields(input.unwrap())
     }
 
     // Assuming no bugs, the interesting interrupt signals are SIGHUP, SIGTERM, SIGINT, and SIGQUIT.
@@ -355,9 +385,55 @@ impl systemapi::SystemAPI for System {
     }
 }
 
+#[cfg(debug_assertions)]
+fn mock_input(filename: String) -> String {
+    match fs::File::open(&filename) {
+        Ok(mut f) => {
+            let mut buf = String::new();
+            match f.read_to_string(&mut buf) {
+                Ok(_) => {
+                    return buf;
+                }
+                Err(e) => {
+                    panic!("Could not read sacct input file {filename}: {e}");
+                }
+            }
+        }
+        Err(e) => {
+            panic!("Could not open sacct input filename {filename}: {e}")
+        }
+    }
+}
+
+// This is atomic only to allow it to be a global variable w/o using unsafe, there's no threading
+// here, and Relaxed is sufficient.
+#[cfg(debug_assertions)]
+static FILE_COUNTER: AtomicUsize = AtomicUsize::new(0);
+
 fn runit(cmd: &str, args: &[&str], timeout: u64) -> Result<String, String> {
     match command::safe_command(cmd, args, timeout) {
-        Ok(s) => Ok(s),
+        Ok(sacct_output) => {
+            #[cfg(debug_assertions)]
+            if let Ok(ref filename) = std::env::var("SONARTEST_SUBCOMMAND_OUTPUT") {
+                eprintln!("{cmd} {:?}", args);
+                let filename = match FILE_COUNTER.fetch_add(1, Ordering::Relaxed) {
+                    0 => filename.to_string(),
+                    n => format!("{filename}.{n}"),
+                };
+                match fs::File::create(&filename) {
+                    Ok(mut f) => match f.write_all(sacct_output.as_bytes()) {
+                        Ok(()) => {}
+                        Err(e) => {
+                            panic!("Could not write sacct output file {filename}: {e}");
+                        }
+                    },
+                    Err(e) => {
+                        panic!("Could not open sacct output file {filename}: {e}");
+                    }
+                }
+            }
+            Ok(sacct_output)
+        }
         Err(command::CmdError::CouldNotStart(e)) => Err(e),
         Err(command::CmdError::Failed(e)) => Err(e),
         Err(command::CmdError::Hung(e)) => Err(e),
