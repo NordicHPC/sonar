@@ -558,7 +558,7 @@ SlurmJob:
     requested_memory_per_node:
       type: 'uint64'
       doc: >
-        Amount of requested memory.  sacct: `ReqMem`  slurm: `JOB_INFO.memory_per_node`
+        Amount of requested memory in kilobytes.  sacct: `ReqMem`  slurm: `JOB_INFO.memory_per_node`
     requested_node_count:
       type: 'uint64'
       doc: >
@@ -600,19 +600,19 @@ SacctData:
     AveDiskRead:
       type: 'uint64'
       doc: >
-        Average number of bytes read by all tasks in job.
+        Average number of kilobytes read by all tasks in job.
     AveDiskWrite:
       type: 'uint64'
       doc: >
-        Average number of bytes written by all tasks in job.
+        Average number of kilobytes written by all tasks in job.
     AveRSS:
       type: 'uint64'
       doc: >
-        Average resident set size of all tasks in job.
+        Average resident set size of all tasks in job, in kilobytes.
     AveVMSize:
       type: 'uint64'
       doc: >
-        Average Virtual Memory size of all tasks in job.
+        Average Virtual Memory size of all tasks in job, in kilobytes.
     ElapsedRaw:
       type: 'uint64'
       doc: >
@@ -628,11 +628,11 @@ SacctData:
     MaxRSS:
       type: 'uint64'
       doc: >
-        Maximum resident set size of all tasks in job.
+        Maximum resident set size of all tasks in job, in kilobytes.
     MaxVMSize:
       type: 'uint64'
       doc: >
-        Maximum Virtual Memory size of all tasks in job.
+        Maximum Virtual Memory size of all tasks in job, in kilobytes.
 ClusterEnvelope:
   fields:
     meta:
