@@ -20,15 +20,15 @@ output=$(SONARTEST_ROLLUP=1 cargo run -- ps --rollup --exclude-system-jobs)
 matches=$(grep ,cmd=rollup, <<< $output)
 rolled=$(grep ,rolledup=1 <<< $matches)
 rolled2=$(grep ,rolledup= <<< $matches)
-if [[ $(wc -l <<< $matches) != 23 ]]; then
+if (( $(wc -l <<< $matches) != 23 )); then
     echo "Bad number of matching lines"
     exit 1
 fi
-if [[ $(wc -l <<< $rolled) != 8 ]]; then
+if (( $(wc -l <<< $rolled) != 8 )); then
     echo "Bad number of rolled-up lines with value 1"
     exit 1
 fi
-if [[ $(wc -l <<< $rolled2) != 8 ]]; then
+if (( $(wc -l <<< $rolled2) != 8 )); then
     echo "Bad number of rolled-up lines - some have a value other than 1"
     exit 1
 fi

@@ -1,18 +1,18 @@
 #!/usr/bin/env bash
 #
 # Check that the Kafka data sink does its job (without sending anything)
-# Requirement: the `jq` utility.
 
 set -e
 echo "This test takes about 30s"
-if [[ $(command -v jq) == "" ]]; then
+if [[ -z $(command -v jq) ]]; then
     echo "Install jq first"
     exit 1
 fi
 
-outfile=daemon-kafka-output.txt
-logfile=daemon-kafka-log.txt
-if [[ $SKIP == "" ]]; then
+mkdir -p tmp
+outfile=tmp/daemon-kafka-output.txt
+logfile=tmp/daemon-kafka-log.txt
+if [[ -z $SKIP ]]; then
     rm -rf $outfile $logfile
 fi
 
@@ -21,7 +21,7 @@ fi
 # If it is set to "fail-all-odd-messages" then every odd-numbered message will fail to be enqueued,
 # and a message about this is printed on stdout (in addition to appearing in the log).
 
-if [[ $SKIP == "" ]]; then
+if [[ -z $SKIP ]]; then
     SONARTEST_MOCK_KAFKA=fail-all-odd-messages cargo run -- daemon daemon-kafka.ini > $outfile 2> $logfile
 fi
 

@@ -3,7 +3,7 @@
 # Check that we can compile and run something with various feature sets.
 
 set -e
-if [[ $(command -v jq) == "" ]]; then
+if [[ -z $(command -v jq) ]]; then
     echo "Install jq first"
     exit 1
 fi

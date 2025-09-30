@@ -5,15 +5,18 @@
 
 set -e
 echo " This takes about 20s"
-rm -f interrupt.output.txt
-SONARTEST_WAIT_INTERRUPT=1 cargo run -- ps 2> interrupt.output.txt &
+
+mkdir -p tmp
+output=tmp/interrupt.output.txt
+rm -f $output
+
+SONARTEST_WAIT_INTERRUPT=1 cargo run -- ps 2> $output &
 bgpid=$!
 sleep 10
 kill -TERM $bgpid
 sleep 10
-if [[ $(tail -n 1 interrupt.output.txt) != 'Info: Interrupt flag was set!' ]]; then
+if [[ $(tail -n 1 $output) != 'Info: Interrupt flag was set!' ]]; then
     echo "Unexpected output!"
     exit 1
 fi
-rm -f interrupt.output.txt
 

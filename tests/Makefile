@@ -8,10 +8,4 @@ rollupchild2: rollupchild
 
 # Same files as in .gitignore
 clean:
-	rm -rf rollup rollup2 rollupchild rollupchild2 \
-	daemon-interrupt-*.txt \
-	daemon-directory-*.txt daemon-directory-data \
-	daemon-kafka-*.txt \
-	regress-*.txt \
-	*.tmp \
-	*~
+	rm -rf rollup rollup2 rollupchild rollupchild2 tmp *~

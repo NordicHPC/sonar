@@ -9,7 +9,7 @@ numbad=$(cargo run -- ps --exclude-commands bash,sh,zsh,csh,ksh,tcsh,kworker | \
 /,cmd=(ba|z|c|k|tc|)sh/ { print }
 " | \
     wc -l)
-if [[ $numbad -ne 0 ]]; then
+if (( numbad != 0 )); then
     echo "Command filtering did not work"
     exit 1
 fi

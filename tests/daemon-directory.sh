@@ -7,11 +7,12 @@
 set -e
 echo "This test takes about 20s"
 
-data_dir=daemon-directory-data
-logfile=daemon-directory-log.txt
+mkdir -p tmp
+data_dir=tmp/daemon-directory-data
+logfile=tmp/daemon-directory-log.txt
 rm -rf $data_dir $logfile
-cargo run -- daemon daemon-directory.ini 2>$logfile
 
+cargo run -- daemon daemon-directory.ini 2>$logfile
 if [[ ! -d $data_dir ]]; then
     echo "No data directory"
     exit 1
@@ -20,13 +21,13 @@ fi
 # There may be more than one output file of each kind if the test ran across midnight UTC; that's OK.
 
 n=$(cat $data_dir/*/*/*/0+sysinfo*json | wc -c)
-if (( $n == 0 )); then
+if (( n == 0 )); then
     echo "Sysinfo file should not be empty"
     exit 1
 fi
 
 n=$(cat $data_dir/*/*/*/0+sample*json | wc -c)
-if (( $n == 0 )); then
+if (( n == 0 )); then
     echo "Sample file should not be empty"
     exit 1
 fi

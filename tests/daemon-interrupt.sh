@@ -18,13 +18,17 @@ echo " This takes about 45s"
 # To test this, we send it a signal after 10s.  At this point, nothing should have been printed, but
 # approximately 3 lines of output should have been accumulated in the buffer.
 
+mkdir -p tmp
+output=tmp/daemon-interrupt-output.txt
+log=tmp/daemon-interrupt-log.txt
+
 for signal in TERM INT HUP; do
     echo "  Testing SIG$signal"
-    rm -f daemon-interrupt-output.txt daemon-interrupt-log.txt
+    rm -f $output $log
 
     # Fork off the daemon in the background
 
-    cargo run -- daemon daemon-interrupt.ini > daemon-interrupt-output.txt 2> daemon-interrupt-log.txt &
+    cargo run -- daemon daemon-interrupt.ini > $output 2> $log &
     pid=$!
 
     # Wait for some output to accumulate in internal buffers
@@ -33,7 +37,7 @@ for signal in TERM INT HUP; do
 
     # Output should have been held
 
-    if (( $(wc -l < daemon-interrupt-output.txt) != 0 )); then
+    if (( $(wc -l < $output) != 0 )); then
         echo "Output file is not empty, output-delay did not work"
         exit 1
     fi
@@ -46,7 +50,7 @@ for signal in TERM INT HUP; do
 
     # The process should have exited
 
-    if [[ $(ps -h -p $pid) != "" ]]; then
+    if [[ -n $(ps -h -p $pid) ]]; then
         echo "Daemon failed to stop after 2s following signal"
         exit 1
     fi
@@ -57,8 +61,8 @@ for signal in TERM INT HUP; do
     # sampling should be disabled to tighten the test.  However, since `cargo run` is sort of slow
     # we can have fewer...
 
-    lines=$(grep '{"topic":' daemon-interrupt-output.txt | wc -l)
-    if (( $lines < 2 || $lines > 5 )); then
+    lines=$(grep '{"topic":' $output | wc -l)
+    if (( lines < 2 || lines > 5 )); then
         echo "Output file is too short or too long, flushing did not work or something else is off"
         exit 1
     fi
@@ -73,7 +77,7 @@ for signal in TERM INT HUP; do
         TERM) s=15 ;;
     esac
     expect="Info: Received signal $s"
-    if [[ $(tail -n 1 daemon-interrupt-log.txt) != $expect ]]; then
+    if [[ $(tail -n 1 $log) != $expect ]]; then
         echo "Incorrect signal information, expected \'$expect\'"
         exit 1
     fi

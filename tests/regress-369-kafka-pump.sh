@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 #
 # Regression test for https://github.com/NordicHPC/sonar/issues/369
-# Requirement: the `jq` utility.
 
 set -e
 echo "This test takes about 30s"
@@ -10,11 +9,14 @@ if [[ -z $(command -v jq) ]]; then
     exit 1
 fi
 
-outfile=regress-369-output.txt
-logfile=regress-369-log.txt
+mkdir -p tmp
+outfile=tmp/regress-369-output.txt
+logfile=tmp/regress-369-log.txt
 if [[ -z $SKIP ]]; then
-    rm -rf $outfile $logfile
+    rm -f $outfile $logfile
 fi
+timestamps=tmp/regress-369-timestamps.txt
+rm -f $timestamps
 
 # The ini produces one record every second but has a 10s sending window and runs the daemon for 30s.
 
@@ -25,12 +27,12 @@ fi
 # First test that messages are not re-sent: all messages should have distinct time stamps and they
 # should be strictly ascending in the output
 
-jq .value.data.attributes.time < $outfile > regress-369-timestamps.txt
-if ! sort --check=silent regress-369-timestamps.txt; then
+jq .value.data.attributes.time < $outfile > $timestamps
+if ! sort --check=silent $timestamps; then
     echo "Timestamps are not ordered!"
     exit 1
 fi
-if [[ -n $(uniq --repeated regress-369-timestamps.txt) ]]; then
+if [[ -n $(uniq --repeated $timestamps) ]]; then
     echo "Timestamps are not unique!"
     exit 1
 fi

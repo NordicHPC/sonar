@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 #
 # Check that `sonar cluster` produces correct output from a known input.
-# Requirement: the `jq` utility.
 
 set -e
 if [[ -z $(command -v jq) ]]; then
@@ -9,17 +8,18 @@ if [[ -z $(command -v jq) ]]; then
     exit 1
 fi
 
-sonar_output=sinfo-parsing-sinfo-output.tmp
-partitions1=sinfo-parsing-partitions1.tmp
-nodes1=sinfo-parsing-nodes1.tmp
-partitions2=sinfo-parsing-partitions2.tmp
-nodes2=sinfo-parsing-nodes2.tmp
+mkdir -p tmp
+sonar_output=tmp/sinfo-parsing-sinfo-output.tmp
+partitions1=tmp/sinfo-parsing-partitions1.tmp
+nodes1=tmp/sinfo-parsing-nodes1.tmp
+partitions2=tmp/sinfo-parsing-partitions2.tmp
+nodes2=tmp/sinfo-parsing-nodes2.tmp
+rm -f $sonar_output $partitions1 $partitions2 $nodes1 $nodes2
 
 # This is pretty harsh: we require bitwise-identical output.  The assumption is that we have
 # hand-checked the output in testdata.  An alternative is to descend into the produced data here
 # with jq and make sure specific values are as expected.  But it amounts to the same thing.
 
-rm -f $sonar_output $partitions1 $partitions2 $nodes1 $nodes2
 SONARTEST_MOCK_PARTITIONS=testdata/partition_output.txt SONARTEST_MOCK_NODES=testdata/node_output.txt \
 			 cargo run -- cluster --json --cluster fox.educloud.no > $sonar_output
 
@@ -36,5 +36,4 @@ if ! cmp $nodes1 $nodes2; then
     echo "Sonar partitions differ"
     exit 1
 fi
-rm -f $sonar_output $partitions1 $partitions2 $nodes1 $nodes2
 echo " Ok"

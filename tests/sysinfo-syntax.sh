@@ -1,10 +1,9 @@
 #!/usr/bin/env bash
 #
 # Check that `sonar sysinfo` produces properly formatted JSON.
-# Requirement: the `jq` utility.
 
 set -e
-if [[ $(command -v jq) == "" ]]; then
+if [[ -z $(command -v jq) ]]; then
     echo "Install jq first"
     exit 1
 fi

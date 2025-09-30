@@ -1,17 +1,16 @@
 #!/usr/bin/env bash
 #
 # Check that `sonar cluster` produces error output if sinfo is not present.
-# Requirement: the `jq` utility.
 
 set -e
-if [[ $(command -v jq) == "" ]]; then
+if [[ -z $(command -v jq) ]]; then
     echo "Install jq first"
     exit 1
 fi
 
-# Check that sacct is not available, or we should do nothing
+# Check that sinfo is not available, or we should do nothing
 
-if [[ $(command -v sinfo) != "" ]]; then
+if [[ -n $(command -v sinfo) ]]; then
     echo " sinfo found, skipping"
     exit 0
 fi
