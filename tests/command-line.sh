@@ -38,7 +38,7 @@ set +e
 output=$(cargo run -- ps --zappa 2>&1)
 exitcode=$?
 set -e
-if [[ $exitcode != 2 ]]; then
+if (( exitcode != 2 )); then
     echo "Failed to reject unknown argument"
     exit 1
 fi
@@ -48,7 +48,7 @@ set +e
 output=$(cargo run -- ps --lockdir 2>&1)
 exitcode=$?
 set -e
-if [[ $exitcode != 2 ]]; then
+if (( exitcode != 2 )); then
     echo "Lockdir should require an argument value"
     exit 1
 fi
@@ -58,7 +58,7 @@ set +e
 output=$(cargo run -- ps --min-cpu-time 7hello 2>&1)
 exitcode=$?
 set -e
-if [[ $exitcode != 2 ]]; then
+if (( exitcode != 2 )); then
     echo "min-cpu-time should require an integer argument value"
     exit 1
 fi

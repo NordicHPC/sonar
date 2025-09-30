@@ -15,7 +15,7 @@ numbad=$(cargo run -- ps --min-cpu-time 5 | \
         print($0)
 }' | \
              wc -l )
-if [[ $numbad -ne 0 ]]; then
+if (( numbad != 0 )); then
     echo "CPU time filtering did not work"
     exit 1
 fi

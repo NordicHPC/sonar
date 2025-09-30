@@ -1,17 +1,16 @@
 #!/usr/bin/env bash
 #
 # Check that `sonar slurm` produces some sane output.
-# Requirement: the `jq` utility.
 
 set -e
-if [[ $(command -v jq) == "" ]]; then
+if [[ -z $(command -v jq) ]]; then
     echo "Install jq first"
     exit 1
 fi
 
 # Check that sacct is available, or we should do nothing
 
-if [[ $(command -v sacct) == "" ]]; then
+if [[ -z $(command -v sacct) ]]; then
     echo "No sacct"
     exit 0
 fi
@@ -21,7 +20,7 @@ fi
 # There's no guarantee that there is a record.
 
 output=$(cargo run -- slurm)
-if [[ $output == "" ]]; then
+if [[ -z $output ]]; then
     echo "No output"
     exit 0
 fi

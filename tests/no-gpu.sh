@@ -4,8 +4,6 @@
 #
 # Next check and that there are no GPU fields in the output from `sonar ps`.
 
-# Requirement: the `jq` utility.
-
 # Add other GPU types here when we add support for them, the tests below should start failing when
 # that happens.
 set -e
@@ -16,7 +14,7 @@ fi
 
 output=$(cargo run -- sysinfo)
 numcards=$(jq .gpu_cards <<< $output)
-if (( $numcards != 0 )); then
+if (( numcards != 0 )); then
     echo "Bad output from jq: <$numcards> should be zero"
     exit 1
 fi

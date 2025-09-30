@@ -4,10 +4,11 @@
 # starts while the lock file exists will terminate immediately with a log message.
 
 set -e
-logfile=lockfile.output.txt
+mkdir -p tmp
+logfile=tmp/lockfile.output.txt
+rm -f $logfile sonar-lock.*
 
 echo " This takes about 15s"
-rm -f $logfile sonar-lock.*
 SONARTEST_WAIT_LOCKFILE=1 cargo run -- ps --lockdir . > /dev/null &
 bgpid=$!
 # Wait for the first process to get going
@@ -19,5 +20,3 @@ if [[ $(tail -n 1 $logfile) != 'Info: Lockfile present, exiting' ]]; then
 fi
 # Wait for the first process to exit
 sleep 10
-# Do not delete the lockfile here, that should be handled by the first sonar process
-rm -f $logfile

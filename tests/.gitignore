@@ -2,12 +2,5 @@ rollup
 rollup2
 rollupchild
 rollupchild2
-daemon-interrupt-*.txt
-daemon-kafka-*.txt
-daemon-directory-*.txt
-daemon-directory-data
-interrupt.output.txt
-lockfile.output.txt
-*.tmp
-regress-*.txt
+tmp
 testdata/*.bak

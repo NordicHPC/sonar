@@ -3,8 +3,6 @@
 # Check that `sonar sysinfo` can detect an NVIDIA GPU if it ought to (based on info from the file
 # system).  This test must be run on a node with such a device to have any effect, hence will not be
 # effective in the github runner.
-#
-# Requirement: the `jq` utility.
 
 set -e
 if [[ ! -e /sys/module/nvidia ]]; then
@@ -22,7 +20,7 @@ if [[ ! ( $numcards =~ ^[0-9]+$ ) ]]; then
     echo "Bad output from jq: <$numcards>"
     exit 1
 fi
-if (( $numcards == 0 )); then
+if (( numcards == 0 )); then
     echo "Number of cards should be nonzero"
     exit 1
 fi
@@ -36,7 +34,7 @@ fi
 output=$(cargo run -- ps --load --exclude-system-jobs)
 infos=$(grep -E 'gpuinfo=.*fan%=.*tempc=.*' <<< $output)
 lines=$(wc -l <<< $infos)
-if (( $lines != 1 )); then
+if (( lines != 1 )); then
     echo "Number of matching output lines should be 1"
     exit 1
 fi

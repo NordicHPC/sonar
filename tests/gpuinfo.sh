@@ -13,13 +13,13 @@ fi
 # performance state, power, clocks).
 
 loadlines=$(cargo run -- ps --load | grep -E ',"?gpuinfo=' | wc -l)
-if [[ $loadlines -ne 1 ]]; then
+if (( loadlines != 1 )); then
     echo "Did not emit gpuinfo data properly - not exactly 1: $loadlines"
     exit 1
 fi
 
 loadlines=$(cargo run -- ps | grep -E ',"?gpuinfo=' | wc -l)
-if [[ $loadlines -ne 0 ]]; then
+if (( loadlines != 0 )); then
     echo "Did not emit gpuinfo data properly - not exactly 0: $loadlines"
     exit 1
 fi

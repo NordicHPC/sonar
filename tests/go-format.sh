@@ -4,7 +4,7 @@
 # during development.
 
 output=$(gofmt -l ../util)
-if [[ $output != "" ]]; then
+if [[ -n $output ]]; then
     echo "FORMATTING FAILURE!"
     echo "The following files are not properly formatted (go fmt):"
     echo "$output"

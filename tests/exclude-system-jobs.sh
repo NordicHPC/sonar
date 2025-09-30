@@ -22,7 +22,7 @@ END {
 ' | \
              awk -F: '{ if (strtonum($3) < 1000) { print $3 } }' | \
              wc -l )
-if [[ $numbad -ne 0 ]]; then
+if (( numbad != 0 )); then
     echo $numbad
     echo "System jobs filtering did not work"
     exit 1

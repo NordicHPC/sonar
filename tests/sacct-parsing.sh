@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 #
 # Check that `sonar slurm` produces correct output from a known input.
-# Requirement: the `jq` utility.
 
 set -e
 if [[ -z $(command -v jq) ]]; then
@@ -9,9 +8,11 @@ if [[ -z $(command -v jq) ]]; then
     exit 1
 fi
 
-sonar_output=sacct-parsing-sacct-output.tmp
-jobs1=sacct-parsing-jobs1.tmp
-jobs2=sacct-parsing-jobs2.tmp
+mkdir -p tmp
+sonar_output=tmp/sacct-parsing-sacct-output.tmp
+jobs1=tmp/sacct-parsing-jobs1.tmp
+jobs2=tmp/sacct-parsing-jobs2.tmp
+rm -f $sonar_output $jobs1 $jobs2
 
 # This is pretty harsh: we require bitwise-identical output.  The assumption is that we have
 # hand-checked the output in testdata.  An alternative is to descend into the produced data here
@@ -20,7 +21,6 @@ jobs2=sacct-parsing-jobs2.tmp
 # The TZ must be set because the sacct-produced data are timezone-less but the sonar-generated
 # expected result is not.
 
-rm -f $sonar_output $jobs1 $jobs2
 TZ=/usr/share/zoneinfo/Europe/Oslo \
     SONARTEST_MOCK_SACCT=testdata/sacct_output.txt \
     cargo run -- slurm --deluge --json --cluster fox.educloud.no \
@@ -34,5 +34,4 @@ if ! cmp $jobs1 $jobs2; then
     exit 1
 fi
 
-rm -f $sonar_output $jobs1 $jobs2
 echo " Ok"

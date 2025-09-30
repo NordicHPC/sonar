@@ -1,17 +1,16 @@
 #!/usr/bin/env bash
 #
 # Check that `sonar cluster` produces some sane output.
-# Requirement: the `jq` utility.
 
 set -e
-if [[ $(command -v jq) == "" ]]; then
+if [[ -z $(command -v jq) ]]; then
     echo "Install jq first"
     exit 1
 fi
 
 # Check that sinfo is available, or we should do nothing
 
-if [[ $(command -v sinfo) == "" ]]; then
+if [[ -z $(command -v sinfo) ]]; then
     echo " No sinfo"
     exit 0
 fi

@@ -1,10 +1,9 @@
 #!/usr/bin/env bash
 #
 # Check that `sonar ps` produces some sane output.
-# Requirement: the `jq` utility.
 
 set -e
-if [[ $(command -v jq) == "" ]]; then
+if [[ -z $(command -v jq) ]]; then
     echo "Install jq first"
     exit 1
 fi
@@ -23,7 +22,7 @@ fi
 
 output=$(cargo run -- ps)
 count=$(wc -l <<< $output)
-if [[ $count -le 0 ]]; then
+if (( count <= 0 )); then
     echo "Must have some number of output lines"
     exit 1
 fi
