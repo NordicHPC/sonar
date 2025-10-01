@@ -5,9 +5,9 @@
     -state print card state
 */
 
+#include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <stdarg.h>
 #include <string.h>
 
 #include "sonar-habana.h"
@@ -58,44 +58,44 @@ int main(int argc, char** argv) {
     printf("\n%u devices\n", count);
 
     switch (mode) {
-      case INFO: {
-          struct habana_card_info_t info;
-          for ( uint32_t dev = 0 ; dev < count ; dev++ ) {
-              memset(&info, 0, sizeof(info));
-              int r = habana_device_get_card_info(dev, &info);
-              if (r == -1) {
-                  panic("Failed to get card info for %u", dev);
-              }
-              printf("\nDEVICE %u\n", dev);
-              printf("  bus %s\n", info.bus_addr);
-              printf("  model %s\n", info.model);
-              printf("  driver %s\n", info.driver);
-              printf("  firmware %s\n", info.firmware);
-              printf("  uuid %s\n", info.uuid);
-              printf("  memory %llu\n", (unsigned long long)info.totalmem);
-              printf("  max_ce_clk %u\n", info.max_ce_clock);
-              printf("  max_plim %u\n", info.max_power_limit);
-          }
-          break;
-      }
-      case STATE: {
-          struct habana_card_state_t info;
-          for ( uint32_t dev = 0 ; dev < count ; dev++ ) {
-              memset(&info, 0, sizeof(info));
-              int r = habana_device_get_card_state(dev, &info);
-              if (r == -1) {
-                  panic("Failed to get card state for %u", dev);
-              }
-              printf("\nDEVICE %u\n", dev);
-              printf("  perf %d\n", info.perf_state);
-              printf("  used %llu\n", (unsigned long long)info.mem_used);
-              printf("  gpu%% %g\n", info.gpu_util);
-              printf("  mem%% %g\n", info.mem_util);
-              printf("  temp %u\n", info.temp);
-              printf("  power %u\n", info.power);
-              printf("  ce_clk %u\n", info.ce_clock);
-          }
-          break;
-      }
+    case INFO: {
+        struct habana_card_info_t info;
+        for (uint32_t dev = 0; dev < count; dev++) {
+            memset(&info, 0, sizeof(info));
+            int r = habana_device_get_card_info(dev, &info);
+            if (r == -1) {
+                panic("Failed to get card info for %u", dev);
+            }
+            printf("\nDEVICE %u\n", dev);
+            printf("  bus %s\n", info.bus_addr);
+            printf("  model %s\n", info.model);
+            printf("  driver %s\n", info.driver);
+            printf("  firmware %s\n", info.firmware);
+            printf("  uuid %s\n", info.uuid);
+            printf("  memory %llu\n", (unsigned long long)info.totalmem);
+            printf("  max_ce_clk %u\n", info.max_ce_clock);
+            printf("  max_plim %u\n", info.max_power_limit);
+        }
+        break;
+    }
+    case STATE: {
+        struct habana_card_state_t info;
+        for (uint32_t dev = 0; dev < count; dev++) {
+            memset(&info, 0, sizeof(info));
+            int r = habana_device_get_card_state(dev, &info);
+            if (r == -1) {
+                panic("Failed to get card state for %u", dev);
+            }
+            printf("\nDEVICE %u\n", dev);
+            printf("  perf %d\n", info.perf_state);
+            printf("  used %llu\n", (unsigned long long)info.mem_used);
+            printf("  gpu%% %g\n", info.gpu_util);
+            printf("  mem%% %g\n", info.mem_util);
+            printf("  temp %u\n", info.temp);
+            printf("  power %u\n", info.power);
+            printf("  ce_clk %u\n", info.ce_clock);
+        }
+        break;
+    }
     }
 }

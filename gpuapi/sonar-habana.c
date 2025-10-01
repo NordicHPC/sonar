@@ -6,13 +6,13 @@
 
 #include <assert.h>
 #include <dlfcn.h>
+#include <fcntl.h>
 #include <inttypes.h>
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-#include <fcntl.h>
 
 #include "sonar-habana.h"
 #include "strtcpy.h"
@@ -20,20 +20,23 @@
 #ifdef SONAR_HABANA_GPU
 
 /* https://docs.habana.ai/en/latest/Management_and_Monitoring/HLML_API/index.html */
-#include <habanalabs/hlml.h>
+#  include <habanalabs/hlml.h>
 
 static hlml_return_t (*s_hlml_device_get_clock_info)(hlml_device_t, hlml_clock_type_t, unsigned*);
 static hlml_return_t (*s_hlml_device_get_count)(unsigned*);
 static hlml_return_t (*s_hlml_device_get_handle_by_index)(unsigned, hlml_device_t*);
-static hlml_return_t (*s_hlml_device_get_max_clock_info)(hlml_device_t, hlml_clock_type_t, unsigned*);
+static hlml_return_t (*s_hlml_device_get_max_clock_info)(
+    hlml_device_t, hlml_clock_type_t, unsigned*);
 static hlml_return_t (*s_hlml_device_get_memory_info)(hlml_device_t, hlml_memory_t*);
 static hlml_return_t (*s_hlml_device_get_name)(hlml_device_t, char* buf, unsigned bufsiz);
 static hlml_return_t (*s_hlml_device_get_pci_info)(hlml_device_t, hlml_pci_info_t*);
 static hlml_return_t (*s_hlml_device_get_performance_state)(hlml_device_t, hlml_p_states_t*);
 static hlml_return_t (*s_hlml_device_get_power_management_limit)(hlml_device_t, unsigned* max);
 static hlml_return_t (*s_hlml_device_get_power_usage)(hlml_device_t, unsigned*);
-static hlml_return_t (*s_hlml_device_get_process_utilization)(hlml_device_t, hlml_process_utilization_sample_t*);
-static hlml_return_t (*s_hlml_device_get_temperature)(hlml_device_t, hlml_temperature_sensors_t, unsigned*);
+static hlml_return_t (*s_hlml_device_get_process_utilization)(
+    hlml_device_t, hlml_process_utilization_sample_t*);
+static hlml_return_t (*s_hlml_device_get_temperature)(
+    hlml_device_t, hlml_temperature_sensors_t, unsigned*);
 static hlml_return_t (*s_hlml_device_get_uuid)(hlml_device_t, char* buf, unsigned bufsiz);
 static hlml_return_t (*s_hlml_get_driver_version)(char* buf, unsigned bufsiz);
 static hlml_return_t (*s_hlml_get_fw_os_version)(hlml_device_t, char* buf, unsigned bufsiz);
@@ -43,7 +46,7 @@ static hlml_return_t (*s_hlml_init)(void);
 static int num_gpus = -1;
 
 /* Mapping from device index to device handle */
-static hlml_device_t *devs;
+static hlml_device_t* devs;
 
 static void probe_gpus() {
     if (num_gpus != -1) {
@@ -61,7 +64,7 @@ static void probe_gpus() {
         if (devs == NULL) {
             return;
         }
-        for ( unsigned i=0 ; i < n ; i++ ) {
+        for (unsigned i = 0; i < n; i++) {
             if (s_hlml_device_get_handle_by_index(i, &devs[i]) != 0) {
                 /*printf("Failed to get device handle\n");*/
                 return;
@@ -86,12 +89,12 @@ static int load_smi() {
     }
     /*printf("Loaded lib, %p\n", habana_lib);*/
 
-#define DLSYM(var, str)                         \
-    if ((var = dlsym(habana_lib, str)) == NULL) {      \
-        /*puts(str);*/                                 \
-        habana_lib = NULL;                             \
-        return -1;                              \
-    }
+#  define DLSYM(var, str)                                                                          \
+      if ((var = dlsym(habana_lib, str)) == NULL) {                                                \
+          /*puts(str);*/                                                                           \
+          habana_lib = NULL;                                                                       \
+          return -1;                                                                               \
+      }
 
     DLSYM(s_hlml_device_get_clock_info, "hlml_device_get_clock_info");
     DLSYM(s_hlml_device_get_count, "hlml_device_get_count");
@@ -171,7 +174,8 @@ int habana_device_get_card_info(uint32_t device_index, struct habana_card_info_t
     }
     s_hlml_device_get_uuid(devs[device_index], infobuf->uuid, (unsigned)sizeof(infobuf->uuid));
     s_hlml_get_driver_version(infobuf->driver, (unsigned)sizeof(infobuf->driver));
-    s_hlml_get_fw_os_version(devs[device_index], infobuf->firmware, (unsigned)sizeof(infobuf->firmware));
+    s_hlml_get_fw_os_version(
+        devs[device_index], infobuf->firmware, (unsigned)sizeof(infobuf->firmware));
     if (strcmp(infobuf->firmware, "N/A") == 0) {
         char fn[256];
         snprintf(fn, sizeof(fn), "/sys/class/accel/accel%d/device/armcp_ver", device_index);
@@ -179,8 +183,8 @@ int habana_device_get_card_info(uint32_t device_index, struct habana_card_info_t
         if (fp != NULL) {
             if (fgets(infobuf->firmware, sizeof(infobuf->firmware), fp) != NULL) {
                 size_t n = strlen(infobuf->firmware);
-                if (n > 0 && infobuf->firmware[n-1] == '\n') {
-                    infobuf->firmware[n-1] = 0;
+                if (n > 0 && infobuf->firmware[n - 1] == '\n') {
+                    infobuf->firmware[n - 1] = 0;
                 }
             }
             fclose(fp);
@@ -223,7 +227,7 @@ int habana_device_get_card_state(uint32_t device_index, struct habana_card_state
     /* TODO: There are other clocks */
     s_hlml_device_get_clock_info(devs[device_index], HLML_CLOCK_SOC, &infobuf->ce_clock);
     s_hlml_device_get_power_usage(devs[device_index], &infobuf->power);
-    infobuf->power /= 1000;  /* milliWatt -> Watt */
+    infobuf->power /= 1000; /* milliWatt -> Watt */
     {
         hlml_p_states_t pstate;
         if (s_hlml_device_get_performance_state(devs[device_index], &pstate) == 0) {

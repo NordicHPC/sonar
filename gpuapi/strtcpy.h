@@ -10,7 +10,7 @@ static inline size_t strtcpy(char* dest, const char* src, size_t n) {
         n--;
     }
     *dest = 0;
-    return m-n;
+    return m - n;
 }
 
 #endif

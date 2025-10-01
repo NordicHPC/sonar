@@ -32,7 +32,7 @@
 
 #ifdef SONAR_AMD_GPU
 
-#include "rocm_smi/rocm_smi.h"
+#  include "rocm_smi/rocm_smi.h"
 
 /* Note that these variably take size_t and uint32_t for the buffer length parameter, do not copy
    prototypes indiscriminately.
@@ -55,16 +55,15 @@ static rsmi_status_t (*xrsmi_dev_perf_level_get)(uint32_t, rsmi_dev_perf_level_t
 static rsmi_status_t (*xrsmi_dev_power_cap_get)(uint32_t, uint32_t, uint64_t*);
 static rsmi_status_t (*xrsmi_dev_power_cap_range_get)(uint32_t, uint32_t, uint64_t*, uint64_t*);
 static rsmi_status_t (*xrsmi_dev_serial_number_get)(uint32_t, char*, uint32_t);
-static rsmi_status_t (*xrsmi_dev_temp_metric_get)(uint32_t, uint32_t, rsmi_temperature_metric_t, int64_t*);
+static rsmi_status_t (*xrsmi_dev_temp_metric_get)(
+    uint32_t, uint32_t, rsmi_temperature_metric_t, int64_t*);
 static rsmi_status_t (*xrsmi_dev_unique_id_get)(uint32_t, uint64_t*);
 static rsmi_status_t (*xrsmi_init)(uint64_t flags);
 static rsmi_status_t (*xrsmi_num_monitor_devices)(uint32_t*);
 static rsmi_status_t (*xrsmi_shut_down)(void);
 static rsmi_status_t (*xrsmi_version_str_get)(rsmi_sw_component_t, char*, uint32_t);
-static rsmi_status_t (*xrsmi_utilization_count_get)(uint32_t,
-                                                    rsmi_utilization_counter_t*,
-                                                    uint32_t,
-                                                    uint64_t*);
+static rsmi_status_t (*xrsmi_utilization_count_get)(
+    uint32_t, rsmi_utilization_counter_t*, uint32_t, uint64_t*);
 
 static int num_gpus = -1;
 
@@ -87,19 +86,20 @@ static int load_rsmi() {
         return 0;
     }
 
-    /* This is the location of the library on all the ml4. It is also where AMD says it should be. */
+    /* This is the location of the library on all the ml4. It is also where AMD says it should be.
+     */
     lib = dlopen("/opt/rocm/lib/librocm_smi64.so.7", RTLD_NOW);
     if (lib == NULL) {
         /*printf("Could not load library\n");*/
         return -1;
     }
 
-#define DLSYM(var, str) \
-    if ((var = dlsym(lib, str)) == NULL) {      \
-        /*puts(str);*/                          \
-        lib = NULL;                             \
-        return -1;                              \
-    }
+#  define DLSYM(var, str)                                                                          \
+      if ((var = dlsym(lib, str)) == NULL) {                                                       \
+          /*puts(str);*/                                                                           \
+          lib = NULL;                                                                              \
+          return -1;                                                                               \
+      }
 
     DLSYM(xrsmi_compute_process_info_by_pid_get, "rsmi_compute_process_info_by_pid_get");
     DLSYM(xrsmi_compute_process_info_get, "rsmi_compute_process_info_get");
@@ -171,12 +171,12 @@ int amdml_device_get_card_info(uint32_t device, struct amdml_card_info_t* infobu
     }
     memset(infobuf, 0, sizeof(*infobuf));
 
-    xrsmi_dev_name_get(device, infobuf->model, sizeof(infobuf->model)-1);
+    xrsmi_dev_name_get(device, infobuf->model, sizeof(infobuf->model) - 1);
     uint64_t uuid;
     if (xrsmi_dev_unique_id_get(device, &uuid) == 0) {
         snprintf(infobuf->uuid, sizeof(infobuf->uuid), "%llx", (unsigned long long)uuid);
     }
-    xrsmi_version_str_get(RSMI_SW_COMP_DRIVER, infobuf->driver, sizeof(infobuf->driver)-1);
+    xrsmi_version_str_get(RSMI_SW_COMP_DRIVER, infobuf->driver, sizeof(infobuf->driver) - 1);
 
     uint64_t cap;
     if (xrsmi_dev_power_cap_get(device, 0, &cap) == 0) {
@@ -191,11 +191,11 @@ int amdml_device_get_card_info(uint32_t device, struct amdml_card_info_t* infobu
     rsmi_frequencies_t freqs;
     if (xrsmi_dev_gpu_clk_freq_get(device, RSMI_CLK_TYPE_SYS, &freqs) == 0) {
         infobuf->min_ce_clock = freqs.frequency[0] / 1000000;
-        infobuf->max_ce_clock = freqs.frequency[freqs.num_supported-1] / 1000000;
+        infobuf->max_ce_clock = freqs.frequency[freqs.num_supported - 1] / 1000000;
     }
     if (xrsmi_dev_gpu_clk_freq_get(device, RSMI_CLK_TYPE_MEM, &freqs) == 0) {
         infobuf->min_mem_clock = freqs.frequency[0] / 1000000;
-        infobuf->max_mem_clock = freqs.frequency[freqs.num_supported-1] / 1000000;
+        infobuf->max_mem_clock = freqs.frequency[freqs.num_supported - 1] / 1000000;
     }
 
     xrsmi_dev_memory_total_get(device, RSMI_MEM_TYPE_VRAM, &infobuf->totalmem);
@@ -208,10 +208,8 @@ int amdml_device_get_card_info(uint32_t device, struct amdml_card_info_t* infobu
     uint64_t bdfid;
     if (xrsmi_dev_pci_id_get(device, &bdfid) == 0) {
         snprintf(infobuf->bus_addr, sizeof(infobuf->bus_addr), "%08x:%02x:%02x.%x",
-                 (unsigned)(bdfid >> 32),
-                 (unsigned)((bdfid >> 8) & 255),
-                 (unsigned)((bdfid >> 3) & 15),
-                 (unsigned)(bdfid & 3));
+            (unsigned)(bdfid >> 32), (unsigned)((bdfid >> 8) & 255), (unsigned)((bdfid >> 3) & 15),
+            (unsigned)(bdfid & 3));
     }
 
     return 0;
@@ -282,7 +280,7 @@ int amdml_device_get_card_state(uint32_t device, struct amdml_card_state_t* info
         infobuf->mem_util = (float)busy;
     }
 
-#if 0
+#  if 0
     /* This API is not supported on the test card I have.  rocm_smi will print this as additional
        detail if available but primarily reports the figures retrieved above. */
     rsmi_utilization_counter_t utils[2];
@@ -295,7 +293,7 @@ int amdml_device_get_card_state(uint32_t device, struct amdml_card_state_t* info
         printf(" gfx=%lld mem=%lld\n",
                (unsigned long long)utils[0].value, (unsigned long long)utils[1].value);
     }
-#endif
+#  endif
 
     return 0;
 #else
@@ -304,7 +302,7 @@ int amdml_device_get_card_state(uint32_t device, struct amdml_card_state_t* info
 }
 
 #ifdef SONAR_AMD_GPU
-static struct amdml_gpu_process_t* infos;  /* NULL for no info yet */
+static struct amdml_gpu_process_t* infos; /* NULL for no info yet */
 static uint32_t info_count;
 #endif /* SONAR_AMD_GPU */
 
@@ -320,13 +318,13 @@ int amdml_device_probe_processes(uint32_t* count) {
     }
 
     rsmi_process_info_t* procs = NULL;
-    uint64_t *card_sizes = NULL;
+    uint64_t* card_sizes = NULL;
 
     uint32_t numprocs = 0;
     if (xrsmi_compute_process_info_get(NULL, &numprocs) != 0) {
         goto bail;
     }
-    numprocs *= 2;              /* Headroom */
+    numprocs *= 2; /* Headroom */
     procs = calloc(numprocs, sizeof(rsmi_process_info_t));
     if (procs == NULL) {
         goto bail;
@@ -344,13 +342,13 @@ int amdml_device_probe_processes(uint32_t* count) {
     if (card_sizes == NULL) {
         goto bail;
     }
-    for ( int d = 0 ; d < num_gpus ; d++ ) {
+    for (int d = 0; d < num_gpus; d++) {
         xrsmi_dev_memory_total_get(0, RSMI_MEM_TYPE_VRAM, &card_sizes[d]);
     }
 
     /* p looks at procs, i looks at infos, the latter may trail the former if we fail to get info */
     unsigned p = 0, i = 0;
-    for ( p=0 ; p < numprocs ; p++ ) {
+    for (p = 0; p < numprocs; p++) {
         infos[i].pid = procs[p].process_id;
 
         /* For whatever reason, mem_util and gpu_util are always zero in this table (at least on the
@@ -366,7 +364,7 @@ int amdml_device_probe_processes(uint32_t* count) {
         if (xrsmi_compute_process_gpus_get(procs[p].process_id, NULL, &numcards) != 0) {
             continue;
         }
-        numcards *= 2;          /* Headroom */
+        numcards *= 2; /* Headroom */
         uint32_t* cards = calloc(numcards, sizeof(uint32_t));
         if (cards == NULL) {
             continue;
@@ -380,7 +378,7 @@ int amdml_device_probe_processes(uint32_t* count) {
         }
 
         uint64_t sum_card_sizes = 0;
-        for (uint32_t c = 0 ; c < numcards ; c++ ) {
+        for (uint32_t c = 0; c < numcards; c++) {
             if (cards[c] <= 31) {
                 infos[i].cards |= (1 << cards[c]);
             }
@@ -421,7 +419,7 @@ int amdml_get_process(uint32_t index, struct amdml_gpu_process_t* infobuf) {
         return -1;
     }
 
-    memcpy(infobuf, infos+index, sizeof(struct amdml_gpu_process_t));
+    memcpy(infobuf, infos + index, sizeof(struct amdml_gpu_process_t));
     return 0;
 #else
     return -1;
