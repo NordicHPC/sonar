@@ -58,6 +58,9 @@ default:
 	@echo ""
 	@echo "See comments in Makefile for more information."
 
+format:
+	clang-format -i --style=file:../clang-format.txt *.c *.h
+
 clean:
 	rm -f *.o *.a *~ nvidia-shell amd-shell xpu-shell habana-shell
 

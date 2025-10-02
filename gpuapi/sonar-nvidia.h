@@ -23,18 +23,18 @@ int nvml_device_get_count(uint32_t* count);
 /* CUDA Version is only one possible interpretation of "firmware", the CUDA compute capability
    version could be another. */
 struct nvml_card_info {
-    char bus_addr[80];          /* pci_info busId, maybe other fabrics later */
-    char model[96];             /* device name */
-    char architecture[32];      /* device architecture or "(unknown)" */
-    char driver[80];            /* Same for all cards on a node */
-    char firmware[32];          /* CUDA Version */
-    char uuid[96];              /* device uuid */
-    uint64_t totalmem;          /* memoryInfo total; bytes */
-    unsigned power_limit;       /* powerManagementLimit, mW */
-    unsigned min_power_limit;   /* powerManagementLimitConstraints min, mW */
-    unsigned max_power_limit;   /* powerManagementLimitConstraints max, mW */
-    unsigned max_ce_clock;      /* maxClockInfo CLOCK_SM, MHz */
-    unsigned max_mem_clock;     /* maxClockInfo CLOCK_MEM, MHz */
+    char bus_addr[80];        /* pci_info busId, maybe other fabrics later */
+    char model[96];           /* device name */
+    char architecture[32];    /* device architecture or "(unknown)" */
+    char driver[80];          /* Same for all cards on a node */
+    char firmware[32];        /* CUDA Version */
+    char uuid[96];            /* device uuid */
+    uint64_t totalmem;        /* memoryInfo total; bytes */
+    unsigned power_limit;     /* powerManagementLimit, mW */
+    unsigned min_power_limit; /* powerManagementLimitConstraints min, mW */
+    unsigned max_power_limit; /* powerManagementLimitConstraints max, mW */
+    unsigned max_ce_clock;    /* maxClockInfo CLOCK_SM, MHz */
+    unsigned max_mem_clock;   /* maxClockInfo CLOCK_MEM, MHz */
 };
 
 /* Clear the infobuf and fill it with available information. */
@@ -49,18 +49,18 @@ int nvml_device_get_card_info(uint32_t device_index, struct nvml_card_info* info
 /* Otherwise a nonnegative integer */
 
 struct nvml_card_state {
-    unsigned fan_speed;         /* percent of max, but may go over 100 */
-    int compute_mode;           /* COMP_MODE_X, defined above */
-    int perf_state;             /* PERF_STATE_UNKNOWN or n >= 0 */
-    uint64_t mem_reserved;      /* memoryInfo total - (free + used); bytes */
-    uint64_t mem_used;          /* memoryInfo used; bytes */
-    float gpu_util;             /* utilizationRates gpu; percent */
-    float mem_util;             /* utilizationRates memory; percent */
-    unsigned temp;              /* temperature, degrees C */
-    unsigned power;             /* powerUsage, mW */
-    unsigned power_limit;       /* powerManagementLimit, mW */
-    unsigned ce_clock;          /* clockInfo CLOCK_SM, MHz */
-    unsigned mem_clock;         /* clockInfo CLOCK_MEM, MHz */
+    unsigned fan_speed;    /* percent of max, but may go over 100 */
+    int compute_mode;      /* COMP_MODE_X, defined above */
+    int perf_state;        /* PERF_STATE_UNKNOWN or n >= 0 */
+    uint64_t mem_reserved; /* memoryInfo total - (free + used); bytes */
+    uint64_t mem_used;     /* memoryInfo used; bytes */
+    float gpu_util;        /* utilizationRates gpu; percent */
+    float mem_util;        /* utilizationRates memory; percent */
+    unsigned temp;         /* temperature, degrees C */
+    unsigned power;        /* powerUsage, mW */
+    unsigned power_limit;  /* powerManagementLimit, mW */
+    unsigned ce_clock;     /* clockInfo CLOCK_SM, MHz */
+    unsigned mem_clock;    /* clockInfo CLOCK_MEM, MHz */
 };
 
 /* Clear the infobuf and fill it with available information. */
@@ -72,10 +72,10 @@ int nvml_device_get_card_state(uint32_t device_index, struct nvml_card_state* in
 int nvml_device_probe_processes(uint32_t device_index, uint32_t* count);
 
 struct nvml_gpu_process {
-    uint32_t pid;               /* Linux process ID */
-    uint32_t mem_util;          /* percent */
-    uint32_t gpu_util;          /* percent */
-    uint64_t mem_size;          /* KB */
+    uint32_t pid;      /* Linux process ID */
+    uint32_t mem_util; /* percent */
+    uint32_t gpu_util; /* percent */
+    uint64_t mem_size; /* KB */
 };
 
 /* Get information for the given process from the internal buffers and store it into *infobuf.  This

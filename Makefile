@@ -15,3 +15,5 @@ test: debug release
 format:
 	cargo fmt
 	( cd util ; $(MAKE) format )
+	( cd tests ; $(MAKE) format )
+	( cd gpuapi ; $(MAKE) format )

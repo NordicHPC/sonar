@@ -19,14 +19,14 @@
 int xpu_device_get_count(uint32_t* count);
 
 struct xpu_card_info_t {
-    char bus_addr[256];  /* PCI busId extended bdf form, maybe other fabrics later */
-    char model[256];     /* Manufacturer's model name, human-readable */
-    char driver[256];    /* Same for all cards on a node? */
-    char firmware[256];  /* Onboard firmware "name @ version" */
-    char uuid[256];      /* some identifying string, if available; otherwise blank */
-    uint64_t totalmem;   /* bytes */
-    unsigned max_ce_clock;      /* core clock rate MHz */
-    unsigned max_power_limit;   /* sustained, W */
+    char bus_addr[256];       /* PCI busId extended bdf form, maybe other fabrics later */
+    char model[256];          /* Manufacturer's model name, human-readable */
+    char driver[256];         /* Same for all cards on a node? */
+    char firmware[256];       /* Onboard firmware "name @ version" */
+    char uuid[256];           /* some identifying string, if available; otherwise blank */
+    uint64_t totalmem;        /* bytes */
+    unsigned max_ce_clock;    /* core clock rate MHz */
+    unsigned max_power_limit; /* sustained, W */
 };
 
 /* Clear the infobuf and fill it with available information for the device. */
@@ -34,12 +34,12 @@ int xpu_device_get_card_info(uint32_t device_index, struct xpu_card_info_t* info
 
 struct xpu_card_state_t {
     /* The underlying stats API is fairly rich, we could do better than this */
-    float gpu_util;             /* utilizationRates gpu; percent */
-    float mem_util;             /* utilizationRates memory; percent */
-    uint64_t mem_used;          /* memoryInfo used; bytes */
-    unsigned temp;              /* temperature, degrees C */
-    unsigned power;             /* powerUsage, mW */
-    unsigned ce_clock;          /* clockInfo CLOCK_SM, MHz */
+    float gpu_util;    /* utilizationRates gpu; percent */
+    float mem_util;    /* utilizationRates memory; percent */
+    uint64_t mem_used; /* memoryInfo used; bytes */
+    unsigned temp;     /* temperature, degrees C */
+    unsigned power;    /* powerUsage, mW */
+    unsigned ce_clock; /* clockInfo CLOCK_SM, MHz */
 };
 
 /* Clear the infobuf and fill it with available information. */
@@ -51,10 +51,10 @@ int xpu_device_get_card_state(uint32_t device_index, struct xpu_card_state_t* in
 int xpu_device_probe_processes(uint32_t device_index, uint32_t* count);
 
 struct xpu_gpu_process_t {
-    uint32_t pid;               /* Linux process ID */
-    uint32_t mem_util;          /* percent */
-    uint32_t gpu_util;          /* percent */
-    uint64_t mem_size;          /* KB */
+    uint32_t pid;      /* Linux process ID */
+    uint32_t mem_util; /* percent */
+    uint32_t gpu_util; /* percent */
+    uint64_t mem_size; /* KB */
 };
 
 /* Get information for the given process from the internal buffers and store it into *infobuf.  This

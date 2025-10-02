@@ -1,6 +1,7 @@
 /* Run this with SONARTEST_ROLLUP=1 and --rollup.
    If you grep the sonar output for ',cmd=rollup,' there should be 23 lines.
-   Of those, there should be eight that have ',rolledup=1' and none that have any other rollup fields.
+   Of those, there should be eight that have ',rolledup=1' and none that have any other rollup
+   fields.
 
    (This code is -std=c89, try to keep it that way.)
 */
@@ -8,9 +9,9 @@
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <unistd.h>
 #include <sys/types.h>
 #include <sys/wait.h>
+#include <unistd.h>
 
 int main(int argc, char** argv) {
     long depth;

@@ -18,27 +18,27 @@
 #include <stdio.h> /* snprintf(), we can fix this if we don't want the baggage */
 #include <stdlib.h>
 #include <string.h>
-#include <time.h>
 #include <sys/utsname.h>
+#include <time.h>
 
 #include "sonar-nvidia.h"
 #include "strtcpy.h"
 
 #ifdef SONAR_NVIDIA_GPU
 
-#define NVML_NO_UNVERSIONED_FUNCTION_DEFS
-#include <nvml.h>
+#  define NVML_NO_UNVERSIONED_FUNCTION_DEFS
+#  include <nvml.h>
 
-#if NVML_API_VERSION < 10
+#  if NVML_API_VERSION < 10
 /* Haven't seen older */
-# error "NVML API VERSION 10 or greater required"
-#endif
+#    error "NVML API VERSION 10 or greater required"
+#  endif
 
-#if NVML_API_VERSION == 10
-#define nvmlProcessInfo_v1_t nvmlProcessInfo_t
-#endif
+#  if NVML_API_VERSION == 10
+#    define nvmlProcessInfo_v1_t nvmlProcessInfo_t
+#  endif
 
-#if NVML_API_VERSION == 11
+#  if NVML_API_VERSION == 11
 /* In API 11 (based on nvml.h 11.3.1) there is nvmlProcessInfo_t which is actually
    nvmlProcessInfo_v2_t, and in API 12 the structure is present under both of those names.  This
    structure has four fields.
@@ -52,62 +52,64 @@
    header files. */
 
 typedef struct {
-    unsigned int       pid;
+    unsigned int pid;
     unsigned long long usedGpuMemory;
 } nvmlProcessInfo_v1_t;
 
-#define nvmlProcessInfo_v2_t nvmlProcessInfo_t
-#endif
+#    define nvmlProcessInfo_v2_t nvmlProcessInfo_t
+#  endif
 
-static nvmlReturn_t (*xnvmlDeviceGetClockInfo)(nvmlDevice_t,nvmlClockType_t,unsigned*);
-static nvmlReturn_t (*xnvmlDeviceGetComputeMode)(nvmlDevice_t,nvmlComputeMode_t*);
-#if NVML_API_VERSION >= 12
+static nvmlReturn_t (*xnvmlDeviceGetClockInfo)(nvmlDevice_t, nvmlClockType_t, unsigned*);
+static nvmlReturn_t (*xnvmlDeviceGetComputeMode)(nvmlDevice_t, nvmlComputeMode_t*);
+#  if NVML_API_VERSION >= 12
 static nvmlReturn_t (*xnvmlDeviceGetComputeRunningProcesses_v3)(
-    nvmlDevice_t,unsigned*,nvmlProcessInfo_v2_t*);
-#endif
-#if NVML_API_VERSION >= 11
+    nvmlDevice_t, unsigned*, nvmlProcessInfo_v2_t*);
+#  endif
+#  if NVML_API_VERSION >= 11
 static nvmlReturn_t (*xnvmlDeviceGetComputeRunningProcesses_v2)(
-    nvmlDevice_t,unsigned*,nvmlProcessInfo_v2_t*);
-#endif
+    nvmlDevice_t, unsigned*, nvmlProcessInfo_v2_t*);
+#  endif
 static nvmlReturn_t (*xnvmlDeviceGetComputeRunningProcesses_v1)(
-    nvmlDevice_t,unsigned*,nvmlProcessInfo_v1_t*);
+    nvmlDevice_t, unsigned*, nvmlProcessInfo_v1_t*);
 static nvmlReturn_t (*xnvmlDeviceGetCount_v2)(unsigned*);
 static nvmlReturn_t (*xnvmlDeviceGetCount_v1)(unsigned*);
 static nvmlReturn_t (*xnvmlDeviceGetHandleByIndex_v2)(int index, nvmlDevice_t* dev);
 static nvmlReturn_t (*xnvmlDeviceGetHandleByIndex_v1)(int index, nvmlDevice_t* dev);
-#if NVML_API_VERSION >= 11
+#  if NVML_API_VERSION >= 11
 static nvmlReturn_t (*xnvmlDeviceGetArchitecture)(nvmlDevice_t, nvmlDeviceArchitecture_t*);
-#endif
-static nvmlReturn_t (*xnvmlDeviceGetFanSpeed)(nvmlDevice_t,unsigned*);
+#  endif
+static nvmlReturn_t (*xnvmlDeviceGetFanSpeed)(nvmlDevice_t, unsigned*);
 static nvmlReturn_t (*xnvmlDeviceGetMemoryInfo)(nvmlDevice_t, nvmlMemory_t*);
-static nvmlReturn_t (*xnvmlDeviceGetMaxClockInfo)(nvmlDevice_t,nvmlClockType_t,unsigned*);
-static nvmlReturn_t (*xnvmlDeviceGetName)(nvmlDevice_t,char*,unsigned);
-static nvmlReturn_t (*xnvmlDeviceGetPciInfo_v3)(nvmlDevice_t,nvmlPciInfo_t*);
-static nvmlReturn_t (*xnvmlDeviceGetPciInfo_v2)(nvmlDevice_t,nvmlPciInfo_t*);
-static nvmlReturn_t (*xnvmlDeviceGetPciInfo_v1)(nvmlDevice_t,nvmlPciInfo_t*);
-static nvmlReturn_t (*xnvmlDeviceGetPerformanceState)(nvmlDevice_t,nvmlPstates_t*);
+static nvmlReturn_t (*xnvmlDeviceGetMaxClockInfo)(nvmlDevice_t, nvmlClockType_t, unsigned*);
+static nvmlReturn_t (*xnvmlDeviceGetName)(nvmlDevice_t, char*, unsigned);
+static nvmlReturn_t (*xnvmlDeviceGetPciInfo_v3)(nvmlDevice_t, nvmlPciInfo_t*);
+static nvmlReturn_t (*xnvmlDeviceGetPciInfo_v2)(nvmlDevice_t, nvmlPciInfo_t*);
+static nvmlReturn_t (*xnvmlDeviceGetPciInfo_v1)(nvmlDevice_t, nvmlPciInfo_t*);
+static nvmlReturn_t (*xnvmlDeviceGetPerformanceState)(nvmlDevice_t, nvmlPstates_t*);
 static nvmlReturn_t (*xnvmlDeviceGetPowerManagementLimitConstraints)(
-    nvmlDevice_t,unsigned*,unsigned*);
-static nvmlReturn_t (*xnvmlDeviceGetPowerManagementLimit)(nvmlDevice_t,unsigned*);
-static nvmlReturn_t (*xnvmlDeviceGetPowerUsage)(nvmlDevice_t,unsigned*);
+    nvmlDevice_t, unsigned*, unsigned*);
+static nvmlReturn_t (*xnvmlDeviceGetPowerManagementLimit)(nvmlDevice_t, unsigned*);
+static nvmlReturn_t (*xnvmlDeviceGetPowerUsage)(nvmlDevice_t, unsigned*);
 static nvmlReturn_t (*xnvmlDeviceGetProcessUtilization)(
-    nvmlDevice_t,nvmlProcessUtilizationSample_t*,unsigned*,unsigned long long);
-static nvmlReturn_t (*xnvmlDeviceGetTemperature)(nvmlDevice_t,nvmlTemperatureSensors_t,unsigned*);
-static nvmlReturn_t (*xnvmlDeviceGetUUID)(nvmlDevice_t,char*,unsigned);
-static nvmlReturn_t (*xnvmlDeviceGetUtilizationRates)(nvmlDevice_t,nvmlUtilization_t*);
+    nvmlDevice_t, nvmlProcessUtilizationSample_t*, unsigned*, unsigned long long);
+static nvmlReturn_t (*xnvmlDeviceGetTemperature)(nvmlDevice_t, nvmlTemperatureSensors_t, unsigned*);
+static nvmlReturn_t (*xnvmlDeviceGetUUID)(nvmlDevice_t, char*, unsigned);
+static nvmlReturn_t (*xnvmlDeviceGetUtilizationRates)(nvmlDevice_t, nvmlUtilization_t*);
 static nvmlReturn_t (*xnvmlInit)();
-static nvmlReturn_t (*xnvmlSystemGetDriverVersion)(char*,unsigned);
+static nvmlReturn_t (*xnvmlSystemGetDriverVersion)(char*, unsigned);
 static nvmlReturn_t (*xnvmlSystemGetCudaDriverVersion)(int*);
 
-#ifdef LOGGING
-#  define LOGIT(s) puts(s)
-#else
-#  define LOGIT(s) do {} while(0)
-#endif
+#  ifdef LOGGING
+#    define LOGIT(s) puts(s)
+#  else
+#    define LOGIT(s)                                                                               \
+        do {                                                                                       \
+        } while (0)
+#  endif
 
 static int load_nvml() {
     static void* lib;
-    char pathbuf[128];          /* Less than 64 is really enough, barring problems */
+    char pathbuf[128]; /* Less than 64 is really enough, barring problems */
     struct utsname sysinfo;
 
     if (lib != NULL) {
@@ -150,8 +152,8 @@ static int load_nvml() {
         lib = dlopen("/lib/libnvidia-ml.so.1", RTLD_NOW);
     }
     if (lib == NULL) {
-        snprintf(pathbuf, sizeof(pathbuf), "/usr/lib/%s-linux-gnu/libnvidia-ml.so.1",
-                 sysinfo.machine);
+        snprintf(
+            pathbuf, sizeof(pathbuf), "/usr/lib/%s-linux-gnu/libnvidia-ml.so.1", sysinfo.machine);
         lib = dlopen(pathbuf, RTLD_NOW);
     }
     if (lib == NULL) {
@@ -166,38 +168,38 @@ static int load_nvml() {
     /* You'll be tempted to try some magic here with # and ## but it won't always work because
        sometimes nvml.h introduces #defines of some of the names we want to use. */
 
-#define DLSYM(var, str) \
-    LOGIT(str);                                 \
-    if ((var = dlsym(lib, str)) == NULL) {      \
-        LOGIT(" ** Symbol failed");             \
-        lib = NULL;                             \
-        return -1;                              \
-    }
+#  define DLSYM(var, str)                                                                          \
+      LOGIT(str);                                                                                  \
+      if ((var = dlsym(lib, str)) == NULL) {                                                       \
+          LOGIT(" ** Symbol failed");                                                              \
+          lib = NULL;                                                                              \
+          return -1;                                                                               \
+      }
 
-#define DLSYM_CANFAIL(var, str) \
-    LOGIT(str);                                 \
-    if ((var = dlsym(lib, str)) == NULL) {      \
-        LOGIT(" ** Symbol failed");             \
-    }
+#  define DLSYM_CANFAIL(var, str)                                                                  \
+      LOGIT(str);                                                                                  \
+      if ((var = dlsym(lib, str)) == NULL) {                                                       \
+          LOGIT(" ** Symbol failed");                                                              \
+      }
 
     DLSYM(xnvmlDeviceGetClockInfo, "nvmlDeviceGetClockInfo");
     DLSYM(xnvmlDeviceGetComputeMode, "nvmlDeviceGetComputeMode");
-#if NVML_API_VERSION >= 12
-    DLSYM_CANFAIL(xnvmlDeviceGetComputeRunningProcesses_v3,
-                  "nvmlDeviceGetComputeRunningProcesses_v3");
-#endif
-#if NVML_API_VERSION >= 11
-    DLSYM_CANFAIL(xnvmlDeviceGetComputeRunningProcesses_v2,
-                  "nvmlDeviceGetComputeRunningProcesses_v2");
-#endif
+#  if NVML_API_VERSION >= 12
+    DLSYM_CANFAIL(
+        xnvmlDeviceGetComputeRunningProcesses_v3, "nvmlDeviceGetComputeRunningProcesses_v3");
+#  endif
+#  if NVML_API_VERSION >= 11
+    DLSYM_CANFAIL(
+        xnvmlDeviceGetComputeRunningProcesses_v2, "nvmlDeviceGetComputeRunningProcesses_v2");
+#  endif
     DLSYM(xnvmlDeviceGetComputeRunningProcesses_v1, "nvmlDeviceGetComputeRunningProcesses");
     DLSYM_CANFAIL(xnvmlDeviceGetCount_v2, "nvmlDeviceGetCount_v2");
     DLSYM(xnvmlDeviceGetCount_v1, "nvmlDeviceGetCount");
     DLSYM_CANFAIL(xnvmlDeviceGetHandleByIndex_v2, "nvmlDeviceGetHandleByIndex_v2");
     DLSYM(xnvmlDeviceGetHandleByIndex_v1, "nvmlDeviceGetHandleByIndex");
-#if NVML_API_VERSION >= 11
+#  if NVML_API_VERSION >= 11
     DLSYM(xnvmlDeviceGetArchitecture, "nvmlDeviceGetArchitecture");
-#endif
+#  endif
     DLSYM(xnvmlDeviceGetFanSpeed, "nvmlDeviceGetFanSpeed");
     DLSYM(xnvmlDeviceGetMemoryInfo, "nvmlDeviceGetMemoryInfo");
     DLSYM(xnvmlDeviceGetMaxClockInfo, "nvmlDeviceGetMaxClockInfo");
@@ -207,7 +209,7 @@ static int load_nvml() {
     DLSYM(xnvmlDeviceGetPciInfo_v1, "nvmlDeviceGetPciInfo");
     DLSYM(xnvmlDeviceGetPerformanceState, "nvmlDeviceGetPerformanceState");
     DLSYM(xnvmlDeviceGetPowerManagementLimitConstraints,
-          "nvmlDeviceGetPowerManagementLimitConstraints");
+        "nvmlDeviceGetPowerManagementLimitConstraints");
     DLSYM(xnvmlDeviceGetPowerManagementLimit, "nvmlDeviceGetPowerManagementLimit");
     DLSYM(xnvmlDeviceGetPowerUsage, "nvmlDeviceGetPowerUsage");
     DLSYM(xnvmlDeviceGetProcessUtilization, "nvmlDeviceGetProcessUtilization");
@@ -252,24 +254,23 @@ static int deviceGetPciInfo(nvmlDevice_t device, nvmlPciInfo_t* pci) {
 
 typedef struct processInfo_t {
     /* These are the types used in the NVIDIA structures */
-    unsigned int        pid;
-    unsigned long long  usedGpuMemory;
+    unsigned int pid;
+    unsigned long long usedGpuMemory;
 } processInfo_t;
 
-static int deviceGetComputeRunningProcesses(nvmlDevice_t dev,
-                                            unsigned* count,
-                                            processInfo_t* infos) {
+static int deviceGetComputeRunningProcesses(
+    nvmlDevice_t dev, unsigned* count, processInfo_t* infos) {
     if (infos == NULL) {
-#if NVML_API_VERSION >= 12
+#  if NVML_API_VERSION >= 12
         if (xnvmlDeviceGetComputeRunningProcesses_v3 != NULL) {
             return xnvmlDeviceGetComputeRunningProcesses_v3(dev, count, NULL);
         }
-#endif
-#if NVML_API_VERSION >= 11
+#  endif
+#  if NVML_API_VERSION >= 11
         if (xnvmlDeviceGetComputeRunningProcesses_v2 != NULL) {
             return xnvmlDeviceGetComputeRunningProcesses_v2(dev, count, NULL);
         }
-#endif
+#  endif
         return xnvmlDeviceGetComputeRunningProcesses_v1(dev, count, NULL);
     }
 
@@ -278,48 +279,40 @@ static int deviceGetComputeRunningProcesses(nvmlDevice_t dev,
     }
 
     /* v2 and v3 use the same data type, nvmlProcessInfo_v2_t. */
-#if NVML_API_VERSION >= 11
+#  if NVML_API_VERSION >= 11
     int v2 = xnvmlDeviceGetComputeRunningProcesses_v2 != NULL;
     int v3 = 0;
-# if NVML_API_VERSION >= 12
+#    if NVML_API_VERSION >= 12
     v3 = xnvmlDeviceGetComputeRunningProcesses_v3 != NULL;
-# endif
-    if (v2 || v3)
-    {
-        nvmlProcessInfo_v2_t *running_procs = calloc(*count,
-                                                     sizeof(nvmlProcessInfo_v2_t));
+#    endif
+    if (v2 || v3) {
+        nvmlProcessInfo_v2_t* running_procs = calloc(*count, sizeof(nvmlProcessInfo_v2_t));
         int r;
         if (running_procs == NULL) {
             return -1;
         }
-# if NVML_API_VERSION >= 12
+#    if NVML_API_VERSION >= 12
         if (xnvmlDeviceGetComputeRunningProcesses_v3) {
-            if ((r = xnvmlDeviceGetComputeRunningProcesses_v3(dev,
-                                                              count,
-                                                              running_procs)) != 0)
-            {
+            if ((r = xnvmlDeviceGetComputeRunningProcesses_v3(dev, count, running_procs)) != 0) {
                 free(running_procs);
                 return r;
             }
         }
-# endif
-        if ((r = xnvmlDeviceGetComputeRunningProcesses_v2(dev,
-                                                          count,
-                                                          running_procs)) != 0)
-        {
+#    endif
+        if ((r = xnvmlDeviceGetComputeRunningProcesses_v2(dev, count, running_procs)) != 0) {
             free(running_procs);
             return r;
         }
-        for ( unsigned i = 0 ; i < *count ; i++ ) {
+        for (unsigned i = 0; i < *count; i++) {
             infos[i].pid = running_procs[i].pid;
             infos[i].usedGpuMemory = running_procs[i].usedGpuMemory;
         }
         free(running_procs);
         return 0;
     }
-#endif /* v2 || v3 */
+#  endif /* v2 || v3 */
 
-    nvmlProcessInfo_v1_t *running_procs = calloc(*count, sizeof(nvmlProcessInfo_v1_t));
+    nvmlProcessInfo_v1_t* running_procs = calloc(*count, sizeof(nvmlProcessInfo_v1_t));
     if (running_procs == NULL) {
         return -1;
     }
@@ -327,7 +320,7 @@ static int deviceGetComputeRunningProcesses(nvmlDevice_t dev,
         free(running_procs);
         return -1;
     }
-    for ( unsigned i = 0 ; i < *count ; i++ ) {
+    for (unsigned i = 0; i < *count; i++) {
         infos[i].pid = running_procs[i].pid;
         infos[i].usedGpuMemory = running_procs[i].usedGpuMemory;
     }
@@ -389,20 +382,19 @@ int nvml_device_get_card_info(uint32_t device, struct nvml_card_info* infobuf) {
     int cuda;
     if (xnvmlSystemGetCudaDriverVersion(&cuda) == 0) {
         snprintf(infobuf->firmware, sizeof(infobuf->firmware), "%d.%d",
-                 NVML_CUDA_DRIVER_VERSION_MAJOR(cuda),
-                 NVML_CUDA_DRIVER_VERSION_MINOR(cuda));
+            NVML_CUDA_DRIVER_VERSION_MAJOR(cuda), NVML_CUDA_DRIVER_VERSION_MINOR(cuda));
     }
 
-#if NVML_API_VERSION >= 11
+#  if NVML_API_VERSION >= 11
     nvmlDeviceArchitecture_t n_arch;
     if (xnvmlDeviceGetArchitecture(dev, &n_arch) == 0) {
         const char* archname = "(unknown)";
-        if (n_arch < sizeof(arch_names)/sizeof(arch_names[0])) {
+        if (n_arch < sizeof(arch_names) / sizeof(arch_names[0])) {
             archname = arch_names[n_arch];
         }
         strcpy(infobuf->architecture, archname);
     }
-#endif
+#  endif
 
     nvmlMemory_t mem;
     if (xnvmlDeviceGetMemoryInfo(dev, &mem) == 0) {
@@ -468,16 +460,16 @@ int nvml_device_get_card_state(uint32_t device, struct nvml_card_state* infobuf)
     nvmlComputeMode_t mode;
     if (xnvmlDeviceGetComputeMode(dev, &mode) == 0) {
         switch (mode) {
-          case NVML_COMPUTEMODE_DEFAULT:
+        case NVML_COMPUTEMODE_DEFAULT:
             infobuf->compute_mode = COMP_MODE_DEFAULT;
             break;
-          case NVML_COMPUTEMODE_PROHIBITED:
+        case NVML_COMPUTEMODE_PROHIBITED:
             infobuf->compute_mode = COMP_MODE_PROHIBITED;
             break;
-          case NVML_COMPUTEMODE_EXCLUSIVE_PROCESS:
+        case NVML_COMPUTEMODE_EXCLUSIVE_PROCESS:
             infobuf->compute_mode = COMP_MODE_EXCLUSIVE_PROCESS;
             break;
-          default:
+        default:
             infobuf->compute_mode = COMP_MODE_UNKNOWN;
             break;
         }
@@ -533,14 +525,14 @@ int nvml_device_get_card_state(uint32_t device, struct nvml_card_state* infobuf)
  */
 
 #ifdef SONAR_NVIDIA_GPU
-static struct nvml_gpu_process* infos;  /* NULL for no info yet */
+static struct nvml_gpu_process* infos; /* NULL for no info yet */
 static unsigned info_count = 0;
 
 /* Probe the last five seconds only, both for the sake of efficiency and because sonar is supposed
    to be a sampler.  It's arguable that we could do better if we were to use a larger window, but
    sonar does not know what its own sampling window is.
 */
-#define PROBE_WINDOW_SECS 5
+#  define PROBE_WINDOW_SECS 5
 #endif /* SONAR_NVIDIA_GPU */
 
 int nvml_device_probe_processes(uint32_t device, uint32_t* count) {
@@ -560,7 +552,7 @@ int nvml_device_probe_processes(uint32_t device, uint32_t* count) {
     unsigned running_procs_count = 0;
     deviceGetComputeRunningProcesses(dev, &running_procs_count, NULL);
 
-    processInfo_t *running_procs = NULL;
+    processInfo_t* running_procs = NULL;
     if (running_procs_count > 0) {
         running_procs = calloc(running_procs_count, sizeof(processInfo_t));
         if (running_procs == NULL) {
@@ -588,21 +580,20 @@ int nvml_device_probe_processes(uint32_t device, uint32_t* count) {
     xnvmlDeviceGetMemoryInfo(dev, &mem);
 
     info_count = 0;
-    infos = calloc(running_procs_count+utilized_procs_count, sizeof(struct nvml_gpu_process));
+    infos = calloc(running_procs_count + utilized_procs_count, sizeof(struct nvml_gpu_process));
     if (infos == NULL) {
         free(running_procs);
         free(utilized_procs);
         return -1;
     }
-    for ( unsigned i = 0 ; i < running_procs_count ; i++ ) {
+    for (unsigned i = 0; i < running_procs_count; i++) {
         infos[i].pid = running_procs[i].pid;
         infos[i].mem_size = running_procs[i].usedGpuMemory / 1024;
     }
     info_count = running_procs_count;
-    for ( unsigned i = 0 ; i < utilized_procs_count ; i++ ) {
+    for (unsigned i = 0; i < utilized_procs_count; i++) {
         unsigned j;
-        for ( j = 0 ; j < info_count && infos[j].pid != utilized_procs[i].pid ; j++ ) {
-        }
+        for (j = 0; j < info_count && infos[j].pid != utilized_procs[i].pid; j++) { }
         if (j == info_count) {
             infos[j].pid = utilized_procs[i].pid;
             infos[j].mem_size = (utilized_procs[i].memUtil * mem.used) / 100 / 1024;
@@ -631,7 +622,7 @@ int nvml_get_process(uint32_t index, struct nvml_gpu_process* infobuf) {
         return -1;
     }
 
-    memcpy(infobuf, infos+index, sizeof(struct nvml_gpu_process));
+    memcpy(infobuf, infos + index, sizeof(struct nvml_gpu_process));
     return 0;
 #else
     return -1;

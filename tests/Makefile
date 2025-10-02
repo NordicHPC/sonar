@@ -3,6 +3,9 @@ CFLAGS=-Wall -std=c89
 
 all: rollup rollup2 rollupchild rollupchild2
 
+format:
+	clang-format -i --style=file:../clang-format.txt *.c
+
 rollupchild2: rollupchild
 	cp rollupchild rollupchild2
 

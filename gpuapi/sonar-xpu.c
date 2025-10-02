@@ -6,21 +6,21 @@
 
 #include <assert.h>
 #include <dlfcn.h>
+#include <fcntl.h>
 #include <inttypes.h>
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-#include <fcntl.h>
 
 #include "sonar-xpu.h"
 #include "strtcpy.h"
 
 #ifdef SONAR_XPU_GPU
 
-#include "xpum_api.h"
-#include "xpum_structs.h"
+#  include "xpum_api.h"
+#  include "xpum_structs.h"
 
 /* Note that these variably take size_t and uint32_t for the buffer length parameter, do not copy
    prototypes indiscriminately.
@@ -28,18 +28,20 @@
 static xpum_result_t (*xpu_init)(void);
 static xpum_result_t (*xpu_shut_down)(void);
 static xpum_result_t (*xpu_get_device_list)(xpum_device_basic_info* devices, int* count);
-static xpum_result_t (*xpu_get_device_properties)(xpum_device_id_t device, xpum_device_properties_t* props);
-static xpum_result_t (*xpu_get_device_power_limits)(xpum_device_id_t device, int32_t tile_id, xpum_power_limits_t* limits);
-static xpum_result_t (*xpu_get_stats)(xpum_device_id_t device, xpum_device_stats_t* data_list, uint32_t* count,
-                                      uint64_t* begin, uint64_t* end, uint64_t session_id);
-static xpum_result_t (*xpu_get_device_utilization_by_process)(xpum_device_id_t device, uint32_t util_interval,
-                                                              xpum_device_util_by_process_t* data_array, uint32_t *count);
+static xpum_result_t (*xpu_get_device_properties)(
+    xpum_device_id_t device, xpum_device_properties_t* props);
+static xpum_result_t (*xpu_get_device_power_limits)(
+    xpum_device_id_t device, int32_t tile_id, xpum_power_limits_t* limits);
+static xpum_result_t (*xpu_get_stats)(xpum_device_id_t device, xpum_device_stats_t* data_list,
+    uint32_t* count, uint64_t* begin, uint64_t* end, uint64_t session_id);
+static xpum_result_t (*xpu_get_device_utilization_by_process)(xpum_device_id_t device,
+    uint32_t util_interval, xpum_device_util_by_process_t* data_array, uint32_t* count);
 static int num_gpus = -1;
 
-#ifdef SONAR_XPU_GPU
+#  ifdef SONAR_XPU_GPU
 /* Canonical mapping from device index to device information */
-static xpum_device_basic_info *devs;
-#endif
+static xpum_device_basic_info* devs;
+#  endif
 
 static void probe_gpus() {
     if (num_gpus != -1) {
@@ -77,12 +79,12 @@ static int load_smi() {
         return -1;
     }
 
-#define DLSYM(var, str)                         \
-    if ((var = dlsym(lib, str)) == NULL) {      \
-        /*puts(str);*/                          \
-        lib = NULL;                             \
-        return -1;                              \
-    }
+#  define DLSYM(var, str)                                                                          \
+      if ((var = dlsym(lib, str)) == NULL) {                                                       \
+          /*puts(str);*/                                                                           \
+          lib = NULL;                                                                              \
+          return -1;                                                                               \
+      }
 
     DLSYM(xpu_init, "xpumInit");
     DLSYM(xpu_shut_down, "xpumShutdown");
@@ -152,25 +154,25 @@ int xpu_device_get_card_info(uint32_t device_index, struct xpu_card_info_t* info
     xpu_get_device_properties(devs[device_index].deviceId, &props);
     int firmware_name_index = -1;
     int firmware_version_index = -1;
-    for (int i=0 ; i < props.propertyLen ; i++ ) {
-      switch (props.properties[i].name) {
+    for (int i = 0; i < props.propertyLen; i++) {
+        switch (props.properties[i].name) {
         /* The order here is as in the struct */
         case XPUM_DEVICE_PROPERTY_PCI_BDF_ADDRESS:
-          strtcpy(infobuf->bus_addr, props.properties[i].value, sizeof(infobuf->bus_addr)-1);
-          break;
+            strtcpy(infobuf->bus_addr, props.properties[i].value, sizeof(infobuf->bus_addr) - 1);
+            break;
         case XPUM_DEVICE_PROPERTY_DEVICE_NAME:
-          strtcpy(infobuf->model, props.properties[i].value, sizeof(infobuf->model)-1);
-          break;
+            strtcpy(infobuf->model, props.properties[i].value, sizeof(infobuf->model) - 1);
+            break;
         case XPUM_DEVICE_PROPERTY_DRIVER_VERSION:
-          strtcpy(infobuf->driver, props.properties[i].value, sizeof(infobuf->driver)-1);
-          break;
+            strtcpy(infobuf->driver, props.properties[i].value, sizeof(infobuf->driver) - 1);
+            break;
         case XPUM_DEVICE_PROPERTY_GFX_DATA_FIRMWARE_NAME:
-          firmware_name_index = i;
-          break;
+            firmware_name_index = i;
+            break;
         case XPUM_DEVICE_PROPERTY_GFX_DATA_FIRMWARE_VERSION:
-          firmware_version_index = i;
-          break;
-#if 0
+            firmware_version_index = i;
+            break;
+#  if 0
           /* At least on the Simula eX3 node, the UUID is basically just the bus address, which is
              not unique enough.  We could fall bak on XPUM_DEVICE_PROPERTY_SERIAL_NUMBER and/or
              XPUM_DEVICE_PROPERTY_VENDOR_NAME but they too have non-unique / uninteresting values.
@@ -178,37 +180,37 @@ int xpu_device_get_card_info(uint32_t device_index, struct xpu_card_info_t* info
         case XPUM_DEVICE_PROPERTY_UUID:
           strtcpy(infobuf->uuid, props.properties[i].value, sizeof(infobuf->uuid)-1);
           break;
-#endif
+#  endif
         case XPUM_DEVICE_PROPERTY_MEMORY_PHYSICAL_SIZE_BYTE:
-          infobuf->totalmem = (uint64_t)strtoull(props.properties[i].value, NULL, 10);
-          break;
+            infobuf->totalmem = (uint64_t)strtoull(props.properties[i].value, NULL, 10);
+            break;
         case XPUM_DEVICE_PROPERTY_CORE_CLOCK_RATE_MHZ:
-          infobuf->max_ce_clock = (uint64_t)strtoull(props.properties[i].value, NULL, 10);
-          break;
+            infobuf->max_ce_clock = (uint64_t)strtoull(props.properties[i].value, NULL, 10);
+            break;
         default:
-          break;
-      }
+            break;
+        }
 
-      /* NOTE: The firmware info is basically not useful (not the other property groups either,
-       * _AMC_ and _DATA_) on the devices I have access to on the Simula eX3 cluster.
-       */
-      if (firmware_name_index >= 0 && firmware_version_index >= 0) {
-          snprintf(infobuf->firmware,
-                   sizeof(infobuf->firmware),
-                   "%s @ %s",
-                   props.properties[firmware_name_index].value,
-                   props.properties[firmware_version_index].value);
-      } else if (firmware_name_index >= 0) {
-          strtcpy(infobuf->firmware, props.properties[firmware_name_index].value, sizeof(infobuf->firmware)-1);
-      } else if (firmware_version_index >= 0) {
-          strtcpy(infobuf->firmware, props.properties[firmware_version_index].value, sizeof(infobuf->firmware)-1);
-      }
+        /* NOTE: The firmware info is basically not useful (not the other property groups either,
+         * _AMC_ and _DATA_) on the devices I have access to on the Simula eX3 cluster.
+         */
+        if (firmware_name_index >= 0 && firmware_version_index >= 0) {
+            snprintf(infobuf->firmware, sizeof(infobuf->firmware), "%s @ %s",
+                props.properties[firmware_name_index].value,
+                props.properties[firmware_version_index].value);
+        } else if (firmware_name_index >= 0) {
+            strtcpy(infobuf->firmware, props.properties[firmware_name_index].value,
+                sizeof(infobuf->firmware) - 1);
+        } else if (firmware_version_index >= 0) {
+            strtcpy(infobuf->firmware, props.properties[firmware_version_index].value,
+                sizeof(infobuf->firmware) - 1);
+        }
 
-      {
-          xpum_power_limits_t limits;
-          xpu_get_device_power_limits(devs[device_index].deviceId, -1, &limits);
-          infobuf->max_power_limit = (unsigned)limits.sustained_limit.power / 1000;
-      }
+        {
+            xpum_power_limits_t limits;
+            xpu_get_device_power_limits(devs[device_index].deviceId, -1, &limits);
+            infobuf->max_power_limit = (unsigned)limits.sustained_limit.power / 1000;
+        }
     }
 
     /* We must synthesize a UUID here, as the devices do not provide UUIDs that are unique in any
@@ -235,7 +237,8 @@ int xpu_device_get_card_info(uint32_t device_index, struct xpu_card_info_t* info
                 break;
             }
             if (c == 'b') {
-                if (fgetc(fp) == 't' && fgetc(fp) == 'i' && fgetc(fp) == 'm' && fgetc(fp) == 'e' && fgetc(fp) == ' ') {
+                if (fgetc(fp) == 't' && fgetc(fp) == 'i' && fgetc(fp) == 'm' && fgetc(fp) == 'e'
+                    && fgetc(fp) == ' ') {
                     found = true;
                 }
             }
@@ -251,7 +254,8 @@ int xpu_device_get_card_info(uint32_t device_index, struct xpu_card_info_t* info
 
     /* Use "/" to separate the fields so that code that wants to hack around the proliferation of
        device UUIDs has something to work with.  A "/" is not legal within any of the fields. */
-    snprintf(infobuf->uuid, sizeof(infobuf->uuid), "%s/%s/%s", hostname, boot_time, infobuf->bus_addr);
+    snprintf(
+        infobuf->uuid, sizeof(infobuf->uuid), "%s/%s/%s", hostname, boot_time, infobuf->bus_addr);
 
     return 0;
 #else
@@ -275,7 +279,7 @@ int xpu_device_get_card_state(uint32_t device_index, struct xpu_card_state_t* in
     if (xpu_get_stats(devs[device_index].deviceId, NULL, &count, &begin, &end, 0) != 0) {
         return -1;
     }
-    xpum_device_stats_t *stats = calloc(count, sizeof(xpum_device_stats_t));
+    xpum_device_stats_t* stats = calloc(count, sizeof(xpum_device_stats_t));
     if (stats == NULL) {
         return -1;
     }
@@ -291,32 +295,32 @@ int xpu_device_get_card_state(uint32_t device_index, struct xpu_card_state_t* in
        To make sense of this, we'll iterate over the outer array and take the first element that
        matches our device ID.  This is probably overly cautious.
     */
-    for (uint32_t c=0 ; c < count ; c++ ) {
+    for (uint32_t c = 0; c < count; c++) {
         if (stats[c].deviceId == devs[device_index].deviceId) {
-            xpum_device_stats_t *s = &stats[c];
-            for (int32_t i=0 ; i < s->count ; i++ ) {
-                xpum_device_stats_data_t *d = &s->dataList[i];
+            xpum_device_stats_t* s = &stats[c];
+            for (int32_t i = 0; i < s->count; i++) {
+                xpum_device_stats_data_t* d = &s->dataList[i];
                 switch (d->metricsType) {
-                  case XPUM_STATS_GPU_UTILIZATION:
+                case XPUM_STATS_GPU_UTILIZATION:
                     infobuf->gpu_util = (float)((double)d->value / (double)d->scale);
                     break;
-                  case XPUM_STATS_POWER:
+                case XPUM_STATS_POWER:
                     infobuf->power = (unsigned)(d->value / d->scale);
                     break;
-                  case XPUM_STATS_GPU_FREQUENCY:
+                case XPUM_STATS_GPU_FREQUENCY:
                     infobuf->ce_clock = (unsigned)d->value;
                     break;
-                  case XPUM_STATS_GPU_CORE_TEMPERATURE:
+                case XPUM_STATS_GPU_CORE_TEMPERATURE:
                     /* Not available on the ex3 node I have */
                     infobuf->temp = (unsigned)d->value;
                     break;
-                  case XPUM_STATS_MEMORY_USED:
+                case XPUM_STATS_MEMORY_USED:
                     infobuf->mem_used = d->value;
                     break;
-                  case XPUM_STATS_MEMORY_UTILIZATION:
+                case XPUM_STATS_MEMORY_UTILIZATION:
                     infobuf->mem_util = (float)((double)d->value / (double)d->scale);
                     break;
-                  default:
+                default:
                     break;
                 }
             }
@@ -332,7 +336,7 @@ int xpu_device_get_card_state(uint32_t device_index, struct xpu_card_state_t* in
 }
 
 #ifdef SONAR_XPU_GPU
-static struct xpu_gpu_process_t* infos;  /* NULL for no info yet */
+static struct xpu_gpu_process_t* infos; /* NULL for no info yet */
 static unsigned info_count = 0;
 #endif
 
@@ -354,7 +358,7 @@ int xpu_device_probe_processes(uint32_t device_index, uint32_t* count) {
         return -1;
     }
     uint64_t totalMem = 0;
-    for (int i=0 ; i < props.propertyLen ; i++) {
+    for (int i = 0; i < props.propertyLen; i++) {
         if (props.properties[i].name == XPUM_DEVICE_PROPERTY_MEMORY_PHYSICAL_SIZE_BYTE) {
             totalMem = (uint64_t)strtoull(props.properties[i].value, NULL, 10);
             break;
@@ -376,7 +380,8 @@ int xpu_device_probe_processes(uint32_t device_index, uint32_t* count) {
             if (stats == NULL) {
                 return -1;
             }
-            r = xpu_get_device_utilization_by_process(devs[device_index].deviceId, 100*1000, stats, &procCount);
+            r = xpu_get_device_utilization_by_process(
+                devs[device_index].deviceId, 100 * 1000, stats, &procCount);
             if (r != XPUM_BUFFER_TOO_SMALL) {
                 break;
             }
@@ -397,7 +402,7 @@ int xpu_device_probe_processes(uint32_t device_index, uint32_t* count) {
     }
     info_count = procCount;
 
-    for (uint32_t p = 0 ; p < procCount ; p++ ) {
+    for (uint32_t p = 0; p < procCount; p++) {
         infos[p].pid = stats[p].processId;
         infos[p].gpu_util = stats[p].computeEngineUtil;
         infos[p].mem_util = stats[p].memSize * 100 / totalMem;
@@ -420,7 +425,7 @@ int xpu_get_process(uint32_t process_index, struct xpu_gpu_process_t* infobuf) {
     if (process_index >= info_count) {
         return -1;
     }
-    memcpy(infobuf, infos+process_index, sizeof(struct xpu_gpu_process_t));
+    memcpy(infobuf, infos + process_index, sizeof(struct xpu_gpu_process_t));
     return 0;
 #else
     return -1;

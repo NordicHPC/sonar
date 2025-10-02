@@ -6,9 +6,9 @@
     -proc  print processes
 */
 
+#include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <stdarg.h>
 #include <string.h>
 
 #include "sonar-amd.h"
@@ -23,11 +23,7 @@ void panic(const char* fmt, ...) {
     exit(1);
 }
 
-enum op_t {
-    INFO,
-    STATE,
-    PROC
-};
+enum op_t { INFO, STATE, PROC };
 
 int main(int argc, char** argv) {
     enum op_t mode = INFO;
@@ -52,75 +48,75 @@ int main(int argc, char** argv) {
     printf("\n%u devices\n", count);
 
     switch (mode) {
-      case INFO: {
-          struct amdml_card_info_t info;
-          for ( uint32_t dev = 0 ; dev < count ; dev++ ) {
-              memset(&info, 0, sizeof(info));
-              int r = amdml_device_get_card_info(dev, &info);
-              if (r == -1) {
-                  panic("Failed to get card info for %u", dev);
-              }
-              printf("\nDEVICE %u\n", dev);
-              printf("  bus %s\n", info.bus_addr);
-              printf("  model %s\n", info.model);
-              printf("  driver %s\n", info.driver);
-              printf("  firmware %s\n", info.firmware);
-              printf("  uuid %s\n", info.uuid);
-              printf("  memory %llu\n", (unsigned long long)info.totalmem);
-              printf("  plim %u\n", info.power_limit);
-              printf("  min_plim %u\n", info.min_power_limit);
-              printf("  max_plim %u\n", info.max_power_limit);
-              printf("  min_ce_clk %u\n", info.min_ce_clock);
-              printf("  max_ce_clk %u\n", info.max_ce_clock);
-              printf("  min_mem_clk %u\n", info.min_mem_clock);
-              printf("  max_mem_clk %u\n", info.max_mem_clock);
-          }
-          break;
-      }
-      case STATE: {
-          struct amdml_card_state_t info;
-          for ( uint32_t dev = 0 ; dev < count ; dev++ ) {
-              memset(&info, 0, sizeof(info));
-              int r = amdml_device_get_card_state(dev, &info);
-              if (r == -1) {
-                  panic("Failed to get card state for %u", dev);
-              }
-              printf("\nDEVICE %u\n", dev);
-              printf("  fan%% %g\n", info.fan_speed_pct);
-              printf("  perf %d\n", info.perf_level);
-              printf("  used %llu\n", (unsigned long long)info.mem_used);
-              printf("  gpu%% %g\n", info.gpu_util);
-              printf("  mem%% %g\n", info.mem_util);
-              printf("  temp %u\n", info.temp);
-              printf("  power %u\n", info.power);
-              printf("  plim %u\n", info.power_limit);
-              printf("  ce_clk %u\n", info.ce_clock);
-              printf("  mem_clk %u\n", info.mem_clock);
-          }
-          break;
-      }
-      case PROC: {
-          struct amdml_gpu_process_t proc;
-          uint32_t pcount;
-          int r = amdml_device_probe_processes(&pcount);
-          if (r == -1) {
-              panic("Failed to get processes\n");
-          }
-          for ( uint32_t p = 0 ; p < pcount ; p++ ) {
-              memset(&proc, 0, sizeof(proc));
-              r = amdml_get_process(p, &proc);
-              if (r == -1) {
-                  panic("Failed to get process %u\n", p);
-              }
-              printf(" PROCESS %u\n", p);
-              printf("  pid %u\n", proc.pid);
-              printf("  cards %02x\n", proc.cards);
-              printf("  mem %u\n", proc.mem_util);
-              printf("  gpu %u\n", proc.gpu_util);
-              printf("  sz %llu\n", (unsigned long long)proc.mem_size);
-          }
-          amdml_free_processes();
-          break;
-      }
+    case INFO: {
+        struct amdml_card_info_t info;
+        for (uint32_t dev = 0; dev < count; dev++) {
+            memset(&info, 0, sizeof(info));
+            int r = amdml_device_get_card_info(dev, &info);
+            if (r == -1) {
+                panic("Failed to get card info for %u", dev);
+            }
+            printf("\nDEVICE %u\n", dev);
+            printf("  bus %s\n", info.bus_addr);
+            printf("  model %s\n", info.model);
+            printf("  driver %s\n", info.driver);
+            printf("  firmware %s\n", info.firmware);
+            printf("  uuid %s\n", info.uuid);
+            printf("  memory %llu\n", (unsigned long long)info.totalmem);
+            printf("  plim %u\n", info.power_limit);
+            printf("  min_plim %u\n", info.min_power_limit);
+            printf("  max_plim %u\n", info.max_power_limit);
+            printf("  min_ce_clk %u\n", info.min_ce_clock);
+            printf("  max_ce_clk %u\n", info.max_ce_clock);
+            printf("  min_mem_clk %u\n", info.min_mem_clock);
+            printf("  max_mem_clk %u\n", info.max_mem_clock);
+        }
+        break;
+    }
+    case STATE: {
+        struct amdml_card_state_t info;
+        for (uint32_t dev = 0; dev < count; dev++) {
+            memset(&info, 0, sizeof(info));
+            int r = amdml_device_get_card_state(dev, &info);
+            if (r == -1) {
+                panic("Failed to get card state for %u", dev);
+            }
+            printf("\nDEVICE %u\n", dev);
+            printf("  fan%% %g\n", info.fan_speed_pct);
+            printf("  perf %d\n", info.perf_level);
+            printf("  used %llu\n", (unsigned long long)info.mem_used);
+            printf("  gpu%% %g\n", info.gpu_util);
+            printf("  mem%% %g\n", info.mem_util);
+            printf("  temp %u\n", info.temp);
+            printf("  power %u\n", info.power);
+            printf("  plim %u\n", info.power_limit);
+            printf("  ce_clk %u\n", info.ce_clock);
+            printf("  mem_clk %u\n", info.mem_clock);
+        }
+        break;
+    }
+    case PROC: {
+        struct amdml_gpu_process_t proc;
+        uint32_t pcount;
+        int r = amdml_device_probe_processes(&pcount);
+        if (r == -1) {
+            panic("Failed to get processes\n");
+        }
+        for (uint32_t p = 0; p < pcount; p++) {
+            memset(&proc, 0, sizeof(proc));
+            r = amdml_get_process(p, &proc);
+            if (r == -1) {
+                panic("Failed to get process %u\n", p);
+            }
+            printf(" PROCESS %u\n", p);
+            printf("  pid %u\n", proc.pid);
+            printf("  cards %02x\n", proc.cards);
+            printf("  mem %u\n", proc.mem_util);
+            printf("  gpu %u\n", proc.gpu_util);
+            printf("  sz %llu\n", (unsigned long long)proc.mem_size);
+        }
+        amdml_free_processes();
+        break;
+    }
     }
 }
