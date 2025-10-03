@@ -1,20 +1,33 @@
-# This works with clang-format v20.1, at least
+# -*- fill-column: 100 -*-
+
+# This works with clang-format v20.1, at least.
+# Also see .dir-locals.el, which more or less tracks this one for Emacs settings.
+
+# The base style is a little arbitrary and may change.  Key settings are changed below anyway.  The
+# most important aspect of the base style the default brace style and spaces-not-tabs.
 
 BasedOnStyle: WebKit
 
 ColumnLimit: 100
 IndentWidth: 4
 
+# Functions:
+#   int zappa(int x) {
+
 BreakBeforeBraces: Custom
 BraceWrapping:
   AfterFunction: false
 
+# Variable comments:
+#   int x;           // x is unknown
+#   int psychedelic; // hard to grasp
+
 AlignTrailingComments: true
+
+# Preprocessor:
+#   #if x
+#   #  define y
+#   #endif
 
 IndentPPDirectives: AfterHash
 PPIndentWidth: 2
-
-# I really want case labels to be indented half-width but "Half" is
-# not (no longer?) a valid setting for IndentCaseLabels, nor is "2".
-# It's a boolean: Indent or not.  In the interest of brevity, it's
-# currently off: "case" is aligned with the "switch".
