@@ -1,37 +1,37 @@
 [![image](https://github.com/NordicHPC/sonar/workflows/Test/badge.svg)](https://github.com/NordicHPC/sonar/actions)
 [![image](https://img.shields.io/badge/license-%20GPL--v3.0-blue.svg)](LICENSE)
 
-
 # sonar
 
 Sonar is a tool to profile usage of HPC resources by regularly sampling processes, accelerators,
 nodes, queues, and clusters.
 
-Sonar examines `/proc` and/or runs some diagnostic programs, filters and groups the information, and
-prints it to stdout or sends it to a remote collector (notably via Kafka).
+Sonar examines `/proc` and `/sys` and/or runs some diagnostic programs, filters and groups the
+information, and prints it to stdout or sends it to a remote collector (notably via Kafka).
 
 ![image of a fish swarm](img/sonar-small.png)
 
 Image: [Midjourney](https://midjourney.com/), [CC BY-NC 4.0](https://creativecommons.org/licenses/by-nc/4.0/legalcode)
 
-For more about the motivation and design, and other considerations, see [doc/DESIGN.md](doc/DESIGN.md).
+For more about the motivation, design, requirements, and other considerations, see [doc/DESIGN.md](doc/DESIGN.md).
 
 ## Subcommands
 
 Sonar has several subcommands that collect information about nodes, jobs, clusters, and processes
 and print it on stdout:
 
-- `sonar ps` takes a snapshot of the currently running processes on the node
+- `sonar ps` takes a snapshot of the currently running processes on the node and the node itself
 - `sonar sysinfo` extracts hardware information about the node
 - `sonar slurm` extracts information about overall job state from the slurm databases
 - `sonar cluster` extracts information about partitions and node state from the slurm databases
 
-Those subcommands are all run-once: Sonar exits after producing output.  Additionally, however,
-`sonar daemon` starts Sonar and keeps it memory-resident, running subprograms at intervals specified
-by a configuration file.  In the daemon mode, exfiltration of data is to a remote Kafka broker or
-into a directory tree.
+Those subcommands are all run-once: Sonar exits after producing output.
 
-Finally, `sonar help` prints some useful help.
+Additionally, `sonar daemon` starts Sonar and keeps it memory-resident, running subprograms at
+intervals specified by a configuration file.  In the daemon mode, exfiltration of data is to a
+remote Kafka broker or into a directory tree, also specified in the configuration file.
+
+Finally, `sonar help` prints some useful help and `sonar version` prints the version number.
 
 ## Compilation and installation
 
@@ -66,52 +66,19 @@ The recommended output format is the "new" JSON format.  Use the command line sw
 all commands to force this format.  Most subcommands currently default to either CSV or an older
 JSON format, but in daemon mode, only the new format is available.
 
-## Collect processes with `sonar ps`
+## Examples
 
-It's sensible to run `sonar ps` every 5 minutes on every compute node.
+Some illustrative runs.  For more detailed instructions on how to use it, see "How we run sonar on a
+cluster", below.  For a full description of the output formats and fields, see the previous section.
 
-```console
-$ sonar ps --help
+### Collect processes with `sonar ps`
 
-...
-
-Options for `ps`:
-  --rollup
-      Merge process records that have the same job ID and command name (on systems
-      with stable job IDs only)
-  --min-cpu-time seconds
-      Include records for jobs that have used at least this much CPU time
-      [default: none]
-  --exclude-system-jobs
-      Exclude records for system jobs (uid < 1000)
-  --exclude-users user,user,...
-      Exclude records whose users match these names [default: none]
-  --exclude-commands command,command,...
-      Exclude records whose commands start with these names [default: none]
-  --min-cpu-percent percentage
-      Include records for jobs that have on average used at least this
-      percentage of CPU, NOTE THIS IS NONMONOTONIC [default: none]
-  --min-mem-percent percentage
-      Include records for jobs that presently use at least this percentage of
-      real memory, NOTE THIS IS NONMONOTONIC [default: none]
-  --lockdir directory
-      Create a per-host lockfile in this directory and exit early if the file
-      exists on startup [default: none]
-  --load
-      Print per-cpu and per-gpu load data
-  --json
-      Format output as new JSON, not CSV
-  --cluster name
-      Optional cluster name (required for --json) with which to tag output
-```
-
-**NOTE** that if you use `--lockdir`, it should name a directory that is cleaned on reboot, such as
-`/var/run`, `/run`, or a tmpfs, and ideally it is a directory on a disk local to the node, not a
-shared disk.
+It's sensible to run `sonar ps` every 5 minutes on every compute node if you care mostly about
+long-running jobs, or at higher frequency if sbrief jobs are of interest to you.
 
 Here is an example output (with the default older CSV output format):
 ```console
-$ sonar ps --exclude-system-jobs --min-cpu-time=10 --rollup
+$ sonar ps --exclude-system-jobs --min-cpu-time=10
 
 v=0.7.0,time=2023-08-10T11:09:41+02:00,host=somehost,cores=8,user=someone,job=0,cmd=fish,cpu%=2.1,cpukib=64400,gpus=none,gpu%=0,gpumem%=0,gpukib=0,cputime_sec=138
 v=0.7.0,time=2023-08-10T11:09:41+02:00,host=somehost,cores=8,user=someone,job=0,cmd=sonar,cpu%=761,cpukib=372,gpus=none,gpu%=0,gpumem%=0,gpukib=0,cputime_sec=137
@@ -121,7 +88,7 @@ v=0.7.0,time=2023-08-10T11:09:41+02:00,host=somehost,cores=8,user=someone,job=0,
 v=0.7.0,time=2023-08-10T11:09:41+02:00,host=somehost,cores=8,user=someone,job=0,cmd=slack,cpu%=3.9,cpukib=716924,gpus=none,gpu%=0,gpumem%=0,gpukib=0,cputime_sec=266
 ```
 
-## Collect system information with `sonar sysinfo`
+### Collect system information with `sonar sysinfo`
 
 The `sysinfo` subcommand collects information about the system and prints it in JSON form on stdout
 (this is the default older JSON format):
@@ -142,21 +109,31 @@ $ sonar sysinfo
 Typical usage for `sysinfo` is to run the command after reboot and (for hot-swappable systems and
 VMs) once every 24 hours, and to aggregate the information in some database.
 
-The `sysinfo` subcommand currently has no options.
+### Collecting job information with `sonar slurm`
 
-## Collecting job information with `sonar slurm` (incomplete)
+The `slurm` command runs `sacct` and extracts job data.  This command exists partly to allow
+clusters to always push data, partly to collect the data for long-term storage, partly to offload
+the Slurm database manager during query processing.
 
-To be written.
+```console
+$ sonar slurm --deluge --json --cluster my.cluster
+...
+```
 
-This command exists partly to allow clusters to always push data, partly to collect the data for
-long-term storage, partly to offload the Slurm database manager during query processing.
+The `--deluge` option extracts running and pending jobs as well as completed jobs.
 
-## Collecting partition and node information with `sonar cluster` (incomplete)
+### Collecting partition and node information with `sonar cluster`
 
-To be written.
+The `cluster` command runs `sinfo` and extracts cluster (partition) information and node
+information.  This command exists partly to allow clusters to always push data, partly to collect
+the data for long-term storage.
 
-This command exists partly to allow clusters to always push data, partly to collect the data for
-long-term storage.
+```console
+$ sonar cluster --cluster my.cluster
+...
+```
+
+The output is always JSON.
 
 ## Collect and analyze results
 
@@ -196,9 +173,10 @@ See [doc/HOWTO-DEPLOY.md](doc/HOWTO-DEPLOY.md).
 Sonar's original vision was as a very simple, lightweight tool that did some basic things fairly
 cheaply and produced easy-to-process output for subsequent scripting.  Sonar is no longer that: with
 GPU integration, SLURM integration, Kafka exfiltration, memory-resident modes, structured output,
-continual focus on performance and an elaborate backend in
-[Jobanalyzer](https://github.com/NAICNO/Jobanalyzer) it is becoming as complex as the tools it was
-intended to replace or at least compete with.
+continual focus on performance and elaborate backends in
+[Jobanalyzer](https://github.com/NAICNO/Jobanalyzer) and
+[Slurm-monitor](https://github.com/2maz/slurm-monitor), it is becoming as complex as the tools it
+was intended to replace or compete with.
 
 Here are some of those tools:
 
