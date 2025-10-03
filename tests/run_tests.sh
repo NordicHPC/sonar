@@ -28,6 +28,7 @@ tests="amd-gpu \
      min-cpu-time \
      no-gpu \
      nvidia-gpu \
+     ps-cpu-util \
      ps-interrupt \
      ps-syntax \
      rollup \
