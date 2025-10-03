@@ -4,11 +4,11 @@
 
 # sonar
 
-Sonar is a tool to profile usage of HPC resources by regularly sampling processes, nodes, queues,
-and clusters.
+Sonar is a tool to profile usage of HPC resources by regularly sampling processes, accelerators,
+nodes, queues, and clusters.
 
 Sonar examines `/proc` and/or runs some diagnostic programs, filters and groups the information, and
-prints it to stdout or sends it to a remote collector (via Kafka).
+prints it to stdout or sends it to a remote collector (notably via Kafka).
 
 ![image of a fish swarm](img/sonar-small.png)
 
@@ -28,11 +28,10 @@ and print it on stdout:
 
 Those subcommands are all run-once: Sonar exits after producing output.  Additionally, however,
 `sonar daemon` starts Sonar and keeps it memory-resident, running subprograms at intervals specified
-by a configuration file.  In this mode, exfiltration of data in production normally happens via
-Kafka.
+by a configuration file.  In the daemon mode, exfiltration of data is to a remote Kafka broker or
+into a directory tree.
 
 Finally, `sonar help` prints some useful help.
-
 
 ## Compilation and installation
 
@@ -53,11 +52,10 @@ In practice it is a little harder:
   (for Kafka) and some other things (to link the GPU probe libraries)
 - Some of the tests in `util/` (if you are going to be running those) require `go`
 
-Some distros, notably RHEL8, have binutils that are too old, you can check by running e.g. `as --version`,
-the major version number is also the version number of binutils.  Binutils 2.32 are new
-enough for the GPU probe libraries but may not be new enough for Kafka.  Binutils 2.40 are known to
-work for both.  Also see comments in `gpuapi/Makefile`.
-
+Some distros, notably RHEL8, have binutils that are too old, you can check by running e.g.
+`as --version`, the major version number is also the version number of binutils.  Binutils 2.32
+are new enough for the GPU probe libraries but may not be new enough for Kafka.  Binutils 2.40
+are known to work for both.  Also see comments in `gpuapi/Makefile`.
 
 ## Output format options
 
@@ -67,7 +65,6 @@ format](doc/NEW-FORMAT.md), currently coexisting but the old format will be phas
 The recommended output format is the "new" JSON format.  Use the command line switch `--json` with
 all commands to force this format.  Most subcommands currently default to either CSV or an older
 JSON format, but in daemon mode, only the new format is available.
-
 
 ## Collect processes with `sonar ps`
 
@@ -147,7 +144,6 @@ VMs) once every 24 hours, and to aggregate the information in some database.
 
 The `sysinfo` subcommand currently has no options.
 
-
 ## Collecting job information with `sonar slurm` (incomplete)
 
 To be written.
@@ -155,14 +151,12 @@ To be written.
 This command exists partly to allow clusters to always push data, partly to collect the data for
 long-term storage, partly to offload the Slurm database manager during query processing.
 
-
 ## Collecting partition and node information with `sonar cluster` (incomplete)
 
 To be written.
 
 This command exists partly to allow clusters to always push data, partly to collect the data for
 long-term storage.
-
 
 ## Collect and analyze results
 
@@ -175,7 +169,6 @@ Sonar data are used by two other tools:
   files for JobGraph can be found in the [data](data) folder.  Its development has been dormant for some
   time.
 
-
 ## Versions and release procedures
 
 We use semantic versioning.  The major version is expected to remain at zero for the foreseeable
@@ -187,7 +180,6 @@ At the time of writing we require:
 
 For all other versioning information, see [doc/VERSIONING.md](doc/VERSIONING.md).
 
-
 ## Authors
 
 - [Radovan Bast](https://bast.fr)
@@ -195,13 +187,26 @@ For all other versioning information, see [doc/VERSIONING.md](doc/VERSIONING.md)
 - [Lars T. Hansen](https://github.com/lars-t-hansen)
 - Henrik Rojas Nagel
 
-
 ## How we run sonar on a cluster
 
 See [doc/HOWTO-DEPLOY.md](doc/HOWTO-DEPLOY.md).
 
-## Similar and related tools (incomplete)
+## Similar and related tools
 
+Sonar's original vision was as a very simple, lightweight tool that did some basic things fairly
+cheaply and produced easy-to-process output for subsequent scripting.  Sonar is no longer that: with
+GPU integration, SLURM integration, Kafka exfiltration, memory-resident modes, structured output,
+continual focus on performance and an elaborate backend in
+[Jobanalyzer](https://github.com/NAICNO/Jobanalyzer) it is becoming as complex as the tools it was
+intended to replace or at least compete with.
+
+Here are some of those tools:
+
+- [Trailblazing Turtle](https://github.com/guilbaults/TrailblazingTurtle), SLURM-specific but similar to Sonar.
+- [Scaphandre](https://hubblo-org.github.io/scaphandre-documentation/index.html), for energy monitoring.
+- [Sysstat and SAR](https://github.com/sysstat/sysstat), for monitoring a lot of things.
+- [seff](https://support.schedmd.com/show_bug.cgi?id=1611), SLURM-specific.
+- [TACC Remora](https://github.com/tacc/remora)
 - Reference implementation which serves as inspiration:
   <https://github.com/UNINETTSigma2/appusage>
 - [TACC Stats](https://github.com/TACC/tacc_stats)
