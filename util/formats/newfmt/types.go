@@ -604,14 +604,14 @@ type SampleJob struct {
 // provides cpu_util but not cpu_avg or cpu_time, and a memory utilization figure from which
 // resident_memory must be back-computed.
 //
-// NOTE: The fields cpu_time, cpu_avg, and cpu_util are different views on the same
-// quantities and are used variously by Sonar and the slurm-monitor dashboard. The Jobanalyzer
-// back-end computes its own cpu_util from a time series of cpu_time values and using the
-// cpu_avg as the first value in the computed series. The slurm-monitor dashboard in contrast
-// uses cpu_util directly, but as it will require some time to perform the sampling it slows down
-// the monitoring process (a little) and make it more expensive (a little), and the result is less
-// accurate (it's a sample, not an averaging over the entire interval). Possibly having either
-// cpu_avg and cpu_time together or cpu_util on its own would be sufficient.
+// NOTE: The fields cpu_time, cpu_avg, and cpu_util are different views on the same quantities and
+// are used variously by Jobanalyzer and the slurm-monitor dashboard. The Jobanalyzer back-end
+// computes its own cpu_util from a time series of cpu_time values and using the cpu_avg as the
+// first value in the computed series. The slurm-monitor dashboard in contrast uses cpu_util
+// directly, but as it will require some time to perform the sampling it slows down the monitoring
+// process (a little) and makes it more expensive (a little), and the result is less accurate (it's
+// a sample, not an averaging over the entire interval). Possibly having either cpu_avg and cpu_time
+// together or cpu_util on its own would be sufficient.
 type SampleProcess struct {
 	// Kilobytes of private resident memory.
 	ResidentMemory uint64 `json:"resident_memory,omitempty"`

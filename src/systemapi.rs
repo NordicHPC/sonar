@@ -45,7 +45,7 @@ pub trait SystemAPI {
 
     // Given the per-process CPU time computed by compute_process_information, and a time to wait,
     // wait for that time and then read the CPU time again.  The sampled process CPU utilization is
-    // the delta of CPU time divided by the delta of time.
+    // the delta of CPU time divided by the delta of time, 1.0 = 100% of one core.
     fn compute_cpu_utilization(
         &self,
         per_pid_cpu_ticks: &[(usize, u64)],
