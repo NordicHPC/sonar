@@ -25,6 +25,7 @@ additionally need to run on these types of nodes:
 - a node with an NVIDIA GPU (UiO ml[1-3,5-9].hpc nodes, or Fox, Saga, or Betzy GPU nodes)
 - a node with an AMD GPU (UiO ml4.hpc node, or Lumi)
 - a node with an XPU GPU (Simula n022)
+- a node with a Habana GPU (Simula h001)
 - a node with Slurm (Fox, Saga, Fram or Betzy login nodes would do)
 
 The tests will probe for GPU and Slurm and enable/disable themselves as appropriate, no
@@ -35,7 +36,17 @@ configuration is needed.
 The interactive tests are:
 
 - `kafka-interactive` tests Sonar's output-to-Kafka-broker functionality with a live broker
+- `threads-interactive` tests the ability to record thread counts (this could be made automated)
 
 ## Coding standards
 
-Most tests don't do this yet, but it's useful to name all temp files <test-name>-<something>.tmp.
+Tests that generate temp outputs should `mkdir -p tmp` and place files in `tmp/`.
+
+Tests that use auxiliary input files should name the files similarly to the test (so
+`daemon-kafka.ini` goes with `daemon-kafka.sh`).
+
+It's useful for tests to have names that start with the major function tested, when possible (so
+`ps-cpu-util.sh` and not just `cpu-util.sh`).
+
+It's useful for every test to print ` Ok` (indented) or some other got-to-the-end phrase (also
+indented) at the end of the script.

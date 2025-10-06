@@ -23,3 +23,5 @@ if (( loadlines != 0 )); then
     echo "Did not emit gpuinfo data properly - not exactly 0: $loadlines"
     exit 1
 fi
+
+echo " Ok"
