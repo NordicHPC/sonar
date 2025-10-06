@@ -309,7 +309,7 @@ fn collect_sample_data(
         let utils = system.compute_cpu_utilization(&per_pid_cpu_ticks, 100)?;
         for (pid, cpu_util) in utils.iter() {
             processes.entry(*pid).and_modify(|e| {
-                e.cpu_util = *cpu_util;
+                e.cpu_util = *cpu_util * 100.0;
             });
             // There is no or_insert case.  It may be that a process has gone away, and there's no
             // data for it, but not that a process has appeared during the utilization computation.

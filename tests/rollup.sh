@@ -11,7 +11,7 @@
 
 set -e
 
-make --quiet
+make rollup-programs
 
 echo " This takes about 10s"
 ./rollup 3 &

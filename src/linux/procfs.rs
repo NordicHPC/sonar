@@ -598,7 +598,7 @@ pub fn compute_process_information(
 
 // Given the per-process CPU time computed by compute_process_information, and a time to wait, wait
 // for that time and then read the CPU time again.  The sampled process CPU utilization is the delta
-// of CPU time divided by the delta of time.
+// of CPU time divided by the delta of time, so 1.0 = 100% of one core.
 
 pub fn compute_cpu_utilization(
     system: &dyn systemapi::SystemAPI,
@@ -644,6 +644,10 @@ pub fn compute_cpu_utilization(
                 bsdtime_ticks = utime_ticks + stime_ticks + cutime_ticks + cstime_ticks;
             }
         }
+        //   delta_ticks * (ms/s / ms) / ticks/s
+        // = (delta_ticks/s) * s/ticks
+        // = ticks * (1/ticks)
+        // = unitless
         let utilization = (bsdtime_ticks - prev_cputime_ticks) as f64
             * (1000.0 / wait_time_ms as f64)
             / ticks_per_sec as f64;
