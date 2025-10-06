@@ -328,11 +328,13 @@ Primary memory in kilobytes
 
 #### **`topo_svg`** string
 
-Base64-encoded text output (SVG source text) of `lstopo` or similar
+Base64-encoded text output (SVG source text) of `lstopo` or similar, using the base64
+alphabet from RFC4648.
 
 #### **`topo_text`** string
 
-Base64-encoded text output (human-readable) of `hwloc-ls` or similar
+Base64-encoded text output (human-readable) of `hwloc-ls` or similar, using the base64
+alphabet from RFC4648.
 
 #### **`cards`** []SysinfoGpuCard
 
