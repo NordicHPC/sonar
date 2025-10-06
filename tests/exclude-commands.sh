@@ -14,3 +14,4 @@ if (( numbad != 0 )); then
     exit 1
 fi
 
+echo " Ok"
