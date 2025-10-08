@@ -2,11 +2,8 @@
 #
 # Check that `sonar cluster` produces correct output from a known input.
 
-set -e
-if [[ -z $(command -v jq) ]]; then
-    echo "Install jq first"
-    exit 1
-fi
+source sh-helper
+assert_jq
 
 mkdir -p tmp
 sonar_output=tmp/sinfo-parsing-sinfo-output.tmp
@@ -29,11 +26,9 @@ jq .data.attributes.partitions < $sonar_output > $partitions2
 jq .data.attributes.nodes < testdata/sonar_sinfo_output.txt > $nodes1
 jq .data.attributes.nodes < $sonar_output > $nodes2
 if ! cmp $partitions1 $partitions2; then
-    echo "Sonar partitions differ"
-    exit 1
+    fail "Sonar partitions differ"
 fi
 if ! cmp $nodes1 $nodes2; then
-    echo "Sonar partitions differ"
-    exit 1
+    fail "Sonar partitions differ"
 fi
 echo " Ok"

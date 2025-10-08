@@ -4,7 +4,8 @@
 #
 # TODO: We should extend this to check that timestamps and file names are correct.
 
-set -e
+source sh-helper
+
 echo "This test takes about 20s"
 
 mkdir -p tmp
@@ -14,23 +15,20 @@ rm -rf $data_dir $logfile
 
 cargo run -- daemon daemon-directory.ini 2>$logfile
 if [[ ! -d $data_dir ]]; then
-    echo "No data directory"
-    exit 1
+    fail "No data directory"
 fi
 
 # There may be more than one output file of each kind if the test ran across midnight UTC; that's OK.
 
 n=$(cat $data_dir/*/*/*/0+sysinfo*json | wc -c)
 if (( n == 0 )); then
-    echo "Sysinfo file should not be empty"
-    exit 1
+    fail "Sysinfo file should not be empty"
 fi
 
 n=$(cat $data_dir/*/*/*/0+sample*json | wc -c)
 if (( n == 0 )); then
-    echo "Sample file should not be empty"
-    exit 1
+    fail "Sample file should not be empty"
 fi
 
-echo " OK"
+echo " Ok"
 

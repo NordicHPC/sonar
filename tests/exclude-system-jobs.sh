@@ -4,7 +4,8 @@
 # name UNAME, run `getent passwd $UNAME` and then extract the third field from the colon-separated
 # list to get the uid, then collect the uids that are < 1000 - these are wrong.
 
-set -e
+source sh-helper
+
 numbad=$(cargo run -- ps --exclude-system-jobs | \
              awk '
 {
@@ -24,8 +25,7 @@ END {
              wc -l )
 if (( numbad != 0 )); then
     echo $numbad
-    echo "System jobs filtering did not work"
-    exit 1
+    fail "System jobs filtering did not work"
 fi
 
 echo " Ok"

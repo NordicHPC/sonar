@@ -2,7 +2,7 @@
 #
 # Check that command line parsing is somewhat sane.
 
-set -e
+source sh-helper
 
 # Allow both forms of argument syntax
 cargo run -- ps --exclude-users=root,$LOGNAME > /dev/null
@@ -39,8 +39,7 @@ output=$(cargo run -- ps --zappa 2>&1)
 exitcode=$?
 set -e
 if (( exitcode != 2 )); then
-    echo "Failed to reject unknown argument"
-    exit 1
+    fail "Failed to reject unknown argument"
 fi
 
 # Signal error with code 2 for invalid arguments: missing string
@@ -49,8 +48,7 @@ output=$(cargo run -- ps --lockdir 2>&1)
 exitcode=$?
 set -e
 if (( exitcode != 2 )); then
-    echo "Lockdir should require an argument value"
-    exit 1
+    fail "Lockdir should require an argument value"
 fi
 
 # Signal error with code 2 for invalid arguments: bad number
@@ -59,6 +57,7 @@ output=$(cargo run -- ps --min-cpu-time 7hello 2>&1)
 exitcode=$?
 set -e
 if (( exitcode != 2 )); then
-    echo "min-cpu-time should require an integer argument value"
-    exit 1
+    fail "min-cpu-time should require an integer argument value"
 fi
+
+echo " Ok"

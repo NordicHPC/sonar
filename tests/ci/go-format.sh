@@ -1,9 +1,8 @@
 #!/bin/bash
 #
-# Note, this should not be run by `run_tests.sh` since it is normal for code to be unformatted
-# during development.
+# Test that the Go code is formatted properly.
 
-output=$(gofmt -l ../util)
+output=$(gofmt -l ../../util)
 if [[ -n $output ]]; then
     echo "FORMATTING FAILURE!"
     echo "The following files are not properly formatted (go fmt):"

@@ -2,7 +2,8 @@
 #
 # Test that the --exclude-commands switch works.
 
-set -e
+source sh-helper
+
 numbad=$(cargo run -- ps --exclude-commands bash,sh,zsh,csh,ksh,tcsh,kworker | \
     awk "
 /,cmd=kworker/ { print }
@@ -10,8 +11,7 @@ numbad=$(cargo run -- ps --exclude-commands bash,sh,zsh,csh,ksh,tcsh,kworker | \
 " | \
     wc -l)
 if (( numbad != 0 )); then
-    echo "Command filtering did not work"
-    exit 1
+    fail "Command filtering did not work"
 fi
 
 echo " Ok"

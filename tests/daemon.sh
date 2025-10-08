@@ -2,12 +2,10 @@
 #
 # Check that `sonar daemon` produces some sane output and can accept some sane input.
 
-set -e
+source sh-helper
+
 echo " This takes about 15s"
-if [[ -z $(command -v jq) ]]; then
-    echo "Install jq first"
-    exit 1
-fi
+assert_jq
 
 mkdir -p tmp
 output=tmp/daemon-output.txt
@@ -24,8 +22,7 @@ before=$(date +%s)
 after=$(date +%s)
 
 if (( after - before < 5 )); then
-    echo "Daemon exited too soon"
-    exit 1
+    fail "Daemon exited too soon"
 fi
 
 # jq will read the individual objects in the file and get properties from all, there will typically
@@ -34,29 +31,25 @@ fi
 topic=$(jq .topic < $output | head -n1)
 expect_topic='"zappa.hpc.axis-of-eval.org.sysinfo"'
 if [[ $topic != $expect_topic ]]; then
-    echo "Bad topic: $topic expected $expect_topic"
-    exit 1
+    fail "Bad topic: $topic expected $expect_topic"
 fi
 
 key=$(jq .key < $output | head -n1)
 expect_key="\"$(hostname)\""
 if [[ $key != $expect_key ]]; then
-    echo "Bad key: $key expected $expect_key"
-    exit 1
+    fail "Bad key: $key expected $expect_key"
 fi
 
 client=$(jq .client < $output | head -n1)
 expect_client="\"hpc.axis-of-eval.org/$(hostname)\""
 if [[ $client != $expect_client ]]; then
-    echo "Bad client: $client expected $expect_client"
-    exit 1
+    fail "Bad client: $client expected $expect_client"
 fi
 
 type=$(jq .value.data.type < $output | head -n1)
 expect_type='"sysinfo"'
 if [[ $type != $expect_type ]]; then
-    echo "Bad type: $type expected $expect_type"
-    exit 1
+    fail "Bad type: $type expected $expect_type"
 fi
 
 echo " Ok"

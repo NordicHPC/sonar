@@ -2,7 +2,8 @@
 #
 # Test that the --exclude-users switch works.
 
-set -e
+source sh-helper
+
 numbad=$(cargo run -- ps --exclude-users root,root,root,$LOGNAME | \
     awk "
 /,user=root,/ { print }
@@ -10,8 +11,7 @@ numbad=$(cargo run -- ps --exclude-users root,root,root,$LOGNAME | \
 " | \
     wc -l)
 if (( numbad != 0 )); then
-    echo "User name filtering did not work"
-    exit 1
+    fail "User name filtering did not work"
 fi
 
 echo " Ok"

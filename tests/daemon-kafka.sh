@@ -2,12 +2,10 @@
 #
 # Check that the Kafka data sink does its job (without sending anything)
 
-set -e
+source sh-helper
+
 echo "This test takes about 30s"
-if [[ -z $(command -v jq) ]]; then
-    echo "Install jq first"
-    exit 1
-fi
+assert_jq
 
 mkdir -p tmp
 outfile=tmp/daemon-kafka-output.txt
@@ -49,8 +47,7 @@ num_bad=0
 for k in $(jq 'select(has("error"))|.id' < $outfile); do
     num_bad=$((num_bad + 1))
     if (( k - prev != 2 )); then
-        echo "Found even key in error output: $k"
-        exit 1
+        fail "Found even key in error output: $k"
     fi
     prev=$((prev + 2))
 done
@@ -60,8 +57,7 @@ num_good=0
 for k in $(jq 'select(has("topic"))|.id' < $outfile); do
     num_good=$((num_good + 1))
     if (( k - prev != 2 )); then
-        echo "Found odd key in normal output: $k"
-        exit 1
+        fail "Found odd key in normal output: $k"
     fi
     prev=$((prev + 2))
 done
@@ -71,8 +67,7 @@ if ((diff < 0)); then
     diff=$((-diff))
 fi
 if ((diff > 1)); then
-    echo "Unlikely good-bad difference $diff"
-    exit 1
+    fail "Unlikely good-bad difference $diff"
 fi
 
 # Testing that the sending window works: We test that sent messages are batched in several batches
@@ -105,12 +100,10 @@ if ((count > 1)); then
 fi
 
 if ((batches < 4)); then
-    echo "No separation of batches detected, batches=$batches"
-    exit 1
+    fail "No separation of batches detected, batches=$batches"
 fi
 if ((multibatch < 4)); then
-    echo "Insufficient batching detected, multibatch=$multibatch"
-    exit 1
+    fail "Insufficient batching detected, multibatch=$multibatch"
 fi
 
-echo " OK"
+echo " Ok"

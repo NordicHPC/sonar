@@ -1,0 +1,25 @@
+# -*- mode: shell-script -*-
+
+set -e
+
+function fail() {
+    echo ' !!!ERROR!!!' "$1"
+    exit 1
+}
+
+function assert_jq() {
+    if [[ -z $(command -v jq) ]]; then
+        fail "Install jq first"
+    fi
+}
+
+function join() {
+    local xs=$1
+    shift 1
+    while [[ $1 != "" ]]; do
+        xs="$xs,$1"
+        shift 1
+    done
+    echo $xs
+}
+

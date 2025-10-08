@@ -2,11 +2,8 @@
 #
 # Check that `sonar sysinfo` produces properly formatted JSON.
 
-set -e
-if [[ -z $(command -v jq) ]]; then
-    echo "Install jq first"
-    exit 1
-fi
+source sh-helper
+assert_jq
 
 # JSON syntax check
 
@@ -19,8 +16,7 @@ echo " JSON ok"
 
 output=$(cargo run -- sysinfo --csv)
 if [[ ! ( $output =~ version= ) ]]; then
-    echo "CSV missing version number"
-    exit 1
+    fail "CSV missing version number"
 fi
 
 echo " CSV ok"

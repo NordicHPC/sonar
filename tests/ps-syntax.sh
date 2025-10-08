@@ -2,11 +2,8 @@
 #
 # Check that `sonar ps` produces some sane output.
 
-set -e
-if [[ -z $(command -v jq) ]]; then
-    echo "Install jq first"
-    exit 1
-fi
+source sh-helper
+assert_jq
 
 # CSV
 #
@@ -23,29 +20,24 @@ fi
 output=$(cargo run -- ps)
 count=$(wc -l <<< $output)
 if (( count <= 0 )); then
-    echo "Must have some number of output lines"
-    exit 1
+    fail "Must have some number of output lines"
 fi
 l=$(head -n 1 <<< $output)
 if [[ !( $l =~ ^v=[0-9]+\.[0-9]+\.[0-9]+(-.+)?, ) ]]; then
-    echo "CSV version missing, got $l"
-    exit 1
+    fail "CSV version missing, got $l"
 fi
 if [[ !( $l =~ ,user=[-a-z0-9_]+, ) ]]; then
-    echo "CSV user missing, got $l"
-    exit 1
+    fail "CSV user missing, got $l"
 fi
 # The command may be quoted so match only the beginning
 if [[ !( $l =~ ,\"?cmd= ) ]]; then
-    echo "CSV cmd missing, got $l"
-    exit 1
+    fail "CSV cmd missing, got $l"
 fi
 if [[ !( $l =~ ,host=$HOSTNAME, ) ]]; then
-    echo "CSV host missing, got $l"
-    exit 1
+    fail "CSV host missing, got $l"
 fi
 
-echo "CSV ok"
+echo " Ok: CSV"
 
 # JSON
 #
@@ -59,40 +51,33 @@ jq . <<< $output > /dev/null
 # Check that the envelope has required fields
 version=$(jq .meta.version <<< $output)
 if [[ !( $version =~ [0-9]+\.[0-9]+\.[0-9](-.+)? ) ]]; then
-    echo "JSON version bad, got $version"
-    exit 1
+    fail "JSON version bad, got $version"
 fi
 x=$(jq .meta.producer <<< $output)
 if [[ $x != '"sonar"' ]]; then
-    echo "JSON producer wrong, got $x"
-    exit 1
+    fail "JSON producer wrong, got $x"
 fi
 # Check that the type is right
 x=$(jq .data.type <<< $output)
 if [[ $x != '"sample"' ]]; then
-    echo "JSON type wrong, got $x"
-    exit 1
+    fail "JSON type wrong, got $x"
 fi
 # Check that data envelope has some required fields
 x=$(jq .data.attributes.time <<< $output)
 if [[ $x == "null" ]]; then
-    echo "JSON time missing"
-    exit 1
+    fail "JSON time missing"
 fi
 x=$(jq .data.attributes.node <<< $output)
 if [[ $x == "null" ]]; then
-    echo "JSON node missing"
-    exit 1
+    fail "JSON node missing"
 fi
 x=$(jq .data.attributes.jobs <<< $output)
 if [[ $x == "null" ]]; then
-    echo "JSON jobs missing"
-    exit 1
+    fail "JSON jobs missing"
 fi
 x=$(jq .data.attributes.system <<< $output)
 if [[ $x == "null" ]]; then
-    echo "JSON system missing"
-    exit 1
+    fail "JSON system missing"
 fi
 
 # If there's at least one sample, check that it has at least user and cmd, which are required.
@@ -101,13 +86,11 @@ first=$(jq '.data.attributes.jobs[0]' <<< $output)
 if [[ $first != "null" ]]; then
     user=$(jq .user <<< $first)
     if [[ $user == "null" ]]; then
-        echo "JSON user missing"
-        exit 1
+        fail "JSON user missing"
     fi
     cmd=$(jq .processes[0].cmd <<< $first)
     if [[ $cmd == "null" ]]; then
-        echo "JSON cmd missing"
-        exit 1
+        fail "JSON cmd missing"
     fi
 fi
 
@@ -116,8 +99,7 @@ fi
 # cpus should really never be absent
 x=$(jq .data.attributes.system.cpus <<< $output)
 if [[ $x == "null" ]]; then
-    echo "JSON system.cpus missing"
-    exit 1
+    fail "JSON system.cpus missing"
 fi
 
 # The others can be zero/empty and thus absent.  What we need to check here is that
@@ -125,9 +107,8 @@ fi
 
 x=$(jq '.data.attributes.system | keys | map(in({"cpus":0,"gpus":0,"existing_entities":0,"load1":0,"load15":0,"load5":0,"runnable_entities":0,"used_memory":0})) | all' <<< $output)
 if [[ $x != "true" ]]; then
-    echo "JSON bad - Unknown field in system: " $(jq .data.attributes.system <<< $output)
-    exit 1
+    fail "JSON bad - Unknown field in system: " $(jq .data.attributes.system <<< $output)
 fi
 
-echo "JSON ok"
+echo " Ok: JSON"
 
