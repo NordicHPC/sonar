@@ -45,7 +45,7 @@ if [[ !( $l =~ ,host=$HOSTNAME, ) ]]; then
     exit 1
 fi
 
-echo "CSV ok"
+echo " Ok: CSV"
 
 # JSON
 #
@@ -129,5 +129,5 @@ if [[ $x != "true" ]]; then
     exit 1
 fi
 
-echo "JSON ok"
+echo " Ok: JSON"
 

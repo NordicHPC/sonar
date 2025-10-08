@@ -32,4 +32,4 @@ if (( $(wc -l <<< $rolled2) != 8 )); then
     echo "Bad number of rolled-up lines - some have a value other than 1"
     exit 1
 fi
-echo " OK"
+echo " Ok"

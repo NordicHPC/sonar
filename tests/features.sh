@@ -37,4 +37,4 @@ for amd in "" "amd"; do
     done
 done
 
-echo " OK"
+echo " Ok"

@@ -62,3 +62,5 @@ if (( exitcode != 2 )); then
     echo "min-cpu-time should require an integer argument value"
     exit 1
 fi
+
+echo " Ok"

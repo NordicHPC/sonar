@@ -28,4 +28,4 @@ if [[ $output =~ ,gpu[%a-z_-]+= ]]; then
     exit 1
 fi
 
-echo " OK"
+echo " Ok"

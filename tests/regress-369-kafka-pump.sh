@@ -57,5 +57,4 @@ grep -n -E '^Info.*Sleeping [0-9]+ before sending' $logfile | awk -F: '{ print $
     prev=$lineno
 done
 
-echo " OK"
-exit 0
+echo " Ok"

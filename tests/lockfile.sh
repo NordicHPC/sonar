@@ -20,3 +20,5 @@ if [[ $(tail -n 1 $logfile) != 'Info: Lockfile present, exiting' ]]; then
 fi
 # Wait for the first process to exit
 sleep 10
+
+echo " Ok"

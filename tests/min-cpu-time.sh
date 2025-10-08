@@ -19,3 +19,5 @@ if (( numbad != 0 )); then
     echo "CPU time filtering did not work"
     exit 1
 fi
+
+echo " Ok"

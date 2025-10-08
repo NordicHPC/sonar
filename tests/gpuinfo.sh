@@ -6,6 +6,7 @@ set -e
 
 # Currently testing this only on nvidia.
 if [[ ! -e /sys/module/nvidia ]]; then
+    echo " No gpu"
     exit 0
 fi
 

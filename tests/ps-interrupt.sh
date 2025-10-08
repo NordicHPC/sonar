@@ -20,3 +20,4 @@ if [[ $(tail -n 1 $output) != 'Info: Interrupt flag was set!' ]]; then
     exit 1
 fi
 
+echo " Ok"

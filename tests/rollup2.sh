@@ -10,7 +10,7 @@
 
 set -e
 
-make --quiet
+make all
 
 echo " This takes about 10s"
 ./rollup2 3 &
@@ -19,4 +19,5 @@ output=$(SONARTEST_ROLLUP=1 cargo run -- ps --rollup --exclude-system-jobs)
 # Grep will exit with code 1 if no lines are matched
 matches1=$(grep -E ',cmd=rollupchild,.*,rolledup=4' <<< $output)
 matches2=$(grep -E ',cmd=rollupchild2,.*,rolledup=3' <<< $output)
-echo " OK"
+
+echo " Ok"

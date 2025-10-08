@@ -82,4 +82,4 @@ for signal in TERM INT HUP; do
         exit 1
     fi
 done
-echo " Interrupt handling OK"
+echo " Ok"

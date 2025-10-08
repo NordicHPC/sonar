@@ -15,3 +15,5 @@ if (( loadlines != 0 )); then
     echo "Did not emit load data properly - not exactly 0"
     exit 1
 fi
+
+echo " Ok"

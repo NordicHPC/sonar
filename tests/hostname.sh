@@ -7,3 +7,5 @@ if (( $(cargo run -- ps | head -n 1 | grep ",host=$(hostname)," | wc -l) == 0 ))
     echo "Wrong hostname??"
     exit 1
 fi
+
+echo " Ok"

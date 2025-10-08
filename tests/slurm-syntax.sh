@@ -11,7 +11,7 @@ fi
 # Check that sacct is available, or we should do nothing
 
 if [[ -z $(command -v sacct) ]]; then
-    echo "No sacct"
+    echo " No sacct"
     exit 0
 fi
 
@@ -21,7 +21,7 @@ fi
 
 output=$(cargo run -- slurm)
 if [[ -z $output ]]; then
-    echo "No output"
+    echo " Ok: No output"
     exit 0
 fi
 
@@ -32,7 +32,7 @@ if [[ !( $l =~ ^v=[0-9]+\.[0-9]+\.[0-9](-.+)?, ) ]]; then
     exit 1
 fi
 
-echo "CSV ok"
+echo " Ok: CSV"
 
 # JSON
 
@@ -49,4 +49,4 @@ if [[ !( $version =~ [0-9]+\.[0-9]+\.[0-9](-.+)? ) ]]; then
     exit 1
 fi
 
-echo "JSON ok"
+echo " Ok: JSON"
