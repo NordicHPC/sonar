@@ -1,0 +1,9 @@
+sonar-daemon-runner
+sonar-daemon-runner-test
+sonar-mock
+selftest
+godot
+*.o
+test_results.txt
+test_pids.txt
+test_id.txt

@@ -1,10 +1,10 @@
-.PHONY: debug release build test format generate default install
+.PHONY: debug release build test format generate default install runner
 ARCH=$(shell uname -m)
 
 # Normally the default target is not quite what you want but it's OK
 # for casual use and to emulate a standard build process.
 
-default: target/release/sonar
+default: target/release/sonar runner
 
 target/release/sonar: src/*.rs src/*/*.rs gpuapi/$(ARCH)/*.a Cargo.toml Cargo.lock
 	cargo build --release
@@ -23,9 +23,16 @@ install: target/release/sonar
 
 debug:
 	CARGO_TARGET_DIR=target/$(ARCH) cargo build
+	$(MAKE) runner
 
 release:
 	CARGO_TARGET_DIR=target/$(ARCH) cargo build --release
+	$(MAKE) runner
+
+runner: runner/sonar-daemon-runner
+
+runner/sonar-daemon-runner: runner/*.c runner/*.h runner/Makefile
+	( cd runner ; $(MAKE) sonar-daemon-runner )
 
 build: generate format release
 
@@ -34,6 +41,7 @@ test: debug release
 	cargo test
 	( cd util ; $(MAKE) test )
 	( cd tests; $(MAKE) test )
+	( cd runner; $(MAKE) test )
 
 # Reformat all sources
 format:
@@ -41,6 +49,7 @@ format:
 	( cd util ; $(MAKE) format )
 	( cd tests ; $(MAKE) format )
 	( cd gpuapi ; $(MAKE) format )
+	( cd runner ; $(MAKE) format )
 
 # (Re)generate all files that are generated
 generate: CITATION.cff

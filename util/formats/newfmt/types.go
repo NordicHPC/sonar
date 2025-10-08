@@ -795,6 +795,9 @@ type SampleProcess struct {
 	// the end, a la ps.
 	Cmd string `json:"cmd,omitempty"`
 
+	// The executable path, if available (privileged).
+	ExePath string `json:"exe,omitempty"`
+
 	// Process ID.  Normally Pid is non-zero.  For rolled-up samples in daemon mode (where a set of
 	// similar processes that changes over time is rolled up as one process that has no obvious
 	// representative Pid), it is a synthesized non-zero value outside the system's Pid range; see

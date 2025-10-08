@@ -6,6 +6,8 @@ use crate::json_tags::*;
 use crate::output;
 #[cfg(feature = "daemon")]
 use crate::pidmap::PidMap;
+#[cfg(feature = "daemon")]
+use crate::privileged;
 use crate::ps_newfmt::format_newfmt;
 use crate::systemapi::{self, DiskInfo};
 use crate::types::{JobID, Pid, Uid};
@@ -280,6 +282,7 @@ pub enum CState {
 pub struct TheProcInfo {
     pub user: String,
     pub command: String,
+    pub exe_path: String,
     pub pid: Pid,
     pub ppid: Pid,
     pub rolledup: usize,
@@ -466,15 +469,31 @@ fn new_with_cpu_info(
     processes: &HashMap<Pid, systemapi::Process>,
 ) -> ProcInfoTable {
     let mut procinfo_by_pid = ProcInfoTable::new();
+    #[cfg(feature = "daemon")]
+    let root: Option<&privileged::RootServer> = system.get_root_server();
     for proc in processes.values() {
         let (job_id, is_slurm) = system
             .get_jobs()
             .job_id_from_pid(system, proc.pid, processes);
+        #[cfg(feature = "daemon")]
+        let exe_path = if let Some(srv) = root {
+            if let Ok(s) = privileged::get_exe_path(proc.pid as u32, srv) {
+                s
+            } else {
+                // TODO: need to handle this error somehow
+                "".to_string()
+            }
+        } else {
+            "".to_string()
+        };
+        #[cfg(not(feature = "daemon"))]
+        let exe_path = "".to_string();
         procinfo_by_pid.insert(
             proc.pid,
             Box::new(TheProcInfo {
                 user: proc.user.clone(),
                 command: proc.command.clone(),
+                exe_path,
                 pid: proc.pid,
                 ppid: proc.ppid,
                 is_system_job: proc.uid < 1000,
