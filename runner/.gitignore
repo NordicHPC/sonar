@@ -1,0 +1,7 @@
+sonar-daemon-runner
+sonar-daemon-runner-test
+sonar-mock
+selftest
+vladimir
+*.o
+test_*.txt
