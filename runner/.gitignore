@@ -1,0 +1,4 @@
+sonar-mock
+sonar-daemon-runner
+selftest
+*.o
