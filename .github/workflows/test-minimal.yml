@@ -2,9 +2,9 @@ name: Test minimal Rust version
 
 on:
   push:
-    branches: [ main release_* ]
+    branches: [ main, 'release_*' ]
   pull_request:
-    branches: [ main release_* ]
+    branches: [ main, 'release_*' ]
 
 jobs:
   build:

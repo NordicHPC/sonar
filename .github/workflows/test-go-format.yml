@@ -2,9 +2,9 @@ name: Test Go code formatting
 
 on:
   push:
-    branches: [ main 'release_*' ]
+    branches: [ main, 'release_*' ]
   pull_request:
-    branches: [ main 'release_*' ]
+    branches: [ main, 'release_*' ]
 
 jobs:
   build:
