@@ -2,6 +2,8 @@
 
 INPUT=../formats/newfmt/types.go
 
+# NOTE!! When adding a target here, be sure to update ../../tests/go-doc-generate.sh
+
 all: NEW-FORMAT.md json_tags.rs types.spec.yaml
 
 NEW-FORMAT.md: $(INPUT) process-doc
