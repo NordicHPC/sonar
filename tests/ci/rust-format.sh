@@ -1,7 +1,6 @@
 #!/bin/bash
 #
-# Note, this should not be run by `run_tests.sh` since it is normal for code to be unformatted
-# during development.
+# Test that the Rust code is formatted properly.
 
 output=$(cargo fmt --check --message-format short)
 if [[ -n $output ]]; then

@@ -20,5 +20,5 @@ jobs:
 
     - name: Regenerate documentation and test
       run: |
-        cd tests
+        cd tests/ci
         ./go-doc-generate.sh

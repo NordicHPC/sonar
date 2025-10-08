@@ -20,5 +20,5 @@ jobs:
 
     - name: Format code
       run: |
-        cd tests
+        cd tests/ci
         ./rust-format.sh
