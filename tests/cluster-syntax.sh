@@ -2,11 +2,9 @@
 #
 # Check that `sonar cluster` produces some sane output.
 
-set -e
-if [[ -z $(command -v jq) ]]; then
-    echo "Install jq first"
-    exit 1
-fi
+source sh-helper
+
+assert_jq
 
 # Check that sinfo is available, or we should do nothing
 
@@ -26,8 +24,7 @@ jq . <<< $output > /dev/null
 # There is always at least an envelope with a version field
 version=$(jq .meta.version <<< $output)
 if [[ !( $version =~ [0-9]+\.[0-9]+\.[0-9](-.+)? ) ]]; then
-    echo "JSON version bad, got $version"
-    exit 1
+    fail "JSON version bad, got $version"
 fi
 
 # This is pretty feeble!

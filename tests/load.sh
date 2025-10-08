@@ -2,18 +2,16 @@
 #
 # Test that we can emit per-cpu load data properly.
 
-set -e
+source sh-helper
 
 loadlines=$(cargo run -- ps --load | grep ',load=' | wc -l)
 if (( loadlines != 1 )); then
-    echo "Did not emit load data properly - not exactly 1"
-    exit 1
+    fail "Did not emit load data properly - not exactly 1"
 fi
 
 loadlines=$(cargo run -- ps | grep ',load=' | wc -l)
 if (( loadlines != 0 )); then
-    echo "Did not emit load data properly - not exactly 0"
-    exit 1
+    fail "Did not emit load data properly - not exactly 0"
 fi
 
 echo " Ok"

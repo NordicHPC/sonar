@@ -8,9 +8,9 @@
 # This requires a (probably) 1.6x or later Rust/Cargo toolchain to build Sonar and `make` + any C89
 # or later C compiler to build the C code.
 
-set -e
+source sh-helper
 
-make all
+make rollup-programs
 
 echo " This takes about 10s"
 ./rollup2 3 &

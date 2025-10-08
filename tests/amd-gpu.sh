@@ -4,11 +4,10 @@
 # system).  This test must be run on a node with such a device to have any effect, hence will not be
 # effective in the github runner.
 
-set -e
-if [[ -z $(command -v jq) ]]; then
-    echo "Install jq first"
-    exit 1
-fi
+source sh-helper
+
+assert_jq
+
 if [[ ! -e /sys/module/amdgpu ]]; then
     echo " No device"
     exit 0
@@ -21,12 +20,10 @@ fi
 output=$(cargo run -- sysinfo)
 numcards=$(jq .gpu_cards <<< $output)
 if [[ ! ( $numcards =~ ^[0-9]+$ ) ]]; then
-    echo "Bad output from jq: <$numcards>"
-    exit 1
+    fail "Bad output from jq: <$numcards>"
 fi
 if (( numcards == 0 )); then
-    echo "Number of cards should be nonzero"
-    exit 1
+    fail "Number of cards should be nonzero"
 fi
 
 # Run ps once with --load to trigger the collection of gpu utilization data.  This is just a
@@ -39,8 +36,7 @@ output=$(cargo run -- ps --load --exclude-system-jobs)
 infos=$(grep -E 'gpuinfo=.*fan%=.*tempc=.*' <<< $output)
 lines=$(wc -l <<< $infos)
 if (( lines != 1 )); then
-    echo "Number of matching output lines should be 1"
-    exit 1
+    fail "Number of matching output lines should be 1"
 fi
 
-echo " OK"
+echo " Ok"

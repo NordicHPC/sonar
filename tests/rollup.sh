@@ -9,7 +9,7 @@
 # This requires a (probably) 1.6x or later Rust/Cargo toolchain to build Sonar and `make` + any C89
 # or later C compiler to build the C code.
 
-set -e
+source sh-helper
 
 make rollup-programs
 
@@ -21,15 +21,12 @@ matches=$(grep ,cmd=rollup, <<< $output)
 rolled=$(grep ,rolledup=1 <<< $matches)
 rolled2=$(grep ,rolledup= <<< $matches)
 if (( $(wc -l <<< $matches) != 23 )); then
-    echo "Bad number of matching lines"
-    exit 1
+    fail "Bad number of matching lines"
 fi
 if (( $(wc -l <<< $rolled) != 8 )); then
-    echo "Bad number of rolled-up lines with value 1"
-    exit 1
+    fail "Bad number of rolled-up lines with value 1"
 fi
 if (( $(wc -l <<< $rolled2) != 8 )); then
-    echo "Bad number of rolled-up lines - some have a value other than 1"
-    exit 1
+    fail "Bad number of rolled-up lines - some have a value other than 1"
 fi
 echo " Ok"

@@ -2,7 +2,8 @@
 #
 # Test that the --min-cpu-time switch works.
 
-set -e
+source sh-helper
+
 numbad=$(cargo run -- ps --min-cpu-time 5 | \
              awk '
 {
@@ -16,8 +17,7 @@ numbad=$(cargo run -- ps --min-cpu-time 5 | \
 }' | \
              wc -l )
 if (( numbad != 0 )); then
-    echo "CPU time filtering did not work"
-    exit 1
+    fail "CPU time filtering did not work"
 fi
 
 echo " Ok"

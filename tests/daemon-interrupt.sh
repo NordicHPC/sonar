@@ -2,7 +2,7 @@
 #
 # Check the interrupt handling for the daemon mode.
 
-set -e
+source sh-helper
 
 echo " This takes about 45s"
 
@@ -38,8 +38,7 @@ for signal in TERM INT HUP; do
     # Output should have been held
 
     if (( $(wc -l < $output) != 0 )); then
-        echo "Output file is not empty, output-delay did not work"
-        exit 1
+        fail "Output file is not empty, output-delay did not work"
     fi
 
     # Output should be flushed by this
@@ -51,8 +50,7 @@ for signal in TERM INT HUP; do
     # The process should have exited
 
     if [[ -n $(ps -h -p $pid) ]]; then
-        echo "Daemon failed to stop after 2s following signal"
-        exit 1
+        fail "Daemon failed to stop after 2s following signal"
     fi
 
     # At this point we should have 3 to 5 lines in daemon-interrupt-output.txt.  It's possible for
@@ -63,8 +61,7 @@ for signal in TERM INT HUP; do
 
     lines=$(grep '{"topic":' $output | wc -l)
     if (( lines < 2 || lines > 5 )); then
-        echo "Output file is too short or too long, flushing did not work or something else is off"
-        exit 1
+        fail "Output file is too short or too long, flushing did not work or something else is off"
     fi
 
     # daemon-interrupt-log.txt should have info about the current signal, from stderr
@@ -78,8 +75,7 @@ for signal in TERM INT HUP; do
     esac
     expect="Info: Received signal $s"
     if [[ $(tail -n 1 $log) != $expect ]]; then
-        echo "Incorrect signal information, expected \'$expect\'"
-        exit 1
+        fail "Incorrect signal information, expected \'$expect\'"
     fi
 done
 echo " Ok"

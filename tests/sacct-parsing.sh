@@ -2,11 +2,8 @@
 #
 # Check that `sonar slurm` produces correct output from a known input.
 
-set -e
-if [[ -z $(command -v jq) ]]; then
-    echo "Install jq first"
-    exit 1
-fi
+source sh-helper
+assert_jq
 
 mkdir -p tmp
 sonar_output=tmp/sacct-parsing-sacct-output.tmp
@@ -29,9 +26,8 @@ TZ=/usr/share/zoneinfo/Europe/Oslo \
 jq .data.attributes.slurm_jobs < testdata/sonar_sacct_output.txt > $jobs1
 jq .data.attributes.slurm_jobs < $sonar_output > $jobs2
 if ! cmp $jobs1 $jobs2; then
-    echo "Sonar output differs"
     diff $jobs1 $jobs2
-    exit 1
+    fail "Sonar output differs!"
 fi
 
 echo " Ok"

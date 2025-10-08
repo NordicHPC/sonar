@@ -2,11 +2,9 @@
 #
 # Check that `sonar cluster` produces error output if sinfo is not present.
 
-set -e
-if [[ -z $(command -v jq) ]]; then
-    echo "Install jq first"
-    exit 1
-fi
+source sh-helper
+
+assert_jq
 
 # Check that sinfo is not available, or we should do nothing
 
@@ -19,8 +17,7 @@ output=$(cargo run -- cluster --cluster x --json)
 error=$(jq .errors <<< $output)
 if [[ ! ( $error =~ "sinfo" ) ]]; then
     echo $output
-    echo "Expected specific error string, got '$error'"
-    exit 1
+    fail "Expected specific error string, got '$error'"
 fi
 
 # Default output is also "new json"
@@ -29,8 +26,7 @@ output=$(cargo run -- cluster --cluster x)
 error=$(jq .errors <<< $output)
 if [[ ! ( $error =~ "sinfo" ) ]]; then
     echo $output
-    echo "Expected specific error string, got '$error'"
-    exit 1
+    fail "Expected specific error string, got '$error'"
 fi
 
 echo " Ok"
