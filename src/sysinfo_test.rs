@@ -37,6 +37,7 @@ pub fn sysinfo_output_test() {
                 index: 0,
                 uuid: "1234.5678".to_string(),
             },
+            manufacturer: "Yoyodyne, Inc.".to_string(),
             model: "Yoyodyne 1".to_string(),
             mem_size_kib: 1024 * 1024,
             power_limit_watt: 2000,

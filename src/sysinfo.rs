@@ -182,6 +182,7 @@ fn layout_card_info_newfmt(node_info: &NodeInfo) -> output::Array {
         let gpu::Card {
             device,
             bus_addr,
+            manufacturer,
             model,
             arch,
             driver,
@@ -199,11 +200,8 @@ fn layout_card_info_newfmt(node_info: &NodeInfo) -> output::Array {
         if bus_addr != "" {
             gpu.push_s(SYSINFO_GPU_CARD_ADDRESS, bus_addr.to_string());
         }
-        if node_info.card_manufacturer != "" {
-            gpu.push_s(
-                SYSINFO_GPU_CARD_MANUFACTURER,
-                node_info.card_manufacturer.clone(),
-            );
+        if manufacturer != "" {
+            gpu.push_s(SYSINFO_GPU_CARD_MANUFACTURER, manufacturer.clone());
         }
         if model != "" {
             gpu.push_s(SYSINFO_GPU_CARD_MODEL, model.to_string());
@@ -285,6 +283,7 @@ fn layout_card_info_oldfmt(node_info: &NodeInfo) -> output::Array {
         let gpu::Card {
             device,
             bus_addr,
+            manufacturer,
             model,
             arch,
             driver,
@@ -300,7 +299,7 @@ fn layout_card_info_oldfmt(node_info: &NodeInfo) -> output::Array {
         gpu.push_s("bus_addr", bus_addr.to_string());
         gpu.push_i("index", device.index as i64);
         gpu.push_s("uuid", device.uuid.to_string());
-        gpu.push_s("manufacturer", node_info.card_manufacturer.clone());
+        gpu.push_s("manufacturer", manufacturer.to_string());
         gpu.push_s("model", model.to_string());
         gpu.push_s("arch", arch.to_string());
         gpu.push_s("driver", driver.to_string());
@@ -328,7 +327,6 @@ struct NodeInfo {
     threads_per_core: u64,
     cores: Vec<systemapi::CoreInfo>,
     mem_kb: u64,
-    card_manufacturer: String,
     gpu_cards: u64,
     gpumem_kb: u64,
     cards: Vec<gpu::Card>,
@@ -349,12 +347,9 @@ fn compute_nodeinfo(system: &dyn systemapi::SystemAPI) -> Result<NodeInfo, Strin
     let memory = system.get_memory_in_kib()?;
     let mem_kb = memory.total;
     let mem_gb = (mem_kb as f64 / (1024.0 * 1024.0)).round() as u64;
-    let (mut cards, manufacturer) = match gpus.probe() {
-        Some(device) => (
-            device.get_card_configuration().unwrap_or_default(),
-            device.get_manufacturer(),
-        ),
-        None => (vec![], "UNKNOWN".to_string()),
+    let mut cards = match gpus.probe() {
+        Some(device) => device.get_card_configuration().unwrap_or_default(),
+        None => vec![],
     };
     let ht = if threads_per_core > 1 {
         " (hyperthreaded)"
@@ -415,7 +410,6 @@ fn compute_nodeinfo(system: &dyn systemapi::SystemAPI) -> Result<NodeInfo, Strin
         threads_per_core: threads_per_core as u64,
         cores,
         mem_kb,
-        card_manufacturer: manufacturer,
         gpu_cards: gpu_cards as u64,
         gpumem_kb,
         cards,

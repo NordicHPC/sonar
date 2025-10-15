@@ -359,7 +359,8 @@ type SysinfoAttributes struct {
 // NOTE: Though the power limit can change, it is reported here (as well as in sample data) because
 // it usually does not.
 type SysinfoGpuCard struct {
-	// Local card index, may change at boot
+	// Local card index, may change at boot.  Cards from different Manufacturers on the same node
+	// have separate index spaces; there may be both an AMD at index 0 and an NVIDIA at index 0.
 	Index uint64 `json:"index"`
 
 	// UUID as reported by card.  See notes in preamble

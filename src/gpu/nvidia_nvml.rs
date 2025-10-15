@@ -125,6 +125,7 @@ pub fn get_card_configuration() -> Option<Vec<gpu::Card>> {
                     index: dev,
                     uuid: get_card_uuid_from_info(&infobuf),
                 },
+                manufacturer: "NVIDIA".to_string(),
                 model: cstrdup(&infobuf.model),
                 arch: cstrdup(&infobuf.architecture),
                 driver: cstrdup(&infobuf.driver),

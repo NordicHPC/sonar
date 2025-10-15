@@ -20,10 +20,6 @@ pub fn probe(hostname: &str, boot_time: u64) -> Option<Box<dyn gpu::Gpu>> {
 }
 
 impl gpu::Gpu for AmdGPU {
-    fn get_manufacturer(&self) -> String {
-        "AMD".to_string()
-    }
-
     fn get_card_configuration(&self) -> Result<Vec<gpu::Card>, String> {
         if let Some(info) = amd_smi::get_card_configuration(&self) {
             Ok(info)

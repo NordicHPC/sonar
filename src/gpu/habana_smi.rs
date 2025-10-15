@@ -91,6 +91,7 @@ pub fn get_card_configuration() -> Option<Vec<gpu::Card>> {
                     index: dev,
                     uuid: get_card_uuid(dev),
                 },
+                manufacturer: "Intel".to_string(),
                 model: cstrdup(&infobuf.model),
                 arch: "Habana".to_string(),
                 driver: cstrdup(&infobuf.driver),
