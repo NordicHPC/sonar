@@ -130,6 +130,7 @@ pub fn get_card_configuration(amd: &AmdGPU) -> Option<Vec<gpu::Card>> {
                     index: dev,
                     uuid: get_card_uuid_from_info(amd, &infobuf),
                 },
+                manufacturer: "AMD".to_string(),
                 model,
                 arch,
                 driver: cstrdup(&infobuf.driver),

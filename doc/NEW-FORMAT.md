@@ -359,7 +359,8 @@ it usually does not.
 
 #### **`index`** uint64
 
-Local card index, may change at boot
+Local card index, may change at boot.  Cards from different Manufacturers on the same node
+have separate index spaces; there may be both an AMD at index 0 and an NVIDIA at index 0.
 
 #### **`uuid`** string
 

@@ -116,6 +116,7 @@ pub fn get_card_configuration(xpu: &XpuGPU) -> Option<Vec<gpu::Card>> {
                     index: dev,
                     uuid: get_card_uuid(xpu, dev),
                 },
+                manufacturer: "Intel".to_string(),
                 model: cstrdup(&infobuf.model),
                 driver: cstrdup(&infobuf.driver),
                 firmware: cstrdup(&infobuf.firmware),

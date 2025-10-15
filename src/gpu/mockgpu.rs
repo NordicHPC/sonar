@@ -24,10 +24,6 @@ pub struct MockGpus {
 }
 
 impl Gpu for MockGpus {
-    fn get_manufacturer(&self) -> String {
-        "Yoyodyne, Inc.".to_string()
-    }
-
     fn get_card_configuration(&self) -> Result<Vec<Card>, String> {
         Ok(self.cards.clone())
     }

@@ -68,6 +68,7 @@ pub struct Process {
 pub struct Card {
     pub device: Name,
     pub bus_addr: String,
+    pub manufacturer: String,
     pub model: String,
     pub arch: String,
     pub driver: String,
@@ -109,15 +110,6 @@ pub const GENERIC_FAILURE: u32 = 1;
 
 // Trait representing the set of cards installed on a node.
 pub trait Gpu {
-    // Retrieve the standard name of the manufacturer of the GPUs.  As get_manufacturer() is for the
-    // GPU object as a whole and not per-card, we are currently assuming that nodes don't have cards
-    // from multiple manufacturers.
-    //
-    // Names, once defined, will never change.  Current names: "NVIDIA", "AMD", "Intel".  Note some
-    // manufacturers may have several very different cards (Intel has XPU and Habana); the
-    // distinction must be encoded in the model or arch fields of the card configuration.
-    fn get_manufacturer(&self) -> String;
-
     // Get static (or nearly static) information about the installed cards.
     //
     // The returned vector is sorted by the card's name.index field, and card indices are tightly

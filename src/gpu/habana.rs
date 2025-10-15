@@ -14,10 +14,6 @@ pub fn probe() -> Option<Box<dyn gpu::Gpu>> {
 }
 
 impl gpu::Gpu for HabanaGPU {
-    fn get_manufacturer(&self) -> String {
-        "Intel".to_string()
-    }
-
     fn get_card_configuration(&self) -> Result<Vec<gpu::Card>, String> {
         if let Some(info) = habana_smi::get_card_configuration() {
             Ok(info)
