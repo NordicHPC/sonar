@@ -1,6 +1,6 @@
 // Rust wrapper around ../../gpuapi/sonar-xpu.{c,h}.
 
-use crate::gpu;
+use crate::gpu::{self, xpu::XpuGPU};
 use crate::ps;
 use crate::types::{Pid, Uid};
 use crate::util::cstrdup;
@@ -100,7 +100,7 @@ pub fn xpu_detect() -> bool {
     }
 }
 
-pub fn get_card_configuration() -> Option<Vec<gpu::Card>> {
+pub fn get_card_configuration(xpu: &XpuGPU) -> Option<Vec<gpu::Card>> {
     let mut num_devices: cty::uint32_t = 0;
     if unsafe { xpu_device_get_count(&mut num_devices) } != 0 {
         return None;
@@ -114,7 +114,7 @@ pub fn get_card_configuration() -> Option<Vec<gpu::Card>> {
                 bus_addr: cstrdup(&infobuf.bus_addr),
                 device: gpu::Name {
                     index: dev,
-                    uuid: get_card_uuid(dev),
+                    uuid: get_card_uuid(xpu, dev),
                 },
                 model: cstrdup(&infobuf.model),
                 driver: cstrdup(&infobuf.driver),
@@ -133,7 +133,7 @@ pub fn get_card_configuration() -> Option<Vec<gpu::Card>> {
     Some(result)
 }
 
-pub fn get_card_utilization() -> Option<Vec<gpu::CardState>> {
+pub fn get_card_utilization(xpu: &XpuGPU) -> Option<Vec<gpu::CardState>> {
     let mut num_devices: cty::uint32_t = 0;
     if unsafe { xpu_device_get_count(&mut num_devices) } != 0 {
         return None;
@@ -146,7 +146,7 @@ pub fn get_card_utilization() -> Option<Vec<gpu::CardState>> {
             result.push(gpu::CardState {
                 device: gpu::Name {
                     index: dev,
-                    uuid: get_card_uuid(dev),
+                    uuid: get_card_uuid(xpu, dev),
                 },
                 gpu_utilization_pct: infobuf.gpu_util,
                 mem_utilization_pct: infobuf.mem_util,
@@ -166,7 +166,7 @@ pub fn get_card_utilization() -> Option<Vec<gpu::CardState>> {
             result.push(gpu::CardState {
                 device: gpu::Name {
                     index: dev,
-                    uuid: get_card_uuid(dev),
+                    uuid: get_card_uuid(xpu, dev),
                 },
                 failing: gpu::GENERIC_FAILURE,
                 ..Default::default()
@@ -177,7 +177,10 @@ pub fn get_card_utilization() -> Option<Vec<gpu::CardState>> {
     Some(result)
 }
 
-pub fn get_process_utilization(ptable: &ps::ProcessTable) -> Option<Vec<gpu::Process>> {
+pub fn get_process_utilization(
+    xpu: &XpuGPU,
+    ptable: &ps::ProcessTable,
+) -> Option<Vec<gpu::Process>> {
     let mut result = vec![];
 
     let mut num_devices: cty::uint32_t = 0;
@@ -201,7 +204,7 @@ pub fn get_process_utilization(ptable: &ps::ProcessTable) -> Option<Vec<gpu::Pro
             result.push(gpu::Process {
                 devices: vec![gpu::Name {
                     index: dev,
-                    uuid: get_card_uuid(dev),
+                    uuid: get_card_uuid(xpu, dev),
                 }],
                 pid: infobuf.pid as Pid,
                 user: username.to_string(),
@@ -219,14 +222,30 @@ pub fn get_process_utilization(ptable: &ps::ProcessTable) -> Option<Vec<gpu::Pro
     Some(result)
 }
 
-// FIXME: This is not a good enough UUID: the UUID provided by the card is just the PCI address
-// and some other constant data.
-fn get_card_uuid(dev: u32) -> String {
+fn get_card_uuid(xpu: &XpuGPU, dev: u32) -> String {
     // TODO: Not the most efficient way to do it, but OK for now?
     let mut infobuf: XpuCardInfo = Default::default();
     if unsafe { xpu_device_get_card_info(dev, &mut infobuf) } == 0 {
-        cstrdup(&infobuf.uuid)
+        #[cfg(debug_assertions)]
+        let uuid = if let Ok(_) = std::env::var("SONARTEST_FAIL_UUID") {
+            "".to_string()
+        } else {
+            cstrdup(&infobuf.uuid)
+        };
+        #[cfg(not(debug_assertions))]
+        let uuid = cstrdup(&infobuf.uuid);
+        if uuid != "" {
+            uuid
+        } else {
+            format!(
+                "{}/{}/{}",
+                &xpu.hostname,
+                xpu.boot_time,
+                cstrdup(&infobuf.bus_addr)
+            )
+        }
     } else {
-        "".to_string()
+        // Fall back to using the device number as the bus address
+        format!("{}/{}/xpu#{dev}", &xpu.hostname, xpu.boot_time)
     }
 }

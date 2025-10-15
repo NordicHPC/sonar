@@ -1,11 +1,17 @@
 use crate::gpu::{self, xpu_smi};
 use crate::ps;
 
-pub struct XpuGPU {}
+pub struct XpuGPU {
+    pub hostname: String,
+    pub boot_time: u64,
+}
 
-pub fn probe() -> Option<Box<dyn gpu::Gpu>> {
+pub fn probe(hostname: &str, boot_time: u64) -> Option<Box<dyn gpu::Gpu>> {
     if xpu_present() {
-        Some(Box::new(XpuGPU {}))
+        Some(Box::new(XpuGPU {
+            hostname: hostname.to_string(),
+            boot_time,
+        }))
     } else {
         None
     }
@@ -17,7 +23,7 @@ impl gpu::Gpu for XpuGPU {
     }
 
     fn get_card_configuration(&self) -> Result<Vec<gpu::Card>, String> {
-        if let Some(info) = xpu_smi::get_card_configuration() {
+        if let Some(info) = xpu_smi::get_card_configuration(&self) {
             Ok(info)
         } else {
             Ok(vec![])
@@ -28,7 +34,7 @@ impl gpu::Gpu for XpuGPU {
         &self,
         ptable: &ps::ProcessTable,
     ) -> Result<Vec<gpu::Process>, String> {
-        if let Some(info) = xpu_smi::get_process_utilization(ptable) {
+        if let Some(info) = xpu_smi::get_process_utilization(&self, ptable) {
             Ok(info)
         } else {
             Ok(vec![])
@@ -36,7 +42,7 @@ impl gpu::Gpu for XpuGPU {
     }
 
     fn get_card_utilization(&self) -> Result<Vec<gpu::CardState>, String> {
-        if let Some(info) = xpu_smi::get_card_utilization() {
+        if let Some(info) = xpu_smi::get_card_utilization(&self) {
             Ok(info)
         } else {
             Ok(vec![])

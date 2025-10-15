@@ -65,8 +65,9 @@ impl Builder {
     pub fn freeze(self) -> Result<System, String> {
         let fs = RealProcFS {};
         let boot_time = procfs::get_boot_time_in_secs_since_epoch(&fs)?;
+        let hostname = hostname::get();
         Ok(System {
-            hostname: hostname::get(),
+            hostname: hostname.clone(),
             cluster: self.cluster,
             jm: if let Some(x) = self.jm {
                 x
@@ -74,7 +75,7 @@ impl Builder {
                 Box::new(jobsapi::NoJobManager::new())
             },
             fs,
-            gpus: realgpu::RealGpu::new(),
+            gpus: realgpu::RealGpu::new(hostname, boot_time),
             timestamp: RefCell::new(time::now_iso8601()),
             now: Cell::new(time::unix_now()),
             boot_time,

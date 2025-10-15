@@ -176,7 +176,7 @@ int xpu_device_get_card_info(uint32_t device_index, struct xpu_card_info_t* info
           /* At least on the Simula eX3 node, the UUID is basically just the bus address, which is
              not unique enough.  We could fall bak on XPUM_DEVICE_PROPERTY_SERIAL_NUMBER and/or
              XPUM_DEVICE_PROPERTY_VENDOR_NAME but they too have non-unique / uninteresting values.
-             So we synthesize a better UUID below. */
+             So we return the empty string and the Rust layer will synthesize a better UUID. */
         case XPUM_DEVICE_PROPERTY_UUID:
           strtcpy(infobuf->uuid, props.properties[i].value, sizeof(infobuf->uuid)-1);
           break;
@@ -212,50 +212,6 @@ int xpu_device_get_card_info(uint32_t device_index, struct xpu_card_info_t* info
             infobuf->max_power_limit = (unsigned)limits.sustained_limit.power / 1000;
         }
     }
-
-    /* We must synthesize a UUID here, as the devices do not provide UUIDs that are unique in any
-       interesting way.  We use bus address + node FQDN + boot time.  This will lead to having a lot
-       of "different" cards over time but guarantees that there is no confusing them.  It should
-       never happen that we cannot obtain host name or boot time. */
-
-    char hostname[65];
-    *hostname = 0;
-    gethostname(hostname, sizeof(hostname));
-
-    /* The boot time is first field of the `btime` line of /proc/stat, it is measured in seconds
-       since epoch.  This file can have some very long lines before we get to `btime`. */
-    char boot_time[65];
-    *boot_time = 0;
-    FILE* fp = fopen("/proc/stat", "r");
-    if (fp != NULL) {
-        int found = 0;
-        char* p = boot_time;
-        while (!found) {
-            /* At the top of the loop, we're always at the start of a line. */
-            int c = fgetc(fp);
-            if (c == EOF) {
-                break;
-            }
-            if (c == 'b') {
-                if (fgetc(fp) == 't' && fgetc(fp) == 'i' && fgetc(fp) == 'm' && fgetc(fp) == 'e'
-                    && fgetc(fp) == ' ') {
-                    found = true;
-                }
-            }
-            while ((c = fgetc(fp)) != EOF && c != '\n') {
-                if (found) {
-                    *p++ = c;
-                }
-            }
-        }
-        *p = 0;
-        fclose(fp);
-    }
-
-    /* Use "/" to separate the fields so that code that wants to hack around the proliferation of
-       device UUIDs has something to work with.  A "/" is not legal within any of the fields. */
-    snprintf(
-        infobuf->uuid, sizeof(infobuf->uuid), "%s/%s/%s", hostname, boot_time, infobuf->bus_addr);
 
     return 0;
 #else
