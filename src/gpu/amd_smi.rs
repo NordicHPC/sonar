@@ -1,6 +1,6 @@
 // Rust wrapper around ../gpuapi/sonar-amd.{c,h}.
 
-use crate::gpu;
+use crate::gpu::{self, amd::AmdGPU};
 use crate::ps;
 use crate::types::Pid;
 use crate::util::cstrdup;
@@ -103,7 +103,7 @@ extern "C" {
 
 ////// End C library API //////////////////////////////////////////////////////////////////////////
 
-pub fn get_card_configuration() -> Option<Vec<gpu::Card>> {
+pub fn get_card_configuration(amd: &AmdGPU) -> Option<Vec<gpu::Card>> {
     let mut num_devices: cty::uint32_t = 0;
     if unsafe { amdml_device_get_count(&mut num_devices) } != 0 {
         return None;
@@ -128,7 +128,7 @@ pub fn get_card_configuration() -> Option<Vec<gpu::Card>> {
                 bus_addr: cstrdup(&infobuf.bus_addr),
                 device: gpu::Name {
                     index: dev,
-                    uuid: get_card_uuid_from_info(&infobuf),
+                    uuid: get_card_uuid_from_info(amd, &infobuf),
                 },
                 model,
                 arch,
@@ -147,7 +147,7 @@ pub fn get_card_configuration() -> Option<Vec<gpu::Card>> {
     Some(result)
 }
 
-pub fn get_card_utilization() -> Option<Vec<gpu::CardState>> {
+pub fn get_card_utilization(amd: &AmdGPU) -> Option<Vec<gpu::CardState>> {
     let mut num_devices: cty::uint32_t = 0;
     if unsafe { amdml_device_get_count(&mut num_devices) } != 0 {
         return None;
@@ -160,7 +160,7 @@ pub fn get_card_utilization() -> Option<Vec<gpu::CardState>> {
             result.push(gpu::CardState {
                 device: gpu::Name {
                     index: dev,
-                    uuid: get_card_uuid(dev),
+                    uuid: get_card_uuid(amd, dev),
                 },
                 failing: 0,
                 fan_speed_pct: infobuf.fan_speed_pct,
@@ -180,7 +180,7 @@ pub fn get_card_utilization() -> Option<Vec<gpu::CardState>> {
             result.push(gpu::CardState {
                 device: gpu::Name {
                     index: dev,
-                    uuid: get_card_uuid(dev),
+                    uuid: get_card_uuid(amd, dev),
                 },
                 failing: gpu::GENERIC_FAILURE,
                 ..Default::default()
@@ -191,7 +191,10 @@ pub fn get_card_utilization() -> Option<Vec<gpu::CardState>> {
     Some(result)
 }
 
-pub fn get_process_utilization(ptable: &ps::ProcessTable) -> Option<Vec<gpu::Process>> {
+pub fn get_process_utilization(
+    amd: &AmdGPU,
+    ptable: &ps::ProcessTable,
+) -> Option<Vec<gpu::Process>> {
     let mut result = vec![];
 
     let mut num_devices: cty::uint32_t = 0;
@@ -218,7 +221,7 @@ pub fn get_process_utilization(ptable: &ps::ProcessTable) -> Option<Vec<gpu::Pro
             if (indices & 1) == 1 {
                 devices.push(gpu::Name {
                     index: k,
-                    uuid: get_card_uuid(k),
+                    uuid: get_card_uuid(amd, k),
                 });
             }
             indices >>= 1;
@@ -241,16 +244,33 @@ pub fn get_process_utilization(ptable: &ps::ProcessTable) -> Option<Vec<gpu::Pro
     Some(result)
 }
 
-fn get_card_uuid(dev: u32) -> String {
+fn get_card_uuid(amd: &AmdGPU, dev: u32) -> String {
     // TODO: Not the most efficient way to do it, but OK for now?
     let mut infobuf: AmdmlCardInfo = Default::default();
     if unsafe { amdml_device_get_card_info(dev, &mut infobuf) } == 0 {
-        get_card_uuid_from_info(&infobuf)
+        get_card_uuid_from_info(amd, &infobuf)
     } else {
-        "".to_string()
+        format!("{}/{}/amd#{dev}", &amd.hostname, amd.boot_time)
     }
 }
 
-fn get_card_uuid_from_info(infobuf: &AmdmlCardInfo) -> String {
-    cstrdup(&infobuf.uuid)
+fn get_card_uuid_from_info(amd: &AmdGPU, infobuf: &AmdmlCardInfo) -> String {
+    #[cfg(debug_assertions)]
+    let uuid = if let Ok(_) = std::env::var("SONARTEST_FAIL_UUID") {
+        "".to_string()
+    } else {
+        cstrdup(&infobuf.uuid)
+    };
+    #[cfg(not(debug_assertions))]
+    let uuid = cstrdup(&infobuf.uuid);
+    if uuid != "" {
+        uuid
+    } else {
+        format!(
+            "{}/{}/{}",
+            &amd.hostname,
+            amd.boot_time,
+            cstrdup(&infobuf.bus_addr)
+        )
+    }
 }

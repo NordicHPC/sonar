@@ -173,6 +173,11 @@ int amdml_device_get_card_info(uint32_t device, struct amdml_card_info_t* infobu
 
     xrsmi_dev_name_get(device, infobuf->model, sizeof(infobuf->model) - 1);
     uint64_t uuid;
+    // On really old systems the UUID is the empty string; the Rust layer will synthesize something
+    // better.  On newer systems, the UUID is some hex string.
+    //
+    // One worry I have is that this ID is not globally unique but only locally unique.  The docs
+    // don't really say.  Since "unique" suggests the former I'm going to go with it.
     if (xrsmi_dev_unique_id_get(device, &uuid) == 0) {
         snprintf(infobuf->uuid, sizeof(infobuf->uuid), "%llx", (unsigned long long)uuid);
     }
