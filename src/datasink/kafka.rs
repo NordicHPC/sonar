@@ -260,7 +260,7 @@ fn send_messages(
                 // An error here only means that the message could not be enqueued; sending errors
                 // are discovered in the ProducerContext.  So an error here is pretty much fatal for
                 // the message, hence we drop it.
-                let msg = format!("Message production error {m}");
+                let msg = format!("Message #{id}: {m}");
                 let _ = control_and_errors.send(Operation::MessageDeliveryError(msg));
             }
         }
@@ -284,7 +284,10 @@ impl ProducerContext for SonarProducerContext {
             Err((e, m)) => {
                 // TODO: The message could not be sent.  We could try to disambiguate here and try
                 // different actions, but for now, just drop it on the floor.
-                let msg = format!("Message production error {delivery_opaque} {:?}", e);
+                let irritant = format!("{:?}", m);
+                let msg = format!(
+                    "Message #{delivery_opaque} delivery error={e:.200} irritant={irritant:.200}"
+                );
                 let _ = self
                     .control_and_errors
                     .send(Operation::MessageDeliveryError(msg));
@@ -317,7 +320,7 @@ impl KafkaSender {
                                        ThreadedProducer<SonarProducerContext, NoCustomPartitioner>>(
                     SonarProducerContext { verbose, control_and_errors },
                 )
-                .map_err(|_| "Producer creation error".to_string())?;
+                .map_err(|e| format!("Could not create Kafka sender, error={e}"))?;
         Ok(KafkaSender { producer })
     }
 }
@@ -326,7 +329,10 @@ impl SenderAdapter for KafkaSender {
     fn send(&self, r: BaseRecord<String, String, usize>) -> Result<(), String> {
         self.producer
             .send::<String, String>(r)
-            .map_err(|_| "Could not send".to_string())
+            .map_err(|(error, r)| {
+                let irritant = format!("{:?}", r);
+                format!("Could not send to Kafka, error={error}, irritant={irritant:.200}")
+            })
     }
 }
 
