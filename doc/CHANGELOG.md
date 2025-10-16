@@ -1,16 +1,36 @@
 # Sonar change log
 
-This is at best partial.
+Older sections are at best partial.  Newer sections (since 0.15) aim to be comprehensive.
 
 Since v0.13.0, the output format is documented mainly by the file
 [util/formats/newfmt/types.go](../util/formats/newfmt/types.go), which specifies the new JSON output
 format in terms of a Go data structure with JSON annotations.  Changes to the output format can most
 easily be be seen by diffing this file against a desired tag, starting with "v0.13.0".  Such changes
-are therefore no longer mentioned specially below.
+are therefore no longer mentioned specially below.  Recall that to get the new format, Sonar must be
+run in daemon mode or with the --json switch (which also requires the --cluster).
 
 The "old" output formats are for the most part not being extended with new fields and should not be
 relied upon.  Consumers should expect to see the "new" JSON format for new data, and all producers
 should ask for that format.
+
+## Changes in v0.16.0 (on `release_0_16`)
+
+* Bug 335 - **BREAKING CHANGE.** The `cpu_util` field was not emitted properly, it should have been
+  scaled by 100 according to docs (it's a percentage).  Older data will look weird compared to new
+  data
+* Bug 352 - **MAJOR FUNCTIONALITY.**  Populate the `topo_svg` field, introduce a `topo_text` field,
+  and expand the config file so as to be able to specify how to generate those data
+* Bug 353 - Remove the `software` field.
+* Bug 387 - **IMPORTANT FIX.** Parse some slurm data, notably ReqMem, correctly.  Previously the parser
+  would always return 0 for this field
+* Bug 401 - better error messages for Kafka
+* Bug 402 - synthesize a UUID on AMD cards when needed
+* Bug 402 - change the syntax of synthesized UUIDs on XPU (now joint with AMD)
+* Bug 403 - allow cards from multiple manufacturers on the same node
+* Bug 407 - clarify semantics of the GPU index field in several data types
+* Testing (sundry): Many testing improvements
+* Doc (sundry): Various improvements
+
 
 ## Changes in v0.15.0 (on `release_0_15`)
 
@@ -20,6 +40,7 @@ should ask for that format.
 * Testing (sundry): Many testing improvements
 * Rust: Dependency updates
 * Rust: Minimum Rust version is now 1.77
+
 
 ## Changes in v0.14.x-devel (on `release_0_14`)
 
