@@ -142,7 +142,7 @@ SysinfoGpuCard:
     index:
       type: 'uint64'
       doc: >
-        Local card index, may change at boot.  Cards from different Manufacturers on the same node have separate index spaces; there may be both an AMD at index 0 and an NVIDIA at index 0.
+        Node-local card index.  See notes in preamble
     uuid:
       type: 'string'
       doc: >
@@ -284,7 +284,7 @@ SampleGpu:
     index:
       type: 'uint64'
       doc: >
-        Local card index, may change at boot
+        Node-local card index.  See notes in preamble
     uuid:
       type: 'NonemptyString'
       doc: >
@@ -418,7 +418,7 @@ SampleProcessGpu:
     index:
       type: 'uint64'
       doc: >
-        Local card index, may change at boot
+        Node-local card index.  See notes in preamble
     uuid:
       type: 'NonemptyString'
       doc: >

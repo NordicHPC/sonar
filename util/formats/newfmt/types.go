@@ -133,8 +133,16 @@ import (
 // compatible, there may be some minor problems translating between them.
 //
 // If a device does not expose a UUID, one will be constructed for it by the monitoring component.
-// This UUID will never be confusable with another device within the same cluster but it may change,
-// eg at reboot, creating a larger population of devices than there is in actuality.
+// A UUID will never be confusable with another device within the same cluster but a synthesized
+// UUID may change, eg at reboot, creating a larger population of devices than there is in
+// actuality.
+//
+// Device indices are hard to use well.  Sonar will report the indices as seen from the node,
+// independent of any mappings created for jobs.  There are several problems.  Indices may change at
+// reboot.  Cards from different manufacturers on the same node have separate index spaces; there
+// may be both an AMD at index 0 and an NVIDIA at index 0.  And seen from within a job the device
+// indices may reflect a mapping created for the job, so the job's "index 0" may differ from the
+// node's "index 0".  Tracking cards by UUIDs is going to be simpler.
 //
 // ## Data format versions
 //
@@ -359,8 +367,7 @@ type SysinfoAttributes struct {
 // NOTE: Though the power limit can change, it is reported here (as well as in sample data) because
 // it usually does not.
 type SysinfoGpuCard struct {
-	// Local card index, may change at boot.  Cards from different Manufacturers on the same node
-	// have separate index spaces; there may be both an AMD at index 0 and an NVIDIA at index 0.
+	// Node-local card index.  See notes in preamble
 	Index uint64 `json:"index"`
 
 	// UUID as reported by card.  See notes in preamble
@@ -495,16 +502,13 @@ type SampleCpu uint64
 // NOTE: In all monitoring data, cards are identified both by current index and by immutable UUID,
 // this is redundant but hopefully useful.
 //
-// NOTE: A card index may be local to a job, as Slurm jobs partition the system and may remap cards
-// to a local name space.  UUID is usually safer.
-//
 // NOTE: Some fields are available on some cards and not on others.
 //
 // NOTE: If there are multiple fans and we start caring about that then we can add a new field, eg
 // "fans", that holds an array of fan speed readings. Similarly, if there are multiple temperature
 // sensors and we care about that we can introduce a new field to hold an array of readings.
 type SampleGpu struct {
-	// Local card index, may change at boot
+	// Node-local card index.  See notes in preamble
 	Index uint64 `json:"index"`
 
 	// Card UUID.  See preamble for notes about UUIDs.
@@ -682,7 +686,7 @@ type SampleProcess struct {
 // data). In that case, the data revealed here for each card will be the aggregate figure for the
 // process divided by the number of cards the process is running on.
 type SampleProcessGpu struct {
-	// Local card index, may change at boot
+	// Node-local card index.  See notes in preamble
 	Index uint64 `json:"index"`
 
 	// Card UUID.  See preamble for notes about UUIDs.
