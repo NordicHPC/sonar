@@ -4,7 +4,7 @@
 
 source sh-helper
 
-if (( $(cargo run -- ps | grep ",user=$USER," | wc -l) == 0 )); then
+if (( $(cargo run -- ps --csv | grep ",user=$USER," | wc -l) == 0 )); then
     fail "User name lookup fails??"
 fi
 

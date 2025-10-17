@@ -292,7 +292,7 @@ pub fn daemon_mode(
             exclude_commands: ini.sample.exclude_commands.clone(),
             lockdir: ini.global.lockdir.clone(),
             token: api_token.clone(),
-            new_json: true,
+            fmt: ps::Format::NewJSON,
             cpu_util: true,
             min_cpu_percent: None, // Nonmonotonic, considered obsolete
             min_mem_percent: None, // Nonmonotonic, considered obsolete

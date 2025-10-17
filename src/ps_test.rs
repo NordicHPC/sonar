@@ -12,7 +12,7 @@ pub fn test_ps_no_meminfo() {
 
     let mut output = Vec::new();
     let options = ps::PsOptions {
-        new_json: true,
+        fmt: ps::Format::NewJSON,
         ..Default::default()
     };
     ps::create_snapshot(&mut output, &system, &options);

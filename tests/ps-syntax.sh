@@ -17,7 +17,7 @@ assert_jq
 # We don't have the infra at the moment to check the CSV output, plus CSV is so flexible that it's
 # sort of hard to check it.
 
-output=$(cargo run -- ps)
+output=$(cargo run -- ps --csv)
 count=$(wc -l <<< $output)
 if (( count <= 0 )); then
     fail "Must have some number of output lines"
