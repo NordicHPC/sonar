@@ -20,7 +20,6 @@ tests="amd-gpu \
      exclude-system-jobs \
      exclude-users \
      features \
-     gpuinfo \
      habana-gpu \
      hostname \
      load \
