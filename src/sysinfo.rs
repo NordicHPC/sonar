@@ -40,20 +40,25 @@ impl<'a> State<'a> {
             writer,
             self.system,
             self.token.clone(),
-            false,
-            true,
+            Format::NewJSON,
             self.topo_svg_cmd.clone(),
             self.topo_text_cmd.clone(),
         )
     }
 }
 
+#[derive(Clone)]
+pub enum Format {
+    CSV,
+    OldJSON,
+    NewJSON,
+}
+
 pub fn show_system(
     writer: &mut dyn io::Write,
     system: &dyn systemapi::SystemAPI,
     token: String,
-    csv: bool,
-    new_json: bool,
+    fmt: Format,
     topo_svg_cmd: Option<String>,
     topo_text_cmd: Option<String>,
 ) {
@@ -69,24 +74,23 @@ pub fn show_system(
                     info.topo_text = Some(output);
                 }
             }
-            if !new_json {
-                layout_sysinfo_oldfmt(system, info)
-            } else {
-                layout_sysinfo_newfmt(system, token, info)
+            match fmt {
+                Format::NewJSON => layout_sysinfo_newfmt(system, token, info),
+                Format::CSV | Format::OldJSON => layout_sysinfo_oldfmt(system, info),
             }
         }
-        Err(e) => {
-            if !new_json {
-                layout_error_oldfmt(system, e)
-            } else {
-                layout_error_newfmt(system, token, e)
-            }
-        }
+        Err(e) => match fmt {
+            Format::NewJSON => layout_error_newfmt(system, token, e),
+            Format::CSV | Format::OldJSON => layout_error_oldfmt(system, e),
+        },
     };
-    if csv {
-        output::write_csv(writer, &output::Value::O(sysinfo));
-    } else {
-        output::write_json(writer, &output::Value::O(sysinfo));
+    match fmt {
+        Format::CSV => {
+            output::write_csv(writer, &output::Value::O(sysinfo));
+        }
+        Format::NewJSON | Format::OldJSON => {
+            output::write_json(writer, &output::Value::O(sysinfo));
+        }
     }
 }
 

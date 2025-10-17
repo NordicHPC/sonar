@@ -77,8 +77,8 @@ enum Commands {
         /// the per-cpu usage since boot.
         load: bool,
 
-        /// Output new JSON, not CSV
-        json: bool,
+        /// Output old CSV, not new JSON
+        csv: bool,
 
         /// Cluster name
         cluster: Option<String>,
@@ -93,8 +93,8 @@ enum Commands {
         /// Output CSV, not old JSON
         csv: bool,
 
-        /// Output new JSON, not old JSON
-        json: bool,
+        /// Output old JSON, not new JSON
+        oldjson: bool,
 
         /// Cluster name
         cluster: Option<String>,
@@ -116,8 +116,8 @@ enum Commands {
         /// to is exclusive.  Precludes -window.
         span: Option<String>,
 
-        /// Output new json, not CSV
-        json: bool,
+        /// Output old CSV, not new JSON
+        csv: bool,
 
         /// Include PENDING and RUNNING jobs
         deluge: bool,
@@ -166,7 +166,7 @@ fn main() {
             exclude_commands,
             lockdir,
             load,
-            json,
+            csv,
             cluster,
         } => {
             let opts = ps::PsOptions {
@@ -187,7 +187,11 @@ fn main() {
                     vec![]
                 },
                 lockdir: lockdir.clone(),
-                new_json: *json,
+                fmt: if *csv {
+                    ps::Format::CSV
+                } else {
+                    ps::Format::NewJSON
+                },
                 cpu_util: true,
                 token,
             };
@@ -206,7 +210,7 @@ fn main() {
         }
         Commands::Sysinfo {
             csv,
-            json,
+            oldjson,
             cluster,
             topo_svg_cmd,
             topo_text_cmd,
@@ -220,8 +224,13 @@ fn main() {
                 writer,
                 &system.freeze().expect("System initialization"),
                 token,
-                *csv,
-                *json,
+                if *csv {
+                    sysinfo::Format::CSV
+                } else if *oldjson {
+                    sysinfo::Format::OldJSON
+                } else {
+                    sysinfo::Format::NewJSON
+                },
                 topo_svg_cmd.clone(),
                 topo_text_cmd.clone(),
             );
@@ -229,7 +238,7 @@ fn main() {
         Commands::Slurmjobs {
             window,
             span,
-            json,
+            csv,
             deluge,
             cluster,
         } => {
@@ -245,7 +254,11 @@ fn main() {
                 *deluge,
                 &system.freeze().expect("System initialization"),
                 token,
-                *json,
+                if *csv {
+                    slurmjobs::Format::CSV
+                } else {
+                    slurmjobs::Format::NewJSON
+                },
             );
         }
         Commands::Cluster { cluster } => {
@@ -321,6 +334,8 @@ fn command_line() -> Commands {
                         (next, json) = (new_next, true);
                     } else if let Some(new_next) = bool_arg(arg, &args, next, "--csv") {
                         (next, csv) = (new_next, true);
+                    } else if let Some(new_next) = bool_arg(arg, &args, next, "--oldfmt") {
+                        (next, csv) = (new_next, true);
                     } else if let Some(new_next) =
                         bool_arg(arg, &args, next, "--exclude-system-jobs")
                     {
@@ -361,10 +376,6 @@ fn command_line() -> Commands {
                     eprintln!("--csv and --json are incompatible");
                     std::process::exit(USAGE_ERROR);
                 }
-                if json && cluster.is_none() {
-                    eprintln!("--json requires --cluster");
-                    std::process::exit(USAGE_ERROR);
-                }
                 Commands::PS {
                     rollup,
                     min_cpu_percent,
@@ -375,12 +386,13 @@ fn command_line() -> Commands {
                     exclude_commands,
                     lockdir,
                     load,
-                    json,
+                    csv,
                     cluster,
                 }
             }
             "sysinfo" => {
                 let mut json = false;
+                let mut oldjson = false;
                 let mut csv = false;
                 let mut cluster = None;
                 let mut topo_svg_cmd = None;
@@ -390,6 +402,8 @@ fn command_line() -> Commands {
                     next += 1;
                     if let Some(new_next) = bool_arg(arg, &args, next, "--json") {
                         (next, json) = (new_next, true);
+                    } else if let Some(new_next) = bool_arg(arg, &args, next, "--oldfmt") {
+                        (next, oldjson) = (new_next, true);
                     } else if let Some(new_next) = bool_arg(arg, &args, next, "--csv") {
                         (next, csv) = (new_next, true);
                     } else if let Some((new_next, value)) =
@@ -408,17 +422,17 @@ fn command_line() -> Commands {
                         usage(true);
                     }
                 }
-                if json && csv {
-                    eprintln!("--csv and --json are incompatible");
+                if (json || oldjson) && csv {
+                    eprintln!("--csv is incompatible with --json and --oldfmt");
                     std::process::exit(USAGE_ERROR);
                 }
-                if json && cluster.is_none() {
-                    eprintln!("--json requires --cluster");
+                if json && oldjson {
+                    eprintln!("--json and --oldfmt are incompatible");
                     std::process::exit(USAGE_ERROR);
                 }
                 Commands::Sysinfo {
                     csv,
-                    json,
+                    oldjson,
                     cluster,
                     topo_svg_cmd,
                     topo_text_cmd,
@@ -442,6 +456,8 @@ fn command_line() -> Commands {
                         (next, span) = (new_next, Some(value));
                     } else if let Some(new_next) = bool_arg(arg, &args, next, "--json") {
                         (next, json) = (new_next, true);
+                    } else if let Some(new_next) = bool_arg(arg, &args, next, "--oldfmt") {
+                        (next, csv) = (new_next, true);
                     } else if let Some(new_next) = bool_arg(arg, &args, next, "--csv") {
                         (next, csv) = (new_next, true);
                     } else if let Some(new_next) = bool_arg(arg, &args, next, "--deluge") {
@@ -461,14 +477,10 @@ fn command_line() -> Commands {
                     eprintln!("--csv and --json are incompatible");
                     std::process::exit(USAGE_ERROR);
                 }
-                if json && cluster.is_none() {
-                    eprintln!("--json requires --cluster");
-                    std::process::exit(USAGE_ERROR);
-                }
                 Commands::Slurmjobs {
                     window,
                     span,
-                    json,
+                    csv,
                     cluster,
                     deluge,
                 }
@@ -479,6 +491,10 @@ fn command_line() -> Commands {
                     let arg = args[next].as_ref();
                     next += 1;
                     if let Some(new_next) = bool_arg(arg, &args, next, "--json") {
+                        // Ignore, there is only one format
+                        next = new_next;
+                    } else if let Some(new_next) = bool_arg(arg, &args, next, "--oldfmt") {
+                        // Ignore, there is only one format
                         next = new_next;
                     } else if let Some((new_next, value)) =
                         string_arg(arg, &args, next, "--cluster")
@@ -489,10 +505,6 @@ fn command_line() -> Commands {
                     }
                 }
                 // The only output format supported is "new JSON", so require `--cluster` always
-                if cluster.is_none() {
-                    eprintln!("The `cluster` command requires --cluster");
-                    std::process::exit(USAGE_ERROR);
-                }
                 Commands::Cluster { cluster }
             }
             "version" => Commands::Version {},
@@ -600,18 +612,20 @@ Options for `ps`:
       exists on startup [default: none]
   --load
       Print per-cpu and per-gpu load data
-  --json
-      Format output as new JSON, not CSV
+  --csv
+      Format output as old CSV, not JSON
+  --oldfmt
+      Synonym for --csv
   --cluster name
-      Optional cluster name (required for --json) with which to tag output
+      Optional cluster name with which to tag output
 
 Options for `sysinfo`:
   --csv
       Format output as CSV, not JSON
-  --json
-      Format output as new JSON, not the old JSON
+  --oldfmt
+      Format output as the old JSON, not the new JSON
   --cluster name
-      Optional cluster name (required for --json) with which to tag output
+      Optional cluster name with which to tag output
   --topo-svg-cmd
       Optional command to execute to generate SVG source for the topo_svg field,
       typically '/path/to/lstopo -of svg'
@@ -628,14 +642,16 @@ Options for `slurm`:
       database with older data.  Precludes --window
   --deluge
       Include PENDING and RUNNING jobs in the output, not just completed jobs.
-  --json
-      Format output as new JSON, not CSV
+  --csv
+      Format output as CSV, not new JSON
+  --oldfmt
+      Synonym for --csv
   --cluster name
-      Optional cluster name (required for --json) with which to tag output
+      Optional cluster name with which to tag output
 
 Options for `cluster`:
   --cluster name
-      Mandatory cluster name with which to tag output
+      Optional cluster name with which to tag output
 ",
     );
     let _ = out.flush();

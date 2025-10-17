@@ -174,6 +174,12 @@ const DEFAULT_WINDOW: u32 = 90;
 // Same output format as sacctd, which uses this version number.
 const VERSION: &str = "0.1.0";
 
+#[derive(Clone)]
+pub enum Format {
+    CSV,
+    NewJSON,
+}
+
 pub fn show_slurm_jobs(
     writer: &mut dyn io::Write,
     window: &Option<u32>,
@@ -181,12 +187,15 @@ pub fn show_slurm_jobs(
     uncompleted: bool,
     system: &dyn systemapi::SystemAPI,
     token: String,
-    new_json: bool,
+    fmt: Format,
 ) {
-    if new_json {
-        show_slurm_jobs_newfmt(writer, window, span, uncompleted, system, token);
-    } else {
-        show_slurm_jobs_oldfmt(writer, window, span, system);
+    match fmt {
+        Format::NewJSON => {
+            show_slurm_jobs_newfmt(writer, window, span, uncompleted, system, token);
+        }
+        Format::CSV => {
+            show_slurm_jobs_oldfmt(writer, window, span, system);
+        }
     }
 }
 

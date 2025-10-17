@@ -16,17 +16,22 @@ make rollup-programs
 echo " This takes about 10s"
 ./rollup 3 &
 sleep 3
-output=$(SONARTEST_ROLLUP=1 cargo run -- ps --rollup --exclude-system-jobs)
+output=$(SONARTEST_ROLLUP=1 cargo run -- ps --rollup --exclude-system-jobs --csv)
+set +e
 matches=$(grep ,cmd=rollup, <<< $output)
 rolled=$(grep ,rolledup=1 <<< $matches)
 rolled2=$(grep ,rolledup= <<< $matches)
-if (( $(wc -l <<< $matches) != 23 )); then
-    fail "Bad number of matching lines"
+set -e
+nmatch=$(wc -l <<< $matches)
+if (( nmatch != 23 )); then
+    fail "Bad number of matching lines, want 23, got $nmatch"
 fi
-if (( $(wc -l <<< $rolled) != 8 )); then
-    fail "Bad number of rolled-up lines with value 1"
+nroll=$(wc -l <<< $rolled)
+if (( nroll != 8 )); then
+    fail "Bad number of rolled-up lines with value 1, want 8, got $nroll"
 fi
-if (( $(wc -l <<< $rolled2) != 8 )); then
+nroll2=$(wc -l <<< $rolled2)
+if (( nroll2 != 8 )); then
     fail "Bad number of rolled-up lines - some have a value other than 1"
 fi
 echo " Ok"
