@@ -28,6 +28,8 @@ should ask for that format.
 * Bug 402 - change the syntax of synthesized UUIDs on XPU (now joint with AMD)
 * Bug 403 - allow cards from multiple manufacturers on the same node
 * Bug 407 - clarify semantics of the GPU index field in several data types
+* Bug 408 - **UX CHANGE.** The output format now defaults to "new JSON", and the cluster name
+  is no longer a required argument for that (defaulting to the empty string).
 * Testing (sundry): Many testing improvements
 * Doc (sundry): Various improvements
 
