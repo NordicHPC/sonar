@@ -5,18 +5,22 @@
 # effective in the github runner.
 
 source sh-helper
+assert_jq
 
 if [[ ! -e /sys/module/nvidia ]]; then
     echo " No device"
     exit 0
 fi
 
+mkdir -p tmp
+output=tmp/nvidia-gpu.tmp
+
 # Test that sysinfo finds the cards.  This is also sufficient to test that the GPU SMI library has
 # been found and is loaded.
 
 # nvidia is enabled by default
-output=$(cargo run -- sysinfo)
-numcards=$(jq .gpu_cards <<< $output)
+cargo run -- sysinfo --oldfmt > $output
+numcards=$(jq .gpu_cards < $output)
 if [[ ! ( $numcards =~ ^[0-9]+$ ) ]]; then
     fail "Bad output from jq: <$numcards>"
 fi
@@ -30,11 +34,10 @@ fi
 #
 # TODO: This will be cleaner once we have json output.
 
-output=$(cargo run -- ps --load --exclude-system-jobs)
-infos=$(grep -E 'gpuinfo=.*fan%=.*tempc=.*' <<< $output)
-lines=$(wc -l <<< $infos)
+cargo run -- ps --load --exclude-system-jobs --csv > $output
+lines=$(grep -E 'gpuinfo=.*fan%=.*tempc=.*' < $output | wc -l)
 if (( lines != 1 )); then
-    fail "Number of matching output lines should be 1"
+    fail "Number of matching output lines should be 1, got $lines"
 fi
 
 echo " OK"

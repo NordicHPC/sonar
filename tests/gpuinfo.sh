@@ -13,12 +13,12 @@ fi
 # The field is going to be there because cards always have some non-default data (fan speeds,
 # performance state, power, clocks).
 
-loadlines=$(cargo run -- ps --load | grep -E ',"?gpuinfo=' | wc -l)
+loadlines=$(cargo run -- ps --load --csv | grep -E ',"?gpuinfo=' | wc -l)
 if (( loadlines != 1 )); then
     fail "Did not emit gpuinfo data properly - not exactly 1: $loadlines"
 fi
 
-loadlines=$(cargo run -- ps | grep -E ',"?gpuinfo=' | wc -l)
+loadlines=$(cargo run -- ps --csv | grep -E ',"?gpuinfo=' | wc -l)
 if (( loadlines != 0 )); then
     fail "Did not emit gpuinfo data properly - not exactly 0: $loadlines"
 fi
