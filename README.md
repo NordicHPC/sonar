@@ -62,9 +62,8 @@ are known to work for both.  Also see comments in `gpuapi/Makefile`.
 There are two output formats, [the old format](doc/OLD-FORMAT.md) and [the new
 format](doc/NEW-FORMAT.md), currently coexisting but the old format will be phased out.
 
-The recommended output format is the "new" JSON format.  Use the command line switch `--json` with
-all commands to force this format.  Most subcommands currently default to either CSV or an older
-JSON format, but in daemon mode, only the new format is available.
+The recommended (and default as of v0.16) output format is the "new" JSON format.  There are command
+line switches to force the older formats, CSV or an older JSON format.
 
 ## Examples
 
@@ -76,7 +75,7 @@ cluster", below.  For a full description of the output formats and fields, see t
 It's sensible to run `sonar ps` every 5 minutes on every compute node if you care mostly about
 long-running jobs, or at higher frequency if sbrief jobs are of interest to you.
 
-Here is an example output (with the default older CSV output format):
+Here is an example output (with the older CSV output format):
 ```console
 $ sonar ps --exclude-system-jobs --min-cpu-time=10
 
@@ -91,7 +90,7 @@ v=0.7.0,time=2023-08-10T11:09:41+02:00,host=somehost,cores=8,user=someone,job=0,
 ### Collect system information with `sonar sysinfo`
 
 The `sysinfo` subcommand collects information about the system and prints it in JSON form on stdout
-(this is the default older JSON format):
+(this is the older JSON format):
 
 ```console
 $ sonar sysinfo
