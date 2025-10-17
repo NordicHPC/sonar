@@ -4,7 +4,7 @@
 
 source sh-helper
 
-numbad=$(cargo run -- ps --min-cpu-time 5 | \
+numbad=$(cargo run -- ps --min-cpu-time 5 --csv | \
              awk '
 {
     s=substr($0, index($0, ",cputime_sec=")+13)

@@ -46,14 +46,12 @@ pub fn sysinfo_output_test() {
             ..Default::default()
         })
         .freeze();
-    // CSV
     let mut output = Vec::new();
     sysinfo::show_system(
         &mut output,
         &system,
         "".to_string(),
-        true,
-        false,
+        sysinfo::Format::CSV,
         None,
         None,
     );
@@ -62,14 +60,12 @@ pub fn sysinfo_output_test() {
 "#;
     assert!(info == expect);
 
-    // Old JSON
     let mut output = Vec::new();
     sysinfo::show_system(
         &mut output,
         &system,
         "".to_string(),
-        false,
-        false,
+        sysinfo::Format::OldJSON,
         None,
         None,
     );
@@ -78,14 +74,12 @@ pub fn sysinfo_output_test() {
 "#;
     assert!(info == expect);
 
-    // New JSON
     let mut output = Vec::new();
     sysinfo::show_system(
         &mut output,
         &system,
         "".to_string(),
-        false,
-        true,
+        sysinfo::Format::NewJSON,
         None,
         None,
     );

@@ -18,6 +18,13 @@ use std::thread;
 use std::time;
 
 #[derive(Default, Clone)]
+pub enum Format {
+    CSV,
+    #[default]
+    NewJSON,
+}
+
+#[derive(Default, Clone)]
 pub struct PsOptions {
     pub rollup: bool,
     pub min_cpu_percent: Option<f64>,
@@ -29,7 +36,7 @@ pub struct PsOptions {
     pub lockdir: Option<String>,
     pub token: String,
     pub load: bool,
-    pub new_json: bool,
+    pub fmt: Format,
     pub cpu_util: bool,
 }
 
@@ -156,8 +163,8 @@ fn do_create_snapshot(
     opts: &PsOptions,
 ) {
     match collect_sample_data(system, opts) {
-        Ok(Some(sample_data)) => {
-            if opts.new_json {
+        Ok(Some(sample_data)) => match opts.fmt {
+            Format::NewJSON => {
                 let recoverable_errors = output::Array::new();
                 let o = output::Value::O(format_newfmt(
                     &sample_data,
@@ -166,7 +173,8 @@ fn do_create_snapshot(
                     recoverable_errors,
                 ));
                 output::write_json(writer, &o);
-            } else {
+            }
+            Format::CSV => {
                 let mut elements = format_oldfmt(&sample_data, system, opts).take();
                 if elements.len() == 0 {
                     elements.push(output::Value::O(make_oldfmt_heartbeat(system)))
@@ -175,24 +183,27 @@ fn do_create_snapshot(
                     output::write_csv(writer, e);
                 }
             }
-        }
+        },
         Ok(None) => {
             // Interrupted, do not print anything
         }
         Err(error) => {
-            if opts.new_json {
-                let mut envelope = output::newfmt_envelope(system, opts.token.clone(), &[]);
-                envelope.push_a(
-                    SAMPLE_ENVELOPE_ERRORS,
-                    output::newfmt_one_error(system, error),
-                );
-                output::write_json(writer, &output::Value::O(envelope));
-            } else {
-                let mut hb = make_oldfmt_heartbeat(system);
-                //+ignore-strings
-                hb.push_s("error", error);
-                //-ignore-strings
-                output::write_csv(writer, &output::Value::O(hb))
+            match opts.fmt {
+                Format::NewJSON => {
+                    let mut envelope = output::newfmt_envelope(system, opts.token.clone(), &[]);
+                    envelope.push_a(
+                        SAMPLE_ENVELOPE_ERRORS,
+                        output::newfmt_one_error(system, error),
+                    );
+                    output::write_json(writer, &output::Value::O(envelope));
+                }
+                Format::CSV => {
+                    let mut hb = make_oldfmt_heartbeat(system);
+                    //+ignore-strings
+                    hb.push_s("error", error);
+                    //-ignore-strings
+                    output::write_csv(writer, &output::Value::O(hb))
+                }
             }
         }
     }
