@@ -309,18 +309,16 @@ impl systemapi::SystemAPI for MockSystem {
         procfs::compute_loadavg(&self.fs)
     }
 
-    fn compute_process_information(
-        &self,
-    ) -> Result<(HashMap<usize, systemapi::Process>, Vec<(usize, u64)>), String> {
+    fn compute_process_information(&self) -> Result<HashMap<usize, systemapi::Process>, String> {
         procfs::compute_process_information(self, &self.fs)
     }
 
     fn compute_cpu_utilization(
         &self,
-        per_pid_cpu_ticks: &[(usize, u64)],
+        processes: &HashMap<usize, systemapi::Process>,
         wait_time_ms: usize,
     ) -> Result<Vec<(usize, f64)>, String> {
-        procfs::compute_cpu_utilization(self, &self.fs, per_pid_cpu_ticks, wait_time_ms)
+        procfs::compute_cpu_utilization(self, &self.fs, processes, wait_time_ms)
     }
 
     fn compute_slurm_job_id(&self, _pid: usize) -> Option<usize> {
