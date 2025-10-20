@@ -102,7 +102,7 @@ fn run_command_unsafely(cmd: String) -> Option<String> {
         Some(verb) => {
             let args = tokens.collect::<Vec<&str>>();
             match command::safe_command(verb, &args, 5) {
-                Ok(s) => Some(s),
+                Ok((s, _)) => Some(s),
                 Err(_) => None,
             }
         }

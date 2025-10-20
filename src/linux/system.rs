@@ -413,7 +413,7 @@ static FILE_COUNTER: AtomicUsize = AtomicUsize::new(0);
 
 fn runit(cmd: &str, args: &[&str], timeout: u64) -> Result<String, String> {
     match command::safe_command(cmd, args, timeout) {
-        Ok(sacct_output) => {
+        Ok((subcommand_output, _)) => {
             #[cfg(debug_assertions)]
             if let Ok(ref filename) = std::env::var("SONARTEST_SUBCOMMAND_OUTPUT") {
                 eprintln!("{cmd} {:?}", args);
@@ -422,18 +422,18 @@ fn runit(cmd: &str, args: &[&str], timeout: u64) -> Result<String, String> {
                     n => format!("{filename}.{n}"),
                 };
                 match fs::File::create(&filename) {
-                    Ok(mut f) => match f.write_all(sacct_output.as_bytes()) {
+                    Ok(mut f) => match f.write_all(subcommand_output.as_bytes()) {
                         Ok(()) => {}
                         Err(e) => {
-                            panic!("Could not write sacct output file {filename}: {e}");
+                            panic!("Could not write subcommand output file {filename}: {e}");
                         }
                     },
                     Err(e) => {
-                        panic!("Could not open sacct output file {filename}: {e}");
+                        panic!("Could not open subcommand output file {filename}: {e}");
                     }
                 }
             }
-            Ok(sacct_output)
+            Ok(subcommand_output)
         }
         Err(command::CmdError::CouldNotStart(e)) => Err(e),
         Err(command::CmdError::Failed(e)) => Err(e),
