@@ -6,7 +6,7 @@
 
 source sh-helper
 
-numbad=$(cargo run -- ps --exclude-system-jobs | \
+numbad=$(cargo run -- ps --exclude-system-jobs --csv | \
              awk '
 {
     s=substr($0, index($0, ",user=")+6)
