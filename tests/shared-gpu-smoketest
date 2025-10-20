@@ -1,0 +1,40 @@
+# -*- mode: shell-script -*-
+
+# To be sourced from the GPU tests.
+# Free variables:
+#  output - name of temp file
+
+set -o pipefail
+
+# Test that sysinfo finds the cards.  This is also sufficient to test that the GPU SMI library has
+# been found and is loaded.
+
+cargo run -- sysinfo > $output
+if (( $(jq .data.attributes.cards[].uuid < $output | wc -l) == 0 )); then
+    fail "Number of cards should be nonzero"
+fi
+
+# Run ps once with --load to trigger the collection of gpu utilization data.  We're not guaranteed
+# that anything is running on the GPUs and can't really guarantee much about the output.
+
+cargo run -- ps --load --exclude-system-jobs > $output
+
+# There should always be a gpus array
+if (( $(jq '.data.attributes.system.gpus' < $output | wc -l) == 0 )); then
+    fail "Got no card array with --load"
+fi
+
+# We should always find uuids
+if (( $(jq '.data.attributes.system.gpus[].uuid' < $output | wc -l) == 0 )); then
+    fail "Got zero cards in card array"
+fi
+
+# Test some other field than uuid.  memory is usually reliable.
+n=0
+for mem in $(jq '.data.attributes.system.gpus[].memory' < $output); do
+    if (( mem == 0 )); then
+        fail "Card $n reports zero memory"
+    fi
+    n=$((n+1))
+done
+
