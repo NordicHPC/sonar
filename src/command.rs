@@ -26,7 +26,7 @@ pub fn safe_command(
     command: &str,
     args: &[&str],
     timeout_seconds: u64,
-) -> Result<String, CmdError> {
+) -> Result<(String, String), CmdError> {
     let mut p = match Exec::cmd(command)
         .args(args)
         .stdout(Redirection::Pipe)
@@ -56,19 +56,11 @@ pub fn safe_command(
     let code = loop {
         match comm.read_string() {
             Ok((Some(stdout), Some(stderr))) => {
-                if !stderr.is_empty() {
-                    stderr_result += &stderr;
-                    break Some(CmdError::Failed(format_failure(
-                        command,
-                        "Unexpected output on stderr",
-                        &stdout_result,
-                        &stderr_result,
-                    )));
-                } else if stdout.is_empty() {
+                stderr_result += &stderr;
+                stdout_result += &stdout;
+                if stdout.is_empty() && stderr.is_empty() {
                     // This is always EOF because timeouts are signaled as Err()
                     break None;
-                } else {
-                    stdout_result += &stdout;
                 }
             }
             Ok((_, _)) => {
@@ -115,7 +107,7 @@ pub fn safe_command(
             if let Some(status) = code {
                 Err(status)
             } else {
-                Ok(stdout_result)
+                Ok((stdout_result, stderr_result))
             }
         }
         Ok(ExitStatus::Exited(126)) => Err(CmdError::CouldNotStart(format_failure(
@@ -173,9 +165,14 @@ fn test_safe_command() {
         Err(_) => assert!(false),
     }
     // This really needs to be the output
-    assert!(
-        safe_command("grep", &["^name =", "Cargo.toml"], 2) == Ok("name = \"sonar\"\n".to_string())
-    );
+    match safe_command("grep", &["^name =", "Cargo.toml"], 2) {
+        Ok((s, _)) => {
+            assert!(s == "name = \"sonar\"\n".to_string())
+        }
+        Err(_) => {
+            assert!(false)
+        }
+    }
     // Not found
     match safe_command("no-such-command-we-hope", &[], 2) {
         Err(CmdError::CouldNotStart(_)) => {}
@@ -209,6 +206,16 @@ fn test_safe_command() {
     match safe_command("cat", &["img/sonar.png"], 5) {
         Ok(_) => {}
         Err(_) => {
+            assert!(false)
+        }
+    }
+    // Should return Ok but should produce output on both stdout and stderr.
+    match safe_command("src/testdata/command-output.sh", &[], 5) {
+        Ok((a, b)) => {
+            assert!(a == "output from stdout\n".to_string());
+            assert!(b == "output from stderr\n".to_string());
+        }
+        Err(_e) => {
             assert!(false)
         }
     }
