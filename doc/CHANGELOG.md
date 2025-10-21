@@ -15,9 +15,9 @@ should ask for that format.
 
 ## Changes in v0.16.0 (on `release_0_16`)
 
-* Bug 335 - **BREAKING CHANGE.** The `cpu_util` field was not emitted properly, it should have been
-  scaled by 100 according to docs (it's a percentage).  Older data will look weird compared to new
-  data
+* Bug 335 / Bug 415 - **BREAKING CHANGE.** The `cpu_util` field was not emitted properly, it should
+  have been scaled by 100 according to docs (it's a percentage) and the time window should be
+  determined accurately.  Older data will look weird compared to new data
 * Bug 352 - **MAJOR FUNCTIONALITY.**  Populate the `topo_svg` field, introduce a `topo_text` field,
   and expand the config file so as to be able to specify how to generate those data
 * Bug 353 - Remove the `software` field.
@@ -30,6 +30,8 @@ should ask for that format.
 * Bug 407 - clarify semantics of the GPU index field in several data types
 * Bug 408 - **UX CHANGE.** The output format now defaults to "new JSON", and the cluster name
   is no longer a required argument for that (defaulting to the empty string).
+* Bug 410 - output on stderr does not by itself cause a subcommand to fail, so long as the
+  exit code is 0
 * Testing (sundry): Many testing improvements
 * Doc (sundry): Various improvements
 
