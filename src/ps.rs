@@ -314,10 +314,10 @@ fn collect_sample_data(
     let (_cpu_total_secs, per_cpu_secs) = system.compute_node_information()?;
     let memory = system.get_memory_in_kib()?;
     let (load1, load5, load15, runnable_entities, existing_entities) = system.compute_loadavg()?;
-    let (mut processes, per_pid_cpu_ticks) = system.compute_process_information()?;
+    let mut processes = system.compute_process_information()?;
 
     if opts.cpu_util {
-        let utils = system.compute_cpu_utilization(&per_pid_cpu_ticks, 100)?;
+        let utils = system.compute_cpu_utilization(&processes, 100)?;
         for (pid, cpu_util) in utils.iter() {
             processes.entry(*pid).and_modify(|e| {
                 e.cpu_util = *cpu_util * 100.0;

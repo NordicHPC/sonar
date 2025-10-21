@@ -30,4 +30,4 @@ if (( util < 75 || util > 125 )); then
     fail "Unlikely CPU utilization $util"
 fi
 
-echo " Ok"
+echo " Ok - $util"

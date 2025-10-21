@@ -83,7 +83,7 @@ pub fn procfs_parse_test() {
     let (total_secs, per_cpu_secs) = system
         .compute_node_information()
         .expect("Test: Must have data");
-    let (mut info, _) = system
+    let mut info = system
         .compute_process_information()
         .expect("Test: Must have data");
     assert!(info.len() == 1);
@@ -186,7 +186,7 @@ pub fn procfs_dead_and_undead_test() {
         .with_users(users)
         .with_threads(threads)
         .freeze();
-    let (mut info, _) = system
+    let mut info = system
         .compute_process_information()
         .expect("Test: Must have data");
 
