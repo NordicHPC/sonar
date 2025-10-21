@@ -1,5 +1,6 @@
 use crate::gpu;
 use crate::jobsapi;
+use crate::systemapi;
 
 use std::collections::HashMap;
 use std::fs;
@@ -38,17 +39,16 @@ pub trait SystemAPI {
     fn compute_loadavg(&self) -> Result<(f64, f64, f64, u64, u64), String>;
 
     // Return a hashmap of structures with process data, keyed by pid.  Pids uniquely tag the
-    // records.  Also return a vector mapping pid to total cpu ticks for the process.
-    fn compute_process_information(
-        &self,
-    ) -> Result<(HashMap<usize, Process>, Vec<(usize, u64)>), String>;
+    // records.
+    fn compute_process_information(&self) -> Result<HashMap<usize, Process>, String>;
 
-    // Given the per-process CPU time computed by compute_process_information, and a time to wait,
-    // wait for that time and then read the CPU time again.  The sampled process CPU utilization is
-    // the delta of CPU time divided by the delta of time, 1.0 = 100% of one core.
+    // Given the process table computed by compute_process_information, and a time to wait, measure
+    // CPU time for all processes, wait for that time, and then read the CPU time again.  The
+    // sampled process CPU utilization is the delta of CPU time divided by the delta of time, 1.0 =
+    // 100% of one core.
     fn compute_cpu_utilization(
         &self,
-        per_pid_cpu_ticks: &[(usize, u64)],
+        processes: &HashMap<usize, systemapi::Process>,
         wait_time_ms: usize,
     ) -> Result<Vec<(usize, f64)>, String>;
 

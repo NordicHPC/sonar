@@ -272,9 +272,6 @@ pub fn get_thread_count(fs: &dyn ProcfsAPI, pid: usize) -> Result<usize, String>
 // Obtain process information via /proc and return a hashmap of structures with all the information
 // we need, keyed by pid.  Pids uniquely tag the records.
 //
-// Also return a vector mapping pid to total cpu ticks for the process.  This will be used to
-// compute per-process CPU utilization in compute_cpu_utilization(), below.
-//
 // This returns Ok(data) on success, otherwise Err(msg).
 //
 // This function uniformly uses /proc, even though in some cases there are system calls that
@@ -283,7 +280,7 @@ pub fn get_thread_count(fs: &dyn ProcfsAPI, pid: usize) -> Result<usize, String>
 pub fn compute_process_information(
     system: &dyn systemapi::SystemAPI,
     fs: &dyn ProcfsAPI,
-) -> Result<(HashMap<usize, systemapi::Process>, Vec<(usize, u64)>), String> {
+) -> Result<HashMap<usize, systemapi::Process>, String> {
     let memtotal_kib = system.get_memory_in_kib()?.total;
 
     // We need this for a lot of things.  On x86 and x64 this is always 100 but in principle it
@@ -314,7 +311,6 @@ pub fn compute_process_information(
     let mut ppids = HashSet::<usize>::new();
     let mut user_table = UserTable::new();
 
-    let mut per_pid_cpu_ticks = vec![];
     for (pid, uid) in pids {
         // Basic system variables.  Intermediate time values are represented in ticks to prevent
         // various roundoff artifacts resulting in NaN or Infinity.
@@ -562,7 +558,6 @@ pub fn compute_process_information(
 
         let num_threads = get_thread_count(fs, pid).unwrap_or(1);
 
-        per_pid_cpu_ticks.push((pid, bsdtime_ticks));
         result.insert(
             pid,
             systemapi::Process {
@@ -593,67 +588,74 @@ pub fn compute_process_information(
         p.has_children = ppids.contains(&p.pid);
     }
 
-    Ok((result, per_pid_cpu_ticks))
+    Ok(result)
 }
-
-// Given the per-process CPU time computed by compute_process_information, and a time to wait, wait
-// for that time and then read the CPU time again.  The sampled process CPU utilization is the delta
-// of CPU time divided by the delta of time, so 1.0 = 100% of one core.
 
 pub fn compute_cpu_utilization(
     system: &dyn systemapi::SystemAPI,
     fs: &dyn ProcfsAPI,
-    per_pid_cpu_ticks: &[(usize, u64)],
+    processes: &HashMap<usize, systemapi::Process>,
     wait_time_ms: usize,
 ) -> Result<Vec<(usize, f64)>, String> {
     let ticks_per_sec = system.get_clock_ticks_per_sec() as u64;
 
-    // This is somewhat dodgy.  It may wait more than 100ms.  It may be that the previous
-    // information was not obtained just before sleeping, but sometime prior to that.
-    thread::sleep(time::Duration::from_millis(100));
+    let mut temp = Vec::with_capacity(processes.len());
+    for (pid, _) in processes {
+        let time_before = time::Instant::now();
+        let (ok, ticks) = compute_process_ticks(fs, *pid)?;
+        temp.push((*pid, ok, ticks, time_before));
+    }
 
-    let mut result = vec![];
-    for (pid, prev_cputime_ticks) in per_pid_cpu_ticks {
-        let bsdtime_ticks;
-        match fs.read_to_string(&format!("{pid}/stat")) {
-            Err(_) => {
-                continue;
-            }
-            Ok(line) => {
-                let field_storage: String;
-                let fields: Vec<&str>;
-                match line.rfind(')') {
-                    None => {
-                        continue;
-                    }
-                    Some(commend) => {
-                        field_storage = line[commend + 1..].trim().to_string();
-                        fields = field_storage
-                            .split_ascii_whitespace()
-                            .collect::<Vec<&str>>();
-                    }
-                }
-                let utime_ticks =
-                    parse_usize_field(&fields, 11, &line, "stat", *pid, "utime")? as u64;
-                let stime_ticks =
-                    parse_usize_field(&fields, 12, &line, "stat", *pid, "stime")? as u64;
-                let cutime_ticks =
-                    parse_usize_field(&fields, 13, &line, "stat", *pid, "cutime")? as u64;
-                let cstime_ticks =
-                    parse_usize_field(&fields, 14, &line, "stat", *pid, "cstime")? as u64;
-                bsdtime_ticks = utime_ticks + stime_ticks + cutime_ticks + cstime_ticks;
-            }
+    thread::sleep(time::Duration::from_millis(wait_time_ms as u64));
+
+    let mut result = Vec::with_capacity(temp.len());
+    for (pid, old_ok, old_ticks, then) in temp {
+        if !old_ok {
+            continue;
         }
+        let (ok, ticks) = compute_process_ticks(fs, pid)?;
+        if !ok {
+            continue;
+        }
+        let delta_ms = then.elapsed().as_millis();
         //   delta_ticks * (ms/s / ms) / ticks/s
         // = (delta_ticks/s) * s/ticks
         // = ticks * (1/ticks)
         // = unitless
-        let utilization = (bsdtime_ticks - prev_cputime_ticks) as f64
-            * (1000.0 / wait_time_ms as f64)
-            / ticks_per_sec as f64;
-        result.push((*pid, utilization));
+        let utilization =
+            (ticks - old_ticks) as f64 * (1000.0 / delta_ms as f64) / ticks_per_sec as f64;
+        result.push((pid, utilization));
     }
     Ok(result)
+}
+
+fn compute_process_ticks(fs: &dyn ProcfsAPI, pid: usize) -> Result<(bool, u64), String> {
+    match fs.read_to_string(&format!("{pid}/stat")) {
+        Err(_) => {
+            return Ok((false, 0));
+        }
+        Ok(line) => {
+            let field_storage: String;
+            let fields: Vec<&str>;
+            match line.rfind(')') {
+                None => {
+                    return Ok((false, 0));
+                }
+                Some(commend) => {
+                    field_storage = line[commend + 1..].trim().to_string();
+                    fields = field_storage
+                        .split_ascii_whitespace()
+                        .collect::<Vec<&str>>();
+                }
+            }
+            let utime_ticks = parse_usize_field(&fields, 11, &line, "stat", pid, "utime")? as u64;
+            let stime_ticks = parse_usize_field(&fields, 12, &line, "stat", pid, "stime")? as u64;
+            let cutime_ticks = parse_usize_field(&fields, 13, &line, "stat", pid, "cutime")? as u64;
+            let cstime_ticks = parse_usize_field(&fields, 14, &line, "stat", pid, "cstime")? as u64;
+            let bsdtime_ticks = utime_ticks + stime_ticks + cutime_ticks + cstime_ticks;
+            return Ok((true, bsdtime_ticks));
+        }
+    }
 }
 
 #[cfg(any(target_arch = "x86_64", test))]
