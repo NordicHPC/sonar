@@ -16,7 +16,7 @@ fi
 #
 # There's no guarantee that there is a record.
 
-output=$(cargo run -- slurm)
+output=$(cargo run -- slurm --csv)
 if [[ -z $output ]]; then
     echo " Ok: No output"
     exit 0
