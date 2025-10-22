@@ -546,15 +546,11 @@ SlurmJob:
     gres_detail:
       type: '[]string'
       doc: >
-        Requested resources. For running jobs, the data can in part be synthesized from process samples: we'll know the resources that are being used.  sacct: TBD - TODO (possibly unavailable or maybe only when RUNNING).  slurm: `JOB_INFO.gres_detail`
+        Requested resources. This will be taken from scontrol's ReqTRES field or sacct's AllocTRES field, whichever is available, with priority for the former.  scontrol: `ReqTRES` sacct: `AllocTRES`  slurm: `JOB_INFO.gres_detail`
     requested_cpus:
       type: 'uint64'
       doc: >
-        Number of requested CPUs.  sacct: `ReqCPUS`  slurm: `JOB_INFO.cpus`  TODO: Is this per node?  If so, change the name of the field.
-    minimum_cpus_per_node:
-      type: 'uint64'
-      doc: >
-        TODO: Description.  This may be the same as requested_cpus?  sacct: TODO - TBD.  slurm: `JOB_INFO.minimum_cpus_per_node`
+        Number of requested CPUs (assumed to be for the job in total, the documentation is not good).  sacct: `ReqCPUS`  slurm: `JOB_INFO.cpus`
     requested_memory_per_node:
       type: 'uint64'
       doc: >

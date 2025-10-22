@@ -3,11 +3,10 @@
 # Regression test for https://github.com/NordicHPC/sonar/issues/369
 
 source sh-helper
+assert cargo jq
 
 echo "This test takes about 30s"
-assert_jq
 
-mkdir -p tmp
 outfile=tmp/regress-369-output.txt
 logfile=tmp/regress-369-log.txt
 if [[ -z $SKIP ]]; then
@@ -30,6 +29,7 @@ if ! sort --check=silent $timestamps; then
     fail "Timestamps are not ordered!"
 fi
 if [[ -n $(uniq --repeated $timestamps) ]]; then
+    cat $timestamps
     fail "Timestamps are not unique!"
 fi
 

@@ -5,9 +5,8 @@
 source sh-helper
 
 echo " This takes about 15s"
-assert_jq
+assert cargo jq
 
-mkdir -p tmp
 output=tmp/daemon-output.txt
 rm -f $output
 

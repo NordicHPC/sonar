@@ -3,6 +3,7 @@
 # Check the interrupt handling for the daemon mode.
 
 source sh-helper
+assert cargo
 
 echo " This takes about 45s"
 
@@ -18,7 +19,6 @@ echo " This takes about 45s"
 # To test this, we send it a signal after 10s.  At this point, nothing should have been printed, but
 # approximately 3 lines of output should have been accumulated in the buffer.
 
-mkdir -p tmp
 output=tmp/daemon-interrupt-output.txt
 log=tmp/daemon-interrupt-log.txt
 
