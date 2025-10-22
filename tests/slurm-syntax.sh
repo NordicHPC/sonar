@@ -3,7 +3,7 @@
 # Check that `sonar slurm` produces some sane output.
 
 source sh-helper
-assert_jq
+assert cargo jq
 
 # Check that sacct is available, or we should do nothing
 

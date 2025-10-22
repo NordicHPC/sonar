@@ -1,6 +1,6 @@
 # -*- mode: shell-script -*-
 
-set -e
+set -e -o pipefail
 mkdir -p tmp
 
 function fail() {

@@ -4,7 +4,7 @@
 # and run sonar ps meanwhile.
 
 source sh-helper
-assert_jq
+assert cargo cc jq
 
 make pincpu
 cargo build
@@ -23,9 +23,8 @@ sleep 4
 #
 # The cpu_util is floating point, so we need to round it.
 
-output=$(cargo run -- ps --exclude-system-jobs --json --cluster my.cluster)
-util=$(jq '.data.attributes.jobs[].processes[]|select(.cmd=="pincpu").cpu_util|ceil' <<< $output)
-
+util=$(cargo run -- ps --exclude-system-jobs --json --cluster my.cluster | \
+           jq '.data.attributes.jobs[].processes[]|select(.cmd=="pincpu").cpu_util|ceil')
 if (( util < 75 || util > 125 )); then
     fail "Unlikely CPU utilization $util"
 fi

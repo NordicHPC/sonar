@@ -3,14 +3,14 @@
 # Test that the --exclude-commands switch works.
 
 source sh-helper
+assert cargo
 
-numbad=$(cargo run -- ps --exclude-commands bash,sh,zsh,csh,ksh,tcsh,kworker | \
-    awk "
+result=$(cargo run -- ps --exclude-commands bash,sh,zsh,csh,ksh,tcsh,kworker | \
+             awk "
 /,cmd=kworker/ { print }
 /,cmd=(ba|z|c|k|tc|)sh/ { print }
-" | \
-    wc -l)
-if (( numbad != 0 )); then
+")
+if [[ -n $result ]]; then
     fail "Command filtering did not work"
 fi
 

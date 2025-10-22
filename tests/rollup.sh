@@ -10,6 +10,7 @@
 # or later C compiler to build the C code.
 
 source sh-helper
+assert cargo cc
 
 make rollup-programs
 

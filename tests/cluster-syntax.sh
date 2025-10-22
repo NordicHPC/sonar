@@ -3,8 +3,9 @@
 # Check that `sonar cluster` produces some sane output.
 
 source sh-helper
+assert cargo jq
 
-assert_jq
+output=tmp/cluster-syntax.tmp
 
 # Check that sinfo is available, or we should do nothing
 
@@ -15,14 +16,14 @@ fi
 
 # JSON - the only format available
 
-output=$(cargo run -- cluster --cluster fox.educloud.no --json)
+cargo run -- cluster --cluster fox.educloud.no > $output
 
 # Syntax check
 
-jq . <<< $output > /dev/null
+jq . $output > /dev/null
 
 # There is always at least an envelope with a version field
-version=$(jq .meta.version <<< $output)
+version=$(jq .meta.version $output)
 if [[ !( $version =~ [0-9]+\.[0-9]+\.[0-9](-.+)? ) ]]; then
     fail "JSON version bad, got $version"
 fi

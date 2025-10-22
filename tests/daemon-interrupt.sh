@@ -59,7 +59,9 @@ for signal in TERM INT HUP; do
     # sampling should be disabled to tighten the test.  However, since `cargo run` is sort of slow
     # we can have fewer...
 
-    lines=$(grep '{"topic":' $output | wc -l)
+    set +e
+    lines=$(grep -c '{"topic":' $output)
+    set -e
     if (( lines < 2 || lines > 5 )); then
         fail "Output file is too short or too long, flushing did not work or something else is off"
     fi

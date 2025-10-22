@@ -3,9 +3,9 @@
 # Check that the Kafka data sink does its job (without sending anything)
 
 source sh-helper
+assert cargo jq
 
 echo "This test takes about 30s"
-assert cargo jq
 
 outfile=tmp/daemon-kafka-output.txt
 logfile=tmp/daemon-kafka-log.txt
@@ -43,7 +43,8 @@ fi
 
 prev=-1
 num_bad=0
-for k in $(jq 'select(has("error"))|.id' < $outfile); do
+keys=$(jq 'select(has("error"))|.id' $outfile)
+for k in $keys; do
     num_bad=$((num_bad + 1))
     if (( k - prev != 2 )); then
         fail "Found even key in error output: $k"
@@ -53,7 +54,8 @@ done
 
 prev=0
 num_good=0
-for k in $(jq 'select(has("topic"))|.id' < $outfile); do
+keys=$(jq 'select(has("topic"))|.id' $outfile)
+for k in $keys; do
     num_good=$((num_good + 1))
     if (( k - prev != 2 )); then
         fail "Found odd key in normal output: $k"
@@ -81,7 +83,8 @@ prev=0
 count=0
 batches=0
 multibatch=0
-for sent in $(jq '.sent' < $outfile); do
+keys=$(jq '.sent' $outfile)
+for sent in $keys; do
     if ((prev < sent)); then
         # New batch
         if ((count > 1)); then

@@ -5,8 +5,9 @@
 # list to get the uid, then collect the uids that are < 1000 - these are wrong.
 
 source sh-helper
+assert cargo
 
-numbad=$(cargo run -- ps --exclude-system-jobs --csv | \
+result=$(cargo run -- ps --exclude-system-jobs --csv | \
              awk '
 {
     s=substr($0, index($0, ",user=")+6)
@@ -21,10 +22,9 @@ END {
     system("getent passwd " s)
 }
 ' | \
-             awk -F: '{ if (strtonum($3) < 1000) { print $3 } }' | \
-             wc -l )
-if (( numbad != 0 )); then
-    echo $numbad
+             awk -F: '{ if (strtonum($3) < 1000) { print $3 } }')
+if [[ -n $result ]]; then
+    echo $result
     fail "System jobs filtering did not work"
 fi
 
