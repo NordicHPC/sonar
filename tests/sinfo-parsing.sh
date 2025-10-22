@@ -3,9 +3,8 @@
 # Check that `sonar cluster` produces correct output from a known input.
 
 source sh-helper
-assert_jq
+assert cargo jq
 
-mkdir -p tmp
 sonar_output=tmp/sinfo-parsing-sinfo-output.tmp
 partitions1=tmp/sinfo-parsing-partitions1.tmp
 nodes1=tmp/sinfo-parsing-nodes1.tmp

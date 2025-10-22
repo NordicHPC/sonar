@@ -73,6 +73,9 @@ pub trait SystemAPI {
         to: &str,
     ) -> Result<String, String>;
 
+    // Run `scontrol -o show job` and return its output.
+    fn run_scontrol(&self) -> Result<String, String>;
+
     fn compute_cluster_kind(&self) -> Option<ClusterKind>;
 
     // On a batch system, return a vector of partition name and standard-format compressed nodelist.

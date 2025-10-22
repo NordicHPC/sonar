@@ -31,6 +31,9 @@ use signal_hook::flag;
 // 3 minutes ought to be enough for anyone.
 const SACCT_TIMEOUT_S: u64 = 180;
 
+// scontrol is also pretty quick
+const SCONTROL_TIMEOUT_S: u64 = 30;
+
 // sinfo will normally be very quick
 const SINFO_TIMEOUT_S: u64 = 10;
 
@@ -291,6 +294,14 @@ impl systemapi::SystemAPI for System {
             ],
             SACCT_TIMEOUT_S,
         )
+    }
+
+    fn run_scontrol(&self) -> Result<String, String> {
+        #[cfg(debug_assertions)]
+        if let Ok(filename) = std::env::var("SONARTEST_MOCK_SCONTROL") {
+            return Ok(mock_input(filename));
+        }
+        runit("scontrol", &["-o", "show", "job"], SCONTROL_TIMEOUT_S)
     }
 
     // Whether we try to run sinfo or run some code to look for the program in the path probably

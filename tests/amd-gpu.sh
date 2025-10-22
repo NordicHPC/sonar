@@ -13,7 +13,6 @@ if [[ ! -e /sys/module/amdgpu ]]; then
     exit 0
 fi
 
-mkdir -p tmp
 output=tmp/amd-gpu.tmp
 
 source shared-gpu-smoketest

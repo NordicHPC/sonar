@@ -12,14 +12,14 @@ if [[ -n $(command -v sacct) ]]; then
     exit 0
 fi
 
-output=$(cargo run -- slurm --cluster x --json)
+output=$(SONARTEST_MOCK_SCONTROL=/dev/null cargo run -- slurm --cluster x --json)
 error=$(jq .errors <<< $output)
 if [[ ! ( $error =~ "sacct" ) ]]; then
     echo $output
     fail "Expected specific error string, got '$error'"
 fi
 
-output=$(cargo run -- slurm --csv)
+output=$(SONARTEST_MOCK_SCONTROL=/dev/null cargo run -- slurm --csv)
 if [[ ! ( $output =~ "error=sacct" ) ]]; then
     fail "Expected specific error string, got '$output'"
 fi

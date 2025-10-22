@@ -36,6 +36,7 @@ tests="amd-gpu \
      sacct-parsing \
      sinfo-parsing \
      slurm-no-sacct \
+     slurm-no-scontrol \
      slurm-syntax \
      sysinfo-syntax \
      sysinfo-topo \
@@ -48,7 +49,7 @@ if [[ -z $1 ]]; then
 fi
 for test in $tests; do
     echo $test
-    if [[ $running == 0 && $test == $1 ]]; then
+    if [[ $running == 0 && ( $test == $1 || $test.sh == $1 ) ]]; then
         running=1
     fi
     if [[ $running == 0 ]]; then

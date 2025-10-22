@@ -13,7 +13,6 @@ if [[ ! -e /sys/module/i915 || -z $(command -v xpu-smi) ]]; then
     exit 0
 fi
 
-mkdir -p tmp
 output=tmp/xpu-gpu.tmp
 
 source shared-gpu-smoketest

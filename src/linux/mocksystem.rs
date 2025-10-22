@@ -347,6 +347,10 @@ impl systemapi::SystemAPI for MockSystem {
         Ok("".to_string()) // Not in use yet
     }
 
+    fn run_scontrol(&self) -> Result<String, String> {
+        Ok("".to_string()) // Not in use yet
+    }
+
     fn compute_cluster_kind(&self) -> Option<systemapi::ClusterKind> {
         None
     }

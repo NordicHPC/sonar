@@ -14,7 +14,7 @@ use once_cell::sync::Lazy;
 
 #[cfg(test)]
 use std::cmp::min;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::io;
 
 // The job states we are interested in collecting information about, notably PENDING and RUNNING
@@ -107,7 +107,6 @@ struct JobAll {
     distribution: String,
     gres_detail: String,
     requested_cpus: u64,
-    minimum_cpus_per_node: u64,
     requested_memory_per_node: u64,
     requested_node_count: u64,
     start_time: String,
@@ -234,15 +233,46 @@ fn collect_sacct_jobs_newfmt(
     uncompleted: bool,
 ) -> Result<Vec<Box<JobAll>>, String> {
     let local = time::now_local();
+    let scontrol_output = system.run_scontrol()?;
+    let resources = parse_scontrol_output(scontrol_output);
     let sacct_output = run_sacct(system, window, span, uncompleted)?;
-    Ok(parse_sacct_jobs_newfmt(&sacct_output, &local))
+    Ok(parse_sacct_jobs_newfmt(&sacct_output, &resources, &local))
 }
 
-fn parse_sacct_jobs_newfmt(sacct_output: &str, local: &libc::tm) -> Vec<Box<JobAll>> {
+fn parse_scontrol_output(scontrol_output: String) -> HashMap<String, String> {
+    let mut resources = HashMap::<String, String>::new();
+    for line in scontrol_output.lines() {
+        let mut id = None;
+        let mut res = None;
+        'Fieldscan: for f in line.split(' ') {
+            if let Some(s) = f.strip_prefix("JobId=") {
+                id = Some(s.to_string());
+                if res.is_some() {
+                    break 'Fieldscan;
+                }
+            } else if let Some(s) = f.strip_prefix("ReqTRES=") {
+                res = Some(s.to_string());
+                if id.is_some() {
+                    break 'Fieldscan;
+                }
+            }
+        }
+        if id.is_some() && res.is_some() {
+            resources.insert(id.unwrap(), res.unwrap());
+        }
+    }
+    resources
+}
+
+fn parse_sacct_jobs_newfmt(
+    sacct_output: &str,
+    resources: &HashMap<String, String>,
+    local: &libc::tm,
+) -> Vec<Box<JobAll>> {
     let mut jobs = vec![];
     for line in sacct_output.lines() {
         // There are ways of making this table-driven but none that are not complicated.
-        let fieldvals = compute_field_values(line);
+        let fieldvals = compute_sacct_field_values(line);
         let mut output_line = Box::new(JobAll {
             ..Default::default()
         });
@@ -274,11 +304,18 @@ fn parse_sacct_jobs_newfmt(sacct_output: &str, local: &libc::tm) -> Vec<Box<JobA
                     }
                 }
                 "JobIDRaw" => {
-                    if let Some((id, step)) = fieldvals[i].split_once('.') {
+                    let id = if let Some((id, step)) = fieldvals[i].split_once('.') {
                         output_line.job_id = parse_uint(id);
                         output_line.job_step = step.to_string();
+                        id
                     } else {
                         output_line.job_id = parse_uint(&fieldvals[i]);
+                        &fieldvals[i]
+                    };
+                    if output_line.gres_detail == "" {
+                        if let Some(r) = resources.get(id) {
+                            output_line.gres_detail = r.clone();
+                        }
                     }
                 }
                 "User" => {
@@ -385,6 +422,9 @@ fn parse_sacct_jobs_newfmt(sacct_output: &str, local: &libc::tm) -> Vec<Box<JobA
                 }
                 "AllocTRES" => {
                     output_line.sacct_alloc_tres = fieldvals[i].clone();
+                    if output_line.gres_detail == "" {
+                        output_line.gres_detail = fieldvals[i].clone();
+                    }
                 }
                 _ => {
                     panic!("Bad field name {}", *field);
@@ -510,7 +550,6 @@ fn render_jobs_newfmt(jobs: Vec<Box<JobAll>>) -> output::Array {
         push_string(&mut o, SLURM_JOB_LAYOUT, j.distribution);
         push_string(&mut o, SLURM_JOB_GRESDETAIL, j.gres_detail);
         push_uint(&mut o, SLURM_JOB_REQ_CPUS, j.requested_cpus);
-        push_uint(&mut o, SLURM_JOB_MIN_CPUSPER_NODE, j.minimum_cpus_per_node);
         push_uint(
             &mut o,
             SLURM_JOB_REQ_MEMORY_PER_NODE,
@@ -606,7 +645,7 @@ fn parse_sacct_jobs_oldfmt(sacct_output: &str, local: &libc::tm) -> output::Arra
 
     let mut jobs = output::Array::new();
     for line in sacct_output.lines() {
-        let fields = compute_field_values(line);
+        let fields = compute_sacct_field_values(line);
 
         let mut output_line = output::Object::new();
         output_line.push_s("v", VERSION.to_string());
@@ -638,7 +677,7 @@ fn parse_sacct_jobs_oldfmt(sacct_output: &str, local: &libc::tm) -> output::Arra
 }
 //-ignore-strings
 
-fn compute_field_values(line: &str) -> Vec<String> {
+fn compute_sacct_field_values(line: &str) -> Vec<String> {
     let mut field_store = line.split('|').collect::<Vec<&str>>();
 
     // If there are more fields than field names then that's because the job name
