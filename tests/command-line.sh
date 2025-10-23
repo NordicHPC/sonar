@@ -3,6 +3,7 @@
 # Check that command line parsing is somewhat sane.
 
 source sh-helper
+assert cargo
 
 # Allow both forms of argument syntax
 cargo run -- ps --exclude-users=root,$LOGNAME > /dev/null

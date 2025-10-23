@@ -36,19 +36,21 @@ fi
 # Next test that there are no sending windows with zero messages sent
 # Possibly the test needs to run much longer and with different settings to *really* test that.
 
-if [[ -n $(grep -E '^Info.*Sending 0 items' $logfile) ]]; then
-    fail "Sending zero items!"
+if grep -q -E '^Info.*Sending 0 items' $logfile; then
+    fail "Sending zero items at least once!"
 fi
 
 # Finally test that a timer is not armed without there being messages to be sent
 # Possibly the test needs to run much longer and with different settings to *really* test that.
 
 prev=-100
-grep -n -E '^Info.*Sleeping [0-9]+ before sending' $logfile | awk -F: '{ print $1 }' | while read lineno; do
-    if (( prev+1 == lineno )); then
-        fail "Back-to-back sleeping lines: $prev $lineno"
-    fi
-    prev=$lineno
-done
+grep -n -E '^Info.*Sleeping [0-9]+ before sending' $logfile | \
+    awk -F: '{ print $1 }' | \
+    while read lineno; do
+        if (( prev+1 == lineno )); then
+            fail "Back-to-back sleeping lines: $prev $lineno"
+        fi
+        prev=$lineno
+    done
 
 echo " Ok"

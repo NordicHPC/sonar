@@ -9,21 +9,20 @@
 # or later C compiler to build the C code.
 
 source sh-helper
+assert cargo cc
+
+output=tmp/rollup2.tmp
 
 make rollup-programs
 
 echo " This takes about 10s"
 ./rollup2 3 &
 sleep 3
-output=$(SONARTEST_ROLLUP=1 cargo run -- ps --rollup --exclude-system-jobs --csv)
-set +e
-matches1=$(grep -E ',cmd=rollupchild,.*,rolledup=4' <<< $output)
-matches2=$(grep -E ',cmd=rollupchild2,.*,rolledup=3' <<< $output)
-set -e
-if [[ -z $matches1 ]]; then
+SONARTEST_ROLLUP=1 cargo run -- ps --rollup --exclude-system-jobs --csv > $output
+if ! grep -q -E ',cmd=rollupchild,.*,rolledup=4' $output; then
     fail "No matching rolledup=4"
 fi
-if [[ -z $matches2 ]]; then
+if ! grep -q -E ',cmd=rollupchild2,.*,rolledup=3' $output; then
     fail "No matching rolledup=3"
 fi
 echo " Ok"

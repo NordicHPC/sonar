@@ -3,7 +3,7 @@
 # Check that `sonar sysinfo` produces properly formatted JSON.
 
 source sh-helper
-assert_jq
+assert cargo jq
 
 # JSON syntax check
 

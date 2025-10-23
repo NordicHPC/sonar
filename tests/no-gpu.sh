@@ -5,6 +5,7 @@
 # Next check and that there are no GPU fields in the output from `sonar ps`.
 
 source sh-helper
+assert cargo
 
 # Add other GPU types here when we add support for them, the tests below should start failing when
 # that happens.
@@ -13,8 +14,7 @@ if [[ -e /sys/module/amdgpu || -e /sys/module/nvidia || -e /sys/module/i915 || -
     exit 0
 fi
 
-output=$(cargo run -- sysinfo)
-numcards=$(jq .gpu_cards <<< $output)
+numcards=$(cargo run -- sysinfo | jq .gpu_cards)
 if (( numcards != 0 )); then
     fail "Bad output from jq: <$numcards> should be zero"
 fi

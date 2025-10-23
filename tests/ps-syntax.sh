@@ -3,7 +3,7 @@
 # Check that `sonar ps` produces some sane output.
 
 source sh-helper
-assert_jq
+assert cargo jq
 
 # CSV
 #

@@ -3,8 +3,9 @@
 # Test that the --min-cpu-time switch works.
 
 source sh-helper
+assert cargo
 
-numbad=$(cargo run -- ps --min-cpu-time 5 --csv | \
+result=$(cargo run -- ps --min-cpu-time 5 --csv | \
              awk '
 {
     s=substr($0, index($0, ",cputime_sec=")+13)
@@ -14,9 +15,8 @@ numbad=$(cargo run -- ps --min-cpu-time 5 --csv | \
         s=substr(s, 0, ix-1)
     if (strtonum(s) < 5)
         print($0)
-}' | \
-             wc -l )
-if (( numbad != 0 )); then
+}')
+if [[ -n $result ]]; then
     fail "CPU time filtering did not work"
 fi
 

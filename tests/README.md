@@ -40,7 +40,20 @@ The interactive tests are:
 
 ## Coding standards
 
-Tests that generate temp outputs should `mkdir -p tmp` and place files in `tmp/`.
+All tests should start by sourcing `sh-helper`.  This will create `tmp/` if necessary and set `-e`
+and `-o pipefail`.
+
+When `-e` gets in the way, typically around a `grep` that may find no lines, disable as locally as
+possible using `set +e` and `set -e`.
+
+Commands that may fail in a way that should cause the test to fail must not be embedded in some
+context that will absorb the failure, but must be lifted to the top level and emit output to files
+or variables, which can then be tested subsequently.  For example, `test`, `[`, `[[`, and `((` will
+consume the error exits of subcommands silently, even in the face of `-e`, as will `for` and
+`while`; there are many others, see the manual.  It is hard to write tests that "error out"
+properly.  All interesting computation that can fail must happen at the statement level.
+
+Tests that generate temp outputs should place files in `tmp/`.
 
 Tests that use auxiliary input files should name the files similarly to the test (so
 `daemon-kafka.ini` goes with `daemon-kafka.sh`).
