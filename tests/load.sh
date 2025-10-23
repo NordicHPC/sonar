@@ -5,15 +5,14 @@
 source sh-helper
 assert cargo
 
-set +e
-loaded=$(cargo run -- ps --load --csv | grep -c ',load=')
-set -e
-if (( $loaded != 1 )); then
-    fail "Did not emit load data properly - not exactly 1: $loaded"
+loaded=$(cargo run -- ps --load | jq '.data.attributes.system.cpus | length')
+if (( loaded == 0 )); then
+    fail "Did not emit load data properly - should be positive: $loaded"
 fi
 
-if cargo run -- ps --csv | grep -q ',load='; then
-    fail "Did not emit load data properly - not exactly 0"
+loaded=$(cargo run -- ps | jq '.data.attributes.system.cpus | length')
+if (( loaded != 0 )); then
+    fail "Did not emit load data properly - should be zero: $loaded"
 fi
 
 echo " Ok"

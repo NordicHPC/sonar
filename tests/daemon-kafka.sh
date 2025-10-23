@@ -7,11 +7,26 @@ assert cargo jq
 
 echo "This test takes about 30s"
 
-outfile=tmp/daemon-kafka-output.txt
-logfile=tmp/daemon-kafka-log.txt
-if [[ -z $SKIP ]]; then
-    rm -rf $outfile $logfile
-fi
+outfile=$(tmpfile daemon-kafka-output)
+logfile=$(tmpfile daemon-kafka-log)
+inifile=$(tmpfile daemon-kafka-ini)
+
+cat > $inifile <<EOF
+[global]
+cluster=hpc.axis-of-eval.org
+role=node
+
+[debug]
+verbose = true
+time-limit = 30s
+
+[kafka]
+broker-address = no.such.host:101010
+sending-window = 10s
+
+[sysinfo]
+cadence=1s
+EOF
 
 # If SONARTEST_MOCK_KAFKA is set then the stdout sink is used for both data and select diagnostics.
 #
@@ -19,7 +34,7 @@ fi
 # and a message about this is printed on stdout (in addition to appearing in the log).
 
 if [[ -z $SKIP ]]; then
-    SONARTEST_MOCK_KAFKA=fail-all-odd-messages cargo run -- daemon daemon-kafka.ini > $outfile 2> $logfile
+    SONARTEST_MOCK_KAFKA=fail-all-odd-messages cargo run -- daemon $inifile > $outfile 2> $logfile
 fi
 
 # The ini produces one record every second but has a 10s sending window and runs the daemon for 30s.

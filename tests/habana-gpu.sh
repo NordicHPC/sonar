@@ -14,7 +14,7 @@ if [[ ! -e /sys/module/habanalabs ]]; then
     exit 0
 fi
 
-output=tmp/habana-gpu.tmp
+output=$(tmpfile habana-gpu)
 
 source shared-gpu-smoketest
 

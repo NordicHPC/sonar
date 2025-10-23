@@ -13,7 +13,7 @@ if [[ ! -e /sys/module/nvidia ]]; then
     exit 0
 fi
 
-output=tmp/nvidia-gpu.tmp
+output=$(tmpfile nvidia-gpu)
 
 source shared-gpu-smoketest
 

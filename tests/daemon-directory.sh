@@ -9,13 +9,34 @@ assert cargo
 
 echo "This test takes about 20s"
 
-data_dir=tmp/daemon-directory-data
-logfile=tmp/daemon-directory-log.txt
-rm -rf $data_dir $logfile
+data_dir=$(tmpdir daemon-directory-data)
+logfile=$(tmpfile daemon-directory-log)
+inifile=$(tmpfile daemon-directory-ini)
 
-cargo run -- daemon daemon-directory.ini 2>$logfile
+cat > $inifile <<EOF
+[global]
+cluster=hpc.axis-of-eval.org
+role=node
+
+[debug]
+verbose = true
+# Set the time limit to 20s so that we'll terminate after a few samples, this is to aid
+# automated testing.
+time-limit = 20s
+
+[directory]
+data-directory = $data_dir
+
+[sample]
+cadence=4s
+
+[sysinfo]
+cadence=5s
+EOF
+
+cargo run -- daemon $inifile 2>$logfile
 if [[ ! -d $data_dir ]]; then
-    fail "No data directory"
+    fail "No data directory $data_dir"
 fi
 
 # There may be more than one output file of each kind if the test ran across midnight UTC; that's OK.

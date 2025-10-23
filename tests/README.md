@@ -23,7 +23,7 @@ no GPUs and no Slurm available and will test the no-GPU and non-Slurm paths of t
 additionally need to run on these types of nodes:
 
 - a node with an NVIDIA GPU (UiO ml[1-3,5-9].hpc nodes, or Fox, Saga, or Betzy GPU nodes)
-- a node with an AMD GPU (UiO ml4.hpc node, or Lumi)
+- a node with an AMD GPU (UiO ml4.hpc node, or Lumi, or any of many Simula nodes)
 - a node with an XPU GPU (Simula n022)
 - a node with a Habana GPU (Simula h001)
 - a node with Slurm (Fox, Saga, Fram or Betzy login nodes would do)
@@ -38,10 +38,20 @@ The interactive tests are:
 - `kafka-interactive` tests Sonar's output-to-Kafka-broker functionality with a live broker
 - `threads-interactive` tests the ability to record thread counts (this could be made automated)
 
+## Caveats
+
+The tests in `tests/` are unreliable if they are run concurrently, or if the suite is run
+concurrently on the same system by the same or a different user, or in some cases if the suite is
+run concurrently on a different system but out of the same directory on a shared disk.  It would be
+somewhat easy to fix some of these problems, but the nature of Sonar is to take a full-system view
+of things and it's hard for conditions that are set up to test something not to leak into a
+concurrent run.
+
+
 ## Coding standards
 
-All tests should start by sourcing `sh-helper`.  This will create `tmp/` if necessary and set `-e`
-and `-o pipefail`.
+All tests should start by sourcing `sh-helper`.  This will create a temp directory if necessary and
+set `-e` and `-o pipefail`.
 
 When `-e` gets in the way, typically around a `grep` that may find no lines, disable as locally as
 possible using `set +e` and `set -e`.
@@ -53,10 +63,12 @@ consume the error exits of subcommands silently, even in the face of `-e`, as wi
 `while`; there are many others, see the manual.  It is hard to write tests that "error out"
 properly.  All interesting computation that can fail must happen at the statement level.
 
-Tests that generate temp outputs should place files in `tmp/`.
+Tests that generate temp outputs should create temp file and directory names using the `tmpfile` and
+`tmpdir` functions in the prefix.  These will be deleted if they exist, unless SKIP is set.
 
 Tests that use auxiliary input files should name the files similarly to the test (so
-`daemon-kafka.ini` goes with `daemon-kafka.sh`).
+`daemon-kafka.ini` goes with `daemon-kafka.sh`).  But generally it's better to make temp files for
+such aux files and use heredocs to populate them.
 
 It's useful for tests to have names that start with the major function tested, when possible (so
 `ps-cpu-util.sh` and not just `cpu-util.sh`).

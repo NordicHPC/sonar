@@ -19,8 +19,23 @@ echo " This takes about 45s"
 # To test this, we send it a signal after 10s.  At this point, nothing should have been printed, but
 # approximately 3 lines of output should have been accumulated in the buffer.
 
-output=tmp/daemon-interrupt-output.txt
-log=tmp/daemon-interrupt-log.txt
+output=$(tmpfile daemon-interrupt-output)
+log=$(tmpfile daemon-interrupt-log)
+inifile=$(tmpfile daemon-interrupt-ini)
+
+cat > $inifile <<EOF
+[global]
+cluster=hpc.axis-of-eval.org
+role=node
+topic-prefix=zappa
+
+[debug]
+time-limit=100s
+output-delay = 20s
+
+[sysinfo]
+cadence=3s
+EOF
 
 for signal in TERM INT HUP; do
     echo "  Testing SIG$signal"
@@ -28,7 +43,7 @@ for signal in TERM INT HUP; do
 
     # Fork off the daemon in the background
 
-    cargo run -- daemon daemon-interrupt.ini > $output 2> $log &
+    cargo run -- daemon $inifile > $output 2> $log &
     pid=$!
 
     # Wait for some output to accumulate in internal buffers

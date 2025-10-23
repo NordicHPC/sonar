@@ -5,7 +5,7 @@
 source sh-helper
 assert cargo jq
 
-output=tmp/cluster-syntax.tmp
+output=$(tmpfile cluster-syntax)
 
 # Check that sinfo is available, or we should do nothing
 

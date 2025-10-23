@@ -8,8 +8,7 @@ assert cargo
 
 echo " This takes about 20s"
 
-output=tmp/interrupt.output.txt
-rm -f $output
+output=$(tmpfile interrupt.output)
 
 SONARTEST_WAIT_INTERRUPT=1 cargo run -- ps 2> $output &
 bgpid=$!

@@ -30,15 +30,19 @@ tests="amd-gpu \
      ps-cpu-util \
      ps-interrupt \
      ps-syntax \
+     ps-syntax-csv \
      rollup \
      rollup2 \
      regress-369-kafka-pump \
      sacct-parsing \
      sinfo-parsing \
      slurm-no-sacct \
+     slurm-no-sacct-csv \
      slurm-no-scontrol \
      slurm-syntax \
+     slurm-syntax-csv \
      sysinfo-syntax \
+     sysinfo-syntax-csv \
      sysinfo-topo \
      user \
      xpu-gpu"

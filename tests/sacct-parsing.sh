@@ -5,10 +5,9 @@
 source sh-helper
 assert cargo jq
 
-sonar_output=tmp/sacct-parsing-sacct-output.tmp
-jobs1=tmp/sacct-parsing-jobs1.tmp
-jobs2=tmp/sacct-parsing-jobs2.tmp
-rm -f $sonar_output $jobs1 $jobs2
+sonar_output=$(tmpfile sacct-parsing-sacct-output)
+jobs1=$(tmpfile sacct-parsing-jobs1)
+jobs2=$(tmpfile sacct-parsing-jobs2)
 
 # This is pretty harsh: we require bitwise-identical output.  The assumption is that we have
 # hand-checked the output in testdata.  An alternative is to descend into the produced data here

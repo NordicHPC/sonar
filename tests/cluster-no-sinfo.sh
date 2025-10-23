@@ -5,7 +5,7 @@
 source sh-helper
 assert cargo jq
 
-output=tmp/cluster-no-sinfo.tmp
+output=$(tmpfile cluster-no-sinfo)
 
 # Check that sinfo is not available, or we should do nothing
 

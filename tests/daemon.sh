@@ -7,7 +7,18 @@ assert cargo jq
 
 echo " This takes about 15s"
 
-output=tmp/daemon-output.txt
+output=$(tmpfile daemon)
+inifile=$(tmpfile daemon-ini)
+
+cat > $inifile <<EOF
+[global]
+cluster=hpc.axis-of-eval.org
+role=node
+topic-prefix=zappa
+
+[sysinfo]
+cadence=5s
+EOF
 
 # Run the daemon with the stdio sink and tell it to exit after 10s; the exit is guaranteed to be
 # clean.  Capture the output, then make sure the output looks sane.
@@ -16,7 +27,7 @@ output=tmp/daemon-output.txt
 
 before=$(date +%s)
 ( echo "exit exit exit" ; sleep 10 ; echo "zappa.hpc.axis-of-eval.org.control.node exit" ) | \
-    cargo run -- daemon daemon.ini > $output
+    cargo run -- daemon $inifile > $output
 after=$(date +%s)
 
 if (( after - before < 5 )); then

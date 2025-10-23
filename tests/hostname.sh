@@ -3,10 +3,11 @@
 # Check that sonar reports the correct hostname
 
 source sh-helper
-assert cargo
+assert cargo jq
 
-if ! cargo run -- ps --csv | head -n 1 | grep -q ",host=$(hostname),"; then
-    fail "Wrong hostname??"
+node=$(../target/debug/sonar ps | jq --raw-output '.data.attributes.node')
+if [[ $node != $(hostname) ]]; then
+    fail "Wrong hostname?  Got $node"
 fi
 
 echo " Ok"
