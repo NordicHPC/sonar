@@ -32,6 +32,9 @@ should ask for that format.
   is no longer a required argument for that (defaulting to the empty string).
 * Bug 410 - output on stderr does not by itself cause a subcommand to fail, so long as the
   exit code is 0
+* Bug 409 - **IMPORTANT FIX.** Run scontrol in addition to sacct in order to extract resource
+  request for pending jobs.  Populate gres_detail field of slurm job data with resouce request
+  data as available (field was previously always blank).
 * Testing (sundry): Many testing improvements
 * Doc (sundry): Various improvements
 
