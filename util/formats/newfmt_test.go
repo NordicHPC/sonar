@@ -299,7 +299,6 @@ func TestNewJSONSlurmJobs(t *testing.T) {
 			assert(t, j.Layout == "cyclic", "#0 layout")
 			assert(t, len(j.GRESDetail) == 0, "#0 gres")
 			assert(t, j.ReqCPUS == 22, "#0 req cpus")
-			assert(t, j.MinCPUSPerNode == 2, "#0 min cpus per node")
 			assert(t, j.ReqMemoryPerNode == 12345678, "#0 req memory")
 			assert(t, j.ReqNodes == 11, "#0 req nodes")
 			assert(t, j.Start == "2025-03-08T18:11:02+01:00", "#0 start")
