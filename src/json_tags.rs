@@ -137,7 +137,6 @@ pub const SLURM_JOB_PRIORITY: &str = "priority"; // ExtendedUint
 pub const SLURM_JOB_LAYOUT: &str = "distribution"; // string
 pub const SLURM_JOB_GRESDETAIL: &str = "gres_detail"; // []string
 pub const SLURM_JOB_REQ_CPUS: &str = "requested_cpus"; // uint64
-pub const SLURM_JOB_MIN_CPUSPER_NODE: &str = "minimum_cpus_per_node"; // uint64
 pub const SLURM_JOB_REQ_MEMORY_PER_NODE: &str = "requested_memory_per_node"; // uint64
 pub const SLURM_JOB_REQ_NODES: &str = "requested_node_count"; // uint64
 pub const SLURM_JOB_START: &str = "start_time"; // Timestamp

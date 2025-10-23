@@ -4,8 +4,8 @@
 # starts while the lock file exists will terminate immediately with a log message.
 
 source sh-helper
+assert cargo
 
-mkdir -p tmp
 logfile=tmp/lockfile.output.txt
 rm -f $logfile sonar-lock.*
 

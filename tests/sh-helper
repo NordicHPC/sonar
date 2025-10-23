@@ -1,6 +1,7 @@
 # -*- mode: shell-script -*-
 
 set -e
+mkdir -p tmp
 
 function fail() {
     echo ' !!!ERROR!!!' "$1"
