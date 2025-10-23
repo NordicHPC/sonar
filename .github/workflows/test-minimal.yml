@@ -1,5 +1,9 @@
 name: Test minimal Rust version
 
+defaults:
+  run:
+    shell: bash
+
 on:
   push:
     branches: [ main, 'release_*' ]

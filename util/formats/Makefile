@@ -1,3 +1,5 @@
+SHELL=/bin/bash
+
 .PHONY: all test format
 
 all:
