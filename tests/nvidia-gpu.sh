@@ -13,7 +13,6 @@ if [[ ! -e /sys/module/nvidia ]]; then
     exit 0
 fi
 
-mkdir -p tmp
 output=tmp/nvidia-gpu.tmp
 
 source shared-gpu-smoketest

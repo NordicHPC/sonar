@@ -4,9 +4,10 @@
 # in an orderly way with a message on stderr.
 
 source sh-helper
+assert cargo
+
 echo " This takes about 20s"
 
-mkdir -p tmp
 output=tmp/interrupt.output.txt
 rm -f $output
 

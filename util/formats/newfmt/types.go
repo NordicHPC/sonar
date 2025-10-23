@@ -898,29 +898,21 @@ type SlurmJob struct {
 	// slurm: `JOB_INFO.steps[i].task.distribution`
 	Layout string `json:"distribution,omitempty"`
 
-	// Requested resources. For running jobs, the data can in part be synthesized from process
-	// samples: we'll know the resources that are being used.
+	// Requested resources. This will be taken from scontrol's ReqTRES field or sacct's AllocTRES
+	// field, whichever is available, with priority for the former.
 	//
-	// sacct: TBD - TODO (possibly unavailable or maybe only when RUNNING).
+	// scontrol: `ReqTRES`
+	// sacct: `AllocTRES`
 	//
 	// slurm: `JOB_INFO.gres_detail`
 	GRESDetail []string `json:"gres_detail,omitempty"`
 
-	// Number of requested CPUs.
+	// Number of requested CPUs (assumed to be for the job in total, the documentation is not good).
 	//
 	// sacct: `ReqCPUS`
 	//
 	// slurm: `JOB_INFO.cpus`
-	//
-	// TODO: Is this per node?  If so, change the name of the field.
 	ReqCPUS uint64 `json:"requested_cpus,omitempty"`
-
-	// TODO: Description.  This may be the same as requested_cpus?
-	//
-	// sacct: TODO - TBD.
-	//
-	// slurm: `JOB_INFO.minimum_cpus_per_node`
-	MinCPUSPerNode uint64 `json:"minimum_cpus_per_node,omitempty"`
 
 	// Amount of requested memory in kilobytes.
 	//

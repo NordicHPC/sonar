@@ -5,10 +5,10 @@
 # TODO: We should extend this to check that timestamps and file names are correct.
 
 source sh-helper
+assert cargo
 
 echo "This test takes about 20s"
 
-mkdir -p tmp
 data_dir=tmp/daemon-directory-data
 logfile=tmp/daemon-directory-log.txt
 rm -rf $data_dir $logfile

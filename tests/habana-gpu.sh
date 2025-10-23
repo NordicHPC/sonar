@@ -14,7 +14,6 @@ if [[ ! -e /sys/module/habanalabs ]]; then
     exit 0
 fi
 
-mkdir -p tmp
 output=tmp/habana-gpu.tmp
 
 source shared-gpu-smoketest

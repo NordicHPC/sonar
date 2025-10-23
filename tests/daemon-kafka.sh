@@ -5,9 +5,8 @@
 source sh-helper
 
 echo "This test takes about 30s"
-assert_jq
+assert cargo jq
 
-mkdir -p tmp
 outfile=tmp/daemon-kafka-output.txt
 logfile=tmp/daemon-kafka-log.txt
 if [[ -z $SKIP ]]; then

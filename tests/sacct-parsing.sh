@@ -3,9 +3,8 @@
 # Check that `sonar slurm` produces correct output from a known input.
 
 source sh-helper
-assert_jq
+assert cargo jq
 
-mkdir -p tmp
 sonar_output=tmp/sacct-parsing-sacct-output.tmp
 jobs1=tmp/sacct-parsing-jobs1.tmp
 jobs2=tmp/sacct-parsing-jobs2.tmp
@@ -20,6 +19,7 @@ rm -f $sonar_output $jobs1 $jobs2
 
 TZ=/usr/share/zoneinfo/Europe/Oslo \
     SONARTEST_MOCK_SACCT=testdata/sacct_output.txt \
+    SONARTEST_MOCK_SCONTROL=/dev/null \
     cargo run -- slurm --deluge --json --cluster fox.educloud.no \
     > $sonar_output
 # Strip the envelope because it contains a timestamp for when the data were generated.
