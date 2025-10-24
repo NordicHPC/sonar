@@ -11,18 +11,23 @@
 source sh-helper
 assert cargo cc
 
-output=tmp/rollup2.tmp
+output=$(tmpfile rollup2)
 
 make rollup-programs
 
 echo " This takes about 10s"
 ./rollup2 3 &
 sleep 3
-SONARTEST_ROLLUP=1 cargo run -- ps --rollup --exclude-system-jobs --csv > $output
-if ! grep -q -E ',cmd=rollupchild,.*,rolledup=4' $output; then
+
+SONARTEST_ROLLUP=1 cargo run -- ps --rollup --exclude-system-jobs > $output
+
+nroll=$(jq '.data.attributes.jobs[].processes[]|select(.cmd=="rollupchild").rolledup' $output)
+if (( nroll != 4 )); then
     fail "No matching rolledup=4"
 fi
-if ! grep -q -E ',cmd=rollupchild2,.*,rolledup=3' $output; then
+
+nroll2=$(jq '.data.attributes.jobs[].processes[]|select(.cmd=="rollupchild2").rolledup' $output)
+if (( nroll2 != 3 )); then
     fail "No matching rolledup=3"
 fi
 echo " Ok"

@@ -3,21 +3,18 @@
 # Test that the --min-cpu-time switch works.
 
 source sh-helper
-assert cargo
+assert jq cargo
 
-result=$(cargo run -- ps --min-cpu-time 5 --csv | \
-             awk '
-{
-    s=substr($0, index($0, ",cputime_sec=")+13)
-    # this field is frequently last so no guarantee there is a trailing comma
-    ix = index(s, ",")
-    if (ix > 0)
-        s=substr(s, 0, ix-1)
-    if (strtonum(s) < 5)
-        print($0)
-}')
+result=$(cargo run -- ps --min-cpu-time 5 | jq '.data.attributes.jobs[].processes[].cpu_time | select(. < 5)')
 if [[ -n $result ]]; then
-    fail "CPU time filtering did not work"
+    fail "CPU time filtering did not work: should have none under 5"
+fi
+
+# At least sonar will have < 5s, most processes will have "null" because the field is zero and is
+# not reported.
+result=$(cargo run -- ps | jq '.data.attributes.jobs[].processes[].cpu_time | select(. < 5)')
+if [[ -z $result ]]; then
+    fail "CPU time filtering did not work: should have some under 5"
 fi
 
 echo " Ok"

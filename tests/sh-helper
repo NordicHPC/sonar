@@ -1,7 +1,23 @@
 # -*- mode: shell-script -*-
 
 set -e -o pipefail
-mkdir -p tmp
+mkdir -p ${TMPDIR:-tmp}
+
+function tmpfile() {
+    local fn="${TMPDIR:-tmp}/$1.tmp"
+    if [[ -z $SKIP ]]; then
+        rm -f $fn
+    fi
+    echo $fn
+}
+
+function tmpdir() {
+    local dn="${TMPDIR:-tmp}/$1.dir.tmp"
+    if [[ -z $SKIP ]]; then
+        rm -rf $dn
+    fi
+    echo $dn
+}
 
 function fail() {
     echo ' !!!ERROR!!!' "$1"

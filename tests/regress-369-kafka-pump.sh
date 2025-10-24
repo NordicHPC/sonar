@@ -7,18 +7,32 @@ assert cargo jq
 
 echo "This test takes about 30s"
 
-outfile=tmp/regress-369-output.txt
-logfile=tmp/regress-369-log.txt
-if [[ -z $SKIP ]]; then
-    rm -f $outfile $logfile
-fi
-timestamps=tmp/regress-369-timestamps.txt
-rm -f $timestamps
+outfile=$(tmpfile regress-369-output)
+logfile=$(tmpfile regress-369-log)
+timestamps=$(tmpfile regress-369-timestamps)
+inifile=$(tmpfile regress-369-ini)
+
+cat > $inifile <<EOF
+[global]
+cluster=hpc.axis-of-eval.org
+role=node
+
+[debug]
+verbose = true
+time-limit = 30s
+
+[kafka]
+broker-address = no.such.host:101010
+sending-window = 10s
+
+[sysinfo]
+cadence=1s
+EOF
 
 # The ini produces one record every second but has a 10s sending window and runs the daemon for 30s.
 
 if [[ -z $SKIP ]]; then
-    SONARTEST_MOCK_KAFKA=1 cargo run -- daemon daemon-kafka.ini > $outfile 2> $logfile
+    SONARTEST_MOCK_KAFKA=1 cargo run -- daemon $inifile > $outfile 2> $logfile
 fi
 
 # First test that messages are not re-sent: all messages should have distinct time stamps and they

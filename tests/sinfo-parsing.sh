@@ -5,12 +5,11 @@
 source sh-helper
 assert cargo jq
 
-sonar_output=tmp/sinfo-parsing-sinfo-output.tmp
-partitions1=tmp/sinfo-parsing-partitions1.tmp
-nodes1=tmp/sinfo-parsing-nodes1.tmp
-partitions2=tmp/sinfo-parsing-partitions2.tmp
-nodes2=tmp/sinfo-parsing-nodes2.tmp
-rm -f $sonar_output $partitions1 $partitions2 $nodes1 $nodes2
+sonar_output=$(tmpfile sinfo-parsing-sinfo-output)
+partitions1=$(tmpfile sinfo-parsing-partitions1)
+nodes1=$(tmpfile sinfo-parsing-nodes1)
+partitions2=$(tmpfile sinfo-parsing-partitions2)
+nodes2=$(tmpfile sinfo-parsing-nodes2)
 
 # This is pretty harsh: we require bitwise-identical output.  The assumption is that we have
 # hand-checked the output in testdata.  An alternative is to descend into the produced data here

@@ -6,8 +6,8 @@
 source sh-helper
 assert cargo
 
-logfile=tmp/lockfile.output.txt
-rm -f $logfile sonar-lock.*
+logfile=$(tmpfile lockfile.output)
+rm -f sonar-lock.*
 
 echo " This takes about 15s"
 SONARTEST_WAIT_LOCKFILE=1 cargo run -- ps --lockdir . > /dev/null &

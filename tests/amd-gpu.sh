@@ -13,7 +13,7 @@ if [[ ! -e /sys/module/amdgpu ]]; then
     exit 0
 fi
 
-output=tmp/amd-gpu.tmp
+output=$(tmpfile amd-gpu)
 
 source shared-gpu-smoketest
 

@@ -13,9 +13,9 @@
 source sh-helper
 assert cargo jq
 
-outfile=tmp/slurm-resource.tmp
-expected=tmp/slurm-resource-expected.tmp
-computed=tmp/slurm-resource-computed.tmp
+outfile=$(tmpfile slurm-resource)
+expected=$(tmpfile slurm-resource-expected)
+computed=$(tmpfile slurm-resource-computed)
 
 TZ=/usr/share/zoneinfo/Europe/Oslo \
     SONARTEST_MOCK_SACCT=testdata/sacct_resource.txt \
