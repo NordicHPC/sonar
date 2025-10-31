@@ -151,6 +151,7 @@ hundred KB when base64-encoded, while the output for `hwloc-ls` is usually quite
 cadence = <duration value>
 window = <duration value>                       # default 2*cadence
 uncompleted = <bool>                            # default false
+batch-size = <count>                            # default none
 ```
 
 The `window` is the sacct time window used for looking for data.
@@ -159,6 +160,11 @@ The `uncompleted` option, if true, triggers the inclusion of data about pending 
 This will result in multiple transmissions of data for the same `(job_id,job_step)`, one at each
 sample point.  If a job stays in, say, the PENDING state for several sampling windows then multiple
 transmissions for the job in the PENDING state will be seen.
+
+If `batch-size` is set it provides the maximum number of job records per output message.  This is
+basically a hack, but if `uncompleted` is true the message volume can be very large, and messages
+may become so large that they cause transmission issues, notably by default Kafka limits messages to
+1MB in size.  Setting `batch-size` can alleviate some of these problems.
 
 ### `[cluster]` section
 
