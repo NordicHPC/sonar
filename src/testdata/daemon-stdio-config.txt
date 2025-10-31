@@ -1,21 +1,50 @@
-# This is a valid test configuration.  Some of the spacing is wonky in order to test
-# space stripping.
+# This is a valid test configuration.  Some of the spacing is wonky in
+# order to test space stripping. For everything, I'm trying to use the
+# non-default values.
+
+# Some things are in daemon-stdio-config{2,3}.txt instead:
+# - [directory] is xor [kafka] and global.topic-prefix
+# - kafka.sasl-password is xor kafka.sasl-password-file
 
 [global]
 cluster = mlx.hpc.uio.no
 role=node
+topic-prefix=zappa
 lock-directory= /root
   
+[kafka]
+broker-address = localhost:0000
+sending-window=1h
+timeout=1m
+ca-file=test-ca
+sasl-password-file=test-pass
+
+[debug]
+time-limit=10m
+output-delay=1m
+verbose=true
+
 [sample]
 cadence =5m
   batchless = true
 load = false  
 rollup = true
 min-cpu-time = 1m
+exclude-system-jobs = false
+exclude-users = bob,alice
+exclude-commands = ls,runuser
 
 [sysinfo]
 cadence = 24h
+on-startup = false
+topo-svg-command = hello
+topo-text-command = goodbye
 
 [slurm]
 cadence = 1h
 window = 90m
+batch-size=17
+uncompleted=true
+
+[cluster]
+cadence = 15m
