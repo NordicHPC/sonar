@@ -63,6 +63,7 @@ pub struct DebugIni {
     pub verbose: bool,
     pub time_limit: Option<Dur>,
     pub output_delay: Option<Dur>,
+    pub oneshot: bool,
 }
 
 pub struct DirectoryIni {
@@ -337,37 +338,36 @@ pub fn daemon_mode(
                     panic!("Event queue receive");
                 }
                 Ok(op) => {
-                    let mut output = Vec::new();
-
                     system.update_time();
+                    let output;
                     let data_tag: &'static str;
                     match op {
                         Operation::Sample => {
                             if ini.debug.verbose {
                                 log::verbose("Sample");
                             }
-                            sample_extractor.run(&mut output);
+                            output = sample_extractor.run();
                             data_tag = json_tags::DATA_TAG_SAMPLE;
                         }
                         Operation::Sysinfo => {
                             if ini.debug.verbose {
                                 log::verbose("Sysinfo");
                             }
-                            sysinfo_extractor.run(&mut output);
+                            output = sysinfo_extractor.run();
                             data_tag = json_tags::DATA_TAG_SYSINFO;
                         }
                         Operation::Jobs => {
                             if ini.debug.verbose {
                                 log::verbose("Jobs");
                             }
-                            slurm_extractor.run(&mut output);
+                            output = slurm_extractor.run();
                             data_tag = json_tags::DATA_TAG_JOBS;
                         }
                         Operation::Cluster => {
                             if ini.debug.verbose {
                                 log::verbose("Cluster");
                             }
-                            cluster_extractor.run(&mut output);
+                            output = cluster_extractor.run();
                             data_tag = json_tags::DATA_TAG_CLUSTER;
                         }
                         Operation::Signal(s) => {
@@ -414,15 +414,20 @@ pub fn daemon_mode(
                         }
                     }
 
-                    let value = String::from_utf8_lossy(&output).to_string();
-                    data_sink.post(
-                        &system,
-                        &ini.global.topic_prefix,
-                        &ini.global.cluster,
-                        data_tag,
-                        &hostname,
-                        value,
-                    );
+                    for o in output {
+                        let value = String::from_utf8_lossy(&o).to_string();
+                        data_sink.post(
+                            &system,
+                            &ini.global.topic_prefix,
+                            &ini.global.cluster,
+                            data_tag,
+                            &hostname,
+                            value,
+                        );
+                    }
+                    if ini.debug.oneshot {
+                        break 'messageloop;
+                    }
                 }
             }
         }
@@ -646,6 +651,7 @@ fn parse_config(config_file: &str) -> Result<Ini, String> {
             time_limit: None,
             output_delay: None,
             verbose: false,
+            oneshot: false,
         },
         sample: SampleIni {
             cadence: None,
@@ -809,6 +815,9 @@ fn parse_config(config_file: &str) -> Result<Ini, String> {
                 "output-delay" => {
                     ini.debug.output_delay =
                         Some(parse_duration("debug.output-delay", &value, true)?);
+                }
+                "oneshot" => {
+                    ini.debug.oneshot = parse_bool(&value)?;
                 }
                 "verbose" => {
                     ini.debug.verbose = parse_bool(&value)?;
