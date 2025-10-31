@@ -33,6 +33,7 @@ tests="amd-gpu \
      rollup \
      rollup2 \
      regress-369-kafka-pump \
+     sacct-batching \
      sacct-parsing \
      sinfo-parsing \
      slurm-no-sacct \
