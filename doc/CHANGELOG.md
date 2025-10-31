@@ -35,6 +35,8 @@ should ask for that format.
 * Bug 409 - **IMPORTANT FIX.** Run scontrol in addition to sacct in order to extract resource
   request for pending jobs.  Populate gres_detail field of slurm job data with resouce request
   data as available (field was previously always blank).
+* Bug 434 - **IMPORTANT FUNCTIONALITY.** Introduce the batch-size setting to allow very large
+  slurm job lists to be split into multiple messages.
 * Testing (sundry): Many testing improvements
 * Doc (sundry): Various improvements
 
