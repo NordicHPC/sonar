@@ -20,8 +20,10 @@ impl<'a> State<'a> {
         State { system, token }
     }
 
-    pub fn run(&mut self, writer: &mut dyn io::Write) {
-        show_cluster(writer, self.system, self.token.clone())
+    pub fn run(&mut self) -> Vec<Vec<u8>> {
+        let mut writer = Vec::new();
+        show_cluster(&mut writer, self.system, self.token.clone());
+        vec![writer]
     }
 }
 

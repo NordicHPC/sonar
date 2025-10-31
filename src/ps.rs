@@ -55,8 +55,10 @@ impl<'a> State<'a> {
         }
     }
 
-    pub fn run(&mut self, writer: &mut dyn io::Write) {
-        do_create_snapshot(writer, self.system, &self.opts)
+    pub fn run(&mut self) -> Vec<Vec<u8>> {
+        let mut writer = Vec::new();
+        do_create_snapshot(&mut writer, self.system, &self.opts);
+        vec![writer]
     }
 }
 

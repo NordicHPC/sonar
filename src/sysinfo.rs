@@ -35,15 +35,17 @@ impl<'a> State<'a> {
         }
     }
 
-    pub fn run(&mut self, writer: &mut dyn io::Write) {
+    pub fn run(&mut self) -> Vec<Vec<u8>> {
+        let mut writer = Vec::new();
         show_system(
-            writer,
+            &mut writer,
             self.system,
             self.token.clone(),
             Format::NewJSON,
             self.topo_svg_cmd.clone(),
             self.topo_text_cmd.clone(),
-        )
+        );
+        vec![writer]
     }
 }
 
