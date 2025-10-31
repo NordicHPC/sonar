@@ -17,7 +17,10 @@ outfile=$(tmpfile slurm-resource)
 expected=$(tmpfile slurm-resource-expected)
 computed=$(tmpfile slurm-resource-computed)
 
-TZ=/usr/share/zoneinfo/Europe/Oslo \
+# Timezone is set to UTC+2 to be consistent with current test data, although for this
+# test it doesn't matter.
+
+TZ=CET-2 \
     SONARTEST_MOCK_SACCT=testdata/sacct_resource.txt \
     SONARTEST_MOCK_SCONTROL=testdata/scontrol_resource.txt \
     cargo run -- slurm --deluge > $outfile
