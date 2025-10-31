@@ -122,9 +122,6 @@ enum Commands {
         /// Include PENDING and RUNNING jobs
         deluge: bool,
 
-        /// If set, split output in multiple messages if the number of job records exceed this
-        batch_size: Option<usize>,
-
         /// Cluster name
         cluster: Option<String>,
     },
@@ -243,7 +240,6 @@ fn main() {
             span,
             csv,
             deluge,
-            batch_size,
             cluster,
         } => {
             let system = if cluster.is_some() {
@@ -256,7 +252,6 @@ fn main() {
                 window,
                 span,
                 *deluge,
-                *batch_size,
                 &system.freeze().expect("System initialization"),
                 token,
                 if *csv {
@@ -449,7 +444,6 @@ fn command_line() -> Commands {
                 let mut json = false;
                 let mut csv = false;
                 let mut deluge = false;
-                let mut batch_size = None;
                 let mut cluster = None;
                 while next < args.len() {
                     let arg = args[next].as_ref();
@@ -468,10 +462,6 @@ fn command_line() -> Commands {
                         (next, csv) = (new_next, true);
                     } else if let Some(new_next) = bool_arg(arg, &args, next, "--deluge") {
                         (next, deluge) = (new_next, true);
-                    } else if let Some((new_next, value)) =
-                        numeric_arg::<usize>(arg, &args, next, "--batch-size")
-                    {
-                        (next, batch_size) = (new_next, Some(value));
                     } else if let Some((new_next, value)) =
                         string_arg(arg, &args, next, "--cluster")
                     {
@@ -493,7 +483,6 @@ fn command_line() -> Commands {
                     csv,
                     cluster,
                     deluge,
-                    batch_size,
                 }
             }
             "cluster" => {
@@ -653,8 +642,6 @@ Options for `slurm`:
       database with older data.  Precludes --window
   --deluge
       Include PENDING and RUNNING jobs in the output, not just completed jobs.
-  --batch-size
-      Split into multiple JSON messages after this many job records.
   --csv
       Format output as CSV, not new JSON
   --oldfmt

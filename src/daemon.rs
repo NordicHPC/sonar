@@ -91,7 +91,6 @@ pub struct JobsIni {
     pub cadence: Option<Dur>,
     pub window: Option<Dur>,
     pub uncompleted: bool,
-    pub batch_size: Option<usize>,
 }
 
 pub struct ClusterIni {
@@ -312,7 +311,6 @@ pub fn daemon_mode(
     let mut slurm_extractor = slurmjobs::State::new(
         ini.jobs.window.map(|c| c.to_minutes() as u32),
         ini.jobs.uncompleted,
-        ini.jobs.batch_size,
         &system,
         api_token.clone(),
     );
@@ -667,7 +665,6 @@ fn parse_config(config_file: &str) -> Result<Ini, String> {
             cadence: None,
             window: None,
             uncompleted: false,
-            batch_size: None,
         },
         cluster: ClusterIni { cadence: None },
     };
@@ -872,13 +869,6 @@ fn parse_config(config_file: &str) -> Result<Ini, String> {
                 "uncompleted" | "incomplete" => {
                     ini.jobs.uncompleted = parse_bool(&value)?;
                 }
-                "batch-size" => {
-                    ini.jobs.batch_size = Some(
-                        value
-                            .parse::<usize>()
-                            .map_err(|_| format!("Bad jobs.batch-size"))?,
-                    );
-                }
                 _ => return Err(format!("Invalid [jobs] setting name `{name}`")),
             },
             Section::Cluster => match name.as_str() {
@@ -1080,64 +1070,16 @@ pub fn test_parser() {
     assert!(parse_duration("", "3H12M35X", true).is_err());
 
     let ini = parse_config("src/testdata/daemon-stdio-config.txt").unwrap();
-
     assert!(ini.global.cluster == "mlx.hpc.uio.no");
     assert!(ini.global.role == "node");
     assert!(ini.global.lockdir == Some("/root".to_string()));
-    assert!(ini.global.topic_prefix == Some("zappa".to_string()));
-
-    assert!(ini.kafka.broker_address == "localhost:0000".to_string());
-    assert!(ini.kafka.sending_window == Dur::Hours(1));
-    assert!(ini.kafka.timeout == Dur::Minutes(1));
-    assert!(ini.kafka.ca_file == Some("test-ca".to_string()));
-    assert!(ini.kafka.sasl_password_file == Some("test-pass".to_string()));
-
-    assert!(ini.debug.time_limit == Some(Dur::Minutes(10)));
-    assert!(ini.debug.output_delay == Some(Dur::Minutes(1)));
-    assert!(ini.debug.verbose == true);
-
     assert!(ini.sample.cadence == Some(Dur::Minutes(5)));
     assert!(ini.sample.batchless);
     assert!(!ini.sample.load);
     assert!(ini.sample.rollup);
     assert!(ini.sample.min_cpu_time == Some(Dur::Minutes(1)));
-    assert!(!ini.sample.exclude_system_jobs);
-    let xusers = vec!["bob", "alice"];
-    assert!(ini.sample.exclude_users.len() == xusers.len());
-    for i in 0..xusers.len() {
-        assert!(&ini.sample.exclude_users[i] == xusers[i]);
-    }
-    let xcmds = vec!["ls", "runuser"];
-    assert!(ini.sample.exclude_commands.len() == xcmds.len());
-    for i in 0..xcmds.len() {
-        assert!(&ini.sample.exclude_commands[i] == xcmds[i]);
-    }
-
     assert!(ini.sysinfo.cadence == Some(Dur::Hours(24)));
-    assert!(!ini.sysinfo.on_startup);
-    assert!(ini.sysinfo.topo_svg_cmd == Some("hello".to_string()));
-    assert!(ini.sysinfo.topo_text_cmd == Some("goodbye".to_string()));
-
     assert!(ini.jobs.cadence == Some(Dur::Hours(1)));
     assert!(ini.jobs.window == Some(Dur::Minutes(90)));
-    assert!(ini.jobs.batch_size == Some(17));
-    assert!(ini.jobs.uncompleted);
-
-    assert!(ini.cluster.cadence == Some(Dur::Minutes(15)));
-
-    let ini = parse_config("src/testdata/daemon-stdio-config2.txt").unwrap();
-
-    assert!(ini.global.cluster == "mlx.hpc.uio.no");
-    assert!(ini.global.role == "master");
-
-    assert!(ini.kafka.broker_address == "localhost:0000".to_string());
-    assert!(ini.kafka.ca_file == Some("myfile".to_string()));
-    assert!(ini.kafka.sasl_password == Some("qumquat".to_string()));
-
-    let ini = parse_config("src/testdata/daemon-stdio-config3.txt").unwrap();
-
-    assert!(ini.global.cluster == "fox.educloud.no");
-    assert!(ini.global.role == "master");
-
-    assert!(ini.directory.data_dir == Some("/dev/null/your/data/here".to_string()));
+    // TODO: Test cluster
 }

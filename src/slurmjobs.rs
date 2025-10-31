@@ -83,7 +83,6 @@ pub struct State<'a> {
     window: Option<u32>,
     token: String,
     uncompleted: bool,
-    batch_size: Option<usize>,
     system: &'a dyn systemapi::SystemAPI,
 }
 
@@ -133,7 +132,6 @@ impl<'a> State<'a> {
     pub fn new(
         window: Option<u32>, // Minutes
         uncompleted: bool,
-        batch_size: Option<usize>,
         system: &'a dyn systemapi::SystemAPI,
         token: String,
     ) -> State<'a> {
@@ -141,21 +139,31 @@ impl<'a> State<'a> {
             window,
             token,
             uncompleted,
-            batch_size,
             system,
         }
     }
 
     pub fn run(&mut self, writer: &mut dyn io::Write) {
-        show_slurm_jobs_newfmt(
-            writer,
-            &self.window,
-            &None,
-            self.uncompleted,
-            self.batch_size,
-            self.system,
-            self.token.clone(),
-        );
+        match collect_sacct_jobs_newfmt(self.system, &self.window, &None, self.uncompleted) {
+            Ok(jobs) => {
+                // This will push out a record even if the jobs array is empty.  This is probably
+                // the right thing, it serves as a heartbeat.
+                let mut envelope = output::newfmt_envelope(self.system, self.token.clone(), &[]);
+                let (mut data, mut attrs) = output::newfmt_data(self.system, DATA_TAG_JOBS);
+                attrs.push_a(JOBS_ATTRIBUTES_SLURM_JOBS, render_jobs_newfmt(jobs));
+                data.push_o(JOBS_DATA_ATTRIBUTES, attrs);
+                envelope.push_o(JOBS_ENVELOPE_DATA, data);
+                output::write_json(writer, &output::Value::O(envelope));
+            }
+            Err(error) => {
+                let mut envelope = output::newfmt_envelope(self.system, self.token.clone(), &[]);
+                envelope.push_a(
+                    JOBS_ENVELOPE_ERRORS,
+                    output::newfmt_one_error(self.system, error),
+                );
+                output::write_json(writer, &output::Value::O(envelope));
+            }
+        }
     }
 }
 
@@ -176,14 +184,13 @@ pub fn show_slurm_jobs(
     window: &Option<u32>,
     span: &Option<String>,
     uncompleted: bool,
-    batch_size: Option<usize>,
     system: &dyn systemapi::SystemAPI,
     token: String,
     fmt: Format,
 ) {
     match fmt {
         Format::NewJSON => {
-            show_slurm_jobs_newfmt(writer, window, span, uncompleted, batch_size, system, token);
+            show_slurm_jobs_newfmt(writer, window, span, uncompleted, system, token);
         }
         Format::CSV => {
             show_slurm_jobs_oldfmt(writer, window, span, system);
@@ -196,32 +203,17 @@ pub fn show_slurm_jobs_newfmt(
     window: &Option<u32>,
     span: &Option<String>,
     uncompleted: bool,
-    batch_size: Option<usize>,
     system: &dyn systemapi::SystemAPI,
     token: String,
 ) {
     match collect_sacct_jobs_newfmt(system, window, span, uncompleted) {
         Ok(jobs) => {
-            // This will push out a record even if the jobs array is empty.  It serves as a
-            // heartbeat.
-            let mut start = 0;
-            loop {
-                let xs = if let Some(n) = batch_size {
-                    &jobs[start..std::cmp::min(start + n, jobs.len())]
-                } else {
-                    &jobs
-                };
-                start += xs.len();
-                let mut envelope = output::newfmt_envelope(system, token.clone(), &[]);
-                let (mut data, mut attrs) = output::newfmt_data(system, DATA_TAG_JOBS);
-                attrs.push_a(JOBS_ATTRIBUTES_SLURM_JOBS, render_jobs_newfmt(xs));
-                data.push_o(JOBS_DATA_ATTRIBUTES, attrs);
-                envelope.push_o(JOBS_ENVELOPE_DATA, data);
-                output::write_json(writer, &output::Value::O(envelope));
-                if start == jobs.len() {
-                    break;
-                }
-            }
+            let mut envelope = output::newfmt_envelope(system, token, &[]);
+            let (mut data, mut attrs) = output::newfmt_data(system, DATA_TAG_JOBS);
+            attrs.push_a(JOBS_ATTRIBUTES_SLURM_JOBS, render_jobs_newfmt(jobs));
+            data.push_o(JOBS_DATA_ATTRIBUTES, attrs);
+            envelope.push_o(JOBS_ENVELOPE_DATA, data);
+            output::write_json(writer, &output::Value::O(envelope));
         }
         Err(error) => {
             let mut envelope = output::newfmt_envelope(system, token, &[]);
@@ -529,34 +521,34 @@ fn parse_volume_kb(val: &str) -> u64 {
     }
 }
 
-fn render_jobs_newfmt(jobs: &[Box<JobAll>]) -> output::Array {
+fn render_jobs_newfmt(jobs: Vec<Box<JobAll>>) -> output::Array {
     let mut a = output::Array::new();
     for j in jobs {
         let mut o = output::Object::new();
         push_uint(&mut o, SLURM_JOB_JOB_ID, j.job_id);
-        push_string(&mut o, SLURM_JOB_JOB_STEP, j.job_step.clone());
-        push_string_full(&mut o, SLURM_JOB_JOB_NAME, j.job_name.clone(), false);
-        push_string(&mut o, SLURM_JOB_JOB_STATE, j.job_state.clone());
+        push_string(&mut o, SLURM_JOB_JOB_STEP, j.job_step);
+        push_string_full(&mut o, SLURM_JOB_JOB_NAME, j.job_name, false);
+        push_string(&mut o, SLURM_JOB_JOB_STATE, j.job_state);
         push_uint(&mut o, SLURM_JOB_ARRAY_JOB_ID, j.array_job_id);
         push_uint(&mut o, SLURM_JOB_ARRAY_TASK_ID, j.array_task_id);
         push_uint(&mut o, SLURM_JOB_HET_JOB_ID, j.het_job_id);
         push_uint(&mut o, SLURM_JOB_HET_JOB_OFFSET, j.het_job_offset);
-        push_string_full(&mut o, SLURM_JOB_USER_NAME, j.user_name.clone(), false);
-        push_string_full(&mut o, SLURM_JOB_ACCOUNT, j.account.clone(), false);
-        push_string(&mut o, SLURM_JOB_SUBMIT_TIME, j.submit_time.clone());
+        push_string_full(&mut o, SLURM_JOB_USER_NAME, j.user_name, false);
+        push_string_full(&mut o, SLURM_JOB_ACCOUNT, j.account, false);
+        push_string(&mut o, SLURM_JOB_SUBMIT_TIME, j.submit_time);
         push_uint(&mut o, SLURM_JOB_TIMELIMIT, j.time_limit);
-        push_string(&mut o, SLURM_JOB_PARTITION, j.partition.clone());
-        push_string_full(&mut o, SLURM_JOB_RESERVATION, j.reservation.clone(), false);
+        push_string(&mut o, SLURM_JOB_PARTITION, j.partition);
+        push_string_full(&mut o, SLURM_JOB_RESERVATION, j.reservation, false);
         if j.nodes.len() > 0 {
             let mut ns = output::Array::new();
-            for n in &j.nodes {
-                ns.push_s(n.clone());
+            for n in j.nodes {
+                ns.push_s(n);
             }
             o.push_a(SLURM_JOB_NODE_LIST, ns);
         }
         push_uint(&mut o, SLURM_JOB_PRIORITY, j.priority);
-        push_string(&mut o, SLURM_JOB_LAYOUT, j.distribution.clone());
-        push_string(&mut o, SLURM_JOB_GRESDETAIL, j.gres_detail.clone());
+        push_string(&mut o, SLURM_JOB_LAYOUT, j.distribution);
+        push_string(&mut o, SLURM_JOB_GRESDETAIL, j.gres_detail);
         push_uint(&mut o, SLURM_JOB_REQ_CPUS, j.requested_cpus);
         push_uint(
             &mut o,
@@ -564,13 +556,13 @@ fn render_jobs_newfmt(jobs: &[Box<JobAll>]) -> output::Array {
             j.requested_memory_per_node,
         );
         push_uint(&mut o, SLURM_JOB_REQ_NODES, j.requested_node_count);
-        push_string(&mut o, SLURM_JOB_START, j.start_time.clone());
+        push_string(&mut o, SLURM_JOB_START, j.start_time);
         push_uint(&mut o, SLURM_JOB_SUSPENDED, j.suspend_time);
-        push_string(&mut o, SLURM_JOB_END, j.end_time.clone());
+        push_string(&mut o, SLURM_JOB_END, j.end_time);
         push_uint(&mut o, SLURM_JOB_EXIT_CODE, j.exit_code);
         let mut s = output::Object::new();
         push_uint(&mut s, SACCT_DATA_MIN_CPU, j.sacct_min_cpu);
-        push_string(&mut s, SACCT_DATA_ALLOC_TRES, j.sacct_alloc_tres.clone());
+        push_string(&mut s, SACCT_DATA_ALLOC_TRES, j.sacct_alloc_tres);
         push_uint(&mut s, SACCT_DATA_AVE_CPU, j.sacct_ave_cpu);
         push_uint(&mut s, SACCT_DATA_AVE_DISK_READ, j.sacct_ave_disk_read);
         push_uint(&mut s, SACCT_DATA_AVE_DISK_WRITE, j.sacct_ave_disk_write);
