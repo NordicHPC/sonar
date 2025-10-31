@@ -14,9 +14,9 @@ jobs2=$(tmpfile sacct-parsing-jobs2)
 # with jq and make sure specific values are as expected.  But it amounts to the same thing.
 
 # The TZ must be set because the sacct-produced data are timezone-less but the sonar-generated
-# expected result is not.
+# expected result is not. CET-2 is UTC+2, corresponding to those data.
 
-TZ=/usr/share/zoneinfo/Europe/Oslo \
+TZ=CET-2 \
     SONARTEST_MOCK_SACCT=testdata/sacct_output.txt \
     SONARTEST_MOCK_SCONTROL=/dev/null \
     cargo run -- slurm --deluge --json --cluster fox.educloud.no \
