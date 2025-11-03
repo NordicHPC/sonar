@@ -106,7 +106,8 @@ struct JobAll {
     nodes: Vec<String>,
     priority: u64,
     distribution: String,
-    gres_detail: String,
+    requested_resources: String,
+    allocated_resources: String,
     requested_cpus: u64,
     requested_memory_per_node: u64,
     requested_node_count: u64,
@@ -274,7 +275,7 @@ fn parse_scontrol_output(scontrol_output: String) -> HashMap<String, String> {
 
 fn parse_sacct_jobs_newfmt(
     sacct_output: &str,
-    resources: &HashMap<String, String>,
+    requested_resources: &HashMap<String, String>,
     local: &libc::tm,
 ) -> Vec<Box<JobAll>> {
     let mut jobs = vec![];
@@ -320,10 +321,8 @@ fn parse_sacct_jobs_newfmt(
                         output_line.job_id = parse_uint(&fieldvals[i]);
                         &fieldvals[i]
                     };
-                    if output_line.gres_detail == "" {
-                        if let Some(r) = resources.get(id) {
-                            output_line.gres_detail = r.clone();
-                        }
+                    if let Some(r) = requested_resources.get(id) {
+                        output_line.requested_resources = r.clone();
                     }
                 }
                 "User" => {
@@ -430,9 +429,7 @@ fn parse_sacct_jobs_newfmt(
                 }
                 "AllocTRES" => {
                     output_line.sacct_alloc_tres = fieldvals[i].clone();
-                    if output_line.gres_detail == "" {
-                        output_line.gres_detail = fieldvals[i].clone();
-                    }
+                    output_line.allocated_resources = fieldvals[i].clone();
                 }
                 _ => {
                     panic!("Bad field name {}", *field);
@@ -556,7 +553,8 @@ fn render_jobs_newfmt(jobs: &[Box<JobAll>]) -> output::Array {
         }
         push_uint(&mut o, SLURM_JOB_PRIORITY, j.priority);
         push_string(&mut o, SLURM_JOB_LAYOUT, j.distribution.clone());
-        push_string(&mut o, SLURM_JOB_GRESDETAIL, j.gres_detail.clone());
+        push_string(&mut o, SLURM_JOB_REQ_TRES, j.requested_resources.clone());
+        push_string(&mut o, SLURM_JOB_ALLOC_TRES, j.allocated_resources.clone());
         push_uint(&mut o, SLURM_JOB_REQ_CPUS, j.requested_cpus);
         push_uint(
             &mut o,

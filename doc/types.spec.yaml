@@ -543,10 +543,14 @@ SlurmJob:
       type: 'string'
       doc: >
         Requested layout.  sacct: `Layout`  slurm: `JOB_INFO.steps[i].task.distribution`
-    gres_detail:
-      type: '[]string'
+    requested_resources:
+      type: 'string'
       doc: >
-        Requested resources. This will be taken from scontrol's ReqTRES field or sacct's AllocTRES field, whichever is available, with priority for the former.  scontrol: `ReqTRES` sacct: `AllocTRES`  slurm: `JOB_INFO.gres_detail`
+        Requested resources. If present, this comes from scontrol's ReqTRES field.  See DecodeSlurmTRES() in decode_jobs.go in this directory for encoding details.  scontrol: `ReqTRES`
+    allocated_resources:
+      type: 'string'
+      doc: >
+        Allocated resources. If present, this comes from sacct's AllocTRES field.  See DecodeSlurmTRES() in decode_jobs.go in this directory for encoding details.  sacct: `AllocTRES`
     requested_cpus:
       type: 'uint64'
       doc: >

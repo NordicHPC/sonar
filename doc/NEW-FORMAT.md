@@ -844,9 +844,6 @@ Job IDs are very complicated.
 Fields below mostly carry names and semantics from the Slurm REST API, except where those names
 or semantics are unworkable.  (For example, the name field really needs to be job_name.)
 
-NOTE: Fields with substructure (AllocTRES, GRESDetail) may have parsers, see other files in this
-package.
-
 NOTE: There may be various ways of getting the data: sacct, scontrol, slurmrestd, or talking to
 the database directly.
 
@@ -1004,15 +1001,19 @@ sacct: `Layout`
 
 slurm: `JOB_INFO.steps[i].task.distribution`
 
-#### **`gres_detail`** []string
+#### **`requested_resources`** string
 
-Requested resources. This will be taken from scontrol's ReqTRES field or sacct's AllocTRES
-field, whichever is available, with priority for the former.
+Requested resources. If present, this comes from scontrol's ReqTRES field.  See
+DecodeSlurmTRES() in decode_jobs.go in this directory for encoding details.
 
 scontrol: `ReqTRES`
-sacct: `AllocTRES`
 
-slurm: `JOB_INFO.gres_detail`
+#### **`allocated_resources`** string
+
+Allocated resources. If present, this comes from sacct's AllocTRES field.  See
+DecodeSlurmTRES() in decode_jobs.go in this directory for encoding details.
+
+sacct: `AllocTRES`
 
 #### **`requested_cpus`** uint64
 
