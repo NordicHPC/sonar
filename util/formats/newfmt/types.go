@@ -755,9 +755,6 @@ type JobsAttributes struct {
 // Fields below mostly carry names and semantics from the Slurm REST API, except where those names
 // or semantics are unworkable.  (For example, the name field really needs to be job_name.)
 //
-// NOTE: Fields with substructure (AllocTRES, GRESDetail) may have parsers, see other files in this
-// package.
-//
 // NOTE: There may be various ways of getting the data: sacct, scontrol, slurmrestd, or talking to
 // the database directly.
 //
@@ -898,14 +895,17 @@ type SlurmJob struct {
 	// slurm: `JOB_INFO.steps[i].task.distribution`
 	Layout string `json:"distribution,omitempty"`
 
-	// Requested resources. This will be taken from scontrol's ReqTRES field or sacct's AllocTRES
-	// field, whichever is available, with priority for the former.
+	// Requested resources. If present, this comes from scontrol's ReqTRES field.  See
+	// DecodeSlurmTRES() in decode_jobs.go in this directory for encoding details.
 	//
 	// scontrol: `ReqTRES`
-	// sacct: `AllocTRES`
+	ReqTRES string `json:"requested_resources,omitempty"`
+
+	// Allocated resources. If present, this comes from sacct's AllocTRES field.  See
+	// DecodeSlurmTRES() in decode_jobs.go in this directory for encoding details.
 	//
-	// slurm: `JOB_INFO.gres_detail`
-	GRESDetail []string `json:"gres_detail,omitempty"`
+	// sacct: `AllocTRES`
+	AllocTRES string `json:"allocated_resources,omitempty"`
 
 	// Number of requested CPUs (assumed to be for the job in total, the documentation is not good).
 	//
