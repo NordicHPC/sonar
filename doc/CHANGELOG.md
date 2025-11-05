@@ -1,6 +1,8 @@
 # Sonar change log
 
-Older sections are at best partial.  Newer sections (since 0.15) aim to be comprehensive.
+Older sections are at best partial.  Newer sections (since 0.15) aim to be comprehensive.  In
+general, all relevant fixes are uplifted from release branches to main, so a change for v0.16 (say)
+will always be on main and in all later releases.
 
 Since v0.13.0, the output format is documented mainly by the file
 [util/formats/newfmt/types.go](../util/formats/newfmt/types.go), which specifies the new JSON output
@@ -12,6 +14,12 @@ run in daemon mode or with the --json switch (which also requires the --cluster)
 The "old" output formats are for the most part not being extended with new fields and should not be
 relied upon.  Consumers should expect to see the "new" JSON format for new data, and all producers
 should ask for that format.
+
+## Changes in v0.17.0 (on `main`)
+
+* Bug 434 - **IMPORTANT FUNCTIONALITY.** Introduce the batch-size setting to allow very large
+  slurm job lists to be split into multiple messages.
+
 
 ## Changes in v0.16.0 (on `release_0_16`)
 
@@ -32,11 +40,10 @@ should ask for that format.
   is no longer a required argument for that (defaulting to the empty string).
 * Bug 410 - output on stderr does not by itself cause a subcommand to fail, so long as the
   exit code is 0
-* Bug 409 - **IMPORTANT FIX.** Run scontrol in addition to sacct in order to extract resource
-  request for pending jobs.  Populate gres_detail field of slurm job data with resouce request
-  data as available (field was previously always blank).
-* Bug 434 - **IMPORTANT FUNCTIONALITY.** Introduce the batch-size setting to allow very large
-  slurm job lists to be split into multiple messages.
+* Bug 409 / 437 - **MAJOR FUNCTIONALITY.** Run scontrol in addition to sacct in order to extract resource
+  request for pending jobs.  Remove the unused `gres_detail` field of slurm job data and introduce
+  two fields `allocated_resources` and `requested_resources` and fill them with unparsed resouce data from
+  sacct and scontrol.
 * Testing (sundry): Many testing improvements
 * Doc (sundry): Various improvements
 
