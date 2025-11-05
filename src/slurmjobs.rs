@@ -147,16 +147,15 @@ impl<'a> State<'a> {
         }
     }
 
-    pub fn run(&mut self, writer: &mut dyn io::Write) {
+    pub fn run(&mut self) -> Vec<Vec<u8>> {
         show_slurm_jobs_newfmt(
-            writer,
             &self.window,
             &None,
             self.uncompleted,
             self.batch_size,
             self.system,
             self.token.clone(),
-        );
+        )
     }
 }
 
@@ -184,7 +183,11 @@ pub fn show_slurm_jobs(
 ) {
     match fmt {
         Format::NewJSON => {
-            show_slurm_jobs_newfmt(writer, window, span, uncompleted, batch_size, system, token);
+            let output =
+                show_slurm_jobs_newfmt(window, span, uncompleted, batch_size, system, token);
+            for o in output {
+                let _ = writer.write(&o);
+            }
         }
         Format::CSV => {
             show_slurm_jobs_oldfmt(writer, window, span, system);
@@ -193,14 +196,14 @@ pub fn show_slurm_jobs(
 }
 
 pub fn show_slurm_jobs_newfmt(
-    writer: &mut dyn io::Write,
     window: &Option<u32>,
     span: &Option<String>,
     uncompleted: bool,
     batch_size: Option<usize>,
     system: &dyn systemapi::SystemAPI,
     token: String,
-) {
+) -> Vec<Vec<u8>> {
+    let mut result = vec![];
     match collect_sacct_jobs_newfmt(system, window, span, uncompleted) {
         Ok(jobs) => {
             // This will push out a record even if the jobs array is empty.  It serves as a
@@ -218,7 +221,9 @@ pub fn show_slurm_jobs_newfmt(
                 attrs.push_a(JOBS_ATTRIBUTES_SLURM_JOBS, render_jobs_newfmt(xs));
                 data.push_o(JOBS_DATA_ATTRIBUTES, attrs);
                 envelope.push_o(JOBS_ENVELOPE_DATA, data);
-                output::write_json(writer, &output::Value::O(envelope));
+                let mut writer = Vec::new();
+                output::write_json(&mut writer, &output::Value::O(envelope));
+                result.push(writer);
                 if start == jobs.len() {
                     break;
                 }
@@ -230,9 +235,12 @@ pub fn show_slurm_jobs_newfmt(
                 JOBS_ENVELOPE_ERRORS,
                 output::newfmt_one_error(system, error),
             );
-            output::write_json(writer, &output::Value::O(envelope));
+            let mut writer = Vec::new();
+            output::write_json(&mut writer, &output::Value::O(envelope));
+            result.push(writer);
         }
     }
+    result
 }
 
 fn collect_sacct_jobs_newfmt(

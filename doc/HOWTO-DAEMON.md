@@ -177,6 +177,8 @@ cadence = <duration value>
 ```
 verbose = bool                                  # default false
 time-limit = <duration value>                   # default none
+oneshot = bool                                  # default false
+output-delay = <duration value>                 # default none
 ```
 
 Setting `verbose` to true will cause the daemon to print somewhat informative messages about what
@@ -185,6 +187,12 @@ it's doing at important points during the run to stderr.
 Setting `time-limit` to a duration will make the daemon exit after roughly that time (it may take
 longer, it will check the exit time before every sample, but not wake up from sleep just to handle
 the limit).
+
+Setting `oneshot` to true will cause the daemon to exit cleanly (and flush its output in the normal
+manner) after processing a single sonar operation.
+
+Setting `output-delay` to a duration will delay the first output until at least that much time
+has passed.
 
 ## DATA MESSAGE FORMATS
 
