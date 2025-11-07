@@ -35,6 +35,7 @@ tests="amd-gpu \
      regress-369-kafka-pump \
      sacct-parsing \
      sinfo-parsing \
+     slurm-resource \
      slurm-no-sacct \
      slurm-no-scontrol \
      slurm-syntax \
