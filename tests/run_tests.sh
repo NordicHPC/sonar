@@ -37,6 +37,7 @@ tests="amd-gpu \
      sacct-batching \
      sacct-parsing \
      sinfo-parsing \
+     slurm-resource \
      slurm-no-sacct \
      slurm-no-sacct-csv \
      slurm-no-scontrol \
