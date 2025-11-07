@@ -84,8 +84,6 @@ pub struct SampleIni {
 pub struct SysinfoIni {
     pub on_startup: bool,
     pub cadence: Option<Dur>,
-    pub topo_svg_cmd: Option<String>,
-    pub topo_text_cmd: Option<String>,
 }
 
 pub struct JobsIni {
@@ -99,11 +97,20 @@ pub struct ClusterIni {
     pub cadence: Option<Dur>,
 }
 
+pub struct PathsIni {
+    pub topo_svg_cmd: Option<String>,
+    pub topo_text_cmd: Option<String>,
+    pub sacct_cmd: Option<String>,
+    pub sinfo_cmd: Option<String>,
+    pub scontrol_cmd: Option<String>,
+}
+
 pub struct Ini {
     pub global: GlobalIni,
     #[cfg(feature = "kafka")]
     pub kafka: KafkaIni,
     pub directory: DirectoryIni,
+    pub paths: PathsIni,
     pub debug: DebugIni,
     pub sample: SampleIni,
     pub sysinfo: SysinfoIni,
@@ -191,6 +198,17 @@ pub fn daemon_mode(
 
     if ini.sample.cadence.is_some() {
         system = system.with_jobmanager(Box::new(jobsapi::AnyJobManager::new(force_slurm)));
+    }
+
+    // FIXME: Why are we not doing this with the topo commands?
+    if let Some(ref p) = ini.paths.sacct_cmd {
+        system = system.with_sacct_cmd(p);
+    }
+    if let Some(ref p) = ini.paths.sinfo_cmd {
+        system = system.with_sinfo_cmd(p);
+    }
+    if let Some(ref p) = ini.paths.scontrol_cmd {
+        system = system.with_scontrol_cmd(p);
     }
 
     let system = system.with_cluster(&ini.global.cluster).freeze()?;
@@ -303,12 +321,16 @@ pub fn daemon_mode(
 
     let mut sysinfo_extractor = sysinfo::State::new(
         &system,
-        ini.sysinfo.topo_svg_cmd.clone(),
-        ini.sysinfo.topo_text_cmd.clone(),
+        // FIXME: Should instead push these into the system?
+        ini.paths.topo_svg_cmd.clone(),
+        ini.paths.topo_text_cmd.clone(),
         api_token.clone(),
     );
 
-    let mut cluster_extractor = cluster::State::new(&system, api_token.clone());
+    let mut cluster_extractor = cluster::State::new(
+        &system,
+        api_token.clone(),
+    );
 
     let mut slurm_extractor = slurmjobs::State::new(
         ini.jobs.window.map(|c| c.to_minutes() as u32),
@@ -666,14 +688,21 @@ fn parse_config(config_file: &str) -> Result<Ini, String> {
         sysinfo: SysinfoIni {
             on_startup: true,
             cadence: None,
-            topo_svg_cmd: None,
-            topo_text_cmd: None,
+            topo_svg_cmd: None, // Use [paths] instead
+            topo_text_cmd: None, // Use [paths] instead
         },
         jobs: JobsIni {
             cadence: None,
             window: None,
             uncompleted: false,
             batch_size: None,
+        },
+        paths: PathsIni {
+            sacct_cmd: None,
+            sinfo_cmd: None,
+            scontrol_cmd: None,
+            topo_svg_cmd: None,
+            topo_text_cmd: None,
         },
         cluster: ClusterIni { cadence: None },
     };
@@ -860,10 +889,10 @@ fn parse_config(config_file: &str) -> Result<Ini, String> {
                     ini.sysinfo.cadence = Some(parse_duration("sysinfo.cadence", &value, false)?);
                 }
                 "topo-svg-command" => {
-                    ini.sysinfo.topo_svg_cmd = Some(value);
+                    ini.paths.topo_svg_cmd = Some(value);
                 }
                 "topo-text-command" => {
-                    ini.sysinfo.topo_text_cmd = Some(value);
+                    ini.paths.topo_text_cmd = Some(value);
                 }
                 _ => return Err(format!("Invalid [sysinfo] setting name `{name}`")),
             },
@@ -896,6 +925,23 @@ fn parse_config(config_file: &str) -> Result<Ini, String> {
                 }
                 _ => return Err(format!("Invalid [cluster] setting name `{name}`")),
             },
+            Section::Paths => match name.as_str() {
+                "sacct-command" => {
+                    ini.paths.sacct_cmd = Some(value);
+                }
+                "scontrol-command" => {
+                    ini.paths.scontrol_cmd = Some(value);
+                }
+                "sinfo-command" => {
+                    ini.paths.sinfo_cmd = Some(value);
+                }
+                "topo-svg-command" => {
+                    ini.paths.topo_svg_cmd = Some(value);
+                }
+                "topo-text-command" => {
+                    ini.paths.topo_text_cmd = Some(value);
+                }
+            }
         }
     }
 

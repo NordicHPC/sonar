@@ -19,6 +19,8 @@ should ask for that format.
 
 * Bug 434 - **IMPORTANT FUNCTIONALITY.** Introduce the batch-size setting to allow very large
   slurm job lists to be split into multiple messages.
+* Bug 443 - Added `[paths]` section and moved the topo command strings there, though they are still
+  recognized in their old location in `[sysinfo]`.
 
 
 ## Changes in v0.16.0 (on `release_0_16`)
