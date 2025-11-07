@@ -18,6 +18,9 @@ are therefore no longer mentioned specially below.
   has no effect.
 * Bug 434 - **IMPORTANT FUNCTIONALITY.** Introduce the batch-size setting to allow very large
   slurm job lists to be split into multiple messages.
+* Bug 443 - Added `[programs]` section and moved the topo command strings there, though they are still
+  recognized in their old location in `[sysinfo]`.  The new section has entries for all the slurm
+  programs too.
 * Bug 453 - Use standard logging, allow control via RUST_LOG.
 
 

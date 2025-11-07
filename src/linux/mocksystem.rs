@@ -382,6 +382,14 @@ impl systemapi::SystemAPI for MockSystem {
         Ok(vec![]) // Not in use yet
     }
 
+    fn compute_node_topo_svg(&self) -> Result<Option<String>, String> {
+        Ok(None) // Not in use yet
+    }
+
+    fn compute_node_topo_text(&self) -> Result<Option<String>, String> {
+        Ok(None) // Not in use yet
+    }
+
     fn handle_interruptions(&self) {
         // Nothing yet
     }

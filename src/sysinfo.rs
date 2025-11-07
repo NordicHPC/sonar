@@ -1,7 +1,6 @@
 #![allow(clippy::len_zero)]
 #![allow(clippy::comparison_to_empty)]
 
-use crate::command;
 use crate::gpu;
 use crate::json_tags::*;
 use crate::output;
@@ -14,37 +13,18 @@ use std::io;
 #[cfg(feature = "daemon")]
 pub struct State<'a> {
     system: &'a dyn systemapi::SystemAPI,
-    topo_svg_cmd: Option<String>,
-    topo_text_cmd: Option<String>,
     token: String,
 }
 
 #[cfg(feature = "daemon")]
 impl<'a> State<'a> {
-    pub fn new(
-        system: &'a dyn systemapi::SystemAPI,
-        topo_svg_cmd: Option<String>,
-        topo_text_cmd: Option<String>,
-        token: String,
-    ) -> State<'a> {
-        State {
-            system,
-            topo_svg_cmd,
-            topo_text_cmd,
-            token,
-        }
+    pub fn new(system: &'a dyn systemapi::SystemAPI, token: String) -> State<'a> {
+        State { system, token }
     }
 
     pub fn run(&mut self) -> Vec<Vec<u8>> {
         let mut writer = Vec::new();
-        show_system(
-            &mut writer,
-            self.system,
-            self.token.clone(),
-            Format::JSON,
-            self.topo_svg_cmd.clone(),
-            self.topo_text_cmd.clone(),
-        );
+        show_system(&mut writer, self.system, self.token.clone(), Format::JSON);
         vec![writer]
     }
 }
@@ -60,20 +40,14 @@ pub fn show_system(
     system: &dyn systemapi::SystemAPI,
     token: String,
     fmt: Format,
-    topo_svg_cmd: Option<String>,
-    topo_text_cmd: Option<String>,
 ) {
     let sysinfo = match compute_nodeinfo(system) {
         Ok(mut info) => {
-            if let Some(cmd) = topo_svg_cmd {
-                if let Some(output) = run_command_unsafely(cmd) {
-                    info.topo_svg = Some(output);
-                }
+            if let Ok(output) = system.compute_node_topo_svg() {
+                info.topo_svg = output;
             }
-            if let Some(cmd) = topo_text_cmd {
-                if let Some(output) = run_command_unsafely(cmd) {
-                    info.topo_text = Some(output);
-                }
+            if let Ok(output) = system.compute_node_topo_text() {
+                info.topo_text = output;
             }
             match fmt {
                 Format::JSON => layout_sysinfo_newfmt(system, token, info),
@@ -87,22 +61,6 @@ pub fn show_system(
         Format::JSON => {
             output::write_json(writer, &output::Value::O(sysinfo));
         }
-    }
-}
-
-// "Unsafely" because technically both the verb and args can contain spaces, but there's no way to
-// express that.
-fn run_command_unsafely(cmd: String) -> Option<String> {
-    let mut tokens = cmd.split_ascii_whitespace();
-    match tokens.next() {
-        Some(verb) => {
-            let args = tokens.collect::<Vec<&str>>();
-            match command::safe_command(verb, &args, 5) {
-                Ok((s, _)) => Some(s),
-                Err(_) => None,
-            }
-        }
-        None => None,
     }
 }
 

@@ -55,14 +55,7 @@ pub fn sysinfo_output_test() {
         .freeze();
 
     let mut output = Vec::new();
-    sysinfo::show_system(
-        &mut output,
-        &system,
-        "".to_string(),
-        sysinfo::Format::JSON,
-        None,
-        None,
-    );
+    sysinfo::show_system(&mut output, &system, "".to_string(), sysinfo::Format::JSON);
     let info = String::from_utf8_lossy(&output);
     let expect = r#"
 {"meta":
