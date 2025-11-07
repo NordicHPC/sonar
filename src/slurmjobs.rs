@@ -268,6 +268,13 @@ fn parse_scontrol_output(scontrol_output: String) -> HashMap<String, String> {
                     break 'Fieldscan;
                 }
             } else if let Some(s) = f.strip_prefix("ReqTRES=") {
+                // Newer SLURM, notably v24
+                res = Some(s.to_string());
+                if id.is_some() {
+                    break 'Fieldscan;
+                }
+            } else if let Some(s) = f.strip_prefix("TRES=") {
+                // Older SLURM, notably v21
                 res = Some(s.to_string());
                 if id.is_some() {
                     break 'Fieldscan;
