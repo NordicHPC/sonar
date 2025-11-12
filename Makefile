@@ -10,7 +10,7 @@ release:
 test: debug release
 	cargo test
 	( cd util ; $(MAKE) test )
-	( cd tests; ./run_tests.sh )
+	( cd tests; $(MAKE) test )
 
 format:
 	cargo fmt
