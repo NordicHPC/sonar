@@ -2,10 +2,8 @@
 #![allow(clippy::comparison_to_empty)]
 
 // Define a nested data structure of arrays, objects, and scalar values that can subsequently be
-// serialized, currently as CSV and JSON, following conventions that are backward compatible with
-// the older ad-hoc Sonar formatting code.
-//
-// Adding eg a compact binary serialization form would be very simple.
+// serialized, currently only as JSON.  Adding eg a compact binary serialization form would be very
+// simple.
 
 use crate::json_tags::*;
 use crate::systemapi;
@@ -109,26 +107,16 @@ impl Object {
 #[derive(Debug)]
 pub struct Array {
     elements: Vec<Value>,
-    nonempty_base45: bool,
-    sep: String,
 }
 
 #[allow(dead_code)]
 impl Array {
     pub fn new() -> Array {
-        Array {
-            elements: vec![],
-            nonempty_base45: false,
-            sep: ",".to_string(),
-        }
+        Array { elements: vec![] }
     }
 
     pub fn from_vec(elements: Vec<Value>) -> Array {
-        Array {
-            elements,
-            nonempty_base45: false,
-            sep: ",".to_string(),
-        }
+        Array { elements }
     }
 
     pub fn take(&mut self) -> Vec<Value> {
@@ -176,22 +164,6 @@ impl Array {
     pub fn push_e(&mut self) {
         self.push(Value::E());
     }
-
-    // This creates a constraint that:
-    //
-    // - there must be at least one element
-    // - all elements must be Value::U
-    // - the array is encoded as an offsetted little-endian base45 string (below).
-    //
-    // This is an efficient and CSV-friendly encoding of a typical array of cpu-second data.
-    pub fn set_encode_nonempty_base45(&mut self) {
-        self.nonempty_base45 = true;
-    }
-
-    // Use sep as a CSV array separator instead of the default ",".
-    pub fn set_csv_separator(&mut self, sep: String) {
-        self.sep = sep;
-    }
 }
 
 // Write some data and ignore errors.
@@ -221,22 +193,6 @@ fn write_json_int(writer: &mut dyn io::Write, v: &Value) {
 }
 
 fn write_json_array(writer: &mut dyn io::Write, a: &Array) {
-    if a.nonempty_base45 {
-        let us = a
-            .elements
-            .iter()
-            .map(|x| {
-                if let Value::U(u) = x {
-                    *u
-                } else {
-                    panic!("Not a Value::U")
-                }
-            })
-            .collect::<Vec<u64>>();
-        write_chars(writer, &encode_cpu_secs_base45el(&us));
-        return;
-    }
-
     let _ = writer.write(b"[");
     let mut first = true;
     for elt in &a.elements {
@@ -268,139 +224,6 @@ fn write_json_string(writer: &mut dyn io::Write, s: &str) {
     let _ = writer.write(b"\"");
     write_chars(writer, &util::json_quote(s));
     let _ = writer.write(b"\"");
-}
-
-// CSV:
-//
-// - an object is a comma-separated list of FIELDs
-// - an array is an X-separated list of VALUEs (where X is comma by default but can be changed)
-// - a TAG is an unquoted string
-// - each FIELD is {TAG}={VALUE}
-// - a VALUE is the string representation of the value
-// - if the FIELD of an object or the VALUE of an array contains ',' or '"', then the FIELD or VALUE
-//   is prefixed and suffixed by '"' and any '"' in the original string is doubled.
-//
-// Note that the bare representation of a value of any kind is just the string representation of the
-// value itself (unquoted), it's the inclusion in an object or array that forces the quoting.
-//
-// The format allows nesting but the number of " grows exponentially with the nesting level if array
-// separators are not managed carefully.  Also, custom array element separators are not handled
-// specially by the quoting mechanism, effectively requiring each nesting level to have its own
-// custom quoting mechanism and to avoid quoting chars used at outer levels.  For data nested more
-// than one level, and especially when those data include arbitrary strings, use JSON.
-
-pub fn write_csv(writer: &mut dyn io::Write, v: &Value) {
-    write_chars(writer, &format_csv_value(v));
-    let _ = writer.write(b"\n");
-}
-
-pub fn format_csv_value(v: &Value) -> String {
-    match v {
-        Value::A(a) => format_csv_array(a),
-        Value::O(o) => format_csv_object(o),
-        Value::S(s) => s.clone(),
-        Value::U(u) => format!("{u}"),
-        Value::I(i) => format!("{i}"),
-        Value::F(f) => format!("{f}"),
-        Value::B(b) => format!("{b}"),
-        Value::E() => "".to_string(),
-    }
-}
-
-fn format_csv_object(o: &Object) -> String {
-    let mut first = true;
-    let mut s = "".to_string();
-    for fld in &o.fields {
-        if !first {
-            s += ","
-        }
-        let mut tmp = fld.tag.clone();
-        tmp += "=";
-        tmp += &format_csv_value(&fld.value);
-        s += &util::csv_quote(&tmp);
-        first = false;
-    }
-    s
-}
-
-fn format_csv_array(a: &Array) -> String {
-    if a.nonempty_base45 {
-        let us = a
-            .elements
-            .iter()
-            .map(|x| {
-                if let Value::U(u) = x {
-                    *u
-                } else {
-                    panic!("Not a Value::U")
-                }
-            })
-            .collect::<Vec<u64>>();
-        return encode_cpu_secs_base45el(&us);
-    }
-    let mut first = true;
-    let mut s = "".to_string();
-    for elt in &a.elements {
-        if !first {
-            s += &a.sep;
-        }
-        s += &util::csv_quote(&format_csv_value(elt));
-        first = false;
-    }
-    s
-}
-
-// Encode a nonempty u64 array compactly.
-//
-// The output must be ASCII text (32 <= c < 128), ideally without ',' or '"' or '\' or ' ' to not
-// make it difficult for the various output formats we use.  Also avoid DEL, because it is a weird
-// control character.
-//
-// We have many encodings to choose from, see https://github.com/NordicHPC/sonar/issues/178.
-//
-// The values to be represented are always cpu seconds of active time since boot, one item per cpu,
-// and it is assumed that they are roughly in the vicinity of each other (the largest is rarely more
-// than 4x the smallest, say).  The assumption does not affect correctness, only compactness.
-//
-// The encoding first finds the minimum input value and subtracts that from all entries.  The
-// minimum value, and all the entries, are then emitted as unsigned little-endian base-45 with the
-// initial digit chosen from a different character set to indicate that it is initial.
-
-fn encode_cpu_secs_base45el(cpu_secs: &[u64]) -> String {
-    let base = *cpu_secs
-        .iter()
-        .reduce(std::cmp::min)
-        .expect("Must have a non-empty array");
-    let mut s = encode_u64_base45el(base);
-    for x in cpu_secs {
-        s += encode_u64_base45el(*x - base).as_str();
-    }
-    s
-}
-
-// The only character unused by the encoding, other than the ones we're not allowed to use, is '='.
-const BASE: u64 = 45;
-const INITIAL: &[u8] = "(){}[]<>+-abcdefghijklmnopqrstuvwxyz!@#$%^&*_".as_bytes();
-const SUBSEQUENT: &[u8] = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ~|';:.?/`".as_bytes();
-
-fn encode_u64_base45el(mut x: u64) -> String {
-    let mut s = String::from(INITIAL[(x % BASE) as usize] as char);
-    x /= BASE;
-    while x > 0 {
-        s.push(SUBSEQUENT[(x % BASE) as usize] as char);
-        x /= BASE;
-    }
-    s
-}
-
-#[test]
-pub fn test_encoding() {
-    assert!(INITIAL.len() == BASE as usize);
-    assert!(SUBSEQUENT.len() == BASE as usize);
-    // This should be *1, *0, *29, *43, 1, *11 with * denoting an INITIAL char.
-    let v = vec![1, 30, 89, 12];
-    println!("{}", encode_cpu_secs_base45el(&v));
-    assert!(encode_cpu_secs_base45el(&v) == ")(t*1b");
 }
 
 // Utilities

@@ -59,50 +59,32 @@ are known to work for both.  Also see comments in `gpuapi/Makefile`.
 
 ## Output format options
 
-There are two output formats, [the old format](doc/OLD-FORMAT.md) and [the new
-format](doc/NEW-FORMAT.md), currently coexisting but the old format will be phased out.
-
-The recommended (and default as of v0.16) output format is the "new" JSON format.  There are command
-line switches to force the older formats, CSV or an older JSON format.
+As of v0.17 there is only one output format, known as [the new format](doc/NEW-FORMAT.md), a JSON
+encoding.  Support for the older CSV format and an older JSON encoding have been removed.
 
 ## Examples
 
-Some illustrative runs.  For more detailed instructions on how to use it, see "How we run sonar on a
-cluster", below.  For a full description of the output formats and fields, see the previous section.
+Some illustrative command lines.  For more detailed instructions on how to use it, see "How we run
+sonar on a cluster", below; notably Sonar has a daemon mode and does not have to be run by a cron
+job.  For a full description of the output formats and fields, see the previous section.
 
 ### Collect processes with `sonar ps`
 
 It's sensible to run `sonar ps` every 5 minutes on every compute node if you care mostly about
 long-running jobs, or at higher frequency if sbrief jobs are of interest to you.
 
-Here is an example output (with the older CSV output format):
 ```console
 $ sonar ps --exclude-system-jobs --min-cpu-time=10
-
-v=0.7.0,time=2023-08-10T11:09:41+02:00,host=somehost,cores=8,user=someone,job=0,cmd=fish,cpu%=2.1,cpukib=64400,gpus=none,gpu%=0,gpumem%=0,gpukib=0,cputime_sec=138
-v=0.7.0,time=2023-08-10T11:09:41+02:00,host=somehost,cores=8,user=someone,job=0,cmd=sonar,cpu%=761,cpukib=372,gpus=none,gpu%=0,gpumem%=0,gpukib=0,cputime_sec=137
-v=0.7.0,time=2023-08-10T11:09:41+02:00,host=somehost,cores=8,user=someone,job=0,cmd=brave,cpu%=14.6,cpukib=2907168,gpus=none,gpu%=0,gpumem%=0,gpukib=0,cputime_sec=3532
-v=0.7.0,time=2023-08-10T11:09:41+02:00,host=somehost,cores=8,user=someone,job=0,cmd=alacritty,cpu%=0.8,cpukib=126700,gpus=none,gpu%=0,gpumem%=0,gpukib=0,cputime_sec=51
-v=0.7.0,time=2023-08-10T11:09:41+02:00,host=somehost,cores=8,user=someone,job=0,cmd=pulseaudio,cpu%=0.7,cpukib=90640,gpus=none,gpu%=0,gpumem%=0,gpukib=0,cputime_sec=399
-v=0.7.0,time=2023-08-10T11:09:41+02:00,host=somehost,cores=8,user=someone,job=0,cmd=slack,cpu%=3.9,cpukib=716924,gpus=none,gpu%=0,gpumem%=0,gpukib=0,cputime_sec=266
+...
 ```
 
 ### Collect system information with `sonar sysinfo`
 
-The `sysinfo` subcommand collects information about the system and prints it in JSON form on stdout
-(this is the older JSON format):
+The `sysinfo` subcommand collects information about the system and prints it on stdout.
 
 ```console
 $ sonar sysinfo
-{
- "timestamp": "2024-02-26T00:00:02+01:00",
- "hostname": "ml1.hpc.uio.no",
- "description": "2x14 (hyperthreaded) Intel(R) Xeon(R) Gold 5120 CPU @ 2.20GHz, 125 GB, 3x NVIDIA GeForce RTX 2080 Ti @ 11GB",
- "cpu_cores": 56,
- "mem_gb": 125,
- "gpu_cards": 3,
- "gpumem_gb": 33
-}
+...
 ```
 
 Typical usage for `sysinfo` is to run the command after reboot and (for hot-swappable systems and
@@ -110,9 +92,9 @@ VMs) once every 24 hours, and to aggregate the information in some database.
 
 ### Collecting job information with `sonar slurm`
 
-The `slurm` command runs `sacct` and extracts job data.  This command exists partly to allow
-clusters to always push data, partly to collect the data for long-term storage, partly to offload
-the Slurm database manager during query processing.
+The `slurm` command runs `sacct` and `scontrol` and extracts job data.  This command exists partly
+to allow clusters to always push data, partly to collect the data for long-term storage, partly to
+offload the Slurm database manager during query processing.
 
 ```console
 $ sonar slurm --deluge --json --cluster my.cluster
@@ -131,8 +113,6 @@ the data for long-term storage.
 $ sonar cluster --cluster my.cluster
 ...
 ```
-
-The output is always JSON.
 
 ## Collect and analyze results
 
@@ -184,7 +164,6 @@ Here are some of those tools:
 - [Sysstat and SAR](https://github.com/sysstat/sysstat), for monitoring a lot of things.
 - [seff](https://support.schedmd.com/show_bug.cgi?id=1611), SLURM-specific.
 - [TACC Remora](https://github.com/tacc/remora)
-- Reference implementation which serves as inspiration:
-  <https://github.com/UNINETTSigma2/appusage>
+- Reference implementation which serves as inspiration: <https://github.com/UNINETTSigma2/appusage>
 - [TACC Stats](https://github.com/TACC/tacc_stats)
 - [Ganglia Monitoring System](http://ganglia.info/)
