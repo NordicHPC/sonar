@@ -367,7 +367,7 @@ checksum = "7a2ae44ef20feb57a68b23d846850f861394c2e02dc425a50098ae8c90267589"
 
 [[package]]
 name = "sonar"
-version = "0.16.0-rc7"
+version = "0.16.0"
 dependencies = [
  "base64",
  "crossbeam",

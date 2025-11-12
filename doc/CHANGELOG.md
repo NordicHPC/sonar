@@ -13,6 +13,7 @@ The "old" output formats are for the most part not being extended with new field
 relied upon.  Consumers should expect to see the "new" JSON format for new data, and all producers
 should ask for that format.
 
+
 ## Changes in v0.16.0 (on `release_0_16`)
 
 * Bug 335 / Bug 415 - **BREAKING CHANGE.** The `cpu_util` field was not emitted properly, it should
@@ -21,8 +22,8 @@ should ask for that format.
 * Bug 352 - **MAJOR FUNCTIONALITY.**  Populate the `topo_svg` field, introduce a `topo_text` field,
   and expand the config file so as to be able to specify how to generate those data
 * Bug 353 - Remove the `software` field.
-* Bug 387 - **IMPORTANT FIX.** Parse some slurm data, notably ReqMem, correctly.  Previously the parser
-  would always return 0 for this field
+* Bug 387 - **IMPORTANT FIX.** Parse some slurm data, notably ReqMem, correctly.  Previously the
+  parser would always return 0 for this field
 * Bug 401 - better error messages for Kafka
 * Bug 402 - synthesize a UUID on AMD cards when needed
 * Bug 402 - change the syntax of synthesized UUIDs on XPU (now joint with AMD)
@@ -32,10 +33,10 @@ should ask for that format.
   is no longer a required argument for that (defaulting to the empty string).
 * Bug 410 - output on stderr does not by itself cause a subcommand to fail, so long as the
   exit code is 0
-* Bug 409 / 437 - **MAJOR FUNCTIONALITY.** Run scontrol in addition to sacct in order to extract resource
-  request for pending jobs.  Remove the unused `gres_detail` field of slurm job data and introduce
-  two fields `allocated_resources` and `requested_resources` and fill them with unparsed resouce data from
-  sacct and scontrol.
+* Bug 409 / 437 - **MAJOR FUNCTIONALITY.** Run scontrol in addition to sacct in order to extract
+  resource request for pending jobs.  Remove the unused `gres_detail` field of slurm job data and
+  introduce two fields `allocated_resources` and `requested_resources` and fill them with unparsed
+  resouce data from sacct and scontrol.
 * Testing (sundry): Many testing improvements
 * Doc (sundry): Various improvements
 
