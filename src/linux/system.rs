@@ -521,6 +521,27 @@ fn runit(cmd: &str, args: &[&str], timeout: u64) -> Result<String, String> {
     }
 }
 
+/*
+            self.topo_svg_cmd.clone(),
+            self.topo_text_cmd.clone(),
+ */
+
+// "Unsafely" because technically both the verb and args can contain spaces, but there's no way to
+// express that.
+fn run_command_unsafely(cmd: String) -> Option<String> {
+    let mut tokens = cmd.split_ascii_whitespace();
+    match tokens.next() {
+        Some(verb) => {
+            let args = tokens.collect::<Vec<&str>>();
+            match command::safe_command(verb, &args, 5) {
+                Ok((s, _)) => Some(s),
+                Err(_) => None,
+            }
+        }
+        None => None,
+    }
+}
+
 fn twofields(text: String) -> Result<Vec<(String, String)>, String> {
     let mut v = vec![];
     for l in text.lines() {

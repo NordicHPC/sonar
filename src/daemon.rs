@@ -326,9 +326,6 @@ pub fn daemon_mode(
 
     let mut sysinfo_extractor = sysinfo::State::new(
         &system,
-        // FIXME: Should instead push these into the system?
-        ini.paths.topo_svg_cmd.clone(),
-        ini.paths.topo_text_cmd.clone(),
         api_token.clone(),
     );
 

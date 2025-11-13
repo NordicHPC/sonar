@@ -85,6 +85,9 @@ pub trait SystemAPI {
     // list.  State names are currently batch system specific.
     fn compute_cluster_nodes(&self) -> Result<Vec<(String, String)>, String>;
 
+    fn compute_node_topo_svg(&self) -> Result<Option<String>, String>;
+    fn compute_node_topo_text(&self) -> Result<Option<String>, String>;
+
     // `create_lock_file` creates it atomically if it does not exist, returning Ok if so; if it does
     // exist, returns Err(io::ErrorKind::AlreadyExists), otherwise some other Err.
     // `remove_lock_file` unconditionally tries to remove the file, returning some Err if it fails.
