@@ -40,6 +40,11 @@ const SINFO_TIMEOUT_S: u64 = 10;
 pub struct Builder {
     jm: Option<Box<dyn jobsapi::JobManager>>,
     cluster: String,
+    sacct: String,
+    scontrol: String,
+    sinfo: String,
+    topo_svg: String,
+    topo_text: String,
 }
 
 impl Builder {
@@ -47,6 +52,11 @@ impl Builder {
         Builder {
             jm: None,
             cluster: "".to_string(),
+            sacct: "sacct".to_string(),
+            scontrol: "scontrol".to_string(),
+            sinfo: "sinfo".to_string(),
+            topo_svg: "".to_string(),
+            topo_text: "".to_string(),
         }
     }
 
@@ -61,6 +71,41 @@ impl Builder {
     pub fn with_jobmanager(self, jm: Box<dyn jobsapi::JobManager>) -> Builder {
         Builder {
             jm: Some(jm),
+            ..self
+        }
+    }
+
+    pub fn with_sacct_cmd(self, cmd: &str) -> Builder {
+        Builder {
+            sacct: cmd.to_string(),
+            ..self
+        }
+    }
+
+    pub fn with_sinfo_cmd(self, cmd: &str) -> Builder {
+        Builder {
+            sinfo: cmd.to_string(),
+            ..self
+        }
+    }
+
+    pub fn with_scontrol_cmd(self, cmd: &str) -> Builder {
+        Builder {
+            scontrol: cmd.to_string(),
+            ..self
+        }
+    }
+
+    pub fn with_topo_svg_cmd(self, cmd: &str) -> Builder {
+        Builder {
+            topo_svg: cmd.to_string(),
+            ..self
+        }
+    }
+
+    pub fn with_topo_text_cmd(self, cmd: &str) -> Builder {
+        Builder {
+            topo_text: cmd.to_string(),
             ..self
         }
     }
@@ -84,6 +129,11 @@ impl Builder {
             boot_time,
             interrupted: Arc::new(AtomicBool::new(false)),
             cpu_info: RefCell::new(None),
+            sacct: self.sacct,
+            scontrol: self.scontrol,
+            sinfo: self.sinfo,
+            topo_svg: self.topo_svg,
+            topo_text: self.topo_text,
         })
     }
 }
@@ -108,6 +158,11 @@ pub struct System {
     boot_time: u64,
     interrupted: Arc<AtomicBool>,
     cpu_info: RefCell<Option<systemapi::CpuInfo>>,
+    sacct: String,
+    sinfo: String,
+    scontrol: String,
+    topo_svg: String,
+    topo_text: String,
 }
 
 impl System {
@@ -278,8 +333,11 @@ impl systemapi::SystemAPI for System {
         if let Ok(filename) = std::env::var("SONARTEST_MOCK_SACCT") {
             return Ok(mock_input(filename));
         }
+        if self.sacct == "" {
+            return Ok("".to_string());
+        }
         runit(
-            "sacct",
+            &self.sacct,
             &[
                 "-aP",
                 "-s",
@@ -301,7 +359,10 @@ impl systemapi::SystemAPI for System {
         if let Ok(filename) = std::env::var("SONARTEST_MOCK_SCONTROL") {
             return Ok(mock_input(filename));
         }
-        runit("scontrol", &["-o", "show", "job"], SCONTROL_TIMEOUT_S)
+        if self.scontrol == "" {
+            return Ok("".to_string());
+        }
+        runit(&self.scontrol, &["-o", "show", "job"], SCONTROL_TIMEOUT_S)
     }
 
     // Whether we try to run sinfo or run some code to look for the program in the path probably
@@ -315,7 +376,10 @@ impl systemapi::SystemAPI for System {
         {
             return Some(systemapi::ClusterKind::Slurm);
         }
-        match runit("sinfo", &["--usage"], SINFO_TIMEOUT_S) {
+        if self.sinfo == "" {
+            return None;
+        }
+        match runit(&self.sinfo, &["--usage"], SINFO_TIMEOUT_S) {
             Ok(_) => Some(systemapi::ClusterKind::Slurm),
             Err(_) => None,
         }
@@ -340,8 +404,11 @@ impl systemapi::SystemAPI for System {
             input = Some(mock_input(filename));
         }
         if input.is_none() {
+            if self.sinfo == "" {
+                return Ok(vec![]);
+            }
             input = Some(runit(
-                "sinfo",
+                &self.sinfo,
                 &["-h", "-a", "-O", "Partition:|,NodeList:|"],
                 SINFO_TIMEOUT_S,
             )?);
@@ -356,8 +423,11 @@ impl systemapi::SystemAPI for System {
             input = Some(mock_input(filename));
         }
         if input.is_none() {
+            if self.sinfo == "" {
+                return Ok(vec![]);
+            }
             input = Some(runit(
-                "sinfo",
+                &self.sinfo,
                 &["-h", "-a", "-e", "-O", "NodeList:|,StateComplete:|"],
                 SINFO_TIMEOUT_S,
             )?);

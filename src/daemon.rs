@@ -200,7 +200,12 @@ pub fn daemon_mode(
         system = system.with_jobmanager(Box::new(jobsapi::AnyJobManager::new(force_slurm)));
     }
 
-    // FIXME: Why are we not doing this with the topo commands?
+    if let Some(ref p) = ini.paths.topo_svg_cmd {
+        system = system.with_topo_svg_cmd(p);
+    }
+    if let Some(ref p) = ini.paths.topo_text_cmd {
+        system = system.with_topo_text_cmd(p);
+    }
     if let Some(ref p) = ini.paths.sacct_cmd {
         system = system.with_sacct_cmd(p);
     }
@@ -688,8 +693,6 @@ fn parse_config(config_file: &str) -> Result<Ini, String> {
         sysinfo: SysinfoIni {
             on_startup: true,
             cadence: None,
-            topo_svg_cmd: None, // Use [paths] instead
-            topo_text_cmd: None, // Use [paths] instead
         },
         jobs: JobsIni {
             cadence: None,
@@ -714,6 +717,7 @@ fn parse_config(config_file: &str) -> Result<Ini, String> {
         Kafka,
         Directory,
         Debug,
+        Paths,
         Sample,
         Sysinfo,
         Jobs,
@@ -762,6 +766,10 @@ fn parse_config(config_file: &str) -> Result<Ini, String> {
         }
         if l == "[debug]" {
             curr_section = Section::Debug;
+            continue;
+        }
+        if l == "[paths]" {
+            curr_section = Section::Paths;
             continue;
         }
         if l == "[ps]" || l == "[sample]" {
@@ -941,6 +949,7 @@ fn parse_config(config_file: &str) -> Result<Ini, String> {
                 "topo-text-command" => {
                     ini.paths.topo_text_cmd = Some(value);
                 }
+                _ => return Err(format!("Invalid [paths] setting name `{name}`")),
             }
         }
     }
