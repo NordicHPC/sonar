@@ -62,6 +62,9 @@ pub trait SystemAPI {
     // and/or removed).
     fn compute_user_by_uid(&self, uid: u32) -> Option<String>;
 
+    // Read a file below /sys/devices/system/node, the filename must be a relative path.
+    fn read_node_file_to_string(&self, filename: &str) -> io::Result<String>;
+
     // Run sacct and return its output.  The arguments are passed on to sacct: `job_states` to `-s`,
     // `field_names` to `-o`, `from` to `-S` and `to` to `-E`.  This is only defined for state and
     // field names that exist, and for properly slurm-formatted dates.

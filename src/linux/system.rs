@@ -207,28 +207,7 @@ impl systemapi::SystemAPI for System {
     }
 
     fn get_numa_distances(&self) -> Result<Vec<Vec<u32>>, String> {
-        let mut m = vec![];
-        for n in 0..self.get_cpu_info()?.sockets {
-            let filename = format!("/sys/devices/system/node/node{n}/distance");
-            match fs::read_to_string(path::Path::new(&filename)) {
-                Ok(s) => {
-                    let mut r = vec![];
-                    for v in s.trim().split(" ") {
-                        match v.parse::<u32>() {
-                            Ok(n) => r.push(n),
-                            Err(_) => {
-                                return Err(format!("Unable to parse {s}"));
-                            }
-                        }
-                    }
-                    m.push(r);
-                }
-                Err(_) => {
-                    return Err(format!("Unable to read {filename}"));
-                }
-            }
-        }
-        Ok(m)
+        get_numa_distances(self)
     }
 
     fn compute_node_information(&self) -> Result<(u64, Vec<u64>), String> {
@@ -265,6 +244,11 @@ impl systemapi::SystemAPI for System {
 
     fn remove_lock_file(&self, p: path::PathBuf) -> io::Result<()> {
         fs::remove_file(p)
+    }
+
+    fn read_node_file_to_string(&self, f: &str) -> io::Result<String> {
+        let filename = format!("/sys/devices/system/node/{f}");
+        fs::read_to_string(path::Path::new(&filename))
     }
 
     fn run_sacct(
@@ -496,4 +480,43 @@ impl procfs::ProcfsAPI for RealProcFS {
         };
         Ok(pids)
     }
+}
+
+pub fn get_numa_distances(system: &dyn systemapi::SystemAPI) -> Result<Vec<Vec<u32>>, String> {
+    let mut m = vec![];
+    // The number of NUMA nodes is no greater than the number of sockets but it is frequently
+    // smaller.  The rule here is that we enumerate the files and we will expect a dense range
+    // (even though numactl currently handles a sparse range), but if there's any kind of hiccup
+    // we fall back to returning an empty matrix, it is only if we can't parse a file that we
+    // could read that we return an error.
+    for n in 0..system.get_cpu_info()?.sockets {
+        match system.read_node_file_to_string(&format!("node{n}/distance")) {
+            Ok(s) => {
+                let mut r = vec![];
+                for v in s.trim().split(" ") {
+                    match v.parse::<u32>() {
+                        Ok(n) => r.push(n),
+                        Err(_) => {
+                            return Err(format!("Unable to parse {s}"));
+                        }
+                    }
+                }
+                m.push(r);
+            }
+            Err(_) => break,
+        }
+    }
+    // Check that we have a square matrix.
+    if m.len() > 0 {
+        let n = m[0].len();
+        if m.len() != n {
+            return Ok(vec![]);
+        }
+        for i in 1..m.len() {
+            if m[i].len() != n {
+                return Ok(vec![]);
+            }
+        }
+    }
+    Ok(m)
 }

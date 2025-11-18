@@ -122,6 +122,7 @@ fn layout_sysinfo_newfmt(
     attrs.push_s(SYSINFO_ATTRIBUTES_NODE, node_info.node.clone());
     attrs.push_s(SYSINFO_ATTRIBUTES_OS_NAME, system.get_os_name());
     attrs.push_s(SYSINFO_ATTRIBUTES_OS_RELEASE, system.get_os_release());
+    attrs.push_u(SYSINFO_ATTRIBUTES_NUMA_NODES, node_info.numa_nodes);
     attrs.push_u(SYSINFO_ATTRIBUTES_SOCKETS, node_info.sockets);
     attrs.push_u(
         SYSINFO_ATTRIBUTES_CORES_PER_SOCKET,
@@ -326,6 +327,7 @@ struct NodeInfo {
     node: String,
     description: String,
     logical_cores: u64,
+    numa_nodes: u64,
     sockets: u64,
     cores_per_socket: u64,
     threads_per_core: u64,
@@ -409,6 +411,7 @@ fn compute_nodeinfo(system: &dyn systemapi::SystemAPI) -> Result<NodeInfo, Strin
             "{sockets}x{cores_per_socket}{ht} {model_name}, {mem_gb} GiB{gpu_desc}"
         ),
         logical_cores: (sockets * cores_per_socket * threads_per_core) as u64,
+        numa_nodes: distances.len() as u64,
         sockets: sockets as u64,
         cores_per_socket: cores_per_socket as u64,
         threads_per_core: threads_per_core as u64,

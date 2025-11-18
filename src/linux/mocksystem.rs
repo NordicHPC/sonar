@@ -2,7 +2,7 @@ use crate::gpu;
 use crate::gpu::mockgpu;
 use crate::jobsapi;
 use crate::json_tags;
-use crate::linux::procfs;
+use crate::linux::{procfs, system};
 use crate::systemapi;
 use crate::time;
 
@@ -15,6 +15,7 @@ use std::path;
 #[derive(Default)]
 pub struct Builder {
     proc_files: Option<HashMap<String, String>>,
+    node_files: Option<HashMap<String, String>>,
     pids: Option<Vec<(usize, u32)>>,
     threads: Option<HashMap<usize, Vec<(usize, u32)>>>,
     users: Option<HashMap<u32, String>>,
@@ -39,9 +40,18 @@ impl Builder {
         }
     }
 
+    // Files below /proc
     pub fn with_proc_files(self, files: HashMap<String, String>) -> Builder {
         Builder {
             proc_files: Some(files),
+            ..self
+        }
+    }
+
+    // Files below /sys/devices/system/node
+    pub fn with_node_files(self, files: HashMap<String, String>) -> Builder {
+        Builder {
+            node_files: Some(files),
             ..self
         }
     }
@@ -188,6 +198,7 @@ impl Builder {
                     threads,
                 }
             },
+            node_files: self.node_files.unwrap_or_default(),
             now: if let Some(x) = self.now {
                 x
             } else {
@@ -216,6 +227,7 @@ pub struct MockSystem {
     os_release: String,
     architecture: String,
     fs: MockFS,
+    node_files: HashMap<String, String>,
     gpus: mockgpu::MockGpuAPI,
     users: HashMap<u32, String>,
     pid: u32,
@@ -298,7 +310,7 @@ impl systemapi::SystemAPI for MockSystem {
     }
 
     fn get_numa_distances(&self) -> Result<Vec<Vec<u32>>, String> {
-        Ok(vec![vec![10u32]])
+        system::get_numa_distances(self)
     }
 
     fn compute_node_information(&self) -> Result<(u64, Vec<u64>), String> {
@@ -335,6 +347,13 @@ impl systemapi::SystemAPI for MockSystem {
 
     fn remove_lock_file(&self, _p: path::PathBuf) -> io::Result<()> {
         panic!("Not in use yet");
+    }
+
+    fn read_node_file_to_string(&self, filename: &str) -> io::Result<String> {
+        match self.node_files.get(filename) {
+            Some(contents) => Ok(contents.clone()),
+            None => Err(io::Error::from(io::ErrorKind::NotFound)),
+        }
     }
 
     fn run_sacct(

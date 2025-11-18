@@ -31,6 +31,7 @@ pub const SYSINFO_ATTRIBUTES_NODE: &str = "node"; // Hostname
 pub const SYSINFO_ATTRIBUTES_OS_NAME: &str = "os_name"; // NonemptyString
 pub const SYSINFO_ATTRIBUTES_OS_RELEASE: &str = "os_release"; // NonemptyString
 pub const SYSINFO_ATTRIBUTES_ARCHITECTURE: &str = "architecture"; // NonemptyString
+pub const SYSINFO_ATTRIBUTES_NUMA_NODES: &str = "numa_nodes"; // uint64
 pub const SYSINFO_ATTRIBUTES_SOCKETS: &str = "sockets"; // NonzeroUint
 pub const SYSINFO_ATTRIBUTES_CORES_PER_SOCKET: &str = "cores_per_socket"; // NonzeroUint
 pub const SYSINFO_ATTRIBUTES_THREADS_PER_CORE: &str = "threads_per_core"; // NonzeroUint
