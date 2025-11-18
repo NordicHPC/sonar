@@ -101,6 +101,10 @@ SysinfoAttributes:
       type: 'NonemptyString'
       doc: >
         Architecture name (the `machine` field of `struct utsname`)
+    numa_nodes:
+      type: 'uint64'
+      doc: >
+        Number of NUMA nodes (frequently smaller than the number of sockets), zero if we can't compute it
     sockets:
       type: 'NonzeroUint'
       doc: >
@@ -124,11 +128,11 @@ SysinfoAttributes:
     topo_svg:
       type: 'string'
       doc: >
-        Base64-encoded text output (SVG source text) of `lstopo` or similar, using the base64 alphabet from RFC4648.
+        Base64-encoded text output (SVG source text) of `lstopo` or similar, using the base64 alphabet from RFC4648
     topo_text:
       type: 'string'
       doc: >
-        Base64-encoded text output (human-readable) of `hwloc-ls` or similar, using the base64 alphabet from RFC4648.
+        Base64-encoded text output (human-readable) of `hwloc-ls` or similar, using the base64 alphabet from RFC4648
     cards:
       type: '[]SysinfoGpuCard'
       doc: >
@@ -136,7 +140,7 @@ SysinfoAttributes:
     distances:
       type: '[][]uint64'
       doc: >
-        Square matrix of standard NUMA node-to-node distances (normalized to 10 for self distance)
+        Square matrix of standard NUMA node-to-node distances (normalized to 10 for self distance), empty if we can't compute it
 SysinfoGpuCard:
   fields:
     index:
