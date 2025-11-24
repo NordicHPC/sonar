@@ -27,7 +27,6 @@ use crate::datasink::DataSink;
 use crate::jobsapi;
 use crate::json_tags;
 use crate::linux;
-use crate::log;
 use crate::ps;
 use crate::slurmjobs;
 use crate::sysinfo;
@@ -179,6 +178,17 @@ pub fn daemon_mode(
     #[allow(unused_mut)]
     let mut ini = parse_config(config_file)?;
 
+    let default_level = if ini.debug.verbose {
+        log::LevelFilter::Debug
+    } else {
+        log::LevelFilter::Warn
+    };
+    simple_logger::SimpleLogger::new()
+        .with_level(default_level)
+        .env()
+        .init()
+        .unwrap();
+
     #[cfg(feature = "kafka")]
     if let Some(ref pwfile) = ini.kafka.sasl_password_file {
         match std::fs::read_to_string(pwfile) {
@@ -279,9 +289,7 @@ pub fn daemon_mode(
         data_sink = Box::new(DelaySink::new(delay, data_sink));
     }
 
-    if ini.debug.verbose {
-        log::verbose("Initialization succeeded");
-    }
+    log::debug!("Initialization succeeded");
 
     let mut sample_extractor = ps::State::new(
         &system,
@@ -327,9 +335,7 @@ pub fn daemon_mode(
     'messageloop: loop {
         select! {
             recv(cutoff) -> _ => {
-                if ini.debug.verbose {
-                    log::verbose("Time limit reached");
-                }
+                log::debug!("Time limit reached");
                 break 'messageloop;
             }
             recv(event_receiver) -> msg => match msg {
@@ -343,40 +349,30 @@ pub fn daemon_mode(
                     let data_tag: &'static str;
                     match op {
                         Operation::Sample => {
-                            if ini.debug.verbose {
-                                log::verbose("Sample");
-                            }
+                            log::debug!("Sample");
                             output = sample_extractor.run();
                             data_tag = json_tags::DATA_TAG_SAMPLE;
                         }
                         Operation::Sysinfo => {
-                            if ini.debug.verbose {
-                                log::verbose("Sysinfo");
-                            }
+                            log::debug!("Sysinfo");
                             output = sysinfo_extractor.run();
                             data_tag = json_tags::DATA_TAG_SYSINFO;
                         }
                         Operation::Jobs => {
-                            if ini.debug.verbose {
-                                log::verbose("Jobs");
-                            }
+                            log::debug!("Jobs");
                             output = slurm_extractor.run();
                             data_tag = json_tags::DATA_TAG_JOBS;
                         }
                         Operation::Cluster => {
-                            if ini.debug.verbose {
-                                log::verbose("Cluster");
-                            }
+                            log::debug!("Cluster");
                             output = cluster_extractor.run();
                             data_tag = json_tags::DATA_TAG_CLUSTER;
                         }
                         Operation::Signal(s) => {
-                            if ini.debug.verbose {
-                                log::verbose(&format!("signal {s}"));
-                            }
+                            log::debug!("signal {s}");
                             match s {
                                 signal::SIGINT | signal::SIGHUP | signal::SIGTERM => {
-                                    log::verbose(&format!("Received signal {s}"));
+                                    log::debug!("Received signal {s}");
                                     break 'messageloop;
                                 }
                                 _ => {
@@ -385,9 +381,7 @@ pub fn daemon_mode(
                             }
                         }
                         Operation::Incoming(key, value) => {
-                            if ini.debug.verbose {
-                                log::verbose("Incoming");
-                            }
+                            log::debug!("Incoming");
                             // TODO: Maybe a reload function
                             // TODO: Maybe pause / restart functions
                             match (key.as_str(), value.as_str()) {
@@ -399,17 +393,12 @@ pub fn daemon_mode(
                             continue 'messageloop;
                         }
                         Operation::Fatal(msg) => {
-                            if ini.debug.verbose {
-                                log::verbose(&format!("Fatal error: {msg}"));
-                            }
+                            log::debug!("Fatal error: {msg}");
                             fatal_msg = msg;
                             break 'messageloop;
                         }
                         Operation::MessageDeliveryError(msg) => {
-                            if ini.debug.verbose {
-                                log::verbose(&msg);
-                            }
-                            log::error(&msg);
+                            log::error!("{msg}");
                             continue 'messageloop;
                         }
                     }
@@ -885,7 +874,7 @@ fn parse_config(config_file: &str) -> Result<Ini, String> {
                     ini.jobs.batch_size = Some(
                         value
                             .parse::<usize>()
-                            .map_err(|_| format!("Bad jobs.batch-size"))?,
+                            .map_err(|_| "Bad jobs.batch-size".to_string())?,
                     );
                 }
                 _ => return Err(format!("Invalid [jobs] setting name `{name}`")),

@@ -10,12 +10,12 @@ echo " This takes about 20s"
 
 output=$(tmpfile interrupt.output)
 
-SONARTEST_WAIT_INTERRUPT=1 cargo run -- ps 2> $output &
+SONARTEST_WAIT_INTERRUPT=1 RUST_LOG=debug cargo run -- ps 2> $output &
 bgpid=$!
 sleep 10
 kill -TERM $bgpid
 sleep 10
-if [[ $(tail -n 1 $output) != 'Info: Interrupt flag was set!' ]]; then
+if ! grep -q -E "DEBUG.*Interrupt flag was set!" $output; then
     fail "Unexpected output!"
 fi
 

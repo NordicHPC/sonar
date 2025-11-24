@@ -2,7 +2,6 @@
 
 use crate::gpu;
 use crate::json_tags::*;
-use crate::log;
 use crate::output;
 use crate::ps_newfmt::format_newfmt;
 use crate::ps_oldfmt::{format_oldfmt, make_oldfmt_heartbeat};
@@ -149,10 +148,10 @@ pub fn create_snapshot(
 
         if skip {
             // Test cases depend on this exact message.
-            log::info("Lockfile present, exiting");
+            log::warn!("Lockfile present, exiting");
         }
         if failed {
-            log::error("Unable to properly manage or delete lockfile");
+            log::error!("Unable to properly manage or delete lockfile");
         }
     } else {
         do_create_snapshot(writer, system, opts);

@@ -43,7 +43,7 @@ for signal in TERM INT HUP; do
 
     # Fork off the daemon in the background
 
-    cargo run -- daemon $inifile > $output 2> $log &
+    RUST_LOG=debug cargo run -- daemon $inifile > $output 2> $log &
     pid=$!
 
     # Wait for some output to accumulate in internal buffers
@@ -90,9 +90,8 @@ for signal in TERM INT HUP; do
         INT) s=2 ;;
         TERM) s=15 ;;
     esac
-    expect="Info: Received signal $s"
-    if [[ $(tail -n 1 $log) != $expect ]]; then
-        fail "Incorrect signal information, expected \'$expect\'"
+    if ! grep -q -E "DEBUG.*Received signal $s" $log; then
+        fail "Incorrect signal information, expected DEBUG.*Received signal $s"
     fi
 done
 echo " Ok"

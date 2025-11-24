@@ -5,8 +5,6 @@ use crate::hostname;
 use crate::jobsapi;
 use crate::linux::procfs;
 use crate::linux::slurm;
-#[cfg(debug_assertions)]
-use crate::log;
 use crate::systemapi;
 use crate::time;
 use crate::users;
@@ -373,7 +371,7 @@ impl systemapi::SystemAPI for System {
         let flag = self.interrupted.load(Ordering::Relaxed);
         if flag {
             // Test cases depend on this exact output.
-            log::info("Interrupt flag was set!")
+            log::debug!("Interrupt flag was set!")
         }
         flag
     }
@@ -385,9 +383,7 @@ fn mock_input(filename: String) -> String {
         Ok(mut f) => {
             let mut buf = String::new();
             match f.read_to_string(&mut buf) {
-                Ok(_) => {
-                    return buf;
-                }
+                Ok(_) => buf,
                 Err(e) => {
                     panic!("Could not read sacct input file {filename}: {e}");
                 }

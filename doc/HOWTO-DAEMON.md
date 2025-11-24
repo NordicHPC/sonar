@@ -182,7 +182,7 @@ output-delay = <duration value>                 # default none
 ```
 
 Setting `verbose` to true will cause the daemon to print somewhat informative messages about what
-it's doing at important points during the run to stderr.
+it's doing at important points during the run to stderr.  (It sets the RUST_LOG level to "debug".)
 
 Setting `time-limit` to a duration will make the daemon exit after roughly that time (it may take
 longer, it will check the exit time before every sample, but not wake up from sleep just to handle

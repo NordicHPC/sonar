@@ -228,7 +228,7 @@ fn get_card_uuid(xpu: &XpuGPU, dev: u32) -> String {
     let mut infobuf: XpuCardInfo = Default::default();
     if unsafe { xpu_device_get_card_info(dev, &mut infobuf) } == 0 {
         #[cfg(debug_assertions)]
-        let uuid = if let Ok(_) = std::env::var("SONARTEST_FAIL_UUID") {
+        let uuid = if std::env::var("SONARTEST_FAIL_UUID").is_ok() {
             "".to_string()
         } else {
             cstrdup(&infobuf.uuid)

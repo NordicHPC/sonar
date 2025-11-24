@@ -19,7 +19,7 @@ pub fn probe(hostname: &str, boot_time: u64) -> Option<Box<dyn gpu::Gpu>> {
 
 impl gpu::Gpu for XpuGPU {
     fn get_card_configuration(&self) -> Result<Vec<gpu::Card>, String> {
-        if let Some(info) = xpu_smi::get_card_configuration(&self) {
+        if let Some(info) = xpu_smi::get_card_configuration(self) {
             Ok(info)
         } else {
             Ok(vec![])
@@ -30,7 +30,7 @@ impl gpu::Gpu for XpuGPU {
         &self,
         ptable: &ps::ProcessTable,
     ) -> Result<Vec<gpu::Process>, String> {
-        if let Some(info) = xpu_smi::get_process_utilization(&self, ptable) {
+        if let Some(info) = xpu_smi::get_process_utilization(self, ptable) {
             Ok(info)
         } else {
             Ok(vec![])
@@ -38,7 +38,7 @@ impl gpu::Gpu for XpuGPU {
     }
 
     fn get_card_utilization(&self) -> Result<Vec<gpu::CardState>, String> {
-        if let Some(info) = xpu_smi::get_card_utilization(&self) {
+        if let Some(info) = xpu_smi::get_card_utilization(self) {
             Ok(info)
         } else {
             Ok(vec![])

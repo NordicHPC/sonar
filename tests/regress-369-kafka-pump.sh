@@ -58,7 +58,7 @@ fi
 # Possibly the test needs to run much longer and with different settings to *really* test that.
 
 prev=-100
-grep -n -E '^Info.*Sleeping [0-9]+ before sending' $logfile | \
+grep -n -E 'DEBUG.*Sleeping [0-9]+ before sending' $logfile | \
     awk -F: '{ print $1 }' | \
     while read lineno; do
         if (( prev+1 == lineno )); then

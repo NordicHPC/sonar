@@ -19,7 +19,6 @@
 
 use crate::daemon::{Dur, Ini, Operation};
 use crate::datasink::DataSink;
-use crate::log;
 use crate::systemapi::SystemAPI;
 #[cfg(debug_assertions)]
 use crate::time::unix_now;
@@ -77,7 +76,6 @@ impl RdKafka {
                 .map(|password| (global.cluster.clone(), password.clone()));
             let sending_window = ini.kafka.sending_window.to_seconds();
             let timeout = ini.kafka.timeout.to_seconds();
-            let verbose = debug.verbose;
             thread::spawn(move || {
                 kafka_producer(
                     broker,
@@ -88,7 +86,6 @@ impl RdKafka {
                     timeout,
                     incoming_message_queue,
                     control_and_errors,
-                    verbose,
                 );
             })
         };
@@ -150,7 +147,6 @@ impl DataSink for RdKafka {
 // will not be a queue.
 
 struct SonarProducerContext {
-    verbose: bool,
     control_and_errors: channel::Sender<Operation>,
 }
 
@@ -167,7 +163,6 @@ fn kafka_producer(
     timeout: u64,
     incoming_message_queue: channel::Receiver<Message>,
     control_and_errors: channel::Sender<Operation>,
-    verbose: bool,
 ) {
     let mut cfg = ClientConfig::new();
     cfg.set("bootstrap.servers", &broker)
@@ -187,8 +182,8 @@ fn kafka_producer(
             cfg.set("security.protocol", "ssl");
         }
     }
-    let producer = make_sender_adapter(cfg, control_and_errors.clone(), verbose)
-        .expect("Producer creation error");
+    let producer =
+        make_sender_adapter(cfg, control_and_errors.clone()).expect("Producer creation error");
 
     let mut id = 0usize;
     let mut rng = util::Rng::new();
@@ -201,10 +196,8 @@ fn kafka_producer(
         if must_arm {
             assert!(!armed);
             let sleep = rng.next() as u64 % sending_window;
-            if verbose {
-                // Note, the /Sleeping {} before sending/ pattern is used by regression tests.
-                log::verbose(&format!("Sleeping {sleep} before sending"));
-            }
+            // Note, the /Sleeping {} before sending/ pattern is used by regression tests.
+            log::debug!("Sleeping {sleep} before sending");
             timeout = channel::after(Duration::from_secs(sleep));
             armed = true;
             must_arm = false;
@@ -212,11 +205,9 @@ fn kafka_producer(
         channel::select! {
             recv(timeout) -> _ => {
                 armed = false;
-                if verbose {
-                    // Note, the /Sending {} items/ pattern is used by regression tests.
-                    log::verbose(&format!("Sending window open.  Sending {} items", backlog.len()));
-                }
-                id = send_messages(&*producer, &control_and_errors, id, &backlog, verbose);
+                // Note, the /Sending {} items/ pattern is used by regression tests.
+                log::debug!("Sending window open.  Sending {} items", backlog.len());
+                id = send_messages(&*producer, &control_and_errors, id, &backlog);
                 backlog.clear();
             }
             recv(incoming_message_queue) -> msg => match msg {
@@ -225,7 +216,7 @@ fn kafka_producer(
                     must_arm = !armed;
                 }
                 Ok(Message::Stop) | Err(_) => {
-                    _ = send_messages(&*producer, &control_and_errors, id, &backlog, verbose);
+                    _ = send_messages(&*producer, &control_and_errors, id, &backlog);
                     break 'producer_loop;
                 }
             }
@@ -241,15 +232,12 @@ fn send_messages(
     control_and_errors: &channel::Sender<Operation>,
     mut id: usize,
     backlog: &[Msg],
-    verbose: bool,
 ) -> usize {
     // We always try to send everything.  Messages that fail are dropped, because the only failure
     // is failure to be enqueued - in that case, the message is probably fatally flawed.
     for msg in backlog.iter() {
         id += 1; // Always give it a new ID, even if it is later dropped.
-        if verbose {
-            log::verbose(&format!("Sending to topic: {} with id {id}", msg.topic));
-        }
+        log::debug!("Sending to topic: {} with id {id}", msg.topic);
         match producer.send(
             BaseRecord::with_opaque_to(&msg.topic, id)
                 .payload(&msg.value)
@@ -277,9 +265,7 @@ impl ProducerContext for SonarProducerContext {
     ) {
         match delivery_result {
             Ok(_) => {
-                if self.verbose {
-                    log::verbose(&format!("Sent #{delivery_opaque} successfully"));
-                }
+                log::debug!("Sent #{delivery_opaque} successfully");
             }
             Err((e, m)) => {
                 // TODO: The message could not be sent.  We could try to disambiguate here and try
@@ -312,13 +298,12 @@ impl KafkaSender {
     fn new(
         cfg: ClientConfig,
         control_and_errors: channel::Sender<Operation>,
-        verbose: bool,
     ) -> Result<KafkaSender, String> {
         let producer: ThreadedProducer<SonarProducerContext, NoCustomPartitioner> =
             cfg
                 .create_with_context::<SonarProducerContext,
                                        ThreadedProducer<SonarProducerContext, NoCustomPartitioner>>(
-                    SonarProducerContext { verbose, control_and_errors },
+                    SonarProducerContext { control_and_errors },
                 )
                 .map_err(|e| format!("Could not create Kafka sender, error={e}"))?;
         Ok(KafkaSender { producer })
@@ -378,16 +363,11 @@ impl SenderAdapter for StdoutSender {
 fn make_sender_adapter(
     cfg: ClientConfig,
     control_and_errors: channel::Sender<Operation>,
-    verbose: bool,
 ) -> Result<Box<dyn SenderAdapter>, String> {
     if std::env::var("SONARTEST_MOCK_KAFKA").is_ok() {
         Ok(Box::new(StdoutSender::new()))
     } else {
-        Ok(Box::new(KafkaSender::new(
-            cfg,
-            control_and_errors.clone(),
-            verbose,
-        )?))
+        Ok(Box::new(KafkaSender::new(cfg, control_and_errors.clone())?))
     }
 }
 
@@ -395,11 +375,6 @@ fn make_sender_adapter(
 fn make_sender_adapter(
     cfg: ClientConfig,
     control_and_errors: channel::Sender<Operation>,
-    verbose: bool,
 ) -> Result<Box<dyn SenderAdapter>, String> {
-    Ok(Box::new(KafkaSender::new(
-        cfg,
-        control_and_errors.clone(),
-        verbose,
-    )?))
+    Ok(Box::new(KafkaSender::new(cfg, control_and_errors.clone())?))
 }
