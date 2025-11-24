@@ -14,6 +14,11 @@ relied upon.  Consumers should expect to see the "new" JSON format for new data,
 should ask for that format.
 
 
+## Changes in v0.16.1 (on `release_0_16`)
+
+* Bug 450 - compute distances correctly to avoid erroring out when NUMA nodes are fewer than sockets;
+  expose `numa_nodes` field on sysinfo for good measure.
+
 ## Changes in v0.16.0 (on `release_0_16`)
 
 * Bug 335 / Bug 415 - **BREAKING CHANGE.** The `cpu_util` field was not emitted properly, it should

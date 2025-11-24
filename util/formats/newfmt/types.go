@@ -326,6 +326,10 @@ type SysinfoAttributes struct {
 	// Architecture name (the `machine` field of `struct utsname`)
 	Architecture NonemptyString `json:"architecture"`
 
+	// Number of NUMA nodes (frequently smaller than the number of sockets), zero if we can't
+	// compute it
+	NumaNodes uint64 `json:"numa_nodes"`
+
 	// Number of CPU sockets
 	Sockets NonzeroUint `json:"sockets"`
 
@@ -342,17 +346,18 @@ type SysinfoAttributes struct {
 	Memory NonzeroUint `json:"memory"`
 
 	// Base64-encoded text output (SVG source text) of `lstopo` or similar, using the base64
-	// alphabet from RFC4648.
+	// alphabet from RFC4648
 	TopoSVG string `json:"topo_svg,omitempty"`
 
 	// Base64-encoded text output (human-readable) of `hwloc-ls` or similar, using the base64
-	// alphabet from RFC4648.
+	// alphabet from RFC4648
 	TopoText string `json:"topo_text,omitempty"`
 
 	// Per-card information
 	Cards []SysinfoGpuCard `json:"cards,omitempty"`
 
-	// Square matrix of standard NUMA node-to-node distances (normalized to 10 for self distance)
+	// Square matrix of standard NUMA node-to-node distances (normalized to 10 for self distance),
+	// empty if we can't compute it
 	Distances [][]uint64 `json:"distances,omitempty"`
 }
 

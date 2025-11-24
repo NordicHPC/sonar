@@ -314,6 +314,11 @@ Operating system version (the `release` field of `struct utsname`)
 
 Architecture name (the `machine` field of `struct utsname`)
 
+#### **`numa_nodes`** uint64
+
+Number of NUMA nodes (frequently smaller than the number of sockets), zero if we can't
+compute it
+
 #### **`sockets`** NonzeroUint
 
 Number of CPU sockets
@@ -337,12 +342,12 @@ Primary memory in kilobytes
 #### **`topo_svg`** string
 
 Base64-encoded text output (SVG source text) of `lstopo` or similar, using the base64
-alphabet from RFC4648.
+alphabet from RFC4648
 
 #### **`topo_text`** string
 
 Base64-encoded text output (human-readable) of `hwloc-ls` or similar, using the base64
-alphabet from RFC4648.
+alphabet from RFC4648
 
 #### **`cards`** []SysinfoGpuCard
 
@@ -350,7 +355,8 @@ Per-card information
 
 #### **`distances`** [][]uint64
 
-Square matrix of standard NUMA node-to-node distances (normalized to 10 for self distance)
+Square matrix of standard NUMA node-to-node distances (normalized to 10 for self distance),
+empty if we can't compute it
 
 ### Type: `SysinfoGpuCard`
 
