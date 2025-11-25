@@ -4,7 +4,6 @@ use crate::gpu;
 use crate::json_tags::*;
 use crate::output;
 use crate::ps_newfmt::format_newfmt;
-use crate::ps_oldfmt::{format_oldfmt, make_oldfmt_heartbeat};
 use crate::systemapi;
 use crate::types::{JobID, Pid, Uid};
 
@@ -18,9 +17,9 @@ use std::time;
 
 #[derive(Default, Clone)]
 pub enum Format {
-    CSV,
+    // There used to be CSV here.  We might add eg Protobuf.
     #[default]
-    NewJSON,
+    JSON,
 }
 
 #[derive(Default, Clone)]
@@ -165,7 +164,7 @@ fn do_create_snapshot(
 ) {
     match collect_sample_data(system, opts) {
         Ok(Some(sample_data)) => match opts.fmt {
-            Format::NewJSON => {
+            Format::JSON => {
                 let recoverable_errors = output::Array::new();
                 let o = output::Value::O(format_newfmt(
                     &sample_data,
@@ -175,38 +174,20 @@ fn do_create_snapshot(
                 ));
                 output::write_json(writer, &o);
             }
-            Format::CSV => {
-                let mut elements = format_oldfmt(&sample_data, system, opts).take();
-                if elements.len() == 0 {
-                    elements.push(output::Value::O(make_oldfmt_heartbeat(system)))
-                }
-                for e in &elements {
-                    output::write_csv(writer, e);
-                }
-            }
         },
         Ok(None) => {
             // Interrupted, do not print anything
         }
-        Err(error) => {
-            match opts.fmt {
-                Format::NewJSON => {
-                    let mut envelope = output::newfmt_envelope(system, opts.token.clone(), &[]);
-                    envelope.push_a(
-                        SAMPLE_ENVELOPE_ERRORS,
-                        output::newfmt_one_error(system, error),
-                    );
-                    output::write_json(writer, &output::Value::O(envelope));
-                }
-                Format::CSV => {
-                    let mut hb = make_oldfmt_heartbeat(system);
-                    //+ignore-strings
-                    hb.push_s("error", error);
-                    //-ignore-strings
-                    output::write_csv(writer, &output::Value::O(hb))
-                }
+        Err(error) => match opts.fmt {
+            Format::JSON => {
+                let mut envelope = output::newfmt_envelope(system, opts.token.clone(), &[]);
+                envelope.push_a(
+                    SAMPLE_ENVELOPE_ERRORS,
+                    output::newfmt_one_error(system, error),
+                );
+                output::write_json(writer, &output::Value::O(envelope));
             }
-        }
+        },
     }
 }
 

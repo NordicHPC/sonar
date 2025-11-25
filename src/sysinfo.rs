@@ -41,7 +41,7 @@ impl<'a> State<'a> {
             &mut writer,
             self.system,
             self.token.clone(),
-            Format::NewJSON,
+            Format::JSON,
             self.topo_svg_cmd.clone(),
             self.topo_text_cmd.clone(),
         );
@@ -51,9 +51,8 @@ impl<'a> State<'a> {
 
 #[derive(Clone)]
 pub enum Format {
-    CSV,
-    OldJSON,
-    NewJSON,
+    // There used to be CSV and OldJSON here, we might add eg Protobuf
+    JSON,
 }
 
 pub fn show_system(
@@ -77,20 +76,15 @@ pub fn show_system(
                 }
             }
             match fmt {
-                Format::NewJSON => layout_sysinfo_newfmt(system, token, info),
-                Format::CSV | Format::OldJSON => layout_sysinfo_oldfmt(system, info),
+                Format::JSON => layout_sysinfo_newfmt(system, token, info),
             }
         }
         Err(e) => match fmt {
-            Format::NewJSON => layout_error_newfmt(system, token, e),
-            Format::CSV | Format::OldJSON => layout_error_oldfmt(system, e),
+            Format::JSON => layout_error_newfmt(system, token, e),
         },
     };
     match fmt {
-        Format::CSV => {
-            output::write_csv(writer, &output::Value::O(sysinfo));
-        }
-        Format::NewJSON | Format::OldJSON => {
+        Format::JSON => {
             output::write_json(writer, &output::Value::O(sysinfo));
         }
     }
@@ -245,92 +239,14 @@ fn layout_card_info_newfmt(node_info: &NodeInfo) -> output::Array {
     gpu_info
 }
 
-// Old JSON/CSV format - this is flattish (to accomodate CSV) and has some idiosyncratic field names.
-
-//+ignore-strings
-fn layout_sysinfo_oldfmt(system: &dyn systemapi::SystemAPI, node_info: NodeInfo) -> output::Object {
-    let gpu_info = layout_card_info_oldfmt(&node_info);
-    let mut sysinfo = output::Object::new();
-    sysinfo.push_s("version", system.get_version());
-    sysinfo.push_s("timestamp", system.get_timestamp());
-    sysinfo.push_s("hostname", system.get_hostname());
-    sysinfo.push_s("description", node_info.description);
-    sysinfo.push_u("cpu_cores", node_info.logical_cores);
-    sysinfo.push_u("mem_gb", node_info.mem_kb / (1024 * 1024));
-    if node_info.gpu_cards != 0 {
-        sysinfo.push_u("gpu_cards", node_info.gpu_cards);
-        if node_info.gpumem_kb != 0 {
-            sysinfo.push_u("gpumem_gb", node_info.gpumem_kb / (1024 * 1024));
-        }
-        if gpu_info.len() > 0 {
-            sysinfo.push_a("gpu_info", gpu_info);
-        }
-    }
-    sysinfo
-}
-
-fn layout_error_oldfmt(system: &dyn systemapi::SystemAPI, error: String) -> output::Object {
-    let mut sysinfo = output::Object::new();
-    sysinfo.push_s("version", system.get_version());
-    sysinfo.push_s("timestamp", system.get_timestamp());
-    sysinfo.push_s("hostname", system.get_hostname());
-    sysinfo.push_s("error", error);
-    sysinfo
-}
-
-fn layout_card_info_oldfmt(node_info: &NodeInfo) -> output::Array {
-    let mut gpu_info = output::Array::new();
-    for c in &node_info.cards {
-        let gpu::Card {
-            device,
-            bus_addr,
-            manufacturer,
-            model,
-            arch,
-            driver,
-            firmware,
-            mem_size_kib,
-            power_limit_watt,
-            max_power_limit_watt,
-            min_power_limit_watt,
-            max_ce_clock_mhz,
-            max_mem_clock_mhz,
-        } = c;
-        let mut gpu = output::Object::new();
-        gpu.push_s("bus_addr", bus_addr.to_string());
-        gpu.push_i("index", device.index as i64);
-        gpu.push_s("uuid", device.uuid.to_string());
-        gpu.push_s("manufacturer", manufacturer.to_string());
-        gpu.push_s("model", model.to_string());
-        gpu.push_s("arch", arch.to_string());
-        gpu.push_s("driver", driver.to_string());
-        gpu.push_s("firmware", firmware.to_string());
-        gpu.push_u("mem_size_kib", *mem_size_kib);
-        gpu.push_i("power_limit_watt", *power_limit_watt as i64);
-        gpu.push_i("max_power_limit_watt", *max_power_limit_watt as i64);
-        gpu.push_i("min_power_limit_watt", *min_power_limit_watt as i64);
-        gpu.push_i("max_ce_clock_mhz", *max_ce_clock_mhz as i64);
-        gpu.push_i("max_mem_clock_mhz", *max_mem_clock_mhz as i64);
-        gpu_info.push_o(gpu);
-    }
-    gpu_info
-}
-//-ignore-strings
-
-const GIB: usize = 1024 * 1024 * 1024;
-
 struct NodeInfo {
     node: String,
-    description: String,
-    logical_cores: u64,
     numa_nodes: u64,
     sockets: u64,
     cores_per_socket: u64,
     threads_per_core: u64,
     cores: Vec<systemapi::CoreInfo>,
     mem_kb: u64,
-    gpu_cards: u64,
-    gpumem_kb: u64,
     cards: Vec<gpu::Card>,
     distances: Vec<Vec<u32>>, // square matrix
     topo_svg: Option<String>,
@@ -345,76 +261,21 @@ fn compute_nodeinfo(system: &dyn systemapi::SystemAPI) -> Result<NodeInfo, Strin
         threads_per_core,
         cores,
     } = system.get_cpu_info()?;
-    let model_name = cores[0].model_name.clone(); // expedient
     let memory = system.get_memory_in_kib()?;
     let mem_kb = memory.total;
-    let mem_gb = (mem_kb as f64 / (1024.0 * 1024.0)).round() as u64;
-    let mut cards = match gpus.probe() {
+    let cards = match gpus.probe() {
         Some(device) => device.get_card_configuration().unwrap_or_default(),
         None => vec![],
     };
-    let ht = if threads_per_core > 1 {
-        " (hyperthreaded)"
-    } else {
-        ""
-    };
     let distances = system.get_numa_distances()?;
-
-    let (gpu_desc, gpu_cards, gpumem_kb) = if !cards.is_empty() {
-        // Sort cards
-        cards.sort_by(|a: &gpu::Card, b: &gpu::Card| {
-            if a.model == b.model {
-                a.mem_size_kib.cmp(&b.mem_size_kib)
-            } else {
-                a.model.cmp(&b.model)
-            }
-        });
-
-        // Merge equal cards
-        let mut i = 0;
-        let mut gpu_desc = "".to_string();
-        while i < cards.len() {
-            let first = i;
-            while i < cards.len()
-                && cards[i].model == cards[first].model
-                && cards[i].mem_size_kib == cards[first].mem_size_kib
-            {
-                i += 1;
-            }
-            let memsize = if cards[first].mem_size_kib > 0 {
-                ((cards[first].mem_size_kib as f64 * 1024.0 / GIB as f64).round() as usize)
-                    .to_string()
-            } else {
-                "unknown ".to_string()
-            };
-            gpu_desc += &format!(", {}x {} @ {}GiB", (i - first), cards[first].model, memsize);
-        }
-
-        // Compute aggregate data
-        let gpu_cards = cards.len() as i32;
-        let mut total_mem_kb = 0u64;
-        for c in &cards {
-            total_mem_kb += c.mem_size_kib;
-        }
-        (gpu_desc, gpu_cards, total_mem_kb)
-    } else {
-        ("".to_string(), 0, 0)
-    };
-
     Ok(NodeInfo {
         node: system.get_hostname(),
-        description: format!(
-            "{sockets}x{cores_per_socket}{ht} {model_name}, {mem_gb} GiB{gpu_desc}"
-        ),
-        logical_cores: (sockets * cores_per_socket * threads_per_core) as u64,
         numa_nodes: distances.len() as u64,
         sockets: sockets as u64,
         cores_per_socket: cores_per_socket as u64,
         threads_per_core: threads_per_core as u64,
         cores,
         mem_kb,
-        gpu_cards: gpu_cards as u64,
-        gpumem_kb,
         cards,
         distances,
         topo_svg: None,
