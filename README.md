@@ -152,7 +152,7 @@ future, reflecting the experimental nature of Sonar.
 
 At the time of writing we require:
 - 2021 edition of Rust
-- Rust 1.77.2 (can be found with `cargo msrv find`)
+- Rust 1.81.0 (can be found with `cargo msrv find`)
 
 For all other versioning information, see [doc/VERSIONING.md](doc/VERSIONING.md).
 

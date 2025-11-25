@@ -257,7 +257,7 @@ fn get_card_uuid(amd: &AmdGPU, dev: u32) -> String {
 
 fn get_card_uuid_from_info(amd: &AmdGPU, infobuf: &AmdmlCardInfo) -> String {
     #[cfg(debug_assertions)]
-    let uuid = if let Ok(_) = std::env::var("SONARTEST_FAIL_UUID") {
+    let uuid = if std::env::var("SONARTEST_FAIL_UUID").is_ok() {
         "".to_string()
     } else {
         cstrdup(&infobuf.uuid)

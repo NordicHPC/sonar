@@ -150,16 +150,10 @@ fn layout_sysinfo_newfmt(
     }
     attrs.push_a(SYSINFO_ATTRIBUTES_DISTANCES, distances);
     if let Some(ref topo_svg) = node_info.topo_svg {
-        attrs.push_s(
-            SYSINFO_ATTRIBUTES_TOPO_SVG,
-            STANDARD.encode(topo_svg.to_string()),
-        );
+        attrs.push_s(SYSINFO_ATTRIBUTES_TOPO_SVG, STANDARD.encode(topo_svg));
     }
     if let Some(ref topo_text) = node_info.topo_text {
-        attrs.push_s(
-            SYSINFO_ATTRIBUTES_TOPO_TEXT,
-            STANDARD.encode(topo_text.to_string()),
-        );
+        attrs.push_s(SYSINFO_ATTRIBUTES_TOPO_TEXT, STANDARD.encode(topo_text));
     }
     let gpu_info = layout_card_info_newfmt(&node_info);
     if gpu_info.len() > 0 {

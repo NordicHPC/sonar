@@ -15,7 +15,7 @@ bgpid=$!
 # Wait for the first process to get going
 sleep 3
 cargo run -- ps --lockdir . 2> $logfile
-if [[ $(tail -n 1 $logfile) != 'Info: Lockfile present, exiting' ]]; then
+if ! grep -q -E "WARN.*Lockfile present, exiting" $logfile; then
     fail "Unexpected output!"
 fi
 # Wait for the first process to exit

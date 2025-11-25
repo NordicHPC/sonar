@@ -24,6 +24,7 @@ tests="amd-gpu \
      hostname \
      load \
      lockfile \
+     logging \
      min-cpu-time \
      no-gpu \
      nvidia-gpu \

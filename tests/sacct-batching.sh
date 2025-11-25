@@ -77,7 +77,7 @@ SONARTEST_MOCK_KAFKA=1 \
     SONARTEST_MOCK_SCONTROL=/dev/null \
     cargo run -- daemon $inifile > /dev/null 2> $logfile
 
-actual_records=$(grep '^Info: Sending to topic: ' $logfile | wc -l)
+actual_records=$(grep 'DEBUG.*Sending to topic: ' $logfile | wc -l)
 if ((actual_records != expected_records)); then
     cat $logfile
     fail "Wrong number of records sent, expected $expected_records got $actual_records"

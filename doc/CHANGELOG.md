@@ -19,6 +19,7 @@ should ask for that format.
 
 * Bug 434 - **IMPORTANT FUNCTIONALITY.** Introduce the batch-size setting to allow very large
   slurm job lists to be split into multiple messages.
+* Bug 453 - Use standard logging, allow control via RUST_LOG.
 
 
 ## Changes in v0.16.1 (on `release_0_16`)

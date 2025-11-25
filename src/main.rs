@@ -9,7 +9,6 @@ mod hostname;
 mod jobsapi;
 mod json_tags;
 mod linux;
-mod log;
 //#[cfg(test)]
 //mod mockjobs;
 mod nodelist;
@@ -132,7 +131,17 @@ enum Commands {
 }
 
 fn main() {
-    log::init();
+    let args = std::env::args().collect::<Vec<String>>();
+
+    // In daemon mode the logging level must be set after command line parsing.  We could avoid this
+    // wrinkle by implementing our own logging engine trait.
+    if args.len() < 2 || args[1] != "daemon" {
+        simple_logger::SimpleLogger::new()
+            .with_level(log::LevelFilter::Warn)
+            .env()
+            .init()
+            .unwrap();
+    }
 
     let mut stdout = io::stdout();
     let writer: &mut dyn io::Write = &mut stdout;
@@ -145,7 +154,16 @@ fn main() {
     #[cfg(not(debug_assertions))]
     let force_slurm = false;
 
-    match &command_line() {
+    #[cfg(debug_assertions)]
+    if std::env::var("SONARTEST_LOGGING").is_ok() {
+        log::error!("Error log message");
+        log::warn!("Warning log message");
+        log::info!("Info log message");
+        log::debug!("Debug log message");
+        log::trace!("Trace log message");
+    }
+
+    match &command_line(args) {
         #[cfg(feature = "daemon")]
         Commands::Daemon { config_file } => {
             // This ignores `writer`, as the daemon manages its own I/O.
@@ -155,7 +173,7 @@ fn main() {
             match daemon::daemon_mode(config_file, system, force_slurm) {
                 Ok(_) => {}
                 Err(e) => {
-                    log::error(&format!("Daemon returned with error: {e}"));
+                    log::error!("Daemon returned with error: {e}");
                 }
             }
         }
@@ -293,8 +311,7 @@ fn main() {
 // Note that --json means "new json" everywhere, so --json for `sonar sysinfo` changes the output
 // format from the default old JSON encoding.
 
-fn command_line() -> Commands {
-    let args = std::env::args().collect::<Vec<String>>();
+fn command_line(args: Vec<String>) -> Commands {
     let mut next = 1;
     if next < args.len() {
         let command = args[next].as_ref();

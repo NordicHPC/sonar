@@ -600,7 +600,7 @@ pub fn compute_cpu_utilization(
     let ticks_per_sec = system.get_clock_ticks_per_sec() as u64;
 
     let mut temp = Vec::with_capacity(processes.len());
-    for (pid, _) in processes {
+    for pid in processes.keys() {
         let time_before = time::Instant::now();
         let (ok, ticks) = compute_process_ticks(fs, *pid)?;
         temp.push((*pid, ok, ticks, time_before));
@@ -631,9 +631,7 @@ pub fn compute_cpu_utilization(
 
 fn compute_process_ticks(fs: &dyn ProcfsAPI, pid: usize) -> Result<(bool, u64), String> {
     match fs.read_to_string(&format!("{pid}/stat")) {
-        Err(_) => {
-            return Ok((false, 0));
-        }
+        Err(_) => Ok((false, 0)),
         Ok(line) => {
             let field_storage: String;
             let fields: Vec<&str>;
@@ -653,7 +651,7 @@ fn compute_process_ticks(fs: &dyn ProcfsAPI, pid: usize) -> Result<(bool, u64), 
             let cutime_ticks = parse_usize_field(&fields, 13, &line, "stat", pid, "cutime")? as u64;
             let cstime_ticks = parse_usize_field(&fields, 14, &line, "stat", pid, "cstime")? as u64;
             let bsdtime_ticks = utime_ticks + stime_ticks + cutime_ticks + cstime_ticks;
-            return Ok((true, bsdtime_ticks));
+            Ok((true, bsdtime_ticks))
         }
     }
 }
