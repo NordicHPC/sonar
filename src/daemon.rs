@@ -83,8 +83,6 @@ pub struct SampleIni {
 pub struct SysinfoIni {
     pub on_startup: bool,
     pub cadence: Option<Dur>,
-    pub topo_svg_cmd: Option<String>,
-    pub topo_text_cmd: Option<String>,
 }
 
 pub struct JobsIni {
@@ -98,11 +96,20 @@ pub struct ClusterIni {
     pub cadence: Option<Dur>,
 }
 
+pub struct ProgramsIni {
+    pub topo_svg_cmd: Option<String>,
+    pub topo_text_cmd: Option<String>,
+    pub sacct_cmd: Option<String>,
+    pub sinfo_cmd: Option<String>,
+    pub scontrol_cmd: Option<String>,
+}
+
 pub struct Ini {
     pub global: GlobalIni,
     #[cfg(feature = "kafka")]
     pub kafka: KafkaIni,
     pub directory: DirectoryIni,
+    pub programs: ProgramsIni,
     pub debug: DebugIni,
     pub sample: SampleIni,
     pub sysinfo: SysinfoIni,
@@ -201,6 +208,22 @@ pub fn daemon_mode(
 
     if ini.sample.cadence.is_some() {
         system = system.with_jobmanager(Box::new(jobsapi::AnyJobManager::new(force_slurm)));
+    }
+
+    if let Some(ref p) = ini.programs.topo_svg_cmd {
+        system = system.with_topo_svg_cmd(p);
+    }
+    if let Some(ref p) = ini.programs.topo_text_cmd {
+        system = system.with_topo_text_cmd(p);
+    }
+    if let Some(ref p) = ini.programs.sacct_cmd {
+        system = system.with_sacct_cmd(p);
+    }
+    if let Some(ref p) = ini.programs.sinfo_cmd {
+        system = system.with_sinfo_cmd(p);
+    }
+    if let Some(ref p) = ini.programs.scontrol_cmd {
+        system = system.with_scontrol_cmd(p);
     }
 
     let system = system.with_cluster(&ini.global.cluster).freeze()?;
@@ -309,12 +332,7 @@ pub fn daemon_mode(
         },
     );
 
-    let mut sysinfo_extractor = sysinfo::State::new(
-        &system,
-        ini.sysinfo.topo_svg_cmd.clone(),
-        ini.sysinfo.topo_text_cmd.clone(),
-        api_token.clone(),
-    );
+    let mut sysinfo_extractor = sysinfo::State::new(&system, api_token.clone());
 
     let mut cluster_extractor = cluster::State::new(&system, api_token.clone());
 
@@ -655,14 +673,19 @@ fn parse_config(config_file: &str) -> Result<Ini, String> {
         sysinfo: SysinfoIni {
             on_startup: true,
             cadence: None,
-            topo_svg_cmd: None,
-            topo_text_cmd: None,
         },
         jobs: JobsIni {
             cadence: None,
             window: None,
             uncompleted: false,
             batch_size: None,
+        },
+        programs: ProgramsIni {
+            sacct_cmd: None,
+            sinfo_cmd: None,
+            scontrol_cmd: None,
+            topo_svg_cmd: None,
+            topo_text_cmd: None,
         },
         cluster: ClusterIni { cadence: None },
     };
@@ -674,6 +697,7 @@ fn parse_config(config_file: &str) -> Result<Ini, String> {
         Kafka,
         Directory,
         Debug,
+        Programs,
         Sample,
         Sysinfo,
         Jobs,
@@ -722,6 +746,10 @@ fn parse_config(config_file: &str) -> Result<Ini, String> {
         }
         if l == "[debug]" {
             curr_section = Section::Debug;
+            continue;
+        }
+        if l == "[programs]" {
+            curr_section = Section::Programs;
             continue;
         }
         if l == "[ps]" || l == "[sample]" {
@@ -849,10 +877,10 @@ fn parse_config(config_file: &str) -> Result<Ini, String> {
                     ini.sysinfo.cadence = Some(parse_duration("sysinfo.cadence", &value, false)?);
                 }
                 "topo-svg-command" => {
-                    ini.sysinfo.topo_svg_cmd = Some(value);
+                    ini.programs.topo_svg_cmd = Some(value);
                 }
                 "topo-text-command" => {
-                    ini.sysinfo.topo_text_cmd = Some(value);
+                    ini.programs.topo_text_cmd = Some(value);
                 }
                 _ => return Err(format!("Invalid [sysinfo] setting name `{name}`")),
             },
@@ -884,6 +912,33 @@ fn parse_config(config_file: &str) -> Result<Ini, String> {
                     ini.cluster.cadence = Some(parse_duration("cluster.cadence", &value, false)?);
                 }
                 _ => return Err(format!("Invalid [cluster] setting name `{name}`")),
+            },
+            Section::Programs => match name.as_str() {
+                "sacct-command" => {
+                    if value != "" {
+                        check_path("sacct-command", &value)?;
+                    }
+                    ini.programs.sacct_cmd = Some(value);
+                }
+                "scontrol-command" => {
+                    if value != "" {
+                        check_path("scontrol-command", &value)?;
+                    }
+                    ini.programs.scontrol_cmd = Some(value);
+                }
+                "sinfo-command" => {
+                    if value != "" {
+                        check_path("sinfo-command", &value)?;
+                    }
+                    ini.programs.sinfo_cmd = Some(value);
+                }
+                "topo-svg-command" => {
+                    ini.programs.topo_svg_cmd = Some(value);
+                }
+                "topo-text-command" => {
+                    ini.programs.topo_text_cmd = Some(value);
+                }
+                _ => return Err(format!("Invalid [programs] setting name `{name}`")),
             },
         }
     }
@@ -931,6 +986,29 @@ fn parse_config(config_file: &str) -> Result<Ini, String> {
     }
 
     Ok(ini)
+}
+
+fn check_path(context: &str, value: &str) -> Result<(), String> {
+    // Must be absolute path without .. elements or spaces (literally spaces, other whitespace is
+    // allowed for now).
+    if !value.starts_with('/') {
+        return Err(format!("{context} must be an absolute path"));
+    }
+    if value.contains("/../") {
+        return Err(format!("{context} must not contain .. elements"));
+    }
+    if value.contains(' ') {
+        return Err(format!("{context} must not contain spaces"));
+    }
+    Ok(())
+}
+
+#[test]
+pub fn test_check_path() {
+    assert!(check_path("", "/a/b/c").is_ok());
+    assert!(check_path("", "a/b/c").is_err());
+    assert!(check_path("", "/a/b/../c").is_err());
+    assert!(check_path("", "/a/b /c").is_err());
 }
 
 fn parse_setting(l: &str) -> Result<(String, String), String> {
@@ -1111,10 +1189,15 @@ pub fn test_parser() {
         assert!(&ini.sample.exclude_commands[i] == xcmds[i]);
     }
 
+    // The topo commands come from the sysinfo section
+    assert!(ini.programs.topo_svg_cmd == Some("hello".to_string()));
+    assert!(ini.programs.topo_text_cmd == Some("goodbye".to_string()));
+    assert!(ini.programs.sinfo_cmd == None);
+    assert!(ini.programs.sacct_cmd == Some("/home/zappa/bin/sacct".to_string()));
+    assert!(ini.programs.scontrol_cmd == Some("/home/zappa/bin/scontrol".to_string()));
+
     assert!(ini.sysinfo.cadence == Some(Dur::Hours(24)));
     assert!(!ini.sysinfo.on_startup);
-    assert!(ini.sysinfo.topo_svg_cmd == Some("hello".to_string()));
-    assert!(ini.sysinfo.topo_text_cmd == Some("goodbye".to_string()));
 
     assert!(ini.jobs.cadence == Some(Dur::Hours(1)));
     assert!(ini.jobs.window == Some(Dur::Minutes(90)));

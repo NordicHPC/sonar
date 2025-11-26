@@ -124,26 +124,10 @@ These are the normal options for `sonar ps`, see the Sonar documentation.
 ```
 cadence = <duration value>
 on-startup = <bool>                             # default true
-topo-svg-command = <string>                     # default none
-topo-text-command = <string>                    # default none
 ```
 
 If `on-startup` is `true` then a sysinfo operation will be executed every time the daemon is
 started, in addition to according to the cadence.
-
-The `topo-svg-command` value should be a command line that produces an SVG describing node topology
-on stdout, typically this would be "/path/to/lstopo --of svg".  The output of the command will be
-placed in the `topo_svg` field.
-
-The `topo-text-command` value should be a command line that produces text describing node topology
-on stdout, typically this would be "/path/to/hwloc-ls".  The output of the command will be placed in
-the `topo_text` field.
-
-Normally, at most one of `topo-svg-command` and `topo-text-command` is used.  If a command can't be
-executed, the directive is silently ignored.
-
-Note that on a serious node, the output of `lstopo` can be large, on the order of several
-hundred KB when base64-encoded, while the output for `hwloc-ls` is usually quite compact.
 
 ### `[jobs]` section aka `[slurm]` section
 
@@ -171,6 +155,36 @@ may become so large that they cause transmission issues, notably by default Kafk
 ```
 cadence = <duration value>
 ```
+
+### `[programs]` section
+
+```
+sacct-command = <string>                        # default "sacct"
+scontrol-command = <string>                     # default "scontrol"
+sinfo-command = <string>                        # default "sinfo"
+topo-svg-command = <string>                     # default none
+topo-text-command = <string>                    # default none
+```
+
+The `sacct-command`, `scontrol-command` and `sinfo-command` commands are used to obtain slurm data
+for the `[jobs]` and `[cluster]` operations.  If specified, they *must* be absolute paths without
+`..` elements and spaces, or they must be empty strings (to disable).
+
+The `topo-svg-command` value should be a command line that produces an SVG describing node topology
+on stdout, typically this would be "/path/to/lstopo --of svg".  The output of the command will be
+placed in the `topo_svg` field of the sysinfo blob.  Spaces separate elements and must not appear in
+the commands or arguments.
+
+The `topo-text-command` value should be a command line that produces text describing node topology
+on stdout, typically this would be "/path/to/hwloc-ls".  The output of the command will be placed in
+the `topo_text` field of the sysinfo blob.  Spaces separate elements and must not appear in the
+commands or arguments.
+
+Normally, at most one of `topo-svg-command` and `topo-text-command` is used.  If a command can't be
+executed, the directive is silently ignored.
+
+Note that on a serious node, the output of `lstopo` can be large, on the order of several
+hundred KB when base64-encoded, while the output for `hwloc-ls` is usually quite compact.
 
 ### `[debug]` section
 

@@ -221,13 +221,21 @@ fn main() {
             } else {
                 system
             };
+            let system = if let Some(ref c) = topo_svg_cmd {
+                system.with_topo_svg_cmd(c)
+            } else {
+                system
+            };
+            let system = if let Some(ref c) = topo_text_cmd {
+                system.with_topo_text_cmd(c)
+            } else {
+                system
+            };
             sysinfo::show_system(
                 writer,
                 &system.freeze().expect("System initialization"),
                 token,
                 sysinfo::Format::JSON,
-                topo_svg_cmd.clone(),
-                topo_text_cmd.clone(),
             );
         }
         Commands::Slurmjobs {

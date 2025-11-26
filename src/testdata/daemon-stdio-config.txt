@@ -34,6 +34,11 @@ exclude-system-jobs = false
 exclude-users = bob,alice
 exclude-commands = ls,runuser
 
+# Note sinfo-command is left at the default, to test defaults
+[programs]
+scontrol-command = /home/zappa/bin/scontrol
+sacct-command = /home/zappa/bin/sacct
+
 [sysinfo]
 cadence = 24h
 on-startup = false
