@@ -37,6 +37,33 @@ function assert() {
     done
 }
 
+function guard() {
+    while [[ -n $1 ]]; do
+        if [[ -z $(command -v $1) ]]; then
+            echo " No $1; skipping test"
+            exit 0
+        fi
+        shift 1
+    done
+}
+
+function guard_group() {
+    while [[ -n $1 ]]; do
+        in_group=0
+        for g in $(groups); do
+            if [[ $g == $1 ]]; then
+                in_group=1
+                break
+            fi
+        done
+        if ((in_group == 0)); then
+            echo " Not in group $1; skipping test"
+            exit 0
+        fi
+        shift 1
+    done
+}
+
 function join() {
     local xs=$1
     shift 1

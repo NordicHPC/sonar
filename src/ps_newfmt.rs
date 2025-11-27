@@ -3,7 +3,7 @@
 use crate::gpu;
 use crate::json_tags::*;
 use crate::output;
-use crate::ps::{ProcInfo, PsOptions, SampleData};
+use crate::ps::{CState, ProcInfo, PsOptions, SampleData};
 use crate::systemapi;
 use crate::util::three_places;
 
@@ -188,6 +188,9 @@ fn format_newfmt_sample(proc_info: &ProcInfo) -> output::Object {
     }
     if proc_info.ppid != 0 {
         fields.push_u(SAMPLE_PROCESS_PARENT_PID, proc_info.ppid as u64);
+    }
+    if proc_info.container_state == CState::Child {
+        fields.push_b(SAMPLE_PROCESS_IN_CONTAINER, true);
     }
     if proc_info.num_threads != 0 {
         fields.push_u(SAMPLE_PROCESS_NUM_THREADS, proc_info.num_threads as u64);
