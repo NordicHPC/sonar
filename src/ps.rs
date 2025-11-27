@@ -237,6 +237,7 @@ pub struct ProcInfo {
     pub rolledup: usize,
     pub num_threads: usize,
     pub is_system_job: bool,
+    pub is_container_process: bool,
     pub has_children: bool,
     pub job_id: usize,
     pub is_slurm: bool,
@@ -322,6 +323,10 @@ fn collect_sample_data(
         return Ok(None);
     }
 
+    if opts.exclude_system_jobs {
+        procinfo_by_pid = mark_containers(procinfo_by_pid);
+    }
+
     let mut candidates = if opts.rollup {
         rollup_processes(procinfo_by_pid)
     } else {
@@ -347,6 +352,46 @@ fn collect_sample_data(
         runnable_entities,
         existing_entities,
     }))
+}
+
+fn mark_containers(mut procinfo_by_pid: ProcInfoTable) -> ProcInfoTable {
+    // Basically any subprocess of a process with "containerd" in the name whose ppid is 1 is a
+    // process running in a container and it should be marked as such.
+
+    // Pass 1: Mark roots
+    for (_, v) in &mut procinfo_by_pid {
+        v.is_container_process = v.command.starts_with("containerd") && v.ppid == 1;
+    }
+
+    // Pass 2: Walk up the tree from every process and if we get to something marked, mark
+    // everything along the path.
+    let all = procinfo_by_pid.keys().map(|v| *v).collect::<Vec<Pid>>();
+    let mut keys = vec![];
+    'outer: for k in all {
+        keys.clear();
+        let mut current = k;
+        loop {
+            if let Some(v) = procinfo_by_pid.get(&current) {
+                if v.pid == 1 {
+                    continue 'outer;
+                }
+                if v.is_container_process {
+                    break;
+                }
+                keys.push(current);
+                current = v.ppid;
+            } else {
+                continue 'outer;
+            }
+        }
+        for k in &keys {
+            if let Some(v) = procinfo_by_pid.get_mut(k) {
+                v.is_container_process = true
+            }
+        }
+    }
+
+    procinfo_by_pid
 }
 
 fn new_with_cpu_info(
@@ -654,7 +699,7 @@ fn filter_proc(proc_info: &ProcInfo, opts: &PsOptions) -> bool {
     // The exclusion filters apply after the inclusion filters and the record must pass all of the
     // ones that are provided.
 
-    if opts.exclude_system_jobs && proc_info.is_system_job {
+    if opts.exclude_system_jobs && proc_info.is_system_job && !proc_info.is_container_process {
         included = false;
     }
     if !opts.exclude_users.is_empty() && opts.exclude_users.contains(&proc_info.user) {
