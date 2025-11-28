@@ -701,7 +701,10 @@ fn filter_proc(proc_info: &ProcInfo, opts: &PsOptions) -> bool {
     // The exclusion filters apply after the inclusion filters and the record must pass all of the
     // ones that are provided.
 
-    if opts.exclude_system_jobs && proc_info.is_system_job && (!proc_info.is_container_process || proc_info.is_container_root) {
+    if opts.exclude_system_jobs
+        && proc_info.is_system_job
+        && (!proc_info.is_container_process || proc_info.is_container_root)
+    {
         included = false;
     }
     if !opts.exclude_users.is_empty() && opts.exclude_users.contains(&proc_info.user) {
