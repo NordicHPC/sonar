@@ -638,7 +638,8 @@ The job ID
 #### **`user`** NonemptyString
 
 User name on the cluster; `_user_<uid>` if not determined but user ID is available,
-`_user_unknown` otherwise.
+`_user_unknown` otherwise.  Notably in the case of container processes (see the "InContainer"
+flag in SampleProcess), the user may be nonsensical (unknown or wrong uid) or root.
 
 #### **`epoch`** uint64
 
@@ -701,6 +702,11 @@ Process ID, zero is used for rolled-up samples (see below at "Rolledup").
 #### **`ppid`** uint64
 
 Parent-process ID.
+
+#### **`in_container`** bool
+
+True if deemed a part of a container.  Notably, for docker this means it is a child of
+something whose name starts with "containerd" where that parent is itself a child of init.
 
 #### **`num_threads`** uint64
 
