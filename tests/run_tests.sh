@@ -16,6 +16,7 @@ tests="amd-gpu \
      daemon-directory \
      daemon-interrupt \
      daemon-kafka \
+     docker-run \
      exclude-commands \
      exclude-system-jobs \
      exclude-users \

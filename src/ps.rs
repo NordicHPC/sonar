@@ -237,6 +237,7 @@ pub struct ProcInfo {
     pub rolledup: usize,
     pub num_threads: usize,
     pub is_system_job: bool,
+    pub is_container_root: bool,
     pub is_container_process: bool,
     pub has_children: bool,
     pub job_id: usize,
@@ -355,12 +356,13 @@ fn collect_sample_data(
 }
 
 fn mark_containers(mut procinfo_by_pid: ProcInfoTable) -> ProcInfoTable {
-    // Basically any subprocess of a process with "containerd" in the name whose ppid is 1 is a
-    // process running in a container and it should be marked as such.
+    // Basically any subprocess of a process whose name starts with "containerd" whose parent is
+    // init is a process running in a container and it should be marked as such.
 
     // Pass 1: Mark roots
     for (_, v) in &mut procinfo_by_pid {
-        v.is_container_process = v.command.starts_with("containerd") && v.ppid == 1;
+        v.is_container_root = v.command.starts_with("containerd") && v.ppid == 1;
+        v.is_container_process = v.is_container_root;
     }
 
     // Pass 2: Walk up the tree from every process and if we get to something marked, mark
@@ -699,7 +701,7 @@ fn filter_proc(proc_info: &ProcInfo, opts: &PsOptions) -> bool {
     // The exclusion filters apply after the inclusion filters and the record must pass all of the
     // ones that are provided.
 
-    if opts.exclude_system_jobs && proc_info.is_system_job && !proc_info.is_container_process {
+    if opts.exclude_system_jobs && proc_info.is_system_job && (!proc_info.is_container_process || proc_info.is_container_root) {
         included = false;
     }
     if !opts.exclude_users.is_empty() && opts.exclude_users.contains(&proc_info.user) {
