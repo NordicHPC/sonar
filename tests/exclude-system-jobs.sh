@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 #
-# Test that the --exclude-system-jobs switch works.  System jobs have uid < 1000.
+# Test that the --exclude-system-jobs switch works.  System jobs have uid < 1000 and their
+# InContainer flag should not be set.
+#
+# TODO:
+#  - this is brittle, it will fail if there are active docker containers on the system.
 
 source sh-helper
 assert cargo jq
