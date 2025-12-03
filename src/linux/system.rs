@@ -73,6 +73,7 @@ impl Builder {
         }
     }
 
+    #[allow(dead_code)]
     pub fn with_sacct_cmd(self, cmd: &str) -> Builder {
         Builder {
             sacct: cmd.to_string(),
@@ -80,6 +81,7 @@ impl Builder {
         }
     }
 
+    #[allow(dead_code)]
     pub fn with_sinfo_cmd(self, cmd: &str) -> Builder {
         Builder {
             sinfo: cmd.to_string(),
@@ -87,6 +89,7 @@ impl Builder {
         }
     }
 
+    #[allow(dead_code)]
     pub fn with_scontrol_cmd(self, cmd: &str) -> Builder {
         Builder {
             scontrol: cmd.to_string(),
@@ -94,6 +97,7 @@ impl Builder {
         }
     }
 
+    #[allow(dead_code)]
     pub fn with_topo_svg_cmd(self, cmd: &str) -> Builder {
         Builder {
             topo_svg: Some(cmd.to_string()),
@@ -101,6 +105,7 @@ impl Builder {
         }
     }
 
+    #[allow(dead_code)]
     pub fn with_topo_text_cmd(self, cmd: &str) -> Builder {
         Builder {
             topo_text: Some(cmd.to_string()),
