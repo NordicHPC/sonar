@@ -20,4 +20,4 @@ rollupchild2: rollupchild
 
 # Same files as in .gitignore
 clean:
-	rm -rf pincpu rollup rollup2 rollupchild rollupchild2 tmp *~
+	rm -rf pincpu pincpus rollup rollup2 rollupchild rollupchild2 tmp *~

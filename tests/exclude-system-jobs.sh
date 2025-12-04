@@ -1,24 +1,21 @@
 #!/usr/bin/env bash
 #
-# Test that the --exclude-system-jobs switch works.  System jobs have uid < 1000.
+# Test that the --exclude-system-jobs switch works.  System jobs have uid < 1000 and the
+# InContainer flag should not be set for any of their processes.
+#
+# Sometimes it's useful to run this test at the same time as this dockerized workload:
+#
+#   make pincpu
+#   docker run -d -v .:/sonar:z --rm -it ubuntu /sonar/pincpu 30
+#
+# In that case, the output should show that at least one dockerized job was found.
 
 source sh-helper
-assert cargo jq
+assert cargo jq go
 
-names=$(cargo run -- ps --exclude-system-jobs | jq --raw-output '.data.attributes.jobs[].user' | sort | uniq)
-uids=""
-for name in $names; do
-    uids="$uids $(getent passwd $name | awk -F: '{ print $3 }')"
-done
-fail=0
-for uid in $uids; do
-    if (( uid < 1000 )); then
-        fail=1
-        echo "Unexpected uid $uid"
-    fi
-done
-if (( fail > 0 )); then
-    fail "Some system uids reported"
-fi
+cargo run -- ps --exclude-system-jobs | \
+    jq -c '.data.attributes.jobs[] | [.user, .processes[].in_container]' | \
+    go run exclude-system-jobs.go
+
 echo " Ok"
 exit 0

@@ -75,6 +75,7 @@ release:
 - on an arm64 node with no GPUs, run `make test`
 - on an x86_64 node with NVIDIA GPUs, run `make test`; the nvidia test should not say "No device"
 - on an x86_64 node with AMD GPUs, run `make test`; the amd test should not say "No device"
+- on a node with docker, run `make test` or `tests/docker*sh`; the test should not say "... skipping test" for any reason
 - on a node with a local Kafka install, go to `tests/kafka` and run the tests as described
   in `tests/kafka/README.md`
 

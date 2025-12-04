@@ -582,7 +582,8 @@ type SampleJob struct {
 	Job uint64 `json:"job"`
 
 	// User name on the cluster; `_user_<uid>` if not determined but user ID is available,
-	// `_user_unknown` otherwise.
+	// `_user_unknown` otherwise.  Notably in the case of container processes (see the "InContainer"
+	// flag in SampleProcess), the user may be nonsensical (unknown or wrong uid) or root.
 	User NonemptyString `json:"user"`
 
 	// Zero for batch jobs, otherwise is a nonzero value that increases (by some amount) when the
@@ -638,6 +639,12 @@ type SampleProcess struct {
 
 	// Parent-process ID.
 	ParentPid uint64 `json:"ppid,omitempty"`
+
+	// True if deemed a part of a container.  Notably, for docker this means it is a child of
+	// something whose name starts with "containerd" where that parent is itself a child of init.
+	// InContainer is a flag on the process and not on the job since it is possible for a job to
+	// fork off a container as part of its work but itself not be running in a container.
+	InContainer bool `json:"in_container,omitempty"`
 
 	// The number of threads in the process, minus 1 - we don't count the process's main thread
 	// (allowing this fields to be omitted in transmission for most processes).
