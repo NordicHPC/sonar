@@ -38,6 +38,7 @@ const SINFO_TIMEOUT_S: u64 = 10;
 pub struct Builder {
     jm: Option<Box<dyn jobsapi::JobManager>>,
     cluster: String,
+    domain: Option<Vec<String>>,
     sacct: String,
     scontrol: String,
     sinfo: String,
@@ -50,11 +51,20 @@ impl Builder {
         Builder {
             jm: None,
             cluster: "".to_string(),
+            domain: None,
             sacct: "sacct".to_string(),
             scontrol: "scontrol".to_string(),
             sinfo: "sinfo".to_string(),
             topo_svg: None,
             topo_text: None,
+        }
+    }
+
+    #[allow(dead_code)]
+    pub fn with_domain(self, domain: &[String]) -> Builder {
+        Builder {
+            domain: Some(domain.iter().map(|x| x.clone()).collect::<Vec<String>>()),
+            ..self
         }
     }
 
@@ -116,9 +126,17 @@ impl Builder {
     pub fn freeze(self) -> Result<System, String> {
         let fs = RealProcFS {};
         let boot_time = procfs::get_boot_time_in_secs_since_epoch(&fs)?;
-        let hostname = hostname::get();
+        let hostname = {
+            let hn = hostname::get();
+            if let Some(ref domain) = self.domain {
+                expand_domain(hn, domain)
+            } else {
+                hn
+            }
+        };
         Ok(System {
             hostname: hostname.clone(),
+            domain: self.domain,
             cluster: self.cluster,
             jm: if let Some(x) = self.jm {
                 x
@@ -141,6 +159,54 @@ impl Builder {
     }
 }
 
+// The entire suffix of hostname must match a prefix of domain, and in that case we attach the rest
+// of domain, otherwise we attach the entire domain to hostname.
+fn expand_domain(hostname: String, domain: &[String]) -> String {
+    let mut full = hostname
+        .split('.')
+        .map(|x| x.to_string())
+        .collect::<Vec<String>>();
+    let mut f = 1;
+    let mut d = 0;
+    let mut matched = true;
+    while f < full.len() && d < domain.len() && matched {
+        if full[f] != domain[d] {
+            matched = false;
+            break;
+        }
+        f += 1;
+        d += 1;
+    }
+    if matched && f == full.len() {
+        for de in domain[d..].iter() {
+            full.push(de.to_string())
+        }
+    } else {
+        for de in domain {
+            full.push(de.to_string());
+        }
+    }
+    full.join(".")
+}
+
+#[test]
+fn test_expand_domain() {
+    assert!(expand_domain("a".to_string(), &[]) == "a");
+    assert!(expand_domain("a.b.c".to_string(), &[]) == "a.b.c");
+    assert!(expand_domain("a.b".to_string(), &["c".to_string()]) == "a.b.c");
+    assert!(expand_domain("a.b".to_string(), &["b".to_string(), "c".to_string()]) == "a.b.c");
+    assert!(expand_domain("a.b.c".to_string(), &["b".to_string(), "c".to_string()]) == "a.b.c");
+    assert!(
+        expand_domain("a.b.c.d".to_string(), &["b".to_string(), "c".to_string()]) == "a.b.c.d.b.c"
+    );
+    assert!(
+        expand_domain(
+            "a.b".to_string(),
+            &["c".to_string(), "d".to_string(), "e".to_string()]
+        ) == "a.b.c.d.e"
+    );
+}
+
 #[cfg(target_arch = "x86_64")]
 const ARCHITECTURE: &str = "x86_64";
 
@@ -152,6 +218,7 @@ const ARCHITECTURE: &'static str = "aarch64";
 
 pub struct System {
     hostname: String,
+    domain: Option<Vec<String>>,
     cluster: String,
     fs: RealProcFS,
     gpus: realgpu::RealGpu,
@@ -190,6 +257,10 @@ impl systemapi::SystemAPI for System {
 
     fn get_cluster(&self) -> String {
         self.cluster.clone()
+    }
+
+    fn get_domain(&self) -> &Option<Vec<String>> {
+        &self.domain
     }
 
     fn get_hostname(&self) -> String {

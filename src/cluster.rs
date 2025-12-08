@@ -60,7 +60,7 @@ fn do_show_cluster(
         p.push_s(CLUSTER_PARTITION_NAME, name);
         p.push_a(
             CLUSTER_PARTITION_NODES,
-            nodelist::parse_and_render(&nodelist)?,
+            nodelist::parse_and_render(system, &nodelist)?,
         );
         partitions.push_o(p);
     }
@@ -68,7 +68,10 @@ fn do_show_cluster(
     let mut nodes = output::Array::new();
     for (nodelist, statelist) in system.compute_cluster_nodes()? {
         let mut p = output::Object::new();
-        p.push_a(CLUSTER_NODES_NAMES, nodelist::parse_and_render(&nodelist)?);
+        p.push_a(
+            CLUSTER_NODES_NAMES,
+            nodelist::parse_and_render(system, &nodelist)?,
+        );
         let mut states = output::Array::new();
         for s in statelist.split('+') {
             states.push_s(s.to_ascii_uppercase());
