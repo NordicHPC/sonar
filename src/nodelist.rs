@@ -1,11 +1,17 @@
 use crate::output;
+use crate::systemapi::SystemAPI;
 
 // Parse a nodelist and render it into an output object as an array of strings.
 
-pub fn parse_and_render(xs: &str) -> Result<output::Array, String> {
+pub fn parse_and_render(system: &dyn SystemAPI, xs: &str) -> Result<output::Array, String> {
     let mut a = output::Array::new();
+    let suffix = if let Some(xs) = system.get_domain() {
+        ".".to_string() + &xs.join(".")
+    } else {
+        "".to_string()
+    };
     for v in parse(xs)? {
-        a.push_s(v);
+        a.push_s(v + &suffix);
     }
     Ok(a)
 }

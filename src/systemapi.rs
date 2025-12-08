@@ -17,6 +17,7 @@ pub trait SystemAPI {
     fn get_version(&self) -> String;
     fn get_timestamp(&self) -> String;
     fn get_cluster(&self) -> String;
+    fn get_domain(&self) -> &Option<Vec<String>>;
     fn get_hostname(&self) -> String;
     fn get_os_name(&self) -> String;
     fn get_os_release(&self) -> String;
