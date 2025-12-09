@@ -43,9 +43,9 @@ func ConsumeJSONJobs(input io.Reader, strict bool, consume func(*JobsEnvelope)) 
 //   billing=20,cpu=20,gres/gpu:rtx30=1,gres/gpu=1,mem=50G,node=1
 
 // The "Value" is an int64 if it can be parsed as that, otherwise float64 if it can be parsed as
-// that, otherwise string.  That includes values suffixed by "G", "M", or "K": "50G" above is parsed
-// as an i64 with the value 50*2^30; "45.50M" would be 45.5*2^20.  Should the value overflow, the
-// parser falls back to a string.
+// that, otherwise string.  That includes values suffixed by "P", "T", "G", "M", or "K": "50G" above
+// is parsed as an i64 with the value 50*2^30; "45.50M" would be 45.5*2^20.  Should the value
+// overflow, the parser falls back to a string.
 
 type SlurmTRES struct {
 	Key   string
@@ -62,7 +62,13 @@ func DecodeSlurmTRES(s string) (result []SlurmTRES, dropped []string) {
 		var value any
 		var scale int64 = 1
 		v := kv
-		if before, found := strings.CutSuffix(v, "G"); found {
+		if before, found := strings.CutSuffix(v, "P"); found {
+			v = before
+			scale = 1024 * 1024 * 1024 * 1024 * 1024
+		} else if before, found := strings.CutSuffix(v, "T"); found {
+			v = before
+			scale = 1024 * 1024 * 1024 * 1024
+		} else if before, found := strings.CutSuffix(v, "G"); found {
 			v = before
 			scale = 1024 * 1024 * 1024
 		} else if before, found := strings.CutSuffix(v, "M"); found {
