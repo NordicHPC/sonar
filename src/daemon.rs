@@ -44,7 +44,6 @@ use signal_hook::iterator::Signals;
 pub struct GlobalIni {
     pub cluster: String,
     pub role: String,
-    pub domain: Option<Vec<String>>,
     pub lockdir: Option<String>,
     pub topic_prefix: Option<String>,
 }
@@ -95,6 +94,7 @@ pub struct JobsIni {
 
 pub struct ClusterIni {
     pub cadence: Option<Dur>,
+    pub domain: Option<Vec<String>>,
 }
 
 pub struct ProgramsIni {
@@ -211,8 +211,8 @@ pub fn daemon_mode(
         system = system.with_jobmanager(Box::new(jobsapi::AnyJobManager::new(force_slurm)));
     }
 
-    if let Some(ref p) = ini.global.domain {
-        system = system.with_domain(p);
+    if let Some(ref p) = ini.cluster.domain {
+        system = system.with_node_domain(p);
     }
 
     if let Some(ref p) = ini.programs.topo_svg_cmd {
@@ -646,7 +646,6 @@ fn parse_config(config_file: &str) -> Result<Ini, String> {
         global: GlobalIni {
             cluster: "".to_string(),
             role: "".to_string(),
-            domain: None,
             lockdir: None,
             topic_prefix: None,
         },
@@ -693,7 +692,10 @@ fn parse_config(config_file: &str) -> Result<Ini, String> {
             topo_svg_cmd: None,
             topo_text_cmd: None,
         },
-        cluster: ClusterIni { cadence: None },
+        cluster: ClusterIni {
+            cadence: None,
+            domain: None,
+        },
     };
 
     enum Section {
@@ -795,21 +797,6 @@ fn parse_config(config_file: &str) -> Result<Ini, String> {
                         ))
                     }
                 },
-                "domain" => {
-                    let mut xs = value
-                        .split(".")
-                        .map(|x| x.to_string())
-                        .collect::<Vec<String>>();
-                    if xs.len() < 2 || xs[0] != "" || xs[1..].iter().any(|x| x == "") {
-                        return Err(format!(
-                            "Invalid global.domain value `{value}` - form .x.y.z required"
-                        ));
-                    }
-                    // Drop initial, empty element
-                    xs.rotate_left(1);
-                    xs.pop();
-                    ini.global.domain = Some(xs);
-                }
                 "lockdir" | "lock-directory" => {
                     ini.global.lockdir = Some(value);
                 }
@@ -935,6 +922,21 @@ fn parse_config(config_file: &str) -> Result<Ini, String> {
             Section::Cluster => match name.as_str() {
                 "cadence" => {
                     ini.cluster.cadence = Some(parse_duration("cluster.cadence", &value, false)?);
+                }
+                "domain" => {
+                    let mut xs = value
+                        .split(".")
+                        .map(|x| x.to_string())
+                        .collect::<Vec<String>>();
+                    if xs.len() < 2 || xs[0] != "" || xs[1..].iter().any(|x| x == "") {
+                        return Err(format!(
+                            "Invalid global.domain value `{value}` - form .x.y.z required"
+                        ));
+                    }
+                    // Drop initial, empty element
+                    xs.rotate_left(1);
+                    xs.pop();
+                    ini.cluster.domain = Some(xs);
                 }
                 _ => return Err(format!("Invalid [cluster] setting name `{name}`")),
             },

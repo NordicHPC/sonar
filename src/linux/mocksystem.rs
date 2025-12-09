@@ -24,7 +24,7 @@ pub struct Builder {
     timestamp: Option<String>,
     hostname: Option<String>,
     cluster: Option<String>,
-    domain: Option<Vec<String>>,
+    node_domain: Option<Vec<String>>,
     version: Option<String>,
     os_name: Option<String>,
     os_release: Option<String>,
@@ -106,9 +106,9 @@ impl Builder {
         }
     }
 
-    pub fn with_domain(self, domain: &[String]) -> Builder {
+    pub fn with_node_domain(self, domain: &[String]) -> Builder {
         Builder {
-            domain: Some(domain.iter().map(|x| x.clone()).collect::<Vec<String>>()),
+            node_domain: Some(domain.iter().map(|x| x.clone()).collect::<Vec<String>>()),
             ..self
         }
     }
@@ -181,7 +181,7 @@ impl Builder {
             } else {
                 "no.cluster.com".to_string()
             },
-            domain: self.domain,
+            node_domain: self.node_domain,
             os_name: if let Some(x) = self.os_name {
                 x
             } else {
@@ -232,7 +232,7 @@ pub struct MockSystem {
     jm: Box<dyn jobsapi::JobManager>,
     hostname: String,
     cluster: String,
-    domain: Option<Vec<String>>,
+    node_domain: Option<Vec<String>>,
     os_name: String,
     os_release: String,
     architecture: String,
@@ -271,8 +271,8 @@ impl systemapi::SystemAPI for MockSystem {
         self.cluster.clone()
     }
 
-    fn get_domain(&self) -> &Option<Vec<String>> {
-        &self.domain
+    fn get_node_domain(&self) -> &Option<Vec<String>> {
+        &self.node_domain
     }
 
     fn get_os_name(&self) -> String {

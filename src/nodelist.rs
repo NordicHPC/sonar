@@ -5,7 +5,7 @@ use crate::systemapi::SystemAPI;
 
 pub fn parse_and_render(system: &dyn SystemAPI, xs: &str) -> Result<output::Array, String> {
     let mut a = output::Array::new();
-    let suffix = if let Some(xs) = system.get_domain() {
+    let suffix = if let Some(xs) = system.get_node_domain() {
         ".".to_string() + &xs.join(".")
     } else {
         "".to_string()
