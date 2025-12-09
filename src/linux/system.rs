@@ -38,7 +38,7 @@ const SINFO_TIMEOUT_S: u64 = 10;
 pub struct Builder {
     jm: Option<Box<dyn jobsapi::JobManager>>,
     cluster: String,
-    domain: Option<Vec<String>>,
+    node_domain: Option<Vec<String>>,
     sacct: String,
     scontrol: String,
     sinfo: String,
@@ -51,7 +51,7 @@ impl Builder {
         Builder {
             jm: None,
             cluster: "".to_string(),
-            domain: None,
+            node_domain: None,
             sacct: "sacct".to_string(),
             scontrol: "scontrol".to_string(),
             sinfo: "sinfo".to_string(),
@@ -61,9 +61,9 @@ impl Builder {
     }
 
     #[allow(dead_code)]
-    pub fn with_domain(self, domain: &[String]) -> Builder {
+    pub fn with_node_domain(self, domain: &[String]) -> Builder {
         Builder {
-            domain: Some(domain.iter().map(|x| x.clone()).collect::<Vec<String>>()),
+            node_domain: Some(domain.iter().map(|x| x.clone()).collect::<Vec<String>>()),
             ..self
         }
     }
@@ -126,17 +126,10 @@ impl Builder {
     pub fn freeze(self) -> Result<System, String> {
         let fs = RealProcFS {};
         let boot_time = procfs::get_boot_time_in_secs_since_epoch(&fs)?;
-        let hostname = {
-            let hn = hostname::get();
-            if let Some(ref domain) = self.domain {
-                expand_domain(hn, domain)
-            } else {
-                hn
-            }
-        };
+        let hostname = hostname::get();
         Ok(System {
             hostname: hostname.clone(),
-            domain: self.domain,
+            node_domain: self.node_domain,
             cluster: self.cluster,
             jm: if let Some(x) = self.jm {
                 x
@@ -161,6 +154,7 @@ impl Builder {
 
 // The entire suffix of hostname must match a prefix of domain, and in that case we attach the rest
 // of domain, otherwise we attach the entire domain to hostname.
+#[allow(dead_code)]
 fn expand_domain(hostname: String, domain: &[String]) -> String {
     let mut full = hostname
         .split('.')
@@ -218,7 +212,7 @@ const ARCHITECTURE: &'static str = "aarch64";
 
 pub struct System {
     hostname: String,
-    domain: Option<Vec<String>>,
+    node_domain: Option<Vec<String>>,
     cluster: String,
     fs: RealProcFS,
     gpus: realgpu::RealGpu,
@@ -259,8 +253,8 @@ impl systemapi::SystemAPI for System {
         self.cluster.clone()
     }
 
-    fn get_domain(&self) -> &Option<Vec<String>> {
-        &self.domain
+    fn get_node_domain(&self) -> &Option<Vec<String>> {
+        &self.node_domain
     }
 
     fn get_hostname(&self) -> String {

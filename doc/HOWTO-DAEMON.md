@@ -41,7 +41,6 @@ the cadence.
 ```
 cluster = <canonical cluster name>
 role = node | master
-domain = <string>                               # default none
 lock-directory = <string>                       # default none
 topic-prefix = <string>                         # default none
 ```
@@ -51,12 +50,6 @@ The `cluster` option is required, eg `fox.educloud.no`.
 The `role` determines how this daemon responds to control messages from a remote controller.  It
 must be defined.  Only the string values listed are accepted.  A `node` typically provides sample
 and sysinfo data only, a `master` often only slurm and cluster data.
-
-If there is a `domain` then it must have the form `.x.y.z` with at least one element.  A host name
-`a.b` is transformed to `a.b.x.y.z`; while `a.x`, `a.x.y`, and `a.x.y.z` become `a.x.y.z`.  The
-mechanism can be used to map slurm prefix names (see the `[cluster]` section) to full node names, or
-to otherwise fixup partial information.  The fixup will be applied to every Node field and every
-value of NodeRange type in the produced data.
 
 If there is a `lock-directory` then a lockfile in that directory is acquired when the daemon runs
 and stays acquired for the daemon's lifetime.  If the daemon is reloaded by remote command the lock
@@ -161,7 +154,12 @@ may become so large that they cause transmission issues, notably by default Kafk
 
 ```
 cadence = <duration value>
+domain = <string>                               # default none
 ```
+
+If there is a `domain` then it must have the form `.x.y.z` with at least one element.  It will be
+appended to all slurm prefix names in every NodeRange value to form full node names.
+
 
 ### `[programs]` section
 

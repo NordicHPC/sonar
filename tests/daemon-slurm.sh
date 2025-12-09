@@ -14,13 +14,13 @@ cat > $inifile <<EOF
 [global]
 cluster=hpc.yes.no
 role=node
-domain=.yes.no
 
 [debug]
 time-limit = 10s
 
 [cluster]
 cadence=5s
+domain=.yes.no
 EOF
 
 SONARTEST_MOCK_PARTITIONS=testdata/partition_output.txt \
