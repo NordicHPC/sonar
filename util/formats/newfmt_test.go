@@ -105,7 +105,7 @@ func TestNewJSONSysinfoActual(t *testing.T) {
 	//
 	// Do this on enough machines and we'll have a decent test of whether Sonar works in practice.
 
-	stdout := runSonar(t, "sysinfo", "--cluster", "xyzzy.no", "--json")
+	stdout := runSonar(t, "sysinfo", "--cluster", "xyzzy.no")
 	err := newfmt.ConsumeJSONSysinfo(
 		strings.NewReader(stdout),
 		true,
@@ -195,7 +195,7 @@ func TestNewJSONSamples(t *testing.T) {
 
 func TestNewJSONSamplesActual(t *testing.T) {
 	// See comments above about this logic
-	stdout := runSonar(t, "ps", "--cluster", "xyzzy.no", "--json")
+	stdout := runSonar(t, "ps", "--cluster", "xyzzy.no")
 	err := newfmt.ConsumeJSONSamples(
 		strings.NewReader(stdout),
 		true,
@@ -246,7 +246,7 @@ func TestNewJSONClusterActual(t *testing.T) {
 		return
 	}
 	// See comments above about this logic
-	stdout := runSonar(t, "cluster", "--cluster", "xyzzy.no", "--json")
+	stdout := runSonar(t, "cluster", "--cluster", "xyzzy.no")
 	err := newfmt.ConsumeJSONCluster(
 		strings.NewReader(stdout),
 		true,
@@ -352,7 +352,7 @@ func TestNewJSONSlurmJobsActual(t *testing.T) {
 		return
 	}
 	// See comments above about this logic
-	stdout := runSonar(t, "slurm", "--cluster", "xyzzy.no", "--json")
+	stdout := runSonar(t, "slurm", "--cluster", "xyzzy.no")
 	err := newfmt.ConsumeJSONJobs(
 		strings.NewReader(stdout),
 		true,
@@ -380,13 +380,13 @@ var built bool
 
 func runSonar(t *testing.T, args ...string) string {
 	if !built {
-		err := exec.Command("sh", "-c", "cd ../.. ; cargo build").Run()
+		err := exec.Command("sh", "-c", "cargo build").Run()
 		if err != nil {
 			t.Fatal("Compiling sonar:", err)
 		}
 		built = true
 	}
-	cmdline := "../../target/debug/sonar " + strings.Join(args, " ")
+	cmdline := "cargo run -- " + strings.Join(args, " ")
 	cmd := exec.Command("sh", "-c", cmdline)
 	stdout, err := cmd.Output()
 	if err != nil {
