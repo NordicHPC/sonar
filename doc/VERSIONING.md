@@ -77,7 +77,7 @@ release:
 - on an x86_64 node with AMD GPUs, run `make test`; the amd test should not say "No device"
 - on a node with docker, run `make test` or `tests/docker*sh`; the test should not say "... skipping test" for any reason
 - on a node with a local Kafka install, go to `tests/kafka` and run the tests as described
-  in `tests/kafka/README.md`
+  in `tests/kafka-interactive/README.md`
 
 All of that assumes that the GPU API C code has been properly rebuilt into platform-dependent
 libraries after updates.  There are no direct ways of testing that at the moment.  It amounts to
