@@ -1,13 +1,18 @@
-# Note the default expiration time for the artifacts produced here is 2 years.
+# Note the default expiration time for the artifacts produced here is 1 year, the longest
+# allowed by best practices.
 
-.PHONY: default all clean
 HOSTNAME ?= $(shell hostname)
-DAYS = 720
+SUBJECT_ALT_NAME ?= "DNS:$(HOSTNAME),DNS:localhost,IP:127.0.0.1"
+DAYS ?= 365
+
+.PHONY: build default all clean
 
 default:
 	@echo "Use an explicit target"
 
 all: server-key.pem server-cert-signed.crt sonar-ca.crt sonar-kafka-keystore.pem
+
+build: clean all
 
 clean:
 	rm -f *.pem *.crt *.csr *.key *.srl
@@ -19,7 +24,7 @@ server-key.pem server-cert.pem: Makefile
 	-days $(DAYS) \
 	-nodes \
 	-subj "/CN=$(USER).$(HOSTNAME)" \
-	-addext "subjectAltName=DNS:$(HOSTNAME),DNS:localhost,IP:127.0.0.1"
+	-addext "subjectAltName=$(SUBJECT_ALT_NAME)"
 
 # CA private key.
 sonar-ca-key.pem: Makefile
@@ -31,13 +36,13 @@ sonar-ca.crt: sonar-ca-key.pem Makefile
 	openssl req -new -x509 -key sonar-ca-key.pem -out sonar-ca.crt \
 	-days $(DAYS) \
 	-subj "/CN=$(USER).$(HOSTNAME) CA" \
-	-addext "subjectAltName=DNS:$(HOSTNAME),DNS:localhost,IP:127.0.0.1"
+	-addext "subjectAltName=$(SUBJECT_ALT_NAME)"
 
 # Server certificate signing request
 server-key.csr: server-key.pem Makefile
 	openssl req -new -key server-key.pem -out server-key.csr \
 	-subj "/CN=$(USER).$(HOSTNAME)" \
-	-addext "subjectAltName=DNS:$(HOSTNAME),DNS:localhost,IP:127.0.0.1"
+	-addext "subjectAltName=$(SUBJECT_ALT_NAME)"
 
 # Server signed certificate
 server-cert-signed.crt: server-key.csr sonar-ca.crt sonar-ca-key.pem Makefile
