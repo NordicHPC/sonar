@@ -93,6 +93,7 @@ pub struct JobsIni {
 }
 
 pub struct ClusterIni {
+    pub on_startup: bool,
     pub cadence: Option<Dur>,
     pub domain: Option<Vec<String>>,
 }
@@ -261,6 +262,11 @@ pub fn daemon_mode(
     // If sysinfo runs on startup then post a message to ourselves.  Should never fail.
     if ini.sysinfo.cadence.is_some() && ini.sysinfo.on_startup {
         let _ignored = event_sender.send(Operation::Sysinfo);
+    }
+
+    // Ditto cluster.
+    if ini.cluster.cadence.is_some() && ini.cluster.on_startup {
+        let _ignored = event_sender.send(Operation::Cluster);
     }
 
     // Alarms for daemon operations - each alarm gets its own thread, wasteful but OK for the time
@@ -693,6 +699,7 @@ fn parse_config(config_file: &str) -> Result<Ini, String> {
             topo_text_cmd: None,
         },
         cluster: ClusterIni {
+            on_startup: true,
             cadence: None,
             domain: None,
         },
@@ -920,6 +927,9 @@ fn parse_config(config_file: &str) -> Result<Ini, String> {
                 _ => return Err(format!("Invalid [jobs] setting name `{name}`")),
             },
             Section::Cluster => match name.as_str() {
+                "on-startup" => {
+                    ini.cluster.on_startup = parse_bool(&value)?;
+                }
                 "cadence" => {
                     ini.cluster.cadence = Some(parse_duration("cluster.cadence", &value, false)?);
                 }
@@ -1232,6 +1242,8 @@ pub fn test_parser() {
     assert!(ini.jobs.uncompleted);
 
     assert!(ini.cluster.cadence == Some(Dur::Minutes(15)));
+    assert!(!ini.cluster.on_startup);
+    assert!(ini.cluster.domain == Some(vec!["fox".to_string(), "nux".to_string()]));
 
     let ini = parse_config("src/testdata/daemon-stdio-config2.txt").unwrap();
 

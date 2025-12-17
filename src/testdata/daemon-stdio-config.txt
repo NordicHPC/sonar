@@ -53,3 +53,5 @@ uncompleted=true
 
 [cluster]
 cadence = 15m
+on-startup = false
+domain = .fox.nux

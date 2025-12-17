@@ -17,6 +17,7 @@ tests="amd-gpu \
      daemon-interrupt \
      daemon-kafka \
      daemon-slurm \
+     daemon-startup \
      docker-run \
      exclude-commands \
      exclude-system-jobs \

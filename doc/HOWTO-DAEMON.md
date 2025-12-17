@@ -155,11 +155,14 @@ may become so large that they cause transmission issues, notably by default Kafk
 ```
 cadence = <duration value>
 domain = <string>                               # default none
+on-startup = <bool>                             # default true
 ```
 
 If there is a `domain` then it must have the form `.x.y.z` with at least one element.  It will be
 appended to all slurm prefix names in every NodeRange value to form full node names.
 
+If `on-startup` is `true` then a cluster operation will be executed every time the daemon is
+started, in addition to according to the cadence.
 
 ### `[programs]` section
 
