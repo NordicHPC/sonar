@@ -911,6 +911,11 @@ type SlurmJob struct {
 	// DecodeSlurmTRES() in decode_jobs.go in this directory for encoding details.
 	//
 	// scontrol: `ReqTRES`
+	//
+	// Note that it's been observed that scontrol produces the items in this field in a surprising
+	// order.  Normally resource requests express a priority order, so specific GPUs will appear in
+	// the list before a generic request.  In the output from scontrol for ReqTRES, this is not
+	// always so (yet AllocTRES seems to have the expected order).
 	ReqTRES string `json:"requested_resources,omitempty"`
 
 	// Allocated resources. If present, this comes from sacct's AllocTRES field.  See
