@@ -77,7 +77,7 @@ impl NodelistParser<'_> {
 
     fn maybe_literal(&mut self) -> Result<bool, String> {
         let start = self.i;
-        while !(self.at_end() || self.peek(b'[') || self.peek(b',')) {
+        while self.peek_literal_char() {
             self.i += 1
         }
         Ok(start < self.i)
@@ -133,6 +133,24 @@ impl NodelistParser<'_> {
         false
     }
 
+    fn peek_literal_char(&mut self) -> bool {
+        if self.at_end() {
+            false
+        } else {
+            // Ignoring international names (IDN), host names are ".", "-", "a-zA-Z0-9".  To support
+            // IDN here in a primitive way, we'll OK every letter above 127, to handle UTF8.
+            // Additionally we allow "_" since it is sometimes used.
+            let c = self.s[self.i];
+            c >= b'a' && c <= b'z'
+                || c >= b'A' && c <= b'Z'
+                || c >= b'0' && c <= b'9'
+                || c == b'-'
+                || c == b'.'
+                || c == b'_'
+                || c > 127
+        }
+    }
+
     fn peek(&mut self, c: u8) -> bool {
         !self.at_end() && self.s[self.i] == c
     }
@@ -171,4 +189,6 @@ pub fn test_parser() {
     assert!(parse("zappa[1-3,]").is_err());
     assert!(parse("zappa[x").is_err());
     assert!(parse("zappa[-").is_err());
+    // Output by sacct for the node list of PENDING jobs
+    assert!(parse("None assigned").is_err());
 }
