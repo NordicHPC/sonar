@@ -20,7 +20,12 @@ function tmpdir() {
 }
 
 function fail() {
-    echo ' !!!ERROR!!!' "$1"
+    local s=' !!!ERROR!!!'
+    while [[ -n $1 ]]; do
+        s="$s $1"
+        shift 1
+    done
+    echo $s
     exit 1
 }
 

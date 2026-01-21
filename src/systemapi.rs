@@ -1,6 +1,5 @@
 use crate::gpu;
 use crate::jobsapi;
-use crate::systemapi;
 
 use std::collections::HashMap;
 use std::fs;
@@ -36,6 +35,9 @@ pub trait SystemAPI {
     // CPU usage data: total cpu seconds and per-cpu seconds.
     fn compute_node_information(&self) -> Result<(u64, Vec<u64>), String>;
 
+    // Disk usage data: as documented for /proc/diskstats
+    fn compute_disk_information(&self) -> Result<Vec<DiskInfo>, String>;
+
     // 1m, 5m, 15m load avg + current runnable and existing entities
     fn compute_loadavg(&self) -> Result<(f64, f64, f64, u64, u64), String>;
 
@@ -49,7 +51,7 @@ pub trait SystemAPI {
     // 100% of one core.
     fn compute_cpu_utilization(
         &self,
-        processes: &HashMap<usize, systemapi::Process>,
+        processes: &HashMap<usize, Process>,
         wait_time_ms: usize,
     ) -> Result<Vec<(usize, f64)>, String>;
 
@@ -150,4 +152,12 @@ pub struct CoreInfo {
     pub model_name: String,
     pub logical_index: i32,
     pub physical_index: i32,
+}
+
+#[derive(Clone, Debug)]
+pub struct DiskInfo {
+    pub name: String,
+    pub major: u64,
+    pub minor: u64,
+    pub stats: Vec<u64>,
 }

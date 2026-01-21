@@ -251,6 +251,10 @@ SampleAttributes:
         Recoverable errors, if any
 SampleSystem:
   fields:
+    boot:
+      type: 'Timestamp'
+      doc: >
+        The node's boot time
     cpus:
       type: '[]SampleCpu'
       doc: >
@@ -259,6 +263,10 @@ SampleSystem:
       type: '[]SampleGpu'
       doc: >
         The state of individual GPU devices
+    disks:
+      type: '[]SampleDisk'
+      doc: >
+        The state of individual disks
     used_memory:
       type: 'uint64'
       doc: >
@@ -341,6 +349,24 @@ SampleGpu:
       type: 'uint64'
       doc: >
         memory current clock
+SampleDisk:
+  fields:
+    name:
+      type: 'string'
+      doc: >
+        Disk's local name.  This must never be empty.
+    major:
+      type: 'uint64'
+      doc: >
+        Disk's local major device number.
+    minor:
+      type: 'uint64'
+      doc: >
+        Disk's local minor device number.
+    stats:
+      type: '[]uint64'
+      doc: >
+        Disk stats values in the order present in /proc/diskstats, see https://github.com/torvalds/linux/blob/master/Documentation/admin-guide/iostats.rst for full documentation.  Note counters may sometimes wrap around, and they will be reset on reboot. See also the Boot field.
 SampleJob:
   fields:
     job:

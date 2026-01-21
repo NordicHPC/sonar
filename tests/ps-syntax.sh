@@ -71,9 +71,9 @@ fi
 # The others can be zero/empty and thus absent.  What we need to check here is that
 # every field present has a known name.
 
-x=$(jq '.data.attributes.system | keys | map(in({"cpus":0,"gpus":0,"existing_entities":0,"load1":0,"load15":0,"load5":0,"runnable_entities":0,"used_memory":0})) | all' <<< $output)
+x=$(jq '.data.attributes.system | keys | map(in({"boot":0,"cpus":0,"gpus":0,"disks":0,"existing_entities":0,"load1":0,"load15":0,"load5":0,"runnable_entities":0,"used_memory":0})) | all' <<< $output)
 if [[ $x != "true" ]]; then
-    fail "JSON bad - Unknown field in system: " $(jq .data.attributes.system <<< $output)
+    fail "JSON bad - Unknown field in system:" $(jq '.data.attributes.system | keys' <<< $output)
 fi
 
 echo " Ok: JSON"

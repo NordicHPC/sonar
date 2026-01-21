@@ -474,11 +474,17 @@ type SampleAttributes struct {
 //
 // NOTE: The sysinfo for the node provides the total memory; available memory = total - used.
 type SampleSystem struct {
+	// The node's boot time
+	Boot Timestamp `json:"boot"`
+
 	// The state of individual cores
 	Cpus []SampleCpu `json:"cpus,omitempty"`
 
 	// The state of individual GPU devices
 	Gpus []SampleGpu `json:"gpus,omitempty"`
+
+	// The state of individual disks
+	Disks []SampleDisk `json:"disks,omitempty"`
 
 	// The amount of primary memory in use in kilobytes
 	UsedMemory uint64 `json:"used_memory,omitempty"`
@@ -555,6 +561,25 @@ type SampleGpu struct {
 
 	// memory current clock
 	MemoryClock uint64 `json:"memory_clock,omitempty"`
+}
+
+// SampleDisk captures the stats for a single disk at a point in time, taken from /proc/diskstats.
+// Names should be unique, as should (major,minor) pairs.
+type SampleDisk struct {
+	// Disk's local name.  This must never be empty.
+	Name string `json:"name"`
+
+	// Disk's local major device number.
+	Major uint64 `json:"major"`
+
+	// Disk's local minor device number.
+	Minor uint64 `json:"minor"`
+
+	// Disk stats values in the order present in /proc/diskstats, see
+	// https://github.com/torvalds/linux/blob/master/Documentation/admin-guide/iostats.rst for full
+	// documentation.  Note counters may sometimes wrap around, and they will be reset on reboot.
+	// See also the Boot field.
+	Stats []uint64 `json:"stats"`
 }
 
 // Sample data for a single job

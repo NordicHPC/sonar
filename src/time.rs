@@ -161,7 +161,6 @@ pub fn format_iso8601(timebuf: &libc::tm) -> String {
 // This iterates up from 1970 and is slowish.  For speed, we'd have a precomputed table of starting
 // values for select years.
 
-#[cfg(any(feature = "daemon", test))]
 pub fn unix_time_components(t: u64) -> (u64, u64, u64, u64, u64, u64) {
     const SECONDS_PER_MINUTE: u64 = 60;
     const SECONDS_PER_HOUR: u64 = 60 * SECONDS_PER_MINUTE;
@@ -210,7 +209,23 @@ pub fn unix_time_components(t: u64) -> (u64, u64, u64, u64, u64, u64) {
     (year, month, days, hour, minute, second)
 }
 
-#[cfg(any(feature = "daemon", test))]
+pub fn unix_time_to_tm(t: u64) -> libc::tm {
+    let (year, month, day, hour, minute, second) = unix_time_components(t);
+    libc::tm {
+        tm_sec: second as i32,
+        tm_min: minute as i32,
+        tm_hour: hour as i32,
+        tm_mday: (day + 1) as i32,
+        tm_mon: month as i32,
+        tm_year: (year - 1900) as i32,
+        tm_wday: 0,
+        tm_yday: 0,
+        tm_isdst: 0,
+        tm_gmtoff: 0,
+        tm_zone: std::ptr::null(),
+    }
+}
+
 fn is_leap_year(year: u64) -> bool {
     year % 400 == 0 || (year % 4 == 0 && year % 100 != 0)
 }
@@ -285,9 +300,16 @@ pub fn test_unix_time_components() {
     let t = 1740568588;
     let (year, month, day, hour, minute, second) = unix_time_components(t);
     assert!(year == 2025);
-    assert!(month == 1);
-    assert!(day == 25);
+    assert!(month == 1); // zero-based
+    assert!(day == 25); // zero-based
     assert!(hour == 11);
     assert!(minute == 16);
     assert!(second == 28);
+}
+
+#[test]
+pub fn test_unix_time_to_tm() {
+    let t = 1740568588;
+    let s = format_iso8601(&unix_time_to_tm(t));
+    assert!(s == "2025-02-26T11:16:28+00:00");
 }
