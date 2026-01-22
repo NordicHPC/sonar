@@ -502,6 +502,10 @@ energy).
 
 NOTE: The sysinfo for the node provides the total memory; available memory = total - used.
 
+#### **`boot`** Timestamp
+
+The node's boot time
+
 #### **`cpus`** []SampleCpu
 
 The state of individual cores
@@ -509,6 +513,10 @@ The state of individual cores
 #### **`gpus`** []SampleGpu
 
 The state of individual GPU devices
+
+#### **`disks`** []SampleDisk
+
+The state of individual disks
 
 #### **`used_memory`** uint64
 
@@ -607,6 +615,30 @@ Compute element current clock
 #### **`memory_clock`** uint64
 
 memory current clock
+
+### Type: `SampleDisk`
+
+SampleDisk captures the stats for a single disk at a point in time, taken from /proc/diskstats.
+Names should be unique, as should (major,minor) pairs.
+
+#### **`name`** string
+
+Disk's local name.  This must never be empty.
+
+#### **`major`** uint64
+
+Disk's local major device number.
+
+#### **`minor`** uint64
+
+Disk's local minor device number.
+
+#### **`stats`** []uint64
+
+Disk stats values in the order present in /proc/diskstats, see
+https://github.com/torvalds/linux/blob/master/Documentation/admin-guide/iostats.rst for full
+documentation.  Note counters may sometimes wrap around, and they will be reset on reboot.
+See also the Boot field.
 
 ### Type: `SampleJob`
 

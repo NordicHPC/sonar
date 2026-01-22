@@ -4,7 +4,7 @@ use crate::gpu;
 use crate::json_tags::*;
 use crate::output;
 use crate::ps_newfmt::format_newfmt;
-use crate::systemapi;
+use crate::systemapi::{self, DiskInfo};
 use crate::types::{JobID, Pid, Uid};
 
 use std::collections::HashMap;
@@ -287,6 +287,7 @@ pub struct SampleData {
     pub process_samples: Vec<ProcInfo>,
     pub gpu_samples: Option<Vec<gpu::CardState>>,
     pub cpu_samples: Vec<u64>,
+    pub disk_samples: Vec<DiskInfo>,
     pub used_memory: u64,
     pub load1: f64,
     pub load5: f64,
@@ -307,6 +308,7 @@ fn collect_sample_data(
     let memory = system.get_memory_in_kib()?;
     let (load1, load5, load15, runnable_entities, existing_entities) = system.compute_loadavg()?;
     let mut processes = system.compute_process_information()?;
+    let disk_info = system.compute_disk_information()?;
 
     if opts.cpu_util {
         let utils = system.compute_cpu_utilization(&processes, 100)?;
@@ -354,6 +356,7 @@ fn collect_sample_data(
         process_samples: candidates,
         gpu_samples: gpu_info,
         cpu_samples: per_cpu_secs,
+        disk_samples: disk_info,
         used_memory: memory.total - memory.available,
         load1,
         load5,

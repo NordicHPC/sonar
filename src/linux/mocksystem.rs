@@ -331,6 +331,10 @@ impl systemapi::SystemAPI for MockSystem {
         procfs::compute_node_information(self, &self.fs)
     }
 
+    fn compute_disk_information(&self) -> Result<Vec<systemapi::DiskInfo>, String> {
+        procfs::compute_disk_information(&self.fs)
+    }
+
     fn compute_loadavg(&self) -> Result<(f64, f64, f64, u64, u64), String> {
         procfs::compute_loadavg(&self.fs)
     }

@@ -5,6 +5,7 @@ use crate::json_tags::*;
 use crate::output;
 use crate::ps::{CState, ProcInfo, PsOptions, SampleData};
 use crate::systemapi;
+use crate::time::{format_iso8601, unix_time_to_tm};
 use crate::util::three_places;
 
 use std::collections::HashMap;
@@ -20,6 +21,10 @@ pub fn format_newfmt(
     attrs.push_s(SAMPLE_ATTRIBUTES_NODE, system.get_hostname());
     if opts.load {
         let mut sstate = output::Object::new();
+        sstate.push_s(
+            SAMPLE_SYSTEM_BOOT,
+            format_iso8601(&unix_time_to_tm(system.get_boot_time_in_secs_since_epoch())),
+        );
         let mut cpu_load = output::Array::new();
         for v in &c.cpu_samples {
             cpu_load.push_i(*v as i64);
@@ -32,6 +37,20 @@ pub fn format_newfmt(
             }
             sstate.push_a(SAMPLE_SYSTEM_GPUS, gpu_load);
         }
+        let mut disk_info = output::Array::new();
+        for v in &c.disk_samples {
+            let mut dsk = output::Object::new();
+            dsk.push_s(SAMPLE_DISK_NAME, v.name.clone());
+            dsk.push_u(SAMPLE_DISK_MAJOR, v.major);
+            dsk.push_u(SAMPLE_DISK_MINOR, v.minor);
+            let mut stats = output::Array::new();
+            for s in &v.stats {
+                stats.push_u(*s);
+            }
+            dsk.push_a(SAMPLE_DISK_STATS, stats);
+            disk_info.push_o(dsk);
+        }
+        sstate.push_a(SAMPLE_SYSTEM_DISKS, disk_info);
         sstate.push_u(SAMPLE_SYSTEM_USED_MEMORY, c.used_memory);
         sstate.push_f(SAMPLE_SYSTEM_LOAD1, c.load1);
         sstate.push_f(SAMPLE_SYSTEM_LOAD5, c.load5);

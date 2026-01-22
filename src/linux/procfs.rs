@@ -237,6 +237,29 @@ pub fn compute_node_information(
     Ok((cpu_total_secs, per_cpu_secs))
 }
 
+pub fn compute_disk_information(fs: &dyn ProcfsAPI) -> Result<Vec<systemapi::DiskInfo>, String> {
+    let s = fs.read_to_string("diskstats")?;
+    let mut disk_stats = vec![];
+    for l in s.split('\n') {
+        // major minor name field ...
+        let fields = l.split_ascii_whitespace().collect::<Vec<&str>>();
+        if fields.len() == 0 {
+            continue;
+        }
+        let mut stats = vec![];
+        for f in &fields[3..] {
+            stats.push(f.parse::<u64>().map_err(|_| format!("Bad field"))?);
+        }
+        disk_stats.push(systemapi::DiskInfo {
+            name: fields[2].to_string(),
+            major: fields[0].parse::<u64>().map_err(|_| format!("Bad field"))?,
+            minor: fields[1].parse::<u64>().map_err(|_| format!("Bad field"))?,
+            stats: stats,
+        })
+    }
+    Ok(disk_stats)
+}
+
 pub fn compute_loadavg(fs: &dyn ProcfsAPI) -> Result<(f64, f64, f64, u64, u64), String> {
     let s = fs.read_to_string("loadavg")?;
     let fields = s.split_ascii_whitespace().collect::<Vec<&str>>();
