@@ -57,12 +57,13 @@ is relinquished temporarily (and the restarted config file may name a different 
 
 If there is a `topic-prefix` then it is prefixed to each data packet's topic.  A popular value would
 be `test` to tag the data coming from test setups.  (See "DATA MESSAGE FORMATS" below for more about
-topics.)
+topics.)  It is a bad idea to use characters other than a-z, 0-9, or hyphen within the prefix.
 
 ### `[kafka]` section
 
 ```
 broker-address = <hostname and port>
+rest-endpoint = <url>
 sending-window = <duration value>               # default 5m
 timeout = <duration value>                      # default 30m
 ca-file = <filename>                            # default none
@@ -70,8 +71,16 @@ sasl-password = <string>                        # default none
 sasl-password-file = <string>                   # default none
 ```
 
-The `broker-address` is required and names the address of the broker.  For Kafka it's usually
-host:port, eg `localhost:9092` for a local broker on the standard port.
+For direct communication with the Kafka broker the `broker-address` is required and provides the
+address of the broker.  For Kafka it's usually host:port, eg `localhost:9092` for a local broker on
+the standard port.
+
+For communication via a REST API (usually required if traffic off the node needs to go through an
+HTTP proxy), the `rest-endpoint` should be set instead of the `broker-address`, and it should be the
+full URL for an API endpoint that will receive a POST with data destined for the Kafka broker.  In
+this case, `ca-file` will currently be ignored - normally the URL will be https to protect the
+credentials and data and the system's normal https crypto materials will be used for authenticating
+the connection.  See the "Kafka REST proxy" section of [HOWTO-KAFKA](HOWTO-KAFKA.md) for more.
 
 All available data are sent to the data sink at some random time within the `sending-window`, which
 starts at the point when data become available to send.
@@ -167,12 +176,16 @@ started, in addition to according to the cadence.
 ### `[programs]` section
 
 ```
+curl-command = <string>                         # default "curl"
 sacct-command = <string>                        # default "sacct"
 scontrol-command = <string>                     # default "scontrol"
 sinfo-command = <string>                        # default "sinfo"
 topo-svg-command = <string>                     # default none
 topo-text-command = <string>                    # default none
 ```
+
+The `curl-command` is used for sending data to the Kafka REST proxy, if that is in use; see
+`kafka.rest-endpoint` above.
 
 The `sacct-command`, `scontrol-command` and `sinfo-command` commands are used to obtain slurm data
 for the `[jobs]` and `[cluster]` operations.  If specified, they *must* be absolute paths without
