@@ -176,8 +176,13 @@ impl Dur {
 //
 // Other errors require threads to post messages back to the main thread.
 //
-// It is crucial that the system does not terminate suddenly once the lock file is held: we must
-// unwind properly and do what we can to relinquish the lock.
+// It is crucial that the system does not terminate suddenly once the lock file is held: the daemon
+// mode must unwind properly and do what it can to relinquish the lock.
+//
+// Note that installing the logger is delegated to the daemon mode (in order to get the log level
+// from the config file) and the daemon mode is required to install the logger before returning,
+// even if there are errors in parsing the config file.  Higher levels will depend on the logger
+// having been installed in order to signal any errors the daemon mode returns.
 
 pub fn daemon_mode(
     config_file: &str,
@@ -185,18 +190,28 @@ pub fn daemon_mode(
     force_slurm: bool,
 ) -> Result<(), String> {
     #[allow(unused_mut)]
-    let mut ini = parse_config(config_file)?;
-
-    let default_level = if ini.debug.verbose {
-        log::LevelFilter::Debug
-    } else {
-        log::LevelFilter::Warn
+    let mut ini = match parse_config(config_file) {
+        Ok(ini) => {
+            simple_logger::SimpleLogger::new()
+                .with_level(if ini.debug.verbose {
+                    log::LevelFilter::Debug
+                } else {
+                    log::LevelFilter::Warn
+                })
+                .env()
+                .init()
+                .unwrap();
+            ini
+        }
+        Err(e) => {
+            simple_logger::SimpleLogger::new()
+                .with_level(log::LevelFilter::Warn)
+                .env()
+                .init()
+                .unwrap();
+            return Err(e);
+        }
     };
-    simple_logger::SimpleLogger::new()
-        .with_level(default_level)
-        .env()
-        .init()
-        .unwrap();
 
     #[cfg(feature = "kafka")]
     if let Some(ref pwfile) = ini.kafka.sasl_password_file {
