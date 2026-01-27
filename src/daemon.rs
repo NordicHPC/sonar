@@ -52,6 +52,7 @@ pub struct GlobalIni {
 pub struct KafkaIni {
     pub broker_address: String,
     pub rest_endpoint: String,
+    pub rest_proxy: String,
     pub sending_window: Dur,
     pub timeout: Dur,
     pub ca_file: Option<String>,
@@ -709,6 +710,7 @@ fn parse_config(config_file: &str) -> Result<Ini, String> {
         kafka: KafkaIni {
             broker_address: "".to_string(),
             rest_endpoint: "".to_string(),
+            rest_proxy: "".to_string(),
             sending_window: Dur::Minutes(5),
             timeout: Dur::Minutes(30),
             ca_file: None,
@@ -876,6 +878,9 @@ fn parse_config(config_file: &str) -> Result<Ini, String> {
                 "rest-endpoint" => {
                     ini.kafka.rest_endpoint = value;
                     have_kafka_rest_endpoint = true;
+                }
+                "rest-proxy" => {
+                    ini.kafka.rest_proxy = value;
                 }
                 "sending-window" => {
                     ini.kafka.sending_window =

@@ -19,10 +19,13 @@ msg_data=$(tmpfile daemon-http-curly-msg)
 cat > $curly <<EOF
 #!/bin/bash
 echo "Args: \$@" >> $curly_out
+echo "http_proxy: \$http_proxy" >> $curly_out
+echo "https_proxy: \$https_proxy" >> $curly_out
 cat >> $curly_out
 EOF
 chmod a+x $curly
 
+prox=myproxy.local
 cat > $inifile <<EOF
 [global]
 cluster=hpc.axis-of-eval.org
@@ -39,6 +42,7 @@ time-limit = 5s
 rest-endpoint = no.such.host:101010
 sending-window = 3s
 sasl-password = foobar
+rest-proxy = $prox
 
 [sysinfo]
 cadence=1s
@@ -57,6 +61,13 @@ fi
 
 if ! grep -q '^Args:' $curly_out; then
     fail "curly output does not have Args lines"
+fi
+
+if ! grep -q "^https_proxy: $prox" $curly_out; then
+    fail "curly output does not have https_proxy line"
+fi
+if ! grep -q "^http_proxy: $prox" $curly_out; then
+    fail "curly output does not have http_proxy line"
 fi
 
 if ! grep '^{' $curly_out > $msg_data; then
