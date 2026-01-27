@@ -14,6 +14,8 @@ tests="amd-gpu \
      command-line \
      daemon \
      daemon-directory \
+     daemon-http \
+     daemon-http-no-curl \
      daemon-interrupt \
      daemon-kafka \
      daemon-read-config \

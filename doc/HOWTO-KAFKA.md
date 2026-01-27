@@ -210,3 +210,32 @@ this. **NOTE** paths may have to be updated for your system.
 TODO.  Here we will use Kafka ACLs to restrict write access to topics <clustername>.<whatever> to
 principals <clustername>, and maybe read access to topics <clustername>.control.<role> ditto.  This
 is all very TBD.
+
+## KAFKA REST PROXY
+
+If the nodes running Sonar are behind an http proxy then the Kafka broker cannot be contacted
+directly, but must be contacted through a Kafka proxy that accepts the data via an http REST call
+and forwards them to the broker.  The proxy in `util/kafka-proxy` can be used for this and Sonar
+knows how to talk to it.  In this case, configure the `[kafka]` section of Sonar's config with a
+`rest-endpoint` instead of a `broker-address` and leave out the `ca-file`.  Run the proxy behind a
+web server, eg, for nginx I use this:
+
+```
+	location /kprox {
+		proxy_pass http://localhost:8090;
+	}
+```
+
+and set up the `rest-endpoint` to be `https://my-kafka-host.uio.no/kprox`.  The 8090 port is the
+default for the proxy.  Then the ini file *for the proxy* is usually pretty simple, these values are
+exactly those that were used in the Sonar config file when it was speaking directly to the Kafka
+broker:
+
+```
+[kafka]
+broker-address = my-kafka-host.uio.no:1553
+ca-file = my-kafka-ca.crt
+```
+
+See the doc block at the head of `../util/kafka-proxy/kprox.go` for more information about the
+proxy configuration.

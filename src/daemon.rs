@@ -21,7 +21,7 @@ use crate::cluster;
 use crate::datasink::delay::DelaySink;
 use crate::datasink::directory::DirectorySink;
 #[cfg(feature = "kafka")]
-use crate::datasink::kafka::RdKafka;
+use crate::datasink::kafka::KafkaSink;
 use crate::datasink::stdio::StdioSink;
 use crate::datasink::DataSink;
 use crate::jobsapi;
@@ -51,6 +51,7 @@ pub struct GlobalIni {
 #[cfg(feature = "kafka")]
 pub struct KafkaIni {
     pub broker_address: String,
+    pub rest_endpoint: String,
     pub sending_window: Dur,
     pub timeout: Dur,
     pub ca_file: Option<String>,
@@ -99,11 +100,12 @@ pub struct ClusterIni {
 }
 
 pub struct ProgramsIni {
-    pub topo_svg_cmd: Option<String>,
-    pub topo_text_cmd: Option<String>,
+    pub curl_cmd: Option<String>,
     pub sacct_cmd: Option<String>,
     pub sinfo_cmd: Option<String>,
     pub scontrol_cmd: Option<String>,
+    pub topo_svg_cmd: Option<String>,
+    pub topo_text_cmd: Option<String>,
 }
 
 pub struct Ini {
@@ -318,21 +320,14 @@ pub fn daemon_mode(
         control_topic = prefix.clone() + "." + &control_topic;
     }
 
-    #[cfg(not(feature = "kafka"))]
-    let mut data_sink: Box<dyn DataSink> = if let Some(ref data_dir) = ini.directory.data_dir {
-        Box::new(DirectorySink::new(data_dir, event_sender))
-    } else {
-        Box::new(StdioSink::new(client_id, control_topic, event_sender))
-    };
-
-    #[cfg(feature = "kafka")]
-    let mut data_sink: Box<dyn DataSink> = if ini.kafka.broker_address != "" {
-        Box::new(RdKafka::new(&ini, client_id, control_topic, event_sender))
-    } else if let Some(ref data_dir) = ini.directory.data_dir {
-        Box::new(DirectorySink::new(data_dir, event_sender))
-    } else {
-        Box::new(StdioSink::new(client_id, control_topic, event_sender))
-    };
+    let mut data_sink: Box<dyn DataSink> =
+        if let Some(s) = try_make_kafka_sink(&ini, &event_sender, &client_id, &control_topic) {
+            s
+        } else if let Some(s) = try_make_directory_sink(&ini, &event_sender) {
+            s
+        } else {
+            Box::new(StdioSink::new(client_id, control_topic, event_sender))
+        };
 
     if let Some(delay) = ini.debug.output_delay {
         data_sink = Box::new(DelaySink::new(delay, data_sink));
@@ -484,6 +479,46 @@ pub fn daemon_mode(
         Err(fatal_msg)
     } else {
         Ok(())
+    }
+}
+
+#[cfg(not(feature = "kafka"))]
+fn try_make_kafka_sink(
+    _: &Ini,
+    _: &channel::Sender<Operation>,
+    _: &str,
+    _: &str,
+) -> Option<Box<dyn DataSink>> {
+    None
+}
+
+#[cfg(feature = "kafka")]
+fn try_make_kafka_sink(
+    ini: &Ini,
+    event_sender: &channel::Sender<Operation>,
+    client_id: &str,
+    control_topic: &str,
+) -> Option<Box<dyn DataSink>> {
+    if ini.kafka.broker_address != "" || ini.kafka.rest_endpoint != "" {
+        Some(Box::new(KafkaSink::new(
+            ini,
+            client_id.to_string(),
+            control_topic.to_string(),
+            event_sender.clone(),
+        )))
+    } else {
+        None
+    }
+}
+
+fn try_make_directory_sink(
+    ini: &Ini,
+    event_sender: &channel::Sender<Operation>,
+) -> Option<Box<dyn DataSink>> {
+    if let Some(ref data_dir) = ini.directory.data_dir {
+        Some(Box::new(DirectorySink::new(data_dir, event_sender.clone())))
+    } else {
+        None
     }
 }
 
@@ -673,6 +708,7 @@ fn parse_config(config_file: &str) -> Result<Ini, String> {
         #[cfg(feature = "kafka")]
         kafka: KafkaIni {
             broker_address: "".to_string(),
+            rest_endpoint: "".to_string(),
             sending_window: Dur::Minutes(5),
             timeout: Dur::Minutes(30),
             ca_file: None,
@@ -707,6 +743,7 @@ fn parse_config(config_file: &str) -> Result<Ini, String> {
             batch_size: None,
         },
         programs: ProgramsIni {
+            curl_cmd: None,
             sacct_cmd: None,
             sinfo_cmd: None,
             scontrol_cmd: None,
@@ -737,7 +774,9 @@ fn parse_config(config_file: &str) -> Result<Ini, String> {
     #[cfg(feature = "kafka")]
     let mut have_kafka = false;
     #[cfg(feature = "kafka")]
-    let mut have_kafka_remote = false;
+    let mut have_kafka_broker = false;
+    #[cfg(feature = "kafka")]
+    let mut have_kafka_rest_endpoint = false;
     let mut have_directory = false;
     let mut have_prefix = false;
     let file = match std::fs::File::open(config_file) {
@@ -832,7 +871,11 @@ fn parse_config(config_file: &str) -> Result<Ini, String> {
             Section::Kafka => match name.as_str() {
                 "broker-address" | "remote-host" => {
                     ini.kafka.broker_address = value;
-                    have_kafka_remote = true;
+                    have_kafka_broker = true;
+                }
+                "rest-endpoint" => {
+                    ini.kafka.rest_endpoint = value;
+                    have_kafka_rest_endpoint = true;
                 }
                 "sending-window" => {
                     ini.kafka.sending_window =
@@ -966,6 +1009,12 @@ fn parse_config(config_file: &str) -> Result<Ini, String> {
                 _ => return Err(format!("Invalid [cluster] setting name `{name}`")),
             },
             Section::Programs => match name.as_str() {
+                "curl-command" => {
+                    if value != "" {
+                        check_path("curl-command", &value)?;
+                    }
+                    ini.programs.curl_cmd = Some(value);
+                }
                 "sacct-command" => {
                     if value != "" {
                         check_path("sacct-command", &value)?;
@@ -1002,33 +1051,49 @@ fn parse_config(config_file: &str) -> Result<Ini, String> {
         return Err("Missing global.role setting".to_string());
     }
 
+    let mut sinks = 0;
+    if have_directory {
+        sinks += 1
+    }
     #[cfg(feature = "kafka")]
     if have_kafka {
-        if have_directory {
-            return Err("Both kafka and data directory configured".to_string());
+        sinks += 1
+    }
+    if sinks > 1 {
+        return Err("More than one data sink configured".to_string());
+    }
+
+    #[cfg(feature = "kafka")]
+    if have_kafka {
+        if have_kafka_broker && have_kafka_rest_endpoint {
+            return Err("Can't have both kafka.broker-address and kafka.rest-endpoint".to_string());
         }
-        if !have_kafka_remote {
-            return Err("Missing kafka.remote-host setting".to_string());
+        if !have_kafka_broker && !have_kafka_rest_endpoint {
+            return Err("Missing kafka.broker-address or kafka.rest-endpoint setting".to_string());
         }
         if ini.kafka.sasl_password.is_some() || ini.kafka.sasl_password_file.is_some() {
             if ini.kafka.sasl_password.is_some() && ini.kafka.sasl_password_file.is_some() {
                 return Err(
-                    "kafka.sasl_password and kafka.sasl_password_file are mutually exclusive"
+                    "kafka.sasl-password and kafka.sasl-password-file are mutually exclusive"
                         .to_string(),
                 );
             }
-            if ini.kafka.ca_file.is_none()
-                || (ini.kafka.sasl_password.is_some()
-                    && ini.kafka.sasl_password.as_ref().unwrap() != ""
-                    && ini.kafka.ca_file.as_ref().unwrap() == "")
-                || (ini.kafka.sasl_password_file.is_some()
-                    && ini.kafka.sasl_password_file.as_ref().unwrap() != ""
-                    && ini.kafka.ca_file.as_ref().unwrap() == "")
-            {
-                return Err(
-                    "kafka.sasl_password and kafka.sasl_password_file require kafka.ca_file"
-                        .to_string(),
-                );
+            // We assume the REST endpoint is https or on localhost, but for raw Kafka it better be
+            // a TLS connection if we carry credentials.
+            if !have_kafka_rest_endpoint {
+                if ini.kafka.ca_file.is_none()
+                    || (ini.kafka.sasl_password.is_some()
+                        && ini.kafka.sasl_password.as_ref().unwrap() != ""
+                        && ini.kafka.ca_file.as_ref().unwrap() == "")
+                    || (ini.kafka.sasl_password_file.is_some()
+                        && ini.kafka.sasl_password_file.as_ref().unwrap() != ""
+                        && ini.kafka.ca_file.as_ref().unwrap() == "")
+                {
+                    return Err(
+                        "kafka.sasl-password and kafka.sasl-password-file require kafka.ca-file"
+                            .to_string(),
+                    );
+                }
             }
         }
     }
