@@ -16,6 +16,7 @@ tests="amd-gpu \
      daemon-directory \
      daemon-interrupt \
      daemon-kafka \
+     daemon-read-config \
      daemon-slurm \
      daemon-startup \
      docker-run \
