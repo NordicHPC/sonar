@@ -102,6 +102,7 @@ impl KafkaSink {
                 })
             } else {
                 let rest_endpoint = kafka.rest_endpoint.clone();
+                let rest_proxy = kafka.rest_proxy.clone();
                 let curl_cmd = if let Some(ref curl) = ini.programs.curl_cmd {
                     curl.to_string()
                 } else {
@@ -111,6 +112,7 @@ impl KafkaSink {
                     http_producer(
                         &curl_cmd,
                         &rest_endpoint,
+                        &rest_proxy,
                         &client_id,
                         sasl_identity,
                         sending_window,
@@ -418,6 +420,7 @@ fn make_sender_adapter(
 fn http_producer(
     cmd: &str,
     api_endpoint: &str,
+    proxy_address: &str,
     client_id: &str,
     sasl_identity: Option<(String, String)>,
     sending_window: u64,
@@ -454,7 +457,7 @@ fn http_producer(
                 armed = false;
                 // Note, the /Sending {} items/ pattern is used by regression tests.
                 log::debug!("Sending window open.  Sending {} items", backlog.len());
-                http_send_messages(cmd, api_endpoint, client_id, retry_count, &sasl_identity, &control_and_errors, backlog);
+                http_send_messages(cmd, api_endpoint, proxy_address, client_id, retry_count, &sasl_identity, &control_and_errors, backlog);
                 backlog = vec![];
             }
             recv(incoming_message_queue) -> msg => match msg {
@@ -463,7 +466,7 @@ fn http_producer(
                     must_arm = !armed;
                 }
                 Ok(Message::Stop) | Err(_) => {
-                    http_send_messages(cmd, api_endpoint, client_id, retry_count, &sasl_identity, &control_and_errors, backlog);
+                    http_send_messages(cmd, api_endpoint, proxy_address, client_id, retry_count, &sasl_identity, &control_and_errors, backlog);
                     break 'producer_loop;
                 }
             }
@@ -480,6 +483,7 @@ fn http_producer(
 fn http_send_messages(
     cmd: &str,
     api_endpoint: &str,
+    proxy_address: &str,
     client_id: &str,
     retry_count: i32,
     sasl_identity: &Option<(String, String)>,
@@ -500,13 +504,16 @@ fn http_send_messages(
     args.push(api_endpoint.to_string());
 
     // Really want to merge stdout and stderr
-    match std::process::Command::new(cmd)
-        .args(args)
+    let mut cmd = std::process::Command::new(cmd);
+    cmd.args(args)
         .stdin(std::process::Stdio::piped())
         .stdout(std::process::Stdio::piped())
-        .stderr(std::process::Stdio::piped())
-        .spawn()
-    {
+        .stderr(std::process::Stdio::piped());
+    if proxy_address != "" {
+        cmd.env("http_proxy", proxy_address)
+            .env("https_proxy", proxy_address);
+    }
+    match cmd.spawn() {
         Ok(mut child) => {
             if let (Some(mut stdin), Some(mut stdout), Some(mut stderr)) =
                 (child.stdin.take(), child.stdout.take(), child.stderr.take())
