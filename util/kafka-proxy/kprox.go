@@ -112,10 +112,7 @@ import (
 	"github.com/twmb/franz-go/pkg/sasl/plain"
 )
 
-const (
-	// This needs to be in sync with the Sonar version, ideally, maybe hard to do.
-	version = "0.18.0-devel"
-)
+//go:generate ./version.bash
 
 const (
 	maxCredentials   = 1000
@@ -152,6 +149,7 @@ type Msg struct {
 
 func main() {
 	flag.Usage = func() {
+		fmt.Fprintf(flag.CommandLine.Output(), "kprox Kafka REST proxy version %s\n", version)
 		fmt.Fprintf(flag.CommandLine.Output(), "Usage of %s:\n", os.Args[0])
 		fmt.Fprintf(flag.CommandLine.Output(), "%s [options] [ini-filename]\n", os.Args[0])
 		fmt.Fprintf(flag.CommandLine.Output(), "Options:\n")
