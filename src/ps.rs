@@ -1,4 +1,5 @@
 #![allow(clippy::len_zero)]
+#![allow(dead_code)]
 
 use crate::gpu;
 use crate::json_tags::*;
@@ -38,10 +39,220 @@ pub struct PsOptions {
     pub cpu_util: bool,
 }
 
+// The PidMap is used for rolled-up pid synthesis.  A rolled-up process - a (job, parent, command)
+// triple - is entered into the map when it is first encountered and holds the synthesized pid of
+// that process.  The rolled-up process is born dirty.  Whenever it is encountered during subsequent
+// sampling it is also marked dirty.  At the end of processing a full set of samples, the map can be
+// scanned and clean elements can be removed, following which all the dirty elements that remain
+// become clean.  When a pid is needed but not available, a scan of the pid space finds free ones.
+//
+// The set of active synthesized pids is expected to be small - at most a few thousand elements even
+// on very large and busy nodes, and typically much less than that.
+//
+// Semantically it is desirable that a synthesized pid is not reused within the same job.  It's
+// impossible to guarantee that, though it is very, very likely to work out if we manage to reuse
+// pids in LRU order.  With a large enough PID space, simply cycling through the space and always
+// picking the next available one is likely to be a good approximation to that.
+//
+// With that in mind: to scan the pid space we create a (typically small) sorted list of the active
+// pids and then build a set of ranges of available pids from that, and put those in a pool in
+// numerical order, and then refill from the pool, wrapping around when we get to the end.
+
+struct PidMap {
+    map: HashMap<ProcessKey, ProcessValue>,
+    before_first: u64,         // sentinel, max system pid
+    after_last: u64,           // sentinel, at most u64::MAX
+    fresh_pid: u64,            // current range min (changes as we allocate pids)
+    curr_max: u64,             // current range max
+    pid_pool: Vec<(u64, u64)>, // (min, max) of a range, but the max is never u64::MAX; sorted descending.
+    dirty: bool,               // value meaning dirty
+}
+
+#[derive(Eq, Hash, PartialEq)]
+struct ProcessKey {
+    job_id: JobID,
+    ppid: Pid,
+    command: String,
+}
+
+struct ProcessValue {
+    pid: u64,
+    dirty: bool,
+}
+
+// These parameters are sensible for a "large enough" pid range, but can be set to other, more
+// aggressive, values during testing with an env var.
+
+// The upper limit on the pid range, exclusive.
+const PID_LIMIT: u64 = std::u64::MAX;
+
+// Ranges with fewer than this many elements are not retained in the free pool, to keep its size
+// manageable.
+const MIN_RANGE_SIZE: u64 = 100;
+
+impl PidMap {
+    fn new(system: &dyn systemapi::SystemAPI) -> PidMap {
+        let limits = get_limits(system);
+        PidMap {
+            map: HashMap::new(),
+            before_first: system.get_pid_max(),
+            after_last: limits.pid_limit,
+            fresh_pid: system.get_pid_max() + 1,
+            curr_max: limits.pid_limit - 1,
+            pid_pool: vec![],
+            dirty: true,
+        }
+    }
+
+    fn avail(&self) -> u64 {
+        self.pid_pool
+            .iter()
+            .map(|v| v.1 - v.0 + 1)
+            .fold(0, |a, b| a + b)
+            + (self.curr_max - self.fresh_pid + 1)
+    }
+
+    fn advance(&mut self, system: &dyn systemapi::SystemAPI) {
+        self.fresh_pid += 1;
+        if self.fresh_pid > self.curr_max {
+            match self.pid_pool.pop() {
+                Some((low, high)) => {
+                    (self.fresh_pid, self.curr_max) = (low, high);
+                }
+                None => {
+                    self.sweep(system);
+                }
+            }
+        }
+    }
+
+    // Always purge all clean elements.  This costs a little extra - we could have decided not to
+    // purge every time this function is called - but keeps things predictable.  Sweeping always
+    // happens on demand, not here.
+
+    fn purge_clean(&mut self) {
+        self.map.retain(|_, v| v.dirty == self.dirty);
+        self.dirty = !self.dirty;
+
+        let verbose = std::env::var("SONARTEST_ROLLUP_PIDS").is_ok();
+        if verbose {
+            log::debug!("PID GC: Dirty after purge: {}", self.map.len());
+        }
+    }
+
+    // The sweeper will set up new fresh_pid/curr_max values.  It does not return if it can't
+    // allocate at least one pid.
+
+    fn sweep(&mut self, system: &dyn systemapi::SystemAPI) {
+        let limits = get_limits(system);
+        let verbose = std::env::var("SONARTEST_ROLLUP_PIDS").is_ok();
+        let target = self.fresh_pid;
+
+        if verbose {
+            log::debug!("PID GC: Target = {target}");
+        }
+
+        self.fresh_pid = 0;
+        self.curr_max = 0;
+        self.pid_pool.clear();
+        let mut xs = self.map.values().map(|v| v.pid).collect::<Vec<u64>>();
+        xs.push(self.before_first);
+        xs.push(self.after_last);
+        xs.sort();
+        let mut i = xs.len() - 1;
+        while i > 0 {
+            // Note we may have high < low now.
+            let high = xs[i] - 1;
+            let low = xs[i - 1] + 1;
+            if high >= low && high - low + 1 >= limits.min_range_size {
+                if verbose {
+                    log::debug!("PID GC: Recover {low}..{high}");
+                }
+                self.pid_pool.push((low, high));
+            }
+            i -= 1;
+        }
+        if self.pid_pool.is_empty() {
+            panic!("PID GC: Empty PID pool");
+        }
+
+        if verbose {
+            log::debug!("PID GC: Total available after collection {}", self.avail());
+        }
+
+        // Now, target points to the next pid to use, so we must pop the pool until we we find a
+        // range that covers that value or one that is higher.  If there are no such ranges then we
+        // retain all ranges and start at the low one.  This ensures that we cycle through available
+        // pids and get a quasi-LRU order for a large enough PID space.
+
+        if target > self.pid_pool[0].1 {
+            if verbose {
+                log::debug!("PID GC: Wrapped around");
+            }
+            (self.fresh_pid, self.curr_max) = self.pid_pool.pop().unwrap();
+        } else {
+            loop {
+                (self.fresh_pid, self.curr_max) = self.pid_pool.pop().unwrap();
+                if self.curr_max >= target {
+                    if verbose {
+                        log::debug!("PID GC: Finding {} {}", self.fresh_pid, self.curr_max);
+                    }
+                    self.fresh_pid = target;
+                    break;
+                }
+                if verbose {
+                    log::debug!(
+                        "PID GC: Discarding {} {} avail = {}",
+                        self.fresh_pid,
+                        self.curr_max,
+                        self.avail()
+                    );
+                }
+            }
+        }
+
+        if verbose {
+            log::debug!("PID GC: Actual available after collection {}", self.avail());
+        }
+    }
+}
+
+struct Limits {
+    pid_limit: u64,
+    min_range_size: u64,
+}
+
+#[allow(unused_variables)]
+fn get_limits(system: &dyn systemapi::SystemAPI) -> Limits {
+    #[allow(unused_mut)]
+    let mut limits = Limits {
+        pid_limit: PID_LIMIT,
+        min_range_size: MIN_RANGE_SIZE,
+    };
+
+    #[cfg(debug_assertions)]
+    if let Ok(s) = std::env::var("SONARTEST_ROLLUP_PIDS") {
+        // SONARTEST_ROLLUP_PIDS should have the form p,r where p is the number of available pids
+        // and r is the minimum pid range size to keep after garbage collection.  All are optional.
+        let mut xs = s.split(",").map(|v| v.parse::<u64>());
+        match xs.next() {
+            Some(Ok(v)) => limits.pid_limit = system.get_pid_max() + 1 + v,
+            Some(_) | None => {}
+        }
+        match xs.next() {
+            Some(Ok(v)) => limits.min_range_size = v,
+            Some(_) | None => {}
+        }
+    }
+
+    limits
+}
+
 #[cfg(feature = "daemon")]
 pub struct State<'a> {
     system: &'a dyn systemapi::SystemAPI,
     opts: PsOptions,
+    pidmap: PidMap,
 }
 
 #[cfg(feature = "daemon")]
@@ -50,12 +261,13 @@ impl<'a> State<'a> {
         State {
             system,
             opts: opts.clone(),
+            pidmap: PidMap::new(system),
         }
     }
 
     pub fn run(&mut self) -> Vec<Vec<u8>> {
         let mut writer = Vec::new();
-        do_create_snapshot(&mut writer, self.system, &self.opts);
+        do_create_snapshot(&mut writer, self.system, &self.opts, Some(&mut self.pidmap));
         vec![writer]
     }
 }
@@ -117,7 +329,7 @@ pub fn create_snapshot(
         }
 
         if !failed && !skip {
-            do_create_snapshot(writer, system, opts);
+            do_create_snapshot(writer, system, opts, None);
 
             // Testing code: If we got the lockfile and produced a report, wait 10s after producing
             // it while holding onto the lockfile.  It is then possible to run sonar in that window
@@ -153,7 +365,7 @@ pub fn create_snapshot(
             log::error!("Unable to properly manage or delete lockfile");
         }
     } else {
-        do_create_snapshot(writer, system, opts);
+        do_create_snapshot(writer, system, opts, None);
     }
 }
 
@@ -161,20 +373,76 @@ fn do_create_snapshot(
     writer: &mut dyn io::Write,
     system: &dyn systemapi::SystemAPI,
     opts: &PsOptions,
+    pidmap: Option<&mut PidMap>,
 ) {
     match collect_sample_data(system, opts) {
-        Ok(Some(sample_data)) => match opts.fmt {
-            Format::JSON => {
-                let recoverable_errors = output::Array::new();
-                let o = output::Value::O(format_newfmt(
-                    &sample_data,
-                    system,
-                    opts,
-                    recoverable_errors,
-                ));
-                output::write_json(writer, &o);
+        Ok(Some(mut sample_data)) => {
+            // Assign PIDs to rolled-up processes?
+            if let Some(pidmap) = pidmap {
+                let verbose = std::env::var("SONARTEST_ROLLUP_PIDS").is_ok();
+                for s in sample_data.process_samples.iter_mut() {
+                    if s.rolledup > 0 {
+                        let key = ProcessKey {
+                            job_id: s.job_id,
+                            ppid: s.ppid,
+                            command: s.command.to_string(),
+                        };
+                        let mut advance = false;
+                        pidmap
+                            .map
+                            .entry(key)
+                            .and_modify(|e| {
+                                // Note this case should only be hit on *subsequent* samples.
+                                if verbose {
+                                    log::debug!(
+                                        "PID synthesis: Old process: {} {} {} {}",
+                                        s.job_id,
+                                        s.ppid,
+                                        s.command,
+                                        e.pid
+                                    );
+                                }
+                                s.pid = e.pid as usize;
+                                e.dirty = pidmap.dirty;
+                            })
+                            .or_insert_with(|| {
+                                if verbose {
+                                    log::debug!(
+                                        "PID synthesis: New process: {} {} {} {}",
+                                        s.job_id,
+                                        s.ppid,
+                                        s.command,
+                                        pidmap.fresh_pid
+                                    );
+                                }
+                                advance = true;
+                                let pid = pidmap.fresh_pid;
+                                s.pid = pid as usize;
+                                ProcessValue {
+                                    pid: pid,
+                                    dirty: pidmap.dirty,
+                                }
+                            });
+                        if advance {
+                            pidmap.advance(system);
+                        }
+                    }
+                }
+                pidmap.purge_clean();
             }
-        },
+            match opts.fmt {
+                Format::JSON => {
+                    let recoverable_errors = output::Array::new();
+                    let o = output::Value::O(format_newfmt(
+                        &sample_data,
+                        system,
+                        opts,
+                        recoverable_errors,
+                    ));
+                    output::write_json(writer, &o);
+                }
+            }
+        }
         Ok(None) => {
             // Interrupted, do not print anything
         }
@@ -680,7 +948,10 @@ fn rollup_processes(procinfo_by_pid: ProcInfoTable) -> Vec<ProcInfo> {
             } else {
                 let x = rolledup.len();
                 index.insert(key, x);
-                rolledup.push(proc_info.clone());
+                rolledup.push(ProcInfo {
+                    pid: 0,
+                    ..proc_info.clone()
+                });
                 // We do not increment the clone's `rolledup` counter here because that counter
                 // counts how many *other* records have been rolled into the canonical one, 0
                 // means "no interesting information" and need not be printed.

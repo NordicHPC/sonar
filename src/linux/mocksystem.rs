@@ -327,6 +327,10 @@ impl systemapi::SystemAPI for MockSystem {
         system::get_numa_distances(self)
     }
 
+    fn get_pid_max(&self) -> u64 {
+        4194304
+    }
+
     fn compute_node_information(&self) -> Result<(u64, Vec<u64>), String> {
         procfs::compute_node_information(self, &self.fs)
     }

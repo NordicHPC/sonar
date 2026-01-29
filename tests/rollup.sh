@@ -37,5 +37,11 @@ if (( nroll2 != nroll )); then
     fail "Bad number of rolled-up lines - some have a value other than 1"
 fi
 
+# This is true for one-shot mode but not for daemon mode
+roll3=$(jq -r '[.data.attributes.jobs[].processes[]] | map(select(.cmd=="rollup" and .pid!=null and .rolledup!=null))' $output)
+if [[ $roll3 != '[]' ]]; then
+    fail "Should have seen no rolledup lines with nonzero pid"
+fi
+
 echo " Ok"
 exit 0

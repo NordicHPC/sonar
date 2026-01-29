@@ -4,5 +4,10 @@ rollup
 rollup2
 rollupchild
 rollupchild2
+daemon-rollup2
+drchild0
+drchild1
+drchild2
+drchild3
 tmp
 testdata/*.bak
