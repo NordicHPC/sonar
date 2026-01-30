@@ -10,7 +10,10 @@ test:
 	$(MAKE) clean
 	./run_tests.sh
 
-rollup-programs: rollup rollup2 rollupchild rollupchild2
+# Add to .gitignore if adding here
+ROLLUP_TARGETS=rollup rollup2 daemon-rollup2 rollupchild rollupchild2 \
+	drchild0 drchild1 drchild2 drchild3
+rollup-programs: $(ROLLUP_TARGETS)
 
 format:
 	clang-format -i --style=file:../clang-format.txt *.c
@@ -18,6 +21,18 @@ format:
 rollupchild2: rollupchild
 	cp rollupchild rollupchild2
 
+drchild0: rollupchild
+	cp rollupchild drchild0
+
+drchild1: rollupchild
+	cp rollupchild drchild1
+
+drchild2: rollupchild
+	cp rollupchild drchild2
+
+drchild3: rollupchild
+	cp rollupchild drchild3
+
 # Same files as in .gitignore
 clean:
-	rm -rf pincpu pincpus rollup rollup2 rollupchild rollupchild2 tmp *~
+	rm -rf pincpu pincpus $(ROLLUP_TARGETS) tmp *~

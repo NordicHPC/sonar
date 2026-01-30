@@ -333,6 +333,15 @@ impl systemapi::SystemAPI for System {
         get_numa_distances(self)
     }
 
+    fn get_pid_max(&self) -> u64 {
+        if let Ok(s) = fs::read_to_string("/proc/sys/kernel/pid_max") {
+            if let Ok(n) = s.parse::<u64>() {
+                return n;
+            }
+        }
+        4194304
+    }
+
     fn compute_node_information(&self) -> Result<(u64, Vec<u64>), String> {
         procfs::compute_node_information(self, &self.fs)
     }

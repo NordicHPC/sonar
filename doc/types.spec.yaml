@@ -402,7 +402,7 @@ SampleProcess:
     pid:
       type: 'uint64'
       doc: >
-        Process ID, zero is used for rolled-up samples (see below at "Rolledup").
+        Process ID.  For rolled-up samples, this is zero in one-shot mode and a synthesized unique Pid outside the system's Pid range in daemon mode.  In pre-v0.18 samples in daemon mode this was also zero.  Also see below at the "Rolledup" field and the section "Rolled-up samples" in the postamble.
     ppid:
       type: 'uint64'
       doc: >
@@ -442,7 +442,7 @@ SampleProcess:
     rolledup:
       type: 'int'
       doc: >
-        The number of additional samples for processes that are "the same" that have been rolled into this one. That is, if the value is 1, the record represents the sum of the sample data for two processes.  See postamble for more.
+        The number of additional samples for processes that are "the same" that have been rolled into this one. That is, if the value is 1, the record represents the sum of the sample data for two processes.  See "Rolled-up samples" in the postamble for more.
     gpus:
       type: '[]SampleProcessGpu'
       doc: >

@@ -199,10 +199,9 @@ fn format_newfmt_sample(proc_info: &ProcInfo) -> output::Object {
         );
     }
     fields.push_s(SAMPLE_PROCESS_CMD, proc_info.command.to_string());
-    if proc_info.rolledup == 0 && proc_info.pid != 0 {
-        // pid must be 0 for rolledup > 0 as there is no guarantee that there is any fixed
-        // representative pid for a rolled-up set of processes: the set can change from run to run,
-        // and sonar has no history.
+    if proc_info.pid != 0 {
+        // Rolled-up processes have a synthesized non-zero pid in daemon mode, and a zero pid in
+        // one-shot mode.
         fields.push_u(SAMPLE_PROCESS_PID, proc_info.pid as u64);
     }
     if proc_info.ppid != 0 {

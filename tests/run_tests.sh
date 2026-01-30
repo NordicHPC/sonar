@@ -19,6 +19,8 @@ tests="amd-gpu \
      daemon-interrupt \
      daemon-kafka \
      daemon-read-config \
+     daemon-rollup \
+     daemon-rollup2 \
      daemon-slurm \
      daemon-startup \
      docker-run \

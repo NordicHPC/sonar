@@ -659,7 +659,10 @@ type SampleProcess struct {
 	// the end, a la ps.
 	Cmd string `json:"cmd,omitempty"`
 
-	// Process ID, zero is used for rolled-up samples (see below at "Rolledup").
+	// Process ID.  For rolled-up samples, this is zero in one-shot mode and a synthesized unique
+	// Pid outside the system's Pid range in daemon mode.  In pre-v0.18 samples in daemon mode this
+	// was also zero.  Also see below at the "Rolledup" field and the section "Rolled-up samples" in
+	// the postamble.
 	Pid uint64 `json:"pid,omitempty"`
 
 	// Parent-process ID.
@@ -699,7 +702,7 @@ type SampleProcess struct {
 
 	// The number of additional samples for processes that are "the same" that have been rolled into
 	// this one. That is, if the value is 1, the record represents the sum of the sample data for
-	// two processes.  See postamble for more.
+	// two processes.  See "Rolled-up samples" in the postamble for more.
 	Rolledup int `json:"rolledup,omitempty"`
 
 	// GPU sample data for all cards used by the process.
@@ -1240,6 +1243,11 @@ type NodeRange NonemptyString
 // The requirement that the rolled-up processes have the same parent process means that there can be
 // several rolled-up records with the same Job ID and command name at the same timestamp at a given
 // node; the records are distinguished by their ParentPid.
+//
+// In daemon mode a rolled-up process is assigned a synthetic non-zero process ID that is stable
+// even as the set of processes in the rolled-up process changes: the synthesized ID is induced by
+// the (Job, ParentPid, Cmd) triple.  Like the regular process ID, the synthesized ID may be reused
+// after some time.
 //
 // The feature does not come without downsides.  Information about individual processes on the same
 // node is lost, so intra-node imbalance is harder to diagnose, and resident memory figures can
