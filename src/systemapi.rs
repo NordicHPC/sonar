@@ -31,6 +31,7 @@ pub trait SystemAPI {
     fn get_cpu_info(&self) -> Result<CpuInfo, String>;
     fn get_memory_in_kib(&self) -> Result<Memory, String>;
     fn get_numa_distances(&self) -> Result<Vec<Vec<u32>>, String>;
+    #[allow(dead_code)]
     fn get_pid_max(&self) -> u64;
 
     // CPU usage data: total cpu seconds and per-cpu seconds.

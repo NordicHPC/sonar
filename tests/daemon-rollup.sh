@@ -54,4 +54,5 @@ for pid in $pids; do
     k=$((k + 1))
 done
 
+pkill rollup
 echo " Ok"

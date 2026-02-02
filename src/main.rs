@@ -15,6 +15,8 @@ mod nodelist;
 mod output;
 #[cfg(test)]
 mod output_test;
+#[cfg(feature = "daemon")]
+mod pidmap;
 mod ps;
 mod ps_newfmt;
 #[cfg(test)]
