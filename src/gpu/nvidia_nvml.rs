@@ -225,7 +225,7 @@ pub fn get_process_utilization(ptable: &ps::ProcessTable) -> Option<Vec<gpu::Pro
                     uuid: get_card_uuid(dev),
                 }],
                 pid: infobuf.pid as Pid,
-                user: username.to_string(),
+                user: username.clone(),
                 uid: uid as Uid,
                 mem_pct: infobuf.mem_util as f32,
                 gpu_pct: infobuf.gpu_util as f32,

@@ -38,7 +38,7 @@ impl DataSink for StdioSink {
         value: String,
     ) {
         let prefix = if let Some(ref s) = topic_prefix {
-            s.to_string() + "."
+            s.clone() + "."
         } else {
             "".to_string()
         };

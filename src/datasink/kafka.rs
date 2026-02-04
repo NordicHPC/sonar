@@ -104,7 +104,7 @@ impl KafkaSink {
                 let rest_endpoint = kafka.rest_endpoint.clone();
                 let rest_proxy = kafka.rest_proxy.clone();
                 let curl_cmd = if let Some(ref curl) = ini.programs.curl_cmd {
-                    curl.to_string()
+                    curl.clone()
                 } else {
                     "curl".to_string()
                 };

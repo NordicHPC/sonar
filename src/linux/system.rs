@@ -63,7 +63,7 @@ impl Builder {
     #[allow(dead_code)]
     pub fn with_node_domain(self, domain: &[String]) -> Builder {
         Builder {
-            node_domain: Some(domain.iter().map(|x| x.clone()).collect::<Vec<String>>()),
+            node_domain: Some(domain.iter().cloned().collect::<Vec<String>>()),
             ..self
         }
     }
@@ -173,11 +173,11 @@ fn expand_domain(hostname: String, domain: &[String]) -> String {
     }
     if matched && f == full.len() {
         for de in domain[d..].iter() {
-            full.push(de.to_string())
+            full.push(de.clone())
         }
     } else {
         for de in domain {
-            full.push(de.to_string());
+            full.push(de.clone());
         }
     }
     full.join(".")
@@ -693,8 +693,8 @@ pub fn get_numa_distances(system: &dyn systemapi::SystemAPI) -> Result<Vec<Vec<u
         if m.len() != n {
             return Ok(vec![]);
         }
-        for i in 1..m.len() {
-            if m[i].len() != n {
+        for v in &m[1..] {
+            if v.len() != n {
                 return Ok(vec![]);
             }
         }

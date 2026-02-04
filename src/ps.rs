@@ -253,7 +253,7 @@ impl ProcessTable {
     #[allow(dead_code)]
     pub fn lookup(&self, pid: Pid) -> (String, Uid) {
         match self.by_pid.get(&pid) {
-            Some((name, uid)) => (name.to_string(), *uid),
+            Some((name, uid)) => (name.clone(), *uid),
             None => ("_user_unknown".to_string(), 1),
         }
     }
@@ -406,7 +406,7 @@ fn collect_sample_data(
 
 fn mark_containers(mut procinfo_by_pid: ProcInfoTable) -> ProcInfoTable {
     // Pass 1: Mark roots.
-    for (_, v) in &mut procinfo_by_pid {
+    for v in procinfo_by_pid.values_mut() {
         if is_container_root(v) {
             v.container_state = CState::Root;
         } else if v.ppid == 0 {
@@ -420,7 +420,7 @@ fn mark_containers(mut procinfo_by_pid: ProcInfoTable) -> ProcInfoTable {
     // in the table, so we must deal with that.
     //
     // The separate collecting of keys sucks but is a fact of Rust.
-    let all = procinfo_by_pid.keys().map(|v| *v).collect::<Vec<Pid>>();
+    let all = procinfo_by_pid.keys().copied().collect::<Vec<Pid>>();
     let mut keys = vec![];
     for k in all {
         keys.clear();
@@ -469,8 +469,8 @@ fn new_with_cpu_info(
         procinfo_by_pid.insert(
             proc.pid,
             ProcInfo {
-                user: proc.user.to_string(),
-                command: proc.command.to_string(),
+                user: proc.user.clone(),
+                command: proc.command.clone(),
                 pid: proc.pid,
                 ppid: proc.ppid,
                 is_system_job: proc.uid < 1000,
@@ -579,7 +579,7 @@ fn add_gpu_info(
                                 .get_jobs()
                                 .job_id_from_pid(system, proc.pid, processes);
                             ProcInfo {
-                                user: proc.user.to_string(),
+                                user: proc.user.clone(),
                                 command,
                                 pid: proc.pid,
                                 ppid,
@@ -691,7 +691,7 @@ fn rollup_processes(procinfo_by_pid: ProcInfoTable) -> Vec<ProcInfo> {
     // processes that together push it over the filtering limit then it will be printed.  This
     // is probably the right thing.
 
-    let mut rolledup : Vec<ProcInfo> = vec![];
+    let mut rolledup: Vec<ProcInfo> = vec![];
     let mut index = HashMap::<(JobID, Pid, String), usize>::new();
     for (_, proc_info) in procinfo_by_pid {
         if proc_info.job_id == 0 || proc_info.has_children || !proc_info.is_slurm {
