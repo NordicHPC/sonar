@@ -30,6 +30,8 @@ use crate::types::{Pid, Uid};
 // hostname:boot_time:bus_address (where hostname is as fully qualified as possible, ideally both
 // cluster and node name).  Each GPU module (nvidia.rs, amd.rs, xpu.rs, etc) is responsible for
 // managing the uuid.
+//
+// Cloneable because Process (below) is cloneable, and incorporates a Name.
 
 #[derive(PartialEq, Eq, Hash, Default, Clone, Debug)]
 pub struct Name {
@@ -48,6 +50,8 @@ pub struct Name {
 // those devices, either evenly or (with CardState information in mind) in some kind of proportional
 // manner.  The values of `gpu_pct`, `mem_pct` and `mem_size_kib` are the sums across all the
 // `devices`.  Thus for four devices, `gpu_pct` can be up to 400.
+//
+// Cloneable because the expansion from one aggregated gpu to multiple gpus in the PS code clones it.
 
 #[derive(PartialEq, Default, Clone, Debug)]
 pub struct Process {
@@ -64,7 +68,8 @@ pub struct Process {
 // Static (sample-invariant) card information.  The power limit is not static but in practice
 // changes only very rarely.
 
-#[derive(PartialEq, Default, Clone, Debug)]
+#[derive(PartialEq, Default, Debug)]
+#[cfg_attr(test, derive(Clone))]
 pub struct Card {
     pub device: Name,
     pub bus_addr: String,
@@ -87,7 +92,7 @@ pub struct Card {
 //
 // The perf_state is -1 for unknown, otherwise >= 0.
 
-#[derive(PartialEq, Default, Clone, Debug)]
+#[derive(PartialEq, Default, Debug)]
 pub struct CardState {
     pub device: Name,
     pub failing: u32,
