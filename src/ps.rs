@@ -148,7 +148,7 @@ pub fn create_snapshot(
         }
 
         if created {
-            match system.remove_lock_file(p) {
+            match system.remove_lock_file(&p) {
                 Ok(_) => {}
                 Err(_) => {
                     failed = true;

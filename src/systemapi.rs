@@ -102,8 +102,8 @@ pub trait SystemAPI {
     // `create_lock_file` creates it atomically if it does not exist, returning Ok if so; if it does
     // exist, returns Err(io::ErrorKind::AlreadyExists), otherwise some other Err.
     // `remove_lock_file` unconditionally tries to remove the file, returning some Err if it fails.
-    fn create_lock_file(&self, p: &path::PathBuf) -> io::Result<fs::File>;
-    fn remove_lock_file(&self, p: path::PathBuf) -> io::Result<()>;
+    fn create_lock_file(&self, p: &path::Path) -> io::Result<fs::File>;
+    fn remove_lock_file(&self, p: &path::Path) -> io::Result<()>;
 
     // `handle_interruptions` enables interrupt checking; `is_interrupted` returns true if an
     // interrupt has been received.  The specific interrupt signals are system-dependent; see the

@@ -271,8 +271,8 @@ fn parse_scontrol_output(scontrol_output: String) -> HashMap<String, String> {
                 }
             }
         }
-        if id.is_some() && res.is_some() {
-            resources.insert(id.unwrap(), res.unwrap());
+        if let (Some(id), Some(res)) = (id, res) {
+            resources.insert(id, res);
         }
     }
     resources

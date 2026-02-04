@@ -390,11 +390,11 @@ impl systemapi::SystemAPI for System {
         users::lookup_user_by_uid(uid).map(|u| u.to_string_lossy().to_string())
     }
 
-    fn create_lock_file(&self, p: &path::PathBuf) -> io::Result<fs::File> {
+    fn create_lock_file(&self, p: &path::Path) -> io::Result<fs::File> {
         fs::File::options().write(true).create_new(true).open(p)
     }
 
-    fn remove_lock_file(&self, p: path::PathBuf) -> io::Result<()> {
+    fn remove_lock_file(&self, p: &path::Path) -> io::Result<()> {
         fs::remove_file(p)
     }
 
