@@ -106,7 +106,7 @@ fn layout_sysinfo_newfmt(
     if let Some(ref topo_text) = node_info.topo_text {
         attrs.push_s(SYSINFO_ATTRIBUTES_TOPO_TEXT, STANDARD.encode(topo_text));
     }
-    let gpu_info = layout_card_info_newfmt(&node_info);
+    let gpu_info = layout_card_info_newfmt(node_info);
     if gpu_info.len() > 0 {
         attrs.push_a(SYSINFO_ATTRIBUTES_CARDS, gpu_info);
     }
@@ -128,9 +128,9 @@ fn layout_error_newfmt(
     envelope
 }
 
-fn layout_card_info_newfmt(node_info: &NodeInfo) -> output::Array {
+fn layout_card_info_newfmt(node_info: NodeInfo) -> output::Array {
     let mut gpu_info = output::Array::new();
-    for c in &node_info.cards {
+    for c in node_info.cards {
         let gpu::Card {
             device,
             bus_addr,
@@ -148,48 +148,48 @@ fn layout_card_info_newfmt(node_info: &NodeInfo) -> output::Array {
         } = c;
         let mut gpu = output::Object::new();
         gpu.push_i(SYSINFO_GPU_CARD_INDEX, device.index as i64);
-        gpu.push_s(SYSINFO_GPU_CARD_UUID, device.uuid.to_string());
+        gpu.push_s(SYSINFO_GPU_CARD_UUID, device.uuid);
         if bus_addr != "" {
-            gpu.push_s(SYSINFO_GPU_CARD_ADDRESS, bus_addr.to_string());
+            gpu.push_s(SYSINFO_GPU_CARD_ADDRESS, bus_addr);
         }
         if manufacturer != "" {
-            gpu.push_s(SYSINFO_GPU_CARD_MANUFACTURER, manufacturer.clone());
+            gpu.push_s(SYSINFO_GPU_CARD_MANUFACTURER, manufacturer);
         }
         if model != "" {
-            gpu.push_s(SYSINFO_GPU_CARD_MODEL, model.to_string());
+            gpu.push_s(SYSINFO_GPU_CARD_MODEL, model);
         }
         if arch != "" {
-            gpu.push_s(SYSINFO_GPU_CARD_ARCHITECTURE, arch.to_string());
+            gpu.push_s(SYSINFO_GPU_CARD_ARCHITECTURE, arch);
         }
         if driver != "" {
-            gpu.push_s(SYSINFO_GPU_CARD_DRIVER, driver.to_string());
+            gpu.push_s(SYSINFO_GPU_CARD_DRIVER, driver);
         }
         if firmware != "" {
-            gpu.push_s(SYSINFO_GPU_CARD_FIRMWARE, firmware.to_string());
+            gpu.push_s(SYSINFO_GPU_CARD_FIRMWARE, firmware);
         }
-        if *mem_size_kib != 0 {
-            gpu.push_u(SYSINFO_GPU_CARD_MEMORY, *mem_size_kib);
+        if mem_size_kib != 0 {
+            gpu.push_u(SYSINFO_GPU_CARD_MEMORY, mem_size_kib);
         }
-        if *power_limit_watt != 0 {
-            gpu.push_i(SYSINFO_GPU_CARD_POWER_LIMIT, *power_limit_watt as i64);
+        if power_limit_watt != 0 {
+            gpu.push_i(SYSINFO_GPU_CARD_POWER_LIMIT, power_limit_watt as i64);
         }
-        if *max_power_limit_watt != 0 {
+        if max_power_limit_watt != 0 {
             gpu.push_i(
                 SYSINFO_GPU_CARD_MAX_POWER_LIMIT,
-                *max_power_limit_watt as i64,
+                max_power_limit_watt as i64,
             );
         }
-        if *min_power_limit_watt != 0 {
+        if min_power_limit_watt != 0 {
             gpu.push_i(
                 SYSINFO_GPU_CARD_MIN_POWER_LIMIT,
-                *min_power_limit_watt as i64,
+                min_power_limit_watt as i64,
             );
         }
-        if *max_ce_clock_mhz != 0 {
-            gpu.push_i(SYSINFO_GPU_CARD_MAX_CECLOCK, *max_ce_clock_mhz as i64);
+        if max_ce_clock_mhz != 0 {
+            gpu.push_i(SYSINFO_GPU_CARD_MAX_CECLOCK, max_ce_clock_mhz as i64);
         }
-        if *max_mem_clock_mhz != 0 {
-            gpu.push_i(SYSINFO_GPU_CARD_MAX_MEMORY_CLOCK, *max_mem_clock_mhz as i64);
+        if max_mem_clock_mhz != 0 {
+            gpu.push_i(SYSINFO_GPU_CARD_MAX_MEMORY_CLOCK, max_mem_clock_mhz as i64);
         }
         gpu_info.push_o(gpu);
     }
