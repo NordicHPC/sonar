@@ -2,7 +2,7 @@ use std::io;
 use std::time::Duration;
 use subprocess::{Exec, ExitStatus, Redirection};
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, PartialEq)]
 pub enum CmdError {
     CouldNotStart(String),
     Failed(String),

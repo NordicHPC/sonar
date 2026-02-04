@@ -18,14 +18,14 @@ use std::thread;
 #[cfg(debug_assertions)]
 use std::time;
 
-#[derive(Default, Clone)]
+#[derive(Default)]
 pub enum Format {
     // There used to be CSV here.  We might add eg Protobuf.
     #[default]
     JSON,
 }
 
-#[derive(Default, Clone)]
+#[derive(Default)]
 pub struct PsOptions {
     pub rollup: bool,
     pub min_cpu_percent: Option<f64>,
@@ -51,10 +51,10 @@ pub struct State<'a> {
 
 #[cfg(feature = "daemon")]
 impl<'a> State<'a> {
-    pub fn new(system: &'a dyn systemapi::SystemAPI, opts: &PsOptions) -> State<'a> {
+    pub fn new(system: &'a dyn systemapi::SystemAPI, opts: PsOptions) -> State<'a> {
         State {
             system,
-            opts: opts.clone(),
+            opts,
             #[cfg(feature = "daemon")]
             pidmap: PidMap::new(system),
         }
@@ -76,7 +76,7 @@ impl<'a> State<'a> {
 pub fn create_snapshot(
     writer: &mut dyn io::Write,
     system: &dyn systemapi::SystemAPI,
-    opts: &PsOptions,
+    opts: PsOptions,
 ) {
     // If a lock file was requested, create one before the operation, exit early if it already
     // exists, and if we performed the operation, remove the file afterwards.  Otherwise, just
@@ -133,7 +133,7 @@ pub fn create_snapshot(
             do_create_snapshot(
                 writer,
                 system,
-                opts,
+                &opts,
                 #[cfg(feature = "daemon")]
                 None,
             );
@@ -175,7 +175,7 @@ pub fn create_snapshot(
         do_create_snapshot(
             writer,
             system,
-            opts,
+            &opts,
             #[cfg(feature = "daemon")]
             None,
         );
@@ -204,7 +204,7 @@ fn do_create_snapshot(
                 Format::JSON => {
                     let recoverable_errors = output::Array::new();
                     let o = output::Value::O(format_newfmt(
-                        &sample_data,
+                        sample_data,
                         system,
                         opts,
                         recoverable_errors,
@@ -275,7 +275,7 @@ pub enum CState {
     Not,
 }
 
-#[derive(Clone, Default)]
+#[derive(Default)]
 pub struct ProcInfo {
     pub user: String,
     pub command: String,
@@ -306,7 +306,7 @@ pub struct ProcInfo {
 
 pub type GpuProcInfos = HashMap<gpu::Name, GpuProcInfo>;
 
-#[derive(Clone, Default)]
+#[derive(Default)]
 pub struct GpuProcInfo {
     pub device: gpu::Name,
     pub gpu_util: u32,
@@ -314,7 +314,7 @@ pub struct GpuProcInfo {
     pub gpu_mem_util: u32,
 }
 
-#[derive(Copy, Clone, Default, PartialEq, Eq)]
+#[derive(Clone, Copy, Default, PartialEq, Eq)]
 pub enum GpuStatus {
     #[default]
     Ok = 0,
@@ -691,13 +691,13 @@ fn rollup_processes(procinfo_by_pid: ProcInfoTable) -> Vec<ProcInfo> {
     // processes that together push it over the filtering limit then it will be printed.  This
     // is probably the right thing.
 
-    let mut rolledup = vec![];
-    let mut index = HashMap::<(JobID, Pid, &str), usize>::new();
-    for proc_info in procinfo_by_pid.values() {
+    let mut rolledup : Vec<ProcInfo> = vec![];
+    let mut index = HashMap::<(JobID, Pid, String), usize>::new();
+    for (_, proc_info) in procinfo_by_pid {
         if proc_info.job_id == 0 || proc_info.has_children || !proc_info.is_slurm {
-            rolledup.push(proc_info.clone());
+            rolledup.push(proc_info);
         } else {
-            let key = (proc_info.job_id, proc_info.ppid, proc_info.command.as_str());
+            let key = (proc_info.job_id, proc_info.ppid, proc_info.command.clone());
             if let Some(x) = index.get(&key) {
                 let p = &mut rolledup[*x];
                 p.num_threads += proc_info.num_threads;
@@ -720,7 +720,7 @@ fn rollup_processes(procinfo_by_pid: ProcInfoTable) -> Vec<ProcInfo> {
                 index.insert(key, x);
                 rolledup.push(ProcInfo {
                     pid: 0,
-                    ..proc_info.clone()
+                    ..proc_info
                 });
                 // We do not increment the clone's `rolledup` counter here because that counter
                 // counts how many *other* records have been rolled into the canonical one, 0

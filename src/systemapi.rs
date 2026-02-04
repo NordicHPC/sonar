@@ -134,12 +134,12 @@ pub struct Process {
 }
 
 // Figures in KB.
-#[derive(Clone)]
 pub struct Memory {
     pub total: u64,
     pub available: u64,
 }
 
+// Cloneable because the system api holds the value and hands out copies
 #[derive(Clone)]
 pub struct CpuInfo {
     pub sockets: i32,
@@ -148,15 +148,16 @@ pub struct CpuInfo {
     pub cores: Vec<CoreInfo>,
 }
 
+// Cloneable because the system api holds the value and hands out copies
 #[derive(Clone)]
-#[allow(dead_code)]
 pub struct CoreInfo {
     pub model_name: String,
+    #[allow(dead_code)]
     pub logical_index: i32,
+    #[allow(dead_code)]
     pub physical_index: i32,
 }
 
-#[derive(Clone, Debug)]
 pub struct DiskInfo {
     pub name: String,
     pub major: u64,

@@ -11,7 +11,7 @@ use crate::util::three_places;
 use std::collections::HashMap;
 
 pub fn format_newfmt(
-    c: &SampleData,
+    c: SampleData,
     system: &dyn systemapi::SystemAPI,
     opts: &PsOptions,
     recoverable_errors: output::Array,
@@ -30,7 +30,7 @@ pub fn format_newfmt(
             cpu_load.push_i(*v as i64);
         }
         sstate.push_a(SAMPLE_SYSTEM_CPUS, cpu_load);
-        if let Some(gpu_samples) = &c.gpu_samples {
+        if let Some(gpu_samples) = c.gpu_samples {
             let mut gpu_load = output::Array::new();
             for v in gpu_samples {
                 gpu_load.push_o(format_newfmt_gpu_sample(v));
@@ -38,9 +38,9 @@ pub fn format_newfmt(
             sstate.push_a(SAMPLE_SYSTEM_GPUS, gpu_load);
         }
         let mut disk_info = output::Array::new();
-        for v in &c.disk_samples {
+        for v in c.disk_samples {
             let mut dsk = output::Object::new();
-            dsk.push_s(SAMPLE_DISK_NAME, v.name.clone());
+            dsk.push_s(SAMPLE_DISK_NAME, v.name);
             dsk.push_u(SAMPLE_DISK_MAJOR, v.major);
             dsk.push_u(SAMPLE_DISK_MINOR, v.minor);
             let mut stats = output::Array::new();
@@ -104,13 +104,13 @@ pub fn format_newfmt(
     envelope
 }
 
-fn format_newfmt_gpu_sample(c: &gpu::CardState) -> output::Object {
+fn format_newfmt_gpu_sample(c: gpu::CardState) -> output::Object {
     let mut s = output::Object::new();
     if c.device.index != 0 {
         s.push_i(SAMPLE_GPU_INDEX, c.device.index as i64);
     }
     if c.device.uuid != "" {
-        s.push_s(SAMPLE_GPU_UUID, c.device.uuid.clone());
+        s.push_s(SAMPLE_GPU_UUID, c.device.uuid);
     }
     if c.failing != 0 {
         s.push_i(SAMPLE_GPU_FAILING, c.failing as i64);
@@ -119,7 +119,7 @@ fn format_newfmt_gpu_sample(c: &gpu::CardState) -> output::Object {
         s.push_i(SAMPLE_GPU_FAN, c.fan_speed_pct.round() as i64);
     }
     if c.compute_mode != "" {
-        s.push_s(SAMPLE_GPU_COMPUTE_MODE, c.compute_mode.clone());
+        s.push_s(SAMPLE_GPU_COMPUTE_MODE, c.compute_mode);
     }
     let perf = (c.perf_state + 1) as u64; // extended-unsigned encoding, perf_state may be -1 here.
     if perf != 0 {
@@ -198,7 +198,7 @@ fn format_newfmt_sample(proc_info: &ProcInfo) -> output::Object {
             proc_info.data_cancelled_kib as u64,
         );
     }
-    fields.push_s(SAMPLE_PROCESS_CMD, proc_info.command.to_string());
+    fields.push_s(SAMPLE_PROCESS_CMD, proc_info.command.clone());
     if proc_info.pid != 0 {
         // Rolled-up processes have a synthesized non-zero pid in daemon mode, and a zero pid in
         // one-shot mode.

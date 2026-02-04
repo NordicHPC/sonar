@@ -29,7 +29,6 @@ impl<'a> State<'a> {
     }
 }
 
-#[derive(Clone)]
 pub enum Format {
     // There used to be CSV and OldJSON here, we might add eg Protobuf
     JSON,

@@ -84,7 +84,7 @@ pub struct State<'a> {
     system: &'a dyn systemapi::SystemAPI,
 }
 
-#[derive(Default, Clone)]
+#[derive(Default)]
 struct JobAll {
     job_id: u64,      // "true" job ID, see doc/NEW-FORMAT.md
     job_step: String, // "true" job step, ditto
@@ -159,7 +159,6 @@ impl<'a> State<'a> {
 // Default sacct reporting window.  Note this value is baked into the help message in main.rs too.
 const DEFAULT_WINDOW: u32 = 90;
 
-#[derive(Clone)]
 pub enum Format {
     // There used to be CSV here before, we might add eg Protobuf
     JSON,

@@ -338,7 +338,7 @@ pub fn daemon_mode(
 
     let mut sample_extractor = ps::State::new(
         &system,
-        &ps::PsOptions {
+        ps::PsOptions {
             rollup: ini.sample.rollup,
             min_cpu_time: ini.sample.min_cpu_time.map(|d| d.to_seconds() as usize),
             exclude_system_jobs: ini.sample.exclude_system_jobs,
