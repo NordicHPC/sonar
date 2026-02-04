@@ -3,6 +3,7 @@
 // Collect CPU process information without GPU information, from files in /proc.
 
 use crate::systemapi;
+use crate::types::{Pid, Uid};
 
 use std::collections::{HashMap, HashSet};
 use std::thread;
@@ -17,10 +18,10 @@ pub trait ProcfsAPI {
     // be opened or read.
     fn read_to_string(&self, path: &str) -> Result<String, String>;
 
-    // Return (name,owner-uid) for every file /proc/<path>/{name} where path can be empty.  Return a
-    // sensible error message in case something goes really, really wrong, but otherwise try to make
-    // the best of it.
-    fn read_numeric_file_names(&self, path: &str) -> Result<Vec<(usize, u32)>, String>;
+    // Return (name,owner-uid) for every file /proc/<path>/{name} where path can be empty and the
+    // name is a number.  Return a sensible error message in case something goes really, really
+    // wrong, but otherwise try to make the best of it.
+    fn read_numeric_file_names(&self, path: &str) -> Result<Vec<(u64, Uid)>, String>;
 }
 
 // Read the /proc/meminfo file from the fs and return the value for total installed memory.
@@ -48,7 +49,7 @@ pub fn get_memory_in_kib(fs: &dyn ProcfsAPI) -> Result<systemapi::Memory, String
             if fields.len() != 3 || fields[2] != "kB" {
                 return Err(format!("Unexpected {} in /proc/meminfo: {l}", fields[0]));
             }
-            *ptr = parse_usize_field(&fields, 1, l, "meminfo", 0, fields[0])? as u64;
+            *ptr = parse_u64_field(&fields, 1, l, "meminfo", 0, fields[0])?;
         }
     }
     if memory.total == 0 {
@@ -183,7 +184,7 @@ pub fn get_boot_time_in_secs_since_epoch(fs: &dyn ProcfsAPI) -> Result<u64, Stri
     for l in stat_s.split('\n') {
         if l.starts_with("btime ") {
             let fields = l.split_ascii_whitespace().collect::<Vec<&str>>();
-            return Ok(parse_usize_field(&fields, 1, l, "stat", 0, "btime")? as u64);
+            return Ok(parse_u64_field(&fields, 1, l, "stat", 0, "btime")?);
         }
     }
     Err(format!("Could not find btime in /proc/stat: {stat_s}"))
@@ -199,7 +200,7 @@ pub fn compute_node_information(
     system: &dyn systemapi::SystemAPI,
     fs: &dyn ProcfsAPI,
 ) -> Result<(u64, Vec<u64>), String> {
-    let ticks_per_sec = system.get_clock_ticks_per_sec() as u64;
+    let ticks_per_sec = system.get_clock_ticks_per_sec();
     if ticks_per_sec == 0 {
         return Err("Could not get a sensible CLK_TCK".to_string());
     }
@@ -218,7 +219,7 @@ pub fn compute_node_information(
             let fields = l.split_ascii_whitespace().collect::<Vec<&str>>();
             let mut sum = 0;
             for i in STAT_FIELDS {
-                sum += parse_usize_field(&fields, i, l, "stat", 0, "cpu")? as u64;
+                sum += parse_u64_field(&fields, i, l, "stat", 0, "cpu")?;
             }
             if l.starts_with("cpu ") {
                 cpu_total_secs = sum / ticks_per_sec;
@@ -292,8 +293,8 @@ pub fn compute_loadavg(fs: &dyn ProcfsAPI) -> Result<(f64, f64, f64, u64, u64), 
     Ok((load1, load5, load15, runnable, existing))
 }
 
-pub fn get_thread_count(fs: &dyn ProcfsAPI, pid: usize) -> Result<usize, String> {
-    Ok(fs.read_numeric_file_names(&format!("{pid}/task"))?.len())
+pub fn get_thread_count(fs: &dyn ProcfsAPI, pid: Pid) -> Result<u64, String> {
+    Ok(fs.read_numeric_file_names(&format!("{pid}/task"))?.len() as u64)
 }
 
 // Obtain process information via /proc and return a hashmap of structures with all the information
@@ -307,13 +308,13 @@ pub fn get_thread_count(fs: &dyn ProcfsAPI, pid: usize) -> Result<usize, String>
 pub fn compute_process_information(
     system: &dyn systemapi::SystemAPI,
     fs: &dyn ProcfsAPI,
-) -> Result<HashMap<usize, systemapi::Process>, String> {
+) -> Result<HashMap<Pid, systemapi::Process>, String> {
     let memtotal_kib = system.get_memory_in_kib()?.total;
 
     // We need this for a lot of things.  On x86 and x64 this is always 100 but in principle it
     // might be something else, so read the true value.
 
-    let ticks_per_sec = system.get_clock_ticks_per_sec() as u64;
+    let ticks_per_sec = system.get_clock_ticks_per_sec();
     if ticks_per_sec == 0 {
         return Err("Could not get a sensible CLK_TCK".to_string());
     }
@@ -334,18 +335,19 @@ pub fn compute_process_information(
     // Collect remaining system data from /proc/{pid}/stat for the enumerated pids.
 
     let kib_per_page = system.get_page_size_in_kib();
-    let mut result = HashMap::<usize, systemapi::Process>::new();
-    let mut ppids = HashSet::<usize>::new();
+    let mut result = HashMap::<Pid, systemapi::Process>::new();
+    let mut ppids = HashSet::<Pid>::new();
     let mut user_table = UserTable::new();
 
-    for (pid, uid) in pids {
+    for (numeric_filename, uid) in pids {
+        let pid = numeric_filename as Pid;
         // Basic system variables.  Intermediate time values are represented in ticks to prevent
         // various roundoff artifacts resulting in NaN or Infinity.
 
         let bsdtime_ticks;
         let mut realtime_ticks;
-        let ppid;
-        let pgrp;
+        let ppid: Pid;
+        let pgrp: Pid;
         let mut comm;
         let utime_ticks;
         let stime_ticks;
@@ -390,7 +392,7 @@ pub fn compute_process_information(
             // surprising zero values; one has to be careful when dividing.
             //
             // In particular for Z, field 5 "tpgid" has been observed to be -1.  For X, many of the
-            // fields are -1.  parse_usize_field() handles -1 specially, folding it to 0.
+            // fields are -1.  parse_u64_field() handles -1 specially, folding it to 0.
 
             // Zombie jobs cannot be ignored, because they are indicative of system health and the
             // information about their presence is used in consumers.
@@ -408,8 +410,8 @@ pub fn compute_process_information(
                 comm += " <defunct>";
             }
 
-            ppid = parse_usize_field(&fields, 1, &line, "stat", pid, "ppid")?;
-            pgrp = parse_usize_field(&fields, 2, &line, "stat", pid, "pgrp")?;
+            ppid = parse_u64_field(&fields, 1, &line, "stat", pid, "ppid")? as Pid;
+            pgrp = parse_u64_field(&fields, 2, &line, "stat", pid, "pgrp")? as Pid;
 
             // Generally we want to record cumulative self+child time.  The child time we read will
             // be for children that have terminated and have been wait()ed for.  The logic is that
@@ -430,13 +432,12 @@ pub fn compute_process_information(
             // has no history, and has no notion of a job or process being "gone".  Instead, enough
             // data must be emitted by Sonar for a postprocessor of the data to reconstruct the job
             // tree and correct the data, if necessary.
-            utime_ticks = parse_usize_field(&fields, 11, &line, "stat", pid, "utime")? as u64;
-            stime_ticks = parse_usize_field(&fields, 12, &line, "stat", pid, "stime")? as u64;
-            let cutime_ticks = parse_usize_field(&fields, 13, &line, "stat", pid, "cutime")? as u64;
-            let cstime_ticks = parse_usize_field(&fields, 14, &line, "stat", pid, "cstime")? as u64;
+            utime_ticks = parse_u64_field(&fields, 11, &line, "stat", pid, "utime")?;
+            stime_ticks = parse_u64_field(&fields, 12, &line, "stat", pid, "stime")?;
+            let cutime_ticks = parse_u64_field(&fields, 13, &line, "stat", pid, "cutime")?;
+            let cstime_ticks = parse_u64_field(&fields, 14, &line, "stat", pid, "cstime")?;
             bsdtime_ticks = utime_ticks + stime_ticks + cutime_ticks + cstime_ticks;
-            let start_time_ticks =
-                parse_usize_field(&fields, 19, &line, "stat", pid, "starttime")? as u64;
+            let start_time_ticks = parse_u64_field(&fields, 19, &line, "stat", pid, "starttime")?;
 
             // boot_time and the current time are both time_t, ie, a 31-bit quantity in 2023 and a
             // 32-bit quantity before 2038.  clock_ticks_per_sec is on the order of 100.  Ergo
@@ -473,9 +474,9 @@ pub fn compute_process_information(
         let rss_kib;
         if let Ok(s) = fs.read_to_string(&format!("{pid}/statm")) {
             let fields = s.split_ascii_whitespace().collect::<Vec<&str>>();
-            rss_kib = parse_usize_field(&fields, 1, &s, "statm", pid, "resident set size")?
-                * kib_per_page;
-            size_kib = parse_usize_field(&fields, 5, &s, "statm", pid, "data size")? * kib_per_page;
+            rss_kib =
+                parse_u64_field(&fields, 1, &s, "statm", pid, "resident set size")? * kib_per_page;
+            size_kib = parse_u64_field(&fields, 5, &s, "statm", pid, "data size")? * kib_per_page;
         } else {
             // This is *usually* benign - see above.
             continue;
@@ -508,14 +509,8 @@ pub fn compute_process_information(
                     if fields.len() != 3 || fields[2] != "kB" {
                         return Err(format!("Unexpected RssAnon in /proc/{pid}/status: {l}"));
                     }
-                    rssanon_kib = parse_usize_field(
-                        &fields,
-                        1,
-                        l,
-                        "status",
-                        pid,
-                        "private resident set size",
-                    )?;
+                    rssanon_kib =
+                        parse_u64_field(&fields, 1, l, "status", pid, "private resident set size")?;
                     break;
                 }
             }
@@ -530,27 +525,26 @@ pub fn compute_process_information(
             }
         }
 
-        let mut data_read_kib: usize = 0;
-        let mut data_written_kib: usize = 0;
-        let mut data_cancelled_kib: usize = 0;
+        let mut data_read_kib: u64 = 0;
+        let mut data_written_kib: u64 = 0;
+        let mut data_cancelled_kib: u64 = 0;
         if let Ok(s) = fs.read_to_string(&format!("{pid}/io")) {
             for l in s.split('\n') {
                 let fields = l.split_ascii_whitespace().collect::<Vec<&str>>();
                 if !fields.is_empty() {
                     match fields[0] {
                         "read_bytes:" => {
-                            data_read_kib =
-                                parse_usize_field(&fields, 1, l, "io", pid, "data read")?
-                                    .div_ceil(1024);
+                            data_read_kib = parse_u64_field(&fields, 1, l, "io", pid, "data read")?
+                                .div_ceil(1024);
                         }
                         "write_bytes:" => {
                             data_written_kib =
-                                parse_usize_field(&fields, 1, l, "io", pid, "data written")?
+                                parse_u64_field(&fields, 1, l, "io", pid, "data written")?
                                     .div_ceil(1024);
                         }
                         "cancelled_write_bytes:" => {
                             data_cancelled_kib =
-                                parse_usize_field(&fields, 1, l, "io", pid, "data cancelled")?
+                                parse_u64_field(&fields, 1, l, "io", pid, "data cancelled")?
                                     .div_ceil(1024);
                         }
                         _ => {}
@@ -586,17 +580,17 @@ pub fn compute_process_information(
         let num_threads = get_thread_count(fs, pid).unwrap_or(1);
 
         result.insert(
-            pid,
+            pid as Pid,
             systemapi::Process {
                 pid,
                 ppid,
                 pgrp,
-                uid: uid as usize,
+                uid,
                 user: user_table.lookup(system, uid),
                 cpu_pct: pcpu_formatted,
                 mem_pct: pmem,
                 cpu_util: 0.0,
-                cputime_sec: cputime_sec as usize,
+                cputime_sec,
                 mem_size_kib: size_kib,
                 rssanon_kib,
                 data_read_kib,
@@ -621,10 +615,10 @@ pub fn compute_process_information(
 pub fn compute_cpu_utilization(
     system: &dyn systemapi::SystemAPI,
     fs: &dyn ProcfsAPI,
-    processes: &HashMap<usize, systemapi::Process>,
+    processes: &HashMap<Pid, systemapi::Process>,
     wait_time_ms: usize,
-) -> Result<Vec<(usize, f64)>, String> {
-    let ticks_per_sec = system.get_clock_ticks_per_sec() as u64;
+) -> Result<Vec<(Pid, f64)>, String> {
+    let ticks_per_sec = system.get_clock_ticks_per_sec();
 
     let mut temp = Vec::with_capacity(processes.len());
     for pid in processes.keys() {
@@ -656,7 +650,7 @@ pub fn compute_cpu_utilization(
     Ok(result)
 }
 
-fn compute_process_ticks(fs: &dyn ProcfsAPI, pid: usize) -> Result<(bool, u64), String> {
+fn compute_process_ticks(fs: &dyn ProcfsAPI, pid: Pid) -> Result<(bool, u64), String> {
     match fs.read_to_string(&format!("{pid}/stat")) {
         Err(_) => Ok((false, 0)),
         Ok(line) => {
@@ -673,10 +667,10 @@ fn compute_process_ticks(fs: &dyn ProcfsAPI, pid: usize) -> Result<(bool, u64), 
                         .collect::<Vec<&str>>();
                 }
             }
-            let utime_ticks = parse_usize_field(&fields, 11, &line, "stat", pid, "utime")? as u64;
-            let stime_ticks = parse_usize_field(&fields, 12, &line, "stat", pid, "stime")? as u64;
-            let cutime_ticks = parse_usize_field(&fields, 13, &line, "stat", pid, "cutime")? as u64;
-            let cstime_ticks = parse_usize_field(&fields, 14, &line, "stat", pid, "cstime")? as u64;
+            let utime_ticks = parse_u64_field(&fields, 11, &line, "stat", pid, "utime")?;
+            let stime_ticks = parse_u64_field(&fields, 12, &line, "stat", pid, "stime")?;
+            let cutime_ticks = parse_u64_field(&fields, 13, &line, "stat", pid, "cutime")?;
+            let cstime_ticks = parse_u64_field(&fields, 14, &line, "stat", pid, "cstime")?;
             let bsdtime_ticks = utime_ticks + stime_ticks + cutime_ticks + cstime_ticks;
             Ok((true, bsdtime_ticks))
         }
@@ -710,14 +704,14 @@ fn parse_i32_field(l: &str) -> Result<i32, String> {
     }
 }
 
-fn parse_usize_field(
+fn parse_u64_field(
     fields: &[&str],
     ix: usize,
     line: &str,
     file: &str,
-    pid: usize,
+    pid: Pid,
     fieldname: &str,
-) -> Result<usize, String> {
+) -> Result<u64, String> {
     if ix >= fields.len() {
         if pid == 0 {
             return Err(format!("Index out of range for /proc/{file}: {ix}: {line}"));
@@ -727,7 +721,7 @@ fn parse_usize_field(
             ));
         }
     }
-    if let Ok(n) = fields[ix].parse::<usize>() {
+    if let Ok(n) = fields[ix].parse::<u64>() {
         return Ok(n);
     }
     if fields[ix] == "-1" {
@@ -746,17 +740,17 @@ fn parse_usize_field(
 }
 
 #[test]
-pub fn parse_usize_field_test() {
+pub fn parse_u64_field_test() {
     let xs = ["37", "-1", "42"];
-    assert!(parse_usize_field(&xs, 0, "", "", 0, "x").unwrap() == 37);
-    assert!(parse_usize_field(&xs, 1, "", "", 0, "x").unwrap() == 0);
-    assert!(parse_usize_field(&xs, 2, "", "", 0, "x").unwrap() == 42);
+    assert!(parse_u64_field(&xs, 0, "", "", 0, "x").unwrap() == 37);
+    assert!(parse_u64_field(&xs, 1, "", "", 0, "x").unwrap() == 0);
+    assert!(parse_u64_field(&xs, 2, "", "", 0, "x").unwrap() == 42);
 }
 
 // The UserTable optimizes uid -> name lookup.
 
 struct UserTable {
-    ht: HashMap<u32, String>,
+    ht: HashMap<Uid, String>,
 }
 
 impl UserTable {
@@ -764,7 +758,7 @@ impl UserTable {
         UserTable { ht: HashMap::new() }
     }
 
-    fn lookup(&mut self, system: &dyn systemapi::SystemAPI, uid: u32) -> String {
+    fn lookup(&mut self, system: &dyn systemapi::SystemAPI, uid: Uid) -> String {
         if let Some(name) = self.ht.get(&uid) {
             name.clone()
         } else if let Some(name) = system.compute_user_by_uid(uid) {

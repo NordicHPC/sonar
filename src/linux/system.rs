@@ -7,6 +7,7 @@ use crate::linux::procfs;
 use crate::linux::slurm;
 use crate::systemapi;
 use crate::time;
+use crate::types::{JobID, Pid, Uid};
 use crate::users;
 use crate::util;
 
@@ -293,22 +294,22 @@ impl systemapi::SystemAPI for System {
         &*self.jm
     }
 
-    fn get_pid(&self) -> u32 {
-        std::process::id()
+    fn get_pid(&self) -> Pid {
+        std::process::id() as Pid
     }
 
     fn get_boot_time_in_secs_since_epoch(&self) -> u64 {
         self.boot_time
     }
 
-    fn get_clock_ticks_per_sec(&self) -> usize {
+    fn get_clock_ticks_per_sec(&self) -> u64 {
         // We're assuming this never changes while the system is running.
-        unsafe { libc::sysconf(libc::_SC_CLK_TCK) as usize }
+        unsafe { libc::sysconf(libc::_SC_CLK_TCK) as u64 }
     }
 
-    fn get_page_size_in_kib(&self) -> usize {
+    fn get_page_size_in_kib(&self) -> u64 {
         // We're assuming this never changes while the system is running.
-        (unsafe { libc::sysconf(libc::_SC_PAGESIZE) as usize }) / 1024
+        (unsafe { libc::sysconf(libc::_SC_PAGESIZE) as u64 }) / 1024
     }
 
     fn get_now_in_secs_since_epoch(&self) -> u64 {
@@ -333,10 +334,10 @@ impl systemapi::SystemAPI for System {
         get_numa_distances(self)
     }
 
-    fn get_pid_max(&self) -> u64 {
+    fn get_pid_max(&self) -> Pid {
         if let Ok(s) = fs::read_to_string("/proc/sys/kernel/pid_max") {
             if let Ok(n) = s.parse::<u64>() {
-                return n;
+                return n as Pid;
             }
         }
         4194304
@@ -354,19 +355,19 @@ impl systemapi::SystemAPI for System {
         procfs::compute_loadavg(&self.fs)
     }
 
-    fn compute_process_information(&self) -> Result<HashMap<usize, systemapi::Process>, String> {
+    fn compute_process_information(&self) -> Result<HashMap<Pid, systemapi::Process>, String> {
         procfs::compute_process_information(self, &self.fs)
     }
 
     fn compute_cpu_utilization(
         &self,
-        processes: &HashMap<usize, systemapi::Process>,
+        processes: &HashMap<Pid, systemapi::Process>,
         wait_time_ms: usize,
-    ) -> Result<Vec<(usize, f64)>, String> {
+    ) -> Result<Vec<(Pid, f64)>, String> {
         procfs::compute_cpu_utilization(self, &self.fs, processes, wait_time_ms)
     }
 
-    fn compute_slurm_job_id(&self, pid: usize) -> Option<usize> {
+    fn compute_slurm_job_id(&self, pid: Pid) -> Option<JobID> {
         slurm::get_job_id(&self.fs, pid)
     }
 
@@ -386,8 +387,8 @@ impl systemapi::SystemAPI for System {
         }
     }
 
-    fn compute_user_by_uid(&self, uid: u32) -> Option<String> {
-        users::lookup_user_by_uid(uid).map(|u| u.to_string_lossy().to_string())
+    fn compute_user_by_uid(&self, uid: Uid) -> Option<String> {
+        users::lookup_user_by_uid(uid as libc::uid_t).map(|u| u.to_string_lossy().to_string())
     }
 
     fn create_lock_file(&self, p: &path::Path) -> io::Result<fs::File> {
@@ -638,7 +639,7 @@ impl procfs::ProcfsAPI for RealProcFS {
         }
     }
 
-    fn read_numeric_file_names(&self, path: &str) -> Result<Vec<(usize, u32)>, String> {
+    fn read_numeric_file_names(&self, path: &str) -> Result<Vec<(u64, Uid)>, String> {
         let mut pids = vec![];
         let dir = if path == "" {
             "/proc".to_string()
@@ -650,8 +651,8 @@ impl procfs::ProcfsAPI for RealProcFS {
                 if let Ok(meta) = dirent.metadata() {
                     let owner = meta.st_uid();
                     if let Some(name) = dirent.path().file_name() {
-                        if let Ok(name) = name.to_string_lossy().parse::<usize>() {
-                            pids.push((name, owner));
+                        if let Ok(name) = name.to_string_lossy().parse::<u64>() {
+                            pids.push((name, owner as Uid));
                         }
                     }
                 }

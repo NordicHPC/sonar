@@ -341,7 +341,7 @@ pub fn daemon_mode(
         &system,
         ps::PsOptions {
             rollup: ini.sample.rollup,
-            min_cpu_time: ini.sample.min_cpu_time.map(|d| d.to_seconds() as usize),
+            min_cpu_time: ini.sample.min_cpu_time.map(|d| d.to_seconds()),
             exclude_system_jobs: ini.sample.exclude_system_jobs,
             load: ini.sample.load,
             exclude_users: ini.sample.exclude_users.clone(),

@@ -30,7 +30,7 @@ pub struct PsOptions {
     pub rollup: bool,
     pub min_cpu_percent: Option<f64>,
     pub min_mem_percent: Option<f64>,
-    pub min_cpu_time: Option<usize>,
+    pub min_cpu_time: Option<u64>,
     pub exclude_system_jobs: bool,
     pub exclude_users: Vec<String>,
     pub exclude_commands: Vec<String>,
@@ -282,25 +282,25 @@ pub struct ProcInfo {
     pub pid: Pid,
     pub ppid: Pid,
     pub rolledup: usize,
-    pub num_threads: usize,
+    pub num_threads: u64,
     pub is_system_job: bool,
     pub container_state: CState,
     pub has_children: bool,
-    pub job_id: usize,
+    pub job_id: JobID,
     pub is_slurm: bool,
     pub cpu_percentage: f64,
     pub cpu_util: f64,
-    pub cputime_sec: usize,
+    pub cputime_sec: u64,
     pub mem_percentage: f64,
-    pub mem_size_kib: usize,
-    pub data_read_kib: usize,
-    pub data_written_kib: usize,
-    pub data_cancelled_kib: usize,
-    pub rssanon_kib: usize,
+    pub mem_size_kib: u64,
+    pub data_read_kib: u64,
+    pub data_written_kib: u64,
+    pub data_cancelled_kib: u64,
+    pub rssanon_kib: u64,
     pub gpus: GpuProcInfos,
     pub gpu_percentage: f64,
     pub gpu_mem_percentage: f64,
-    pub gpu_mem_size_kib: usize,
+    pub gpu_mem_size_kib: u64,
     pub gpu_status: GpuStatus,
 }
 
@@ -567,7 +567,7 @@ fn add_gpu_info(
                             );
                             e.gpu_percentage += proc.gpu_pct as f64;
                             e.gpu_mem_percentage += proc.mem_pct as f64;
-                            e.gpu_mem_size_kib += proc.mem_size_kib as usize;
+                            e.gpu_mem_size_kib += proc.mem_size_kib;
                         })
                         .or_insert_with(|| {
                             // This is a process the card knows about but that we did not see during
@@ -596,7 +596,7 @@ fn add_gpu_info(
                                 ),
                                 gpu_percentage: proc.gpu_pct as f64,
                                 gpu_mem_percentage: proc.mem_pct as f64,
-                                gpu_mem_size_kib: proc.mem_size_kib as usize,
+                                gpu_mem_size_kib: proc.mem_size_kib,
                                 ..Default::default()
                             }
                         });

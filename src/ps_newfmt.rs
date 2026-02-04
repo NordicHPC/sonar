@@ -6,6 +6,7 @@ use crate::output;
 use crate::ps::{CState, ProcInfo, PsOptions, SampleData};
 use crate::systemapi;
 use crate::time::{format_iso8601, unix_time_to_tm};
+use crate::types::JobID;
 use crate::util::three_places;
 
 use std::collections::HashMap;
@@ -62,7 +63,7 @@ pub fn format_newfmt(
     // Group processes under (user, jobid) except for jobid 0.
     // `collected` collects the sample indices for like (user,job) where job != 0.
     // `zeroes` collects the sample indices for job = 0.
-    let mut collected = HashMap::<(&str, usize), Vec<usize>>::new();
+    let mut collected = HashMap::<(&str, JobID), Vec<usize>>::new();
     let mut zeroes = vec![];
     for i in 0..c.process_samples.len() {
         let sample = &c.process_samples[i];
@@ -154,7 +155,7 @@ fn format_newfmt_gpu_sample(c: gpu::CardState) -> output::Object {
 
 fn format_newfmt_job(
     system: &dyn systemapi::SystemAPI,
-    id: usize,
+    id: JobID,
     user: &str,
     ixs: &[usize], // Not empty
     samples: &[ProcInfo],
@@ -181,22 +182,19 @@ fn format_newfmt_sample(proc_info: &ProcInfo) -> output::Object {
     let mut fields = output::Object::new();
 
     if proc_info.rssanon_kib != 0 {
-        fields.push_u(SAMPLE_PROCESS_RESIDENT_MEMORY, proc_info.rssanon_kib as u64);
+        fields.push_u(SAMPLE_PROCESS_RESIDENT_MEMORY, proc_info.rssanon_kib);
     }
     if proc_info.mem_size_kib != 0 {
-        fields.push_u(SAMPLE_PROCESS_VIRTUAL_MEMORY, proc_info.mem_size_kib as u64);
+        fields.push_u(SAMPLE_PROCESS_VIRTUAL_MEMORY, proc_info.mem_size_kib);
     }
     if proc_info.data_read_kib != 0 {
-        fields.push_u(SAMPLE_PROCESS_READ, proc_info.data_read_kib as u64);
+        fields.push_u(SAMPLE_PROCESS_READ, proc_info.data_read_kib);
     }
     if proc_info.data_written_kib != 0 {
-        fields.push_u(SAMPLE_PROCESS_WRITTEN, proc_info.data_written_kib as u64);
+        fields.push_u(SAMPLE_PROCESS_WRITTEN, proc_info.data_written_kib);
     }
     if proc_info.data_cancelled_kib != 0 {
-        fields.push_u(
-            SAMPLE_PROCESS_CANCELLED,
-            proc_info.data_cancelled_kib as u64,
-        );
+        fields.push_u(SAMPLE_PROCESS_CANCELLED, proc_info.data_cancelled_kib);
     }
     fields.push_s(SAMPLE_PROCESS_CMD, proc_info.command.clone());
     if proc_info.pid != 0 {
@@ -211,7 +209,7 @@ fn format_newfmt_sample(proc_info: &ProcInfo) -> output::Object {
         fields.push_b(SAMPLE_PROCESS_IN_CONTAINER, true);
     }
     if proc_info.num_threads != 0 {
-        fields.push_u(SAMPLE_PROCESS_NUM_THREADS, proc_info.num_threads as u64);
+        fields.push_u(SAMPLE_PROCESS_NUM_THREADS, proc_info.num_threads);
     }
     if proc_info.cpu_percentage != 0.0 {
         fields.push_f(
@@ -223,7 +221,7 @@ fn format_newfmt_sample(proc_info: &ProcInfo) -> output::Object {
         fields.push_f(SAMPLE_PROCESS_CPU_UTIL, three_places(proc_info.cpu_util));
     }
     if proc_info.cputime_sec != 0 {
-        fields.push_u(SAMPLE_PROCESS_CPU_TIME, proc_info.cputime_sec as u64);
+        fields.push_u(SAMPLE_PROCESS_CPU_TIME, proc_info.cputime_sec);
     }
     if proc_info.rolledup > 0 {
         fields.push_u(SAMPLE_PROCESS_ROLLEDUP, proc_info.rolledup as u64);

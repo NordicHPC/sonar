@@ -2,6 +2,7 @@
 // queue (if any) away from the rest of sonar.
 
 use crate::systemapi;
+use crate::types::{JobID, Pid};
 
 use std::collections::HashMap;
 
@@ -13,9 +14,9 @@ pub trait JobManager {
     fn job_id_from_pid(
         &self,
         system: &dyn systemapi::SystemAPI,
-        pid: usize,
-        processes: &HashMap<usize, systemapi::Process>,
-    ) -> (usize, bool);
+        pid: Pid,
+        processes: &HashMap<Pid, systemapi::Process>,
+    ) -> (JobID, bool);
 }
 
 pub struct NoJobManager {}
@@ -30,9 +31,9 @@ impl JobManager for NoJobManager {
     fn job_id_from_pid(
         &self,
         _system: &dyn systemapi::SystemAPI,
-        _pid: usize,
-        _processes: &HashMap<usize, systemapi::Process>,
-    ) -> (usize, bool) {
+        _pid: Pid,
+        _processes: &HashMap<Pid, systemapi::Process>,
+    ) -> (JobID, bool) {
         (0, false)
     }
 }
@@ -51,13 +52,13 @@ impl JobManager for AnyJobManager {
     fn job_id_from_pid(
         &self,
         system: &dyn systemapi::SystemAPI,
-        pid: usize,
-        processes: &HashMap<usize, systemapi::Process>,
-    ) -> (usize, bool) {
+        pid: Pid,
+        processes: &HashMap<Pid, systemapi::Process>,
+    ) -> (JobID, bool) {
         if let Some(id) = system.compute_slurm_job_id(pid) {
             (id, id != 0)
         } else if let Some(p) = processes.get(&pid) {
-            (p.pgrp, self.force_slurm)
+            (p.pgrp as JobID, self.force_slurm)
         } else {
             (0, false)
         }
