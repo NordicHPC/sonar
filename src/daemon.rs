@@ -122,6 +122,7 @@ pub struct Ini {
     pub cluster: ClusterIni,
 }
 
+// Cloneable because a repeated_event operation will clone it.
 #[derive(Clone, Debug)]
 pub enum Operation {
     Sample,
