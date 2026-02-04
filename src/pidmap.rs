@@ -32,29 +32,29 @@
 // on very large and busy nodes, and typically much less than that.
 
 use crate::systemapi;
-use crate::types::{JobID, Pid};
+use crate::types::{JobID, Pid, PID_MAX};
 use std::collections::HashMap;
 
-// These parameters are sensible for a "large enough" pid range, but can be set to other, more
-// aggressive, values during testing with the SONARTEST_ROLLUP_PIDS env var.  That var should have
-// the form p,r where p is the number of available pids and r is the minimum pid range size to keep
-// after garbage collection.  Both are optional.
-
-// The upper limit on the pid range, exclusive.
-const PID_LIMIT: u64 = u64::MAX;
+// PID_LIMIT and MIN_RANGE_SIZE are sensible for a "large enough" pid range, but can be set to
+// other, more aggressive, values during testing with the SONARTEST_ROLLUP_PIDS env var.  That var
+// should have the form p,r where p is the number of available pids and r is the minimum pid range
+// size to keep after garbage collection.  Both are optional.
 
 // Ranges with fewer than this many elements are not retained in the free pool, to keep its size
 // manageable.
-const MIN_RANGE_SIZE: u64 = 100;
+const MIN_RANGE_SIZE: usize = 100;
+
+// The upper limit on the pid range, exclusive.
+const PID_LIMIT: Pid = PID_MAX;
 
 pub struct PidMap {
     map: HashMap<ProcessKey, ProcessValue>,
-    min_range_size: u64,       // dynamic MIN_RANGE_SIZE
-    before_first: u64,         // sentinel, max system pid
-    after_last: u64,           // sentinel, at most u64::MAX
-    fresh_pid: u64,            // current range min (changes as we allocate pids)
-    curr_max: u64,             // current range max
-    pid_pool: Vec<(u64, u64)>, // (min, max) of a range, but the max is never u64::MAX; sorted descending.
+    min_range_size: usize,     // dynamic MIN_RANGE_SIZE
+    before_first: Pid,         // sentinel, max system pid
+    after_last: Pid,           // sentinel, at most u64::MAX
+    fresh_pid: Pid,            // current range min (changes as we allocate pids)
+    curr_max: Pid,             // current range max
+    pid_pool: Vec<(Pid, Pid)>, // (min, max) of a range, but the max is never u64::MAX; sorted descending.
     dirty: bool,               // value meaning dirty
     verbose: bool,             // true iff SONARTEST_ROLLUP_PIDS is set
 }
@@ -86,10 +86,10 @@ impl PidMap {
                 // See documentation above.
                 let mut xs = s.split(",").map(|v| v.parse::<u64>());
                 if let Some(Ok(v)) = xs.next() {
-                    pid_limit = system.get_pid_max() + 1 + v;
+                    pid_limit = system.get_pid_max() + 1 + v as Pid;
                 }
                 if let Some(Ok(v)) = xs.next() {
-                    min_range_size = v;
+                    min_range_size = v as usize;
                 }
             }
         }
@@ -171,9 +171,12 @@ impl PidMap {
         }
     }
 
-    fn avail(&self) -> u64 {
-        self.pid_pool.iter().map(|v| v.1 - v.0 + 1).sum::<u64>()
-            + (self.curr_max - self.fresh_pid + 1)
+    fn avail(&self) -> usize {
+        self.pid_pool
+            .iter()
+            .map(|v| (v.1 - v.0 + 1) as usize)
+            .sum::<usize>()
+            + (self.curr_max - self.fresh_pid + 1) as usize
     }
 
     fn advance(&mut self) {
@@ -203,11 +206,7 @@ impl PidMap {
         self.fresh_pid = 0;
         self.curr_max = 0;
         self.pid_pool.clear();
-        let mut xs = self
-            .map
-            .values()
-            .map(|v| v.pid as u64)
-            .collect::<Vec<u64>>();
+        let mut xs = self.map.values().map(|v| v.pid).collect::<Vec<Pid>>();
         xs.push(self.before_first);
         xs.push(self.after_last);
         xs.sort();
@@ -216,7 +215,7 @@ impl PidMap {
             // Note we may have high < low now.
             let high = xs[i] - 1;
             let low = xs[i - 1] + 1;
-            if high >= low && high - low + 1 >= self.min_range_size {
+            if high >= low && (high - low + 1) as usize >= self.min_range_size {
                 if self.verbose {
                     log::debug!("PID GC: Recover {low}..{high}");
                 }

@@ -5,6 +5,7 @@ use crate::json_tags;
 use crate::linux::{procfs, system};
 use crate::systemapi;
 use crate::time;
+use crate::types::{JobID, Pid, Uid};
 
 use std::cell;
 use std::collections::HashMap;
@@ -16,9 +17,9 @@ use std::path;
 pub struct Builder {
     proc_files: Option<HashMap<String, String>>,
     node_files: Option<HashMap<String, String>>,
-    pids: Option<Vec<(usize, u32)>>,
-    threads: Option<HashMap<usize, Vec<(usize, u32)>>>,
-    users: Option<HashMap<u32, String>>,
+    pids: Option<Vec<(u64, Uid)>>,
+    threads: Option<HashMap<Pid, Vec<(u64, Uid)>>>,
+    users: Option<HashMap<Uid, String>>,
     now: Option<u64>,
     boot_time: Option<u64>,
     timestamp: Option<String>,
@@ -57,21 +58,21 @@ impl Builder {
         }
     }
 
-    pub fn with_pids(self, pids: Vec<(usize, u32)>) -> Builder {
+    pub fn with_pids(self, pids: Vec<(u64, Uid)>) -> Builder {
         Builder {
             pids: Some(pids),
             ..self
         }
     }
 
-    pub fn with_threads(self, threads: HashMap<usize, Vec<(usize, u32)>>) -> Builder {
+    pub fn with_threads(self, threads: HashMap<Pid, Vec<(u64, Uid)>>) -> Builder {
         Builder {
             threads: Some(threads),
             ..self
         }
     }
 
-    pub fn with_users(self, users: HashMap<u32, String>) -> Builder {
+    pub fn with_users(self, users: HashMap<Uid, String>) -> Builder {
         Builder {
             users: Some(users),
             ..self
@@ -239,11 +240,11 @@ pub struct MockSystem {
     fs: MockFS,
     node_files: HashMap<String, String>,
     gpus: mockgpu::MockGpuAPI,
-    users: HashMap<u32, String>,
-    pid: u32,
+    users: HashMap<Uid, String>,
+    pid: Pid,
     version: String,
-    ticks_per_sec: usize,
-    pagesz: usize,
+    ticks_per_sec: u64,
+    pagesz: u64,
     now: u64,
     boot_time: u64,
 }
@@ -295,15 +296,15 @@ impl systemapi::SystemAPI for MockSystem {
         &*self.jm
     }
 
-    fn get_pid(&self) -> u32 {
+    fn get_pid(&self) -> Pid {
         self.pid
     }
 
-    fn get_clock_ticks_per_sec(&self) -> usize {
+    fn get_clock_ticks_per_sec(&self) -> u64 {
         self.ticks_per_sec
     }
 
-    fn get_page_size_in_kib(&self) -> usize {
+    fn get_page_size_in_kib(&self) -> u64 {
         self.pagesz
     }
 
@@ -327,7 +328,7 @@ impl systemapi::SystemAPI for MockSystem {
         system::get_numa_distances(self)
     }
 
-    fn get_pid_max(&self) -> u64 {
+    fn get_pid_max(&self) -> Pid {
         4194304
     }
 
@@ -343,23 +344,23 @@ impl systemapi::SystemAPI for MockSystem {
         procfs::compute_loadavg(&self.fs)
     }
 
-    fn compute_process_information(&self) -> Result<HashMap<usize, systemapi::Process>, String> {
+    fn compute_process_information(&self) -> Result<HashMap<Pid, systemapi::Process>, String> {
         procfs::compute_process_information(self, &self.fs)
     }
 
     fn compute_cpu_utilization(
         &self,
-        processes: &HashMap<usize, systemapi::Process>,
+        processes: &HashMap<Pid, systemapi::Process>,
         wait_time_ms: usize,
-    ) -> Result<Vec<(usize, f64)>, String> {
+    ) -> Result<Vec<(Pid, f64)>, String> {
         procfs::compute_cpu_utilization(self, &self.fs, processes, wait_time_ms)
     }
 
-    fn compute_slurm_job_id(&self, _pid: usize) -> Option<usize> {
+    fn compute_slurm_job_id(&self, _pid: Pid) -> Option<JobID> {
         None
     }
 
-    fn compute_user_by_uid(&self, uid: u32) -> Option<String> {
+    fn compute_user_by_uid(&self, uid: Uid) -> Option<String> {
         self.users.get(&uid).map(|s| s.clone())
     }
 
@@ -423,9 +424,15 @@ impl systemapi::SystemAPI for MockSystem {
 }
 
 pub struct MockFS {
+    // Map from file name to file contents
     proc_files: HashMap<String, String>,
-    pids: Vec<(usize, u32)>,
-    threads: HashMap<usize, Vec<(usize, u32)>>,
+
+    // PIDs from /proc/{pid} where the car is the numeric file name (the pid really) and the cdr is
+    // the owner's uid.
+    pids: Vec<(u64, Uid)>,
+
+    // For a given pid, the contents of its threads subdirectory: file name (Pid) and owning Uid
+    threads: HashMap<Pid, Vec<(u64, Uid)>>,
 }
 
 impl procfs::ProcfsAPI for MockFS {
@@ -436,13 +443,13 @@ impl procfs::ProcfsAPI for MockFS {
         }
     }
 
-    fn read_numeric_file_names(&self, path: &str) -> Result<Vec<(usize, u32)>, String> {
+    fn read_numeric_file_names(&self, path: &str) -> Result<Vec<(u64, Uid)>, String> {
         if path == "" {
             Ok(self.pids.clone())
         } else {
             // We require the path to be <pid>/task, so parse the pid
             match path.split_once('/') {
-                Some((a, _)) => match a.parse::<usize>() {
+                Some((a, _)) => match a.parse::<Pid>() {
                     Ok(pid) => match self.threads.get(&pid) {
                         Some(v) => Ok(v.clone()),
                         None => Ok(vec![(0, 0)]),

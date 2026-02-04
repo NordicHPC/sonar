@@ -1,5 +1,6 @@
 use crate::gpu;
 use crate::jobsapi;
+use crate::types::{JobID, Pid, Uid};
 
 use std::collections::HashMap;
 use std::fs;
@@ -21,10 +22,10 @@ pub trait SystemAPI {
     fn get_os_name(&self) -> String;
     fn get_os_release(&self) -> String;
     fn get_architecture(&self) -> String;
-    fn get_clock_ticks_per_sec(&self) -> usize;
-    fn get_page_size_in_kib(&self) -> usize;
+    fn get_clock_ticks_per_sec(&self) -> u64;
+    fn get_page_size_in_kib(&self) -> u64;
     fn get_now_in_secs_since_epoch(&self) -> u64;
-    fn get_pid(&self) -> u32;
+    fn get_pid(&self) -> Pid;
     fn get_boot_time_in_secs_since_epoch(&self) -> u64;
     fn get_gpus(&self) -> &dyn gpu::GpuAPI;
     fn get_jobs(&self) -> &dyn jobsapi::JobManager;
@@ -32,7 +33,7 @@ pub trait SystemAPI {
     fn get_memory_in_kib(&self) -> Result<Memory, String>;
     fn get_numa_distances(&self) -> Result<Vec<Vec<u32>>, String>;
     #[allow(dead_code)]
-    fn get_pid_max(&self) -> u64;
+    fn get_pid_max(&self) -> Pid;
 
     // CPU usage data: total cpu seconds and per-cpu seconds.
     fn compute_node_information(&self) -> Result<(u64, Vec<u64>), String>;
@@ -45,7 +46,7 @@ pub trait SystemAPI {
 
     // Return a hashmap of structures with process data, keyed by pid.  Pids uniquely tag the
     // records.
-    fn compute_process_information(&self) -> Result<HashMap<usize, Process>, String>;
+    fn compute_process_information(&self) -> Result<HashMap<Pid, Process>, String>;
 
     // Given the process table computed by compute_process_information, and a time to wait, measure
     // CPU time for all processes, wait for that time, and then read the CPU time again.  The
@@ -53,19 +54,19 @@ pub trait SystemAPI {
     // 100% of one core.
     fn compute_cpu_utilization(
         &self,
-        processes: &HashMap<usize, Process>,
+        processes: &HashMap<Pid, Process>,
         wait_time_ms: usize,
-    ) -> Result<Vec<(usize, f64)>, String>;
+    ) -> Result<Vec<(Pid, f64)>, String>;
 
     // This returns Some(n) where n > 0 if we could parse the job ID, Some(0) if the API is
     // available but the ID is not obtainable, or None otherwise.  Thus None is a signal to fall
     // back to other (non-Slurm) mechanisms.
-    fn compute_slurm_job_id(&self, pid: usize) -> Option<usize>;
+    fn compute_slurm_job_id(&self, pid: Pid) -> Option<JobID>;
 
     // Try to figure out the user's name from system tables, this may be an expensive operation.
     // There's a tiny risk that the answer could change between two calls (if a user were added
     // and/or removed).
-    fn compute_user_by_uid(&self, uid: u32) -> Option<String>;
+    fn compute_user_by_uid(&self, uid: Uid) -> Option<String>;
 
     // Read a file below /sys/devices/system/node, the filename must be a relative path.
     fn read_node_file_to_string(&self, filename: &str) -> io::Result<String>;
@@ -114,23 +115,23 @@ pub trait SystemAPI {
 
 #[derive(PartialEq, Debug)]
 pub struct Process {
-    pub pid: usize,
-    pub ppid: usize,
-    pub pgrp: usize,
-    pub uid: usize,
+    pub pid: Pid,
+    pub ppid: Pid,
+    pub pgrp: Pid,
+    pub uid: Uid,
     pub user: String, // _noinfo_<uid> if name unobtainable
     pub cpu_pct: f64, // Cumulative, not very useful but sonalyze uses it
     pub mem_pct: f64,
     pub cpu_util: f64, // Sample (over a short time period), slurm-monitor uses it
-    pub cputime_sec: usize,
-    pub mem_size_kib: usize,
-    pub data_read_kib: usize,
-    pub data_written_kib: usize,
-    pub data_cancelled_kib: usize,
-    pub rssanon_kib: usize,
+    pub cputime_sec: u64,
+    pub mem_size_kib: u64,
+    pub data_read_kib: u64,
+    pub data_written_kib: u64,
+    pub data_cancelled_kib: u64,
+    pub rssanon_kib: u64,
     pub command: String,
     pub has_children: bool,
-    pub num_threads: usize, // including main thread
+    pub num_threads: u64, // including main thread
 }
 
 // Figures in KB.

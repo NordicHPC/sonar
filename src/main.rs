@@ -58,7 +58,7 @@ enum Commands {
 
         /// Include records for jobs that have used at least this much CPU time (in seconds)
         /// [default: none]
-        min_cpu_time: Option<usize>,
+        min_cpu_time: Option<u64>,
 
         /// Exclude records for system jobs (uid < 1000)
         exclude_system_jobs: bool,
@@ -353,7 +353,7 @@ fn command_line(args: Vec<String>) -> Commands {
                     {
                         (next, min_mem_percent) = (new_next, Some(value));
                     } else if let Some((new_next, value)) =
-                        numeric_arg::<usize>(arg, &args, next, "--min-cpu-time")
+                        numeric_arg::<u64>(arg, &args, next, "--min-cpu-time")
                     {
                         (next, min_cpu_time) = (new_next, Some(value));
                     } else if let Some((new_next, value)) =
