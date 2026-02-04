@@ -102,8 +102,8 @@ pub trait SystemAPI {
     // `create_lock_file` creates it atomically if it does not exist, returning Ok if so; if it does
     // exist, returns Err(io::ErrorKind::AlreadyExists), otherwise some other Err.
     // `remove_lock_file` unconditionally tries to remove the file, returning some Err if it fails.
-    fn create_lock_file(&self, p: &path::PathBuf) -> io::Result<fs::File>;
-    fn remove_lock_file(&self, p: path::PathBuf) -> io::Result<()>;
+    fn create_lock_file(&self, p: &path::Path) -> io::Result<fs::File>;
+    fn remove_lock_file(&self, p: &path::Path) -> io::Result<()>;
 
     // `handle_interruptions` enables interrupt checking; `is_interrupted` returns true if an
     // interrupt has been received.  The specific interrupt signals are system-dependent; see the
@@ -134,12 +134,12 @@ pub struct Process {
 }
 
 // Figures in KB.
-#[derive(Clone)]
 pub struct Memory {
     pub total: u64,
     pub available: u64,
 }
 
+// Cloneable because the system api holds the value and hands out copies
 #[derive(Clone)]
 pub struct CpuInfo {
     pub sockets: i32,
@@ -148,15 +148,16 @@ pub struct CpuInfo {
     pub cores: Vec<CoreInfo>,
 }
 
+// Cloneable because the system api holds the value and hands out copies
 #[derive(Clone)]
-#[allow(dead_code)]
 pub struct CoreInfo {
     pub model_name: String,
+    #[allow(dead_code)]
     pub logical_index: i32,
+    #[allow(dead_code)]
     pub physical_index: i32,
 }
 
-#[derive(Clone, Debug)]
 pub struct DiskInfo {
     pub name: String,
     pub major: u64,

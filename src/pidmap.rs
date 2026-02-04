@@ -41,7 +41,7 @@ use std::collections::HashMap;
 // after garbage collection.  Both are optional.
 
 // The upper limit on the pid range, exclusive.
-const PID_LIMIT: u64 = std::u64::MAX;
+const PID_LIMIT: u64 = u64::MAX;
 
 // Ranges with fewer than this many elements are not retained in the free pool, to keep its size
 // manageable.
@@ -85,26 +85,24 @@ impl PidMap {
             {
                 // See documentation above.
                 let mut xs = s.split(",").map(|v| v.parse::<u64>());
-                match xs.next() {
-                    Some(Ok(v)) => pid_limit = system.get_pid_max() + 1 + v,
-                    Some(_) | None => {}
+                if let Some(Ok(v)) = xs.next() {
+                    pid_limit = system.get_pid_max() + 1 + v;
                 }
-                match xs.next() {
-                    Some(Ok(v)) => min_range_size = v,
-                    Some(_) | None => {}
+                if let Some(Ok(v)) = xs.next() {
+                    min_range_size = v;
                 }
             }
         }
         PidMap {
             map: HashMap::new(),
-            min_range_size: min_range_size,
+            min_range_size,
             before_first: system.get_pid_max(),
             after_last: pid_limit,
             fresh_pid: system.get_pid_max() + 1,
             curr_max: pid_limit - 1,
             pid_pool: vec![],
             dirty: true,
-            verbose: verbose,
+            verbose,
         }
     }
 
@@ -112,8 +110,8 @@ impl PidMap {
     /// parent, command) triple.
     pub fn assign_pid(&mut self, job_id: JobID, ppid: Pid, command: &str) -> Pid {
         let key = ProcessKey {
-            job_id: job_id,
-            ppid: ppid,
+            job_id,
+            ppid,
             command: command.to_string(),
         };
         let mut advance = false;
@@ -174,10 +172,7 @@ impl PidMap {
     }
 
     fn avail(&self) -> u64 {
-        self.pid_pool
-            .iter()
-            .map(|v| v.1 - v.0 + 1)
-            .fold(0, |a, b| a + b)
+        self.pid_pool.iter().map(|v| v.1 - v.0 + 1).sum::<u64>()
             + (self.curr_max - self.fresh_pid + 1)
     }
 

@@ -248,13 +248,17 @@ pub fn compute_disk_information(fs: &dyn ProcfsAPI) -> Result<Vec<systemapi::Dis
         }
         let mut stats = vec![];
         for f in &fields[3..] {
-            stats.push(f.parse::<u64>().map_err(|_| format!("Bad field"))?);
+            stats.push(f.parse::<u64>().map_err(|_| "Bad field".to_string())?);
         }
         disk_stats.push(systemapi::DiskInfo {
             name: fields[2].to_string(),
-            major: fields[0].parse::<u64>().map_err(|_| format!("Bad field"))?,
-            minor: fields[1].parse::<u64>().map_err(|_| format!("Bad field"))?,
-            stats: stats,
+            major: fields[0]
+                .parse::<u64>()
+                .map_err(|_| "Bad field".to_string())?,
+            minor: fields[1]
+                .parse::<u64>()
+                .map_err(|_| "Bad field".to_string())?,
+            stats,
         })
     }
     Ok(disk_stats)

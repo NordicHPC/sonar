@@ -208,7 +208,7 @@ pub fn get_process_utilization(
                     uuid: get_card_uuid(xpu, dev),
                 }],
                 pid: infobuf.pid as Pid,
-                user: username.to_string(),
+                user: username.clone(),
                 uid: uid as Uid,
                 mem_pct: infobuf.mem_util as f32,
                 gpu_pct: infobuf.gpu_util as f32,

@@ -210,7 +210,7 @@ fn main() {
             ps::create_snapshot(
                 writer,
                 &system.freeze().expect("System initialization"),
-                &opts,
+                opts,
             );
         }
         Commands::Sysinfo {

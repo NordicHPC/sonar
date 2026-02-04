@@ -363,11 +363,11 @@ impl systemapi::SystemAPI for MockSystem {
         self.users.get(&uid).map(|s| s.clone())
     }
 
-    fn create_lock_file(&self, _p: &path::PathBuf) -> io::Result<fs::File> {
+    fn create_lock_file(&self, _p: &path::Path) -> io::Result<fs::File> {
         panic!("Not in use yet");
     }
 
-    fn remove_lock_file(&self, _p: path::PathBuf) -> io::Result<()> {
+    fn remove_lock_file(&self, _p: &path::Path) -> io::Result<()> {
         panic!("Not in use yet");
     }
 

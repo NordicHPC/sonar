@@ -15,7 +15,7 @@ pub fn test_ps_no_meminfo() {
         fmt: ps::Format::JSON,
         ..Default::default()
     };
-    ps::create_snapshot(&mut output, &system, &options);
+    ps::create_snapshot(&mut output, &system, options);
     let info = String::from_utf8_lossy(&output);
     let expect = r#"
 {
