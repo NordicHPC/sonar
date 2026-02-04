@@ -55,7 +55,7 @@ fn do_show_cluster(
         let name = if let Some(suffix) = name.strip_suffix('*') {
             suffix.to_string()
         } else {
-            name.to_string()
+            name
         };
         p.push_s(CLUSTER_PARTITION_NAME, name);
         p.push_a(

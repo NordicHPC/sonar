@@ -12,4 +12,5 @@ pub type JobID = u64;
 pub type Pid = u64;
 pub type Uid = u64;
 
+#[allow(dead_code)]
 pub const PID_MAX: Pid = u64::MAX;

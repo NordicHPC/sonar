@@ -41,7 +41,7 @@ pub fn get() -> String {
     }
 }
 
-pub fn primitive_get() -> io::Result<OsString> {
+fn primitive_get() -> io::Result<OsString> {
     // According to the POSIX specification,
     // host names are limited to `HOST_NAME_MAX` bytes
     //
