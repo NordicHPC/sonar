@@ -11,6 +11,7 @@ use crate::types::{JobID, Pid, Uid};
 use crate::users;
 use crate::util;
 
+use std::boxed::Box;
 use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
 use std::fs;
@@ -355,13 +356,13 @@ impl systemapi::SystemAPI for System {
         procfs::compute_loadavg(&self.fs)
     }
 
-    fn compute_process_information(&self) -> Result<HashMap<Pid, systemapi::Process>, String> {
+    fn compute_process_information(&self) -> Result<HashMap<Pid, Box<systemapi::Process>>, String> {
         procfs::compute_process_information(self, &self.fs)
     }
 
     fn compute_cpu_utilization(
         &self,
-        processes: &HashMap<Pid, systemapi::Process>,
+        processes: &HashMap<Pid, Box<systemapi::Process>>,
         wait_time_ms: usize,
     ) -> Result<Vec<(Pid, f64)>, String> {
         procfs::compute_cpu_utilization(self, &self.fs, processes, wait_time_ms)

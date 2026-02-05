@@ -11,7 +11,7 @@ impl jobsapi::JobManager for MockJobManager {
         &self,
         _system: &dyn systemapi::SystemAPI,
         pid: Pid,
-        _processes: &HashMap<Pid, systemapi::Process>,
+        _processes: &HashMap<Pid, Box<systemapi::Process>>,
     ) -> (JobID, bool) {
         (pid as JobID, false)
     }

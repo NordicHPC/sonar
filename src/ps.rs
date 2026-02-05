@@ -10,6 +10,7 @@ use crate::ps_newfmt::format_newfmt;
 use crate::systemapi::{self, DiskInfo};
 use crate::types::{JobID, Pid, Uid};
 
+use std::boxed::Box;
 use std::collections::HashMap;
 use std::io::{self, Write};
 use std::path::PathBuf;
@@ -242,7 +243,7 @@ pub struct ProcessTable {
 }
 
 impl ProcessTable {
-    pub fn from_processes<T>(procs: &HashMap<T, systemapi::Process>) -> ProcessTable {
+    pub fn from_processes<T>(procs: &HashMap<T, Box<systemapi::Process>>) -> ProcessTable {
         let mut by_pid = HashMap::new();
         for proc in procs.values() {
             by_pid.insert(proc.pid as Pid, (proc.user.clone(), proc.uid));
@@ -264,7 +265,7 @@ impl ProcessTable {
 // of this data, internal or external to the program, may treat separate processes with job ID "0"
 // as part of the same job.
 
-pub type ProcInfoTable = HashMap<Pid, ProcInfo>;
+pub type ProcInfoTable = HashMap<Pid, Box<ProcInfo>>;
 
 #[derive(Clone, Copy, Default, PartialEq)]
 pub enum CState {
@@ -322,7 +323,7 @@ pub enum GpuStatus {
 }
 
 pub struct SampleData {
-    pub process_samples: Vec<ProcInfo>,
+    pub process_samples: Vec<Box<ProcInfo>>,
     pub gpu_samples: Option<Vec<gpu::CardState>>,
     pub cpu_samples: Vec<u64>,
     pub disk_samples: Vec<DiskInfo>,
@@ -382,13 +383,13 @@ fn collect_sample_data(
         procinfo_by_pid
             .drain()
             .map(|(_, v)| v)
-            .collect::<Vec<ProcInfo>>()
+            .collect::<Vec<Box<ProcInfo>>>()
     };
 
     let candidates = candidates
         .drain(0..)
         .filter(|proc_info| filter_proc(proc_info, opts))
-        .collect::<Vec<ProcInfo>>();
+        .collect::<Vec<Box<ProcInfo>>>();
 
     Ok(Some(SampleData {
         process_samples: candidates,
@@ -459,7 +460,7 @@ fn is_container_root(v: &ProcInfo) -> bool {
 
 fn new_with_cpu_info(
     system: &dyn systemapi::SystemAPI,
-    processes: &HashMap<Pid, systemapi::Process>,
+    processes: &HashMap<Pid, Box<systemapi::Process>>,
 ) -> ProcInfoTable {
     let mut procinfo_by_pid = ProcInfoTable::new();
     for proc in processes.values() {
@@ -468,7 +469,7 @@ fn new_with_cpu_info(
             .job_id_from_pid(system, proc.pid, processes);
         procinfo_by_pid.insert(
             proc.pid,
-            ProcInfo {
+            Box::new(ProcInfo {
                 user: proc.user.clone(),
                 command: proc.command.clone(),
                 pid: proc.pid,
@@ -492,7 +493,7 @@ fn new_with_cpu_info(
                 data_written_kib: proc.data_written_kib,
                 data_cancelled_kib: proc.data_cancelled_kib,
                 ..Default::default()
-            },
+            }),
         );
     }
     procinfo_by_pid
@@ -501,7 +502,7 @@ fn new_with_cpu_info(
 fn add_gpu_info(
     mut procinfo_by_pid: ProcInfoTable,
     system: &dyn systemapi::SystemAPI,
-    processes: &HashMap<Pid, systemapi::Process>,
+    processes: &HashMap<Pid, Box<systemapi::Process>>,
 ) -> (ProcInfoTable, Option<Vec<gpu::CardState>>) {
     // When a GPU fails it may be a transient error or a permanent error, but either way sonar does
     // not know.  We just record the failure.  This is a soft failure, surfaced through dashboards;
@@ -578,7 +579,7 @@ fn add_gpu_info(
                             let (job_id, is_slurm) = system
                                 .get_jobs()
                                 .job_id_from_pid(system, proc.pid, processes);
-                            ProcInfo {
+                            Box::new(ProcInfo {
                                 user: proc.user.clone(),
                                 command,
                                 pid: proc.pid,
@@ -598,7 +599,7 @@ fn add_gpu_info(
                                 gpu_mem_percentage: proc.mem_pct as f64,
                                 gpu_mem_size_kib: proc.mem_size_kib,
                                 ..Default::default()
-                            }
+                            })
                         });
                 }
             }
@@ -662,7 +663,7 @@ fn aggregate_gpus(gpus: &mut GpuProcInfos, others: &GpuProcInfos) {
     }
 }
 
-fn rollup_processes(procinfo_by_pid: ProcInfoTable) -> Vec<ProcInfo> {
+fn rollup_processes(procinfo_by_pid: ProcInfoTable) -> Vec<Box<ProcInfo>> {
     // This is a little complicated because processes with job_id 0 or processes that have
     // subprocesses or processes that do not belong to Slurm jobs cannot be rolled up, nor can
     // we roll up processes with different ppid.
@@ -691,7 +692,7 @@ fn rollup_processes(procinfo_by_pid: ProcInfoTable) -> Vec<ProcInfo> {
     // processes that together push it over the filtering limit then it will be printed.  This
     // is probably the right thing.
 
-    let mut rolledup: Vec<ProcInfo> = vec![];
+    let mut rolledup: Vec<Box<ProcInfo>> = vec![];
     let mut index = HashMap::<(JobID, Pid, String), usize>::new();
     for (_, proc_info) in procinfo_by_pid {
         if proc_info.job_id == 0 || proc_info.has_children || !proc_info.is_slurm {
@@ -718,10 +719,10 @@ fn rollup_processes(procinfo_by_pid: ProcInfoTable) -> Vec<ProcInfo> {
             } else {
                 let x = rolledup.len();
                 index.insert(key, x);
-                rolledup.push(ProcInfo {
+                rolledup.push(Box::new(ProcInfo {
                     pid: 0,
-                    ..proc_info
-                });
+                    ..*proc_info
+                }));
                 // We do not increment the clone's `rolledup` counter here because that counter
                 // counts how many *other* records have been rolled into the canonical one, 0
                 // means "no interesting information" and need not be printed.

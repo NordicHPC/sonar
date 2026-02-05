@@ -2,6 +2,7 @@ use crate::gpu;
 use crate::jobsapi;
 use crate::types::{JobID, Pid, Uid};
 
+use std::boxed::Box;
 use std::collections::HashMap;
 use std::fs;
 use std::io;
@@ -46,7 +47,7 @@ pub trait SystemAPI {
 
     // Return a hashmap of structures with process data, keyed by pid.  Pids uniquely tag the
     // records.
-    fn compute_process_information(&self) -> Result<HashMap<Pid, Process>, String>;
+    fn compute_process_information(&self) -> Result<HashMap<Pid, Box<Process>>, String>;
 
     // Given the process table computed by compute_process_information, and a time to wait, measure
     // CPU time for all processes, wait for that time, and then read the CPU time again.  The
@@ -54,7 +55,7 @@ pub trait SystemAPI {
     // 100% of one core.
     fn compute_cpu_utilization(
         &self,
-        processes: &HashMap<Pid, Process>,
+        processes: &HashMap<Pid, Box<Process>>,
         wait_time_ms: usize,
     ) -> Result<Vec<(Pid, f64)>, String>;
 
