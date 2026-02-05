@@ -9,7 +9,6 @@ use crate::time::{format_iso8601, unix_time_to_tm};
 use crate::types::JobID;
 use crate::util::three_places;
 
-use std::boxed::Box;
 use std::collections::HashMap;
 
 pub fn format_newfmt(
@@ -159,7 +158,7 @@ fn format_newfmt_job(
     id: JobID,
     user: &str,
     ixs: &[usize], // Not empty
-    samples: &[Box<ProcInfo>],
+    samples: &[ProcInfo],
 ) -> output::Object {
     let mut job = output::Object::new();
     job.push_u(SAMPLE_JOB_JOB, id as u64);

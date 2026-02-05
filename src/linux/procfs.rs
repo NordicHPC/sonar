@@ -308,7 +308,7 @@ pub fn get_thread_count(fs: &dyn ProcfsAPI, pid: Pid) -> Result<u64, String> {
 pub fn compute_process_information(
     system: &dyn systemapi::SystemAPI,
     fs: &dyn ProcfsAPI,
-) -> Result<HashMap<Pid, Box<systemapi::Process>>, String> {
+) -> Result<HashMap<Pid, systemapi::Process>, String> {
     let memtotal_kib = system.get_memory_in_kib()?.total;
 
     // We need this for a lot of things.  On x86 and x64 this is always 100 but in principle it
@@ -335,7 +335,7 @@ pub fn compute_process_information(
     // Collect remaining system data from /proc/{pid}/stat for the enumerated pids.
 
     let kib_per_page = system.get_page_size_in_kib();
-    let mut result = HashMap::<Pid, Box<systemapi::Process>>::new();
+    let mut result = HashMap::<Pid, systemapi::Process>::new();
     let mut ppids = HashSet::<Pid>::new();
     let mut user_table = UserTable::new();
 
@@ -581,7 +581,7 @@ pub fn compute_process_information(
 
         result.insert(
             pid as Pid,
-            Box::new(systemapi::Process {
+            Box::new(systemapi::TheProcess {
                 pid,
                 ppid,
                 pgrp,
@@ -615,7 +615,7 @@ pub fn compute_process_information(
 pub fn compute_cpu_utilization(
     system: &dyn systemapi::SystemAPI,
     fs: &dyn ProcfsAPI,
-    processes: &HashMap<Pid, Box<systemapi::Process>>,
+    processes: &HashMap<Pid, systemapi::Process>,
     wait_time_ms: usize,
 ) -> Result<Vec<(Pid, f64)>, String> {
     let ticks_per_sec = system.get_clock_ticks_per_sec();

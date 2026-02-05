@@ -15,7 +15,7 @@ pub trait JobManager {
         &self,
         system: &dyn systemapi::SystemAPI,
         pid: Pid,
-        processes: &HashMap<Pid, Box<systemapi::Process>>,
+        processes: &HashMap<Pid, systemapi::Process>,
     ) -> (JobID, bool);
 }
 
@@ -32,7 +32,7 @@ impl JobManager for NoJobManager {
         &self,
         _system: &dyn systemapi::SystemAPI,
         _pid: Pid,
-        _processes: &HashMap<Pid, Box<systemapi::Process>>,
+        _processes: &HashMap<Pid, systemapi::Process>,
     ) -> (JobID, bool) {
         (0, false)
     }
@@ -53,7 +53,7 @@ impl JobManager for AnyJobManager {
         &self,
         system: &dyn systemapi::SystemAPI,
         pid: Pid,
-        processes: &HashMap<Pid, Box<systemapi::Process>>,
+        processes: &HashMap<Pid, systemapi::Process>,
     ) -> (JobID, bool) {
         if let Some(id) = system.compute_slurm_job_id(pid) {
             (id, id != 0)

@@ -47,7 +47,7 @@ pub trait SystemAPI {
 
     // Return a hashmap of structures with process data, keyed by pid.  Pids uniquely tag the
     // records.
-    fn compute_process_information(&self) -> Result<HashMap<Pid, Box<Process>>, String>;
+    fn compute_process_information(&self) -> Result<HashMap<Pid, Process>, String>;
 
     // Given the process table computed by compute_process_information, and a time to wait, measure
     // CPU time for all processes, wait for that time, and then read the CPU time again.  The
@@ -55,7 +55,7 @@ pub trait SystemAPI {
     // 100% of one core.
     fn compute_cpu_utilization(
         &self,
-        processes: &HashMap<Pid, Box<Process>>,
+        processes: &HashMap<Pid, Process>,
         wait_time_ms: usize,
     ) -> Result<Vec<(Pid, f64)>, String>;
 
@@ -115,7 +115,7 @@ pub trait SystemAPI {
 }
 
 #[derive(PartialEq, Debug)]
-pub struct Process {
+pub struct TheProcess {
     pub pid: Pid,
     pub ppid: Pid,
     pub pgrp: Pid,
@@ -134,6 +134,8 @@ pub struct Process {
     pub has_children: bool,
     pub num_threads: u64, // including main thread
 }
+
+pub type Process = Box<TheProcess>;
 
 // Figures in KB.
 pub struct Memory {
