@@ -491,6 +491,8 @@ fn http_send_messages(
     backlog: Vec<Msg>,
 ) {
     let mut args = vec![
+        "--silent".to_string(),
+        "--show-error".to_string(),
         "--data-binary".to_string(),
         "@-".to_string(),
         "-H".to_string(),
