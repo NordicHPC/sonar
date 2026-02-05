@@ -2,6 +2,7 @@ use crate::gpu;
 use crate::jobsapi;
 use crate::types::{JobID, Pid, Uid};
 
+use std::boxed::Box;
 use std::collections::HashMap;
 use std::fs;
 use std::io;
@@ -114,7 +115,7 @@ pub trait SystemAPI {
 }
 
 #[derive(PartialEq, Debug)]
-pub struct Process {
+pub struct TheProcess {
     pub pid: Pid,
     pub ppid: Pid,
     pub pgrp: Pid,
@@ -133,6 +134,9 @@ pub struct Process {
     pub has_children: bool,
     pub num_threads: u64, // including main thread
 }
+
+// Large structure allocated inside other aggregates, so box it.
+pub type Process = Box<TheProcess>;
 
 // Figures in KB.
 pub struct Memory {

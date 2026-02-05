@@ -10,6 +10,7 @@ use crate::ps_newfmt::format_newfmt;
 use crate::systemapi::{self, DiskInfo};
 use crate::types::{JobID, Pid, Uid};
 
+use std::boxed::Box;
 use std::collections::HashMap;
 use std::io::{self, Write};
 use std::path::PathBuf;
@@ -276,7 +277,7 @@ pub enum CState {
 }
 
 #[derive(Default)]
-pub struct ProcInfo {
+pub struct TheProcInfo {
     pub user: String,
     pub command: String,
     pub pid: Pid,
@@ -303,6 +304,9 @@ pub struct ProcInfo {
     pub gpu_mem_size_kib: u64,
     pub gpu_status: GpuStatus,
 }
+
+// Large structure allocated inside other aggregates, so box it.
+pub type ProcInfo = Box<TheProcInfo>;
 
 pub type GpuProcInfos = HashMap<gpu::Name, GpuProcInfo>;
 
@@ -468,7 +472,7 @@ fn new_with_cpu_info(
             .job_id_from_pid(system, proc.pid, processes);
         procinfo_by_pid.insert(
             proc.pid,
-            ProcInfo {
+            Box::new(TheProcInfo {
                 user: proc.user.clone(),
                 command: proc.command.clone(),
                 pid: proc.pid,
@@ -492,7 +496,7 @@ fn new_with_cpu_info(
                 data_written_kib: proc.data_written_kib,
                 data_cancelled_kib: proc.data_cancelled_kib,
                 ..Default::default()
-            },
+            }),
         );
     }
     procinfo_by_pid
@@ -578,7 +582,7 @@ fn add_gpu_info(
                             let (job_id, is_slurm) = system
                                 .get_jobs()
                                 .job_id_from_pid(system, proc.pid, processes);
-                            ProcInfo {
+                            Box::new(TheProcInfo {
                                 user: proc.user.clone(),
                                 command,
                                 pid: proc.pid,
@@ -598,7 +602,7 @@ fn add_gpu_info(
                                 gpu_mem_percentage: proc.mem_pct as f64,
                                 gpu_mem_size_kib: proc.mem_size_kib,
                                 ..Default::default()
-                            }
+                            })
                         });
                 }
             }
@@ -693,7 +697,7 @@ fn rollup_processes(procinfo_by_pid: ProcInfoTable) -> Vec<ProcInfo> {
 
     let mut rolledup: Vec<ProcInfo> = vec![];
     let mut index = HashMap::<(JobID, Pid, String), usize>::new();
-    for (_, proc_info) in procinfo_by_pid {
+    for (_, mut proc_info) in procinfo_by_pid {
         if proc_info.job_id == 0 || proc_info.has_children || !proc_info.is_slurm {
             rolledup.push(proc_info);
         } else {
@@ -718,13 +722,11 @@ fn rollup_processes(procinfo_by_pid: ProcInfoTable) -> Vec<ProcInfo> {
             } else {
                 let x = rolledup.len();
                 index.insert(key, x);
-                rolledup.push(ProcInfo {
-                    pid: 0,
-                    ..proc_info
-                });
-                // We do not increment the clone's `rolledup` counter here because that counter
-                // counts how many *other* records have been rolled into the canonical one, 0
-                // means "no interesting information" and need not be printed.
+                // We do not increment the `rolledup` counter here because that counter counts how
+                // many *other* records have been rolled into the canonical one, 0 means "no
+                // interesting information" and need not be printed.
+                proc_info.pid = 0;
+                rolledup.push(proc_info);
             }
         }
     }

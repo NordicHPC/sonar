@@ -1,3 +1,5 @@
+#![allow(clippy::comparison_to_empty)]
+
 // Rust wrapper around ../gpuapi/sonar-amd.{c,h}.
 
 use crate::gpu::{self, amd::AmdGPU};
