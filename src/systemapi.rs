@@ -135,6 +135,7 @@ pub struct TheProcess {
     pub num_threads: u64, // including main thread
 }
 
+// Large structure allocated inside other aggregates, so box it.
 pub type Process = Box<TheProcess>;
 
 // Figures in KB.

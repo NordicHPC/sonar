@@ -305,6 +305,7 @@ pub struct TheProcInfo {
     pub gpu_status: GpuStatus,
 }
 
+// Large structure allocated inside other aggregates, so box it.
 pub type ProcInfo = Box<TheProcInfo>;
 
 pub type GpuProcInfos = HashMap<gpu::Name, GpuProcInfo>;
@@ -696,7 +697,7 @@ fn rollup_processes(procinfo_by_pid: ProcInfoTable) -> Vec<ProcInfo> {
 
     let mut rolledup: Vec<ProcInfo> = vec![];
     let mut index = HashMap::<(JobID, Pid, String), usize>::new();
-    for (_, proc_info) in procinfo_by_pid {
+    for (_, mut proc_info) in procinfo_by_pid {
         if proc_info.job_id == 0 || proc_info.has_children || !proc_info.is_slurm {
             rolledup.push(proc_info);
         } else {
@@ -721,13 +722,11 @@ fn rollup_processes(procinfo_by_pid: ProcInfoTable) -> Vec<ProcInfo> {
             } else {
                 let x = rolledup.len();
                 index.insert(key, x);
-                rolledup.push(Box::new(TheProcInfo {
-                    pid: 0,
-                    ..*proc_info
-                }));
-                // We do not increment the clone's `rolledup` counter here because that counter
-                // counts how many *other* records have been rolled into the canonical one, 0
-                // means "no interesting information" and need not be printed.
+                // We do not increment the `rolledup` counter here because that counter counts how
+                // many *other* records have been rolled into the canonical one, 0 means "no
+                // interesting information" and need not be printed.
+                proc_info.pid = 0;
+                rolledup.push(proc_info);
             }
         }
     }

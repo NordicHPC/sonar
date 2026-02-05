@@ -184,7 +184,7 @@ pub fn get_boot_time_in_secs_since_epoch(fs: &dyn ProcfsAPI) -> Result<u64, Stri
     for l in stat_s.split('\n') {
         if l.starts_with("btime ") {
             let fields = l.split_ascii_whitespace().collect::<Vec<&str>>();
-            return Ok(parse_u64_field(&fields, 1, l, "stat", 0, "btime")?);
+            return parse_u64_field(&fields, 1, l, "stat", 0, "btime");
         }
     }
     Err(format!("Could not find btime in /proc/stat: {stat_s}"))

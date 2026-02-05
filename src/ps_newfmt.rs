@@ -161,6 +161,8 @@ fn format_newfmt_job(
     samples: &[ProcInfo],
 ) -> output::Object {
     let mut job = output::Object::new();
+    // id may be u32 during testing
+    #[allow(clippy::unnecessary_cast)]
     job.push_u(SAMPLE_JOB_JOB, id as u64);
     job.push_s(SAMPLE_JOB_USER, user.to_string());
     if !samples[ixs[0]].is_slurm {
@@ -200,9 +202,13 @@ fn format_newfmt_sample(proc_info: &ProcInfo) -> output::Object {
     if proc_info.pid != 0 {
         // Rolled-up processes have a synthesized non-zero pid in daemon mode, and a zero pid in
         // one-shot mode.
+        // pid may be u32 during testing
+        #[allow(clippy::unnecessary_cast)]
         fields.push_u(SAMPLE_PROCESS_PID, proc_info.pid as u64);
     }
     if proc_info.ppid != 0 {
+        // ppid may be u32 during testing
+        #[allow(clippy::unnecessary_cast)]
         fields.push_u(SAMPLE_PROCESS_PARENT_PID, proc_info.ppid as u64);
     }
     if proc_info.container_state == CState::Child {

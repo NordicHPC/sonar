@@ -1,3 +1,6 @@
+#![allow(clippy::comparison_to_empty)]
+#![allow(clippy::len_zero)]
+
 use crate::command;
 use crate::gpu;
 use crate::gpu::realgpu;
@@ -65,7 +68,7 @@ impl Builder {
     #[allow(dead_code)]
     pub fn with_node_domain(self, domain: &[String]) -> Builder {
         Builder {
-            node_domain: Some(domain.iter().cloned().collect::<Vec<String>>()),
+            node_domain: Some(domain.to_vec()),
             ..self
         }
     }

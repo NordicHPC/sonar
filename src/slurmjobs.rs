@@ -1,7 +1,6 @@
 #![allow(clippy::comparison_to_empty)]
 #![allow(clippy::vec_box)]
 #![allow(clippy::len_zero)]
-#![allow(clippy::comparison_to_empty)]
 
 use crate::json_tags::*;
 use crate::nodelist;
