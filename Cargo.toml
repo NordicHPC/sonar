@@ -14,6 +14,8 @@ habana = []
 daemon = []
 kafka = [ "dep:rdkafka" ]
 default = [ "nvidia", "amd", "xpu", "habana", "daemon", "kafka" ]
+# https://documentation.sigma2.no/hpc_machines/saga.html
+saga = [ "nvidia", "daemon", "kafka" ]
 
 [dependencies]
 cty = "0.2.2"
