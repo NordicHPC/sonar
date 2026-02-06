@@ -8,10 +8,10 @@ release:
 	CARGO_TARGET_DIR=target/$(ARCH) cargo build
 
 debug-saga:
-	CARGO_TARGET_DIR=target/saga/$(ARCH) cargo build --no-default-features features=saga
+	CARGO_TARGET_DIR=target/saga/$(ARCH) cargo build --no-default-features --features=saga
 
 release-saga:
-	CARGO_TARGET_DIR=target/saga/$(ARCH) cargo build --no-default-features features=saga --release
+	CARGO_TARGET_DIR=target/saga/$(ARCH) cargo build --no-default-features --features=saga --release
 
 test: debug release
 	cargo test
