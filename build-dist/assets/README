@@ -1,0 +1,5 @@
+# Sonar
+
+Sonar is an unprivileged continuous profiling daemon that collects data about jobs, processes,
+cores, accelerators, and disks.  It stores the data locally or exfiltrates them to a remote
+data collector.  See https://github.com/NordicHPC/sonar.
