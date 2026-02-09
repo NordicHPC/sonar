@@ -270,8 +270,9 @@ func runKafkaSender(ch <-chan Msg) {
 				}
 				var err error
 				opts := []kgo.Opt{
-					kgo.SeedBrokers(kafkaBrokerAddress),
 					kgo.ClientID("kprox-" + version),
+					kgo.SeedBrokers(kafkaBrokerAddress),
+					kgo.AllowAutoTopicCreation(),
 				}
 				if saslUser != "" || saslPassword != "" {
 					opts = append(opts, kgo.SASL(plain.Auth{
