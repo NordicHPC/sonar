@@ -10,8 +10,7 @@ format in terms of a Go data structure with JSON annotations.  Changes to the ou
 easily be be seen by diffing this file against a desired tag, starting with "v0.13.0".  Such changes
 are therefore no longer mentioned specially below.
 
-
-## Changes in v0.17.0 (on `main`)
+## Changes in v0.17.0 (on `release_0_17`)
 
 * Bug 244 - **REMOVED FUNCTIONALITY.** Remove all code related to producing CSV and the "old" JSON
   format, asking for those formats will now cause errors.  The --json switch is still accepted but
@@ -21,8 +20,14 @@ are therefore no longer mentioned specially below.
 * Bug 443 - Added `[programs]` section and moved the topo command strings there, though they are still
   recognized in their old location in `[sysinfo]`.  The new section has entries for all the slurm
   programs too.
+* Bug 445 - Capture disk statistics.
 * Bug 453 - Use standard logging, allow control via RUST_LOG.
-
+* Bug 457 - Grab processes running inside Docker containers.
+* Bug 459 - Allow for a 'domain' suffix in `[cluster]` data for some broken clusters.
+* Bug 464 - Handle Tera and Peta suffixes.
+* Bug 468 - Send cluster messages on startup.
+* Bug 471 - Parse the nodelist in slurm data better.
+* Misc testing and infra improvements.
 
 ## Changes in v0.16.1 (on `release_0_16`)
 
