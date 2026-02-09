@@ -10,6 +10,11 @@ format in terms of a Go data structure with JSON annotations.  Changes to the ou
 easily be be seen by diffing this file against a desired tag, starting with "v0.13.0".  Such changes
 are therefore no longer mentioned specially below.
 
+## Changes in v0.18.0 (on `main`)
+
+* Bug 474 - Add a REST proxy to be used with Kafka when the nodes are behind HTTP proxies.
+* Bug 483 - Synthesize a PID for rolled-up processes.
+
 ## Changes in v0.17.0 (on `release_0_17`)
 
 * Bug 244 - **REMOVED FUNCTIONALITY.** Remove all code related to producing CSV and the "old" JSON
