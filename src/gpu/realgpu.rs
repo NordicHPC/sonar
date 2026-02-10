@@ -3,6 +3,8 @@ use crate::ps;
 
 #[cfg(feature = "amd")]
 use crate::gpu::amd;
+#[cfg(feature = "fakegpu")]
+use crate::gpu::fakegpu;
 #[cfg(feature = "habana")]
 use crate::gpu::habana;
 #[cfg(feature = "nvidia")]
@@ -36,6 +38,10 @@ impl GpuAPI for RealGpu {
         #[cfg(feature = "amd")]
         if let Some(amd) = amd::probe(&self.hostname, self.boot_time) {
             gpus.push(amd);
+        }
+        #[cfg(feature = "fakegpu")]
+        if let Some(fakegpu) = fakegpu::probe(&self.hostname, self.boot_time) {
+            gpus.push(fakegpu);
         }
         #[cfg(feature = "xpu")]
         if let Some(xpu) = xpu::probe(&self.hostname, self.boot_time) {

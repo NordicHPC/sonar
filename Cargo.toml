@@ -11,6 +11,7 @@ nvidia = []
 amd = []
 xpu = []
 habana = []
+fakegpu = [] # for testing
 daemon = []
 kafka = [ "dep:rdkafka" ]
 default = [ "nvidia", "amd", "xpu", "habana", "daemon", "kafka" ]
