@@ -1,5 +1,5 @@
 CFLAGS=-Wall -std=c89 -O1
-.PHONY: default rollup-programs clean test
+.PHONY: default rollup-programs clean test generate
 
 default:
 	@echo "Pick a specific target"
@@ -17,6 +17,8 @@ rollup-programs: $(ROLLUP_TARGETS)
 
 format:
 	clang-format -i --style=file:../clang-format.txt *.c
+
+generate:
 
 rollupchild2: rollupchild
 	cp rollupchild rollupchild2

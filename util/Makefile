@@ -1,7 +1,12 @@
-.PHONY: all test format
+.PHONY: all test format generate
 
 all:
 	@echo "Select a specific target"
+
+generate:
+	( cd formats ; $(MAKE) generate )
+	( cd process-doc ; $(MAKE) install )
+	( cd kafka-proxy ; $(MAKE) generate )
 
 test:
 	( cd formats ; $(MAKE) test )
