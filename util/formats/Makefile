@@ -1,9 +1,16 @@
 SHELL=/bin/bash
 
-.PHONY: all test format
+.PHONY: all test format generate
 
 all:
 	@echo "Pick an explicit target"
+
+generate:
+	@if [[ $$(command -v go) != "" ]]; then \
+		( cd newfmt ; go generate ); \
+	else \
+		echo "Skipping formats generation - no go executable"; \
+	fi
 
 test:
 	@if [[ $$(command -v go) != "" ]]; then \

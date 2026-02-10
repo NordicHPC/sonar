@@ -33,7 +33,7 @@ int main(int argc, char** argv) {
                     perror("Forking child");
                     exit(1);
                 case 0:
-                    sprintf(name, "drchild%d", i/3 + k*2);
+                    sprintf(name, "drchild%d", i / 3 + k * 2);
                     fprintf(stderr, "Starting %s\n", name);
                     execl(name, name, NULL);
                     fprintf(stderr, "Failed to exec child %s\n", name);

@@ -1,4 +1,4 @@
-.PHONY: all release test format
+.PHONY: all release test format generate
 
 all:
 	@echo "Select a specific target"
@@ -11,9 +11,15 @@ all:
 # Use -a to force a rebuild of all dependencies because casual use of 'go build' during dev will
 # create a libc dependency and it may not be a direct dependency.
 
-release: kprox.go version.go ../../Cargo.toml Makefile
-	go generate
+release: kprox
+
+kprox: kprox.go version.go Makefile
 	CGO_ENABLED=0 go build -a
+
+generate: version.go
+
+version.go: ../../Cargo.toml version.bash
+	go generate
 
 test:
 	go test
