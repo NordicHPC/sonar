@@ -109,6 +109,7 @@ sonar-xpu-stub.o: sonar-xpu.c sonar-xpu.h Makefile
 libsonar-habana.a: sonar-habana.o Makefile
 	ar rs $@ $<
 
+
 sonar-habana.o: sonar-habana.c sonar-habana.h strtcpy.h Makefile
 	$(CC) -c $(CFLAGS) -DSONAR_HABANA_GPU -o $@ $<
 
@@ -117,6 +118,15 @@ libsonar-habana-stub.a: sonar-habana-stub.o Makefile
 
 sonar-habana-stub.o: sonar-habana.c sonar-habana.h Makefile
 	$(CC) -c $(CFLAGS) -o $@ $<
+
+
+# For testing
+
+libsonar-fakegpu.a: sonar-fakegpu.o Makefile
+	ar rs $@ $<
+
+sonar-fakegpu.o: sonar-fakegpu.c sonar-fakegpu.h strtcpy.h Makefile
+	$(CC) -c $(CFLAGS) -DSONAR_FAKE_GPU -o $@ $<
 
 # Various test code.
 #

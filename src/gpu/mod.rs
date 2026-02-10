@@ -2,6 +2,10 @@
 mod amd;
 #[cfg(feature = "amd")]
 mod amd_smi;
+#[cfg(feature = "fakegpu")]
+mod fakegpu;
+#[cfg(feature = "fakegpu")]
+mod fakegpu_smi;
 #[cfg(feature = "habana")]
 mod habana;
 #[cfg(feature = "habana")]
