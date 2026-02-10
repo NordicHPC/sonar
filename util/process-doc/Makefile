@@ -4,7 +4,9 @@ INPUT=../formats/newfmt/types.go
 
 # NOTE!! When adding a target here, be sure to update ../../tests/go-doc-generate.sh
 
-generate: version.go NEW-FORMAT.md json_tags.rs types.spec.yaml
+generate: version.go all
+
+all: NEW-FORMAT.md json_tags.rs types.spec.yaml
 
 version.go: ../../Cargo.toml version.bash
 	go generate
