@@ -5,7 +5,7 @@ all:
 
 generate:
 	( cd formats ; $(MAKE) generate )
-	( cd process-doc ; $(MAKE) install )
+	( cd process-doc ; $(MAKE) generate )
 	( cd kafka-proxy ; $(MAKE) generate )
 
 test:

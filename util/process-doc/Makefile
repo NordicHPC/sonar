@@ -5,7 +5,11 @@ OUTPUTS=NEW-FORMAT.md json_tags.rs types.spec.yaml
 
 all: $(OUTPUTS)
 
-generate: version.go $(OUTPUTS)
+# `install` is the old name, used here and there.
+generate install: $(OUTPUTS)
+	mv NEW-FORMAT.md ../../doc
+	mv json_tags.rs ../../src
+	mv types.spec.yaml ../../doc
 
 version.go: ../../Cargo.toml version.bash
 	go generate
@@ -21,8 +25,3 @@ types.spec.yaml: $(INPUT) process-doc
 
 process-doc: process-doc.go version.go go.mod
 	go build
-
-install: $(OUTPUTS)
-	mv NEW-FORMAT.md ../../doc
-	mv json_tags.rs ../../src
-	mv types.spec.yaml ../../doc
