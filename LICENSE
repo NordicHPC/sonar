@@ -1,5 +1,5 @@
-The code below util/formats has its own license; see the LICENSE file
-in that directory.
+The code below util/formats and util/kafka-proxy has its own license;
+see the LICENSE files in those directories.
 
 The parts of Sonar not covered by a separate license are covered by
 the following license.
