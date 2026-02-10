@@ -6,7 +6,7 @@ INPUT=../formats/newfmt/types.go
 
 generate: version.go NEW-FORMAT.md json_tags.rs types.spec.yaml
 
-version.go: ../../Cargo.toml
+version.go: ../../Cargo.toml version.bash
 	go generate
 
 NEW-FORMAT.md: $(INPUT) process-doc
