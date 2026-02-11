@@ -4,7 +4,11 @@ version = "0.18.0-devel"
 edition = "2021"
 repository = "https://github.com/NordicHPC/sonar"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+# We want this for building RPMs reliably with older rpmbuild (as on Saga) since it can't deal with
+# the default level of debug information in Rust release builds (ie none).
+[profile.release-with-debug]
+inherits = "release"
+debug = 1
 
 [features]
 nvidia = []
