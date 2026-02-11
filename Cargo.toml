@@ -13,6 +13,9 @@ xpu = []
 habana = []
 fakegpu = [] # for testing
 daemon = []
+# It's sort of a bug that kafka depends on rdkafka, since rdkafka is only one of several transports
+# for Kafka traffic (the other one currently being https to the REST proxy).  It should be possible
+# to compile Sonar with only some transports.
 kafka = [ "dep:rdkafka" ]
 default = [ "nvidia", "amd", "xpu", "habana", "daemon", "kafka" ]
 
