@@ -64,7 +64,7 @@ topics.)  It is a bad idea to use characters other than a-z, 0-9, or hyphen with
 ```
 broker-address = <hostname and port>
 rest-endpoint = <url>
-rest-proxy = <url>
+http-proxy = <url>
 sending-window = <duration value>               # default 5m
 timeout = <duration value>                      # default 30m
 ca-file = <filename>                            # default none
@@ -81,7 +81,7 @@ HTTP proxy), the `rest-endpoint` should be set instead of the `broker-address`, 
 full URL for an API endpoint that will receive a POST with data destined for the Kafka broker.  In
 this case, `ca-file` will currently be ignored - normally the URL will be https to protect the
 credentials and data and the system's normal https crypto materials will be used for authenticating
-the connection.  When `rest-endpoint` is used, `rest-proxy` can be used to set the local proxy
+the connection.  When `rest-endpoint` is used, `http-proxy` can be used to set the local proxy
 address, in the event this is not set in the environment.  See the "Kafka REST proxy" section of
 [HOWTO-KAFKA](HOWTO-KAFKA.md) for more.
 
