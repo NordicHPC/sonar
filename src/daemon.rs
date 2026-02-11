@@ -44,6 +44,7 @@ use signal_hook::iterator::Signals;
 pub struct GlobalIni {
     pub cluster: String,
     pub role: String,
+    pub master_if: String,
     pub lockdir: Option<String>,
     pub topic_prefix: Option<String>,
 }
@@ -288,36 +289,44 @@ pub fn daemon_mode(
         let _ignored = event_sender.send(Operation::Cluster);
     }
 
+    let is_master = ini.global.role == "master"
+        || ini.global.role == "predicated"
+            && master_predicate_match(&ini.global.master_if, &hostname);
+
     // Alarms for daemon operations - each alarm gets its own thread, wasteful but OK for the time
     // being.  These will post the given events at the given cadences.
-    if let Some(c) = ini.sysinfo.cadence {
-        let sender = event_sender.clone();
-        thread::spawn(move || {
-            repeated_event(json_tags::DATA_TAG_SYSINFO, sender, Operation::Sysinfo, c);
-        });
-    }
-    if let Some(c) = ini.sample.cadence {
-        let sender = event_sender.clone();
-        thread::spawn(move || {
-            repeated_event(json_tags::DATA_TAG_SAMPLE, sender, Operation::Sample, c);
-        });
-    }
-    if let Some(c) = ini.jobs.cadence {
-        let sender = event_sender.clone();
-        thread::spawn(move || {
-            repeated_event(json_tags::DATA_TAG_JOBS, sender, Operation::Jobs, c);
-        });
-    }
-    if let Some(c) = ini.cluster.cadence {
-        let sender = event_sender.clone();
-        thread::spawn(move || {
-            repeated_event(json_tags::DATA_TAG_CLUSTER, sender, Operation::Cluster, c);
-        });
+    if !is_master {
+        if let Some(c) = ini.jobs.cadence {
+            let sender = event_sender.clone();
+            thread::spawn(move || {
+                repeated_event(json_tags::DATA_TAG_JOBS, sender, Operation::Jobs, c);
+            });
+        }
+        if let Some(c) = ini.cluster.cadence {
+            let sender = event_sender.clone();
+            thread::spawn(move || {
+                repeated_event(json_tags::DATA_TAG_CLUSTER, sender, Operation::Cluster, c);
+            });
+        }
+    } else {
+        if let Some(c) = ini.sysinfo.cadence {
+            let sender = event_sender.clone();
+            thread::spawn(move || {
+                repeated_event(json_tags::DATA_TAG_SYSINFO, sender, Operation::Sysinfo, c);
+            });
+        }
+        if let Some(c) = ini.sample.cadence {
+            let sender = event_sender.clone();
+            thread::spawn(move || {
+                repeated_event(json_tags::DATA_TAG_SAMPLE, sender, Operation::Sample, c);
+            });
+        }
     }
 
     let client_id = ini.global.cluster.clone() + "/" + &hostname;
 
-    let mut control_topic = ini.global.cluster.clone() + ".control." + &ini.global.role;
+    let mut control_topic =
+        ini.global.cluster.clone() + ".control." + if is_master { "master" } else { "node" };
     if let Some(ref prefix) = ini.global.topic_prefix {
         control_topic = prefix.clone() + "." + &control_topic;
     }
@@ -481,6 +490,64 @@ pub fn daemon_mode(
         Err(fatal_msg)
     } else {
         Ok(())
+    }
+}
+
+fn master_predicate_match(predicate: &str, hostname: &str) -> bool {
+    let first = {
+        if let Some((first, _)) = hostname.split_once('.') {
+            first
+        } else {
+            hostname
+        }
+    };
+    // The predicate has been tested for syntactic validity earlier so a '*' is always last
+    if let Some((prefix, _)) = predicate.rsplit_once('*') {
+        first.starts_with(prefix)
+    } else {
+        first == predicate
+    }
+}
+
+// The master host: predicate is a string that matches either the first element of the host name
+// exactly or a prefix of the first element of the host name, the latter is indicated by the last
+// char of the predicate being '*'.  Other likely wildcard chars are illegal, also the host name
+// element separator '.'.  An empty literal is illegal.  Other domains than host: are illegal.
+fn decode_master_predicate(mut predicate: &str) -> Option<String> {
+    if !predicate.starts_with("host:") {
+        return None;
+    }
+    predicate = &predicate[5..];
+    let l = predicate.len();
+    let decode = {
+        let mut it = predicate.char_indices();
+        loop {
+            match it.next() {
+                Some((i, c)) => {
+                    match c {
+                        '?' | '[' | ']' | '.' => {
+                            break 0
+                        }
+                        '*' => {
+                            if i == l - 1 {
+                                break 2
+                            } else {
+                                break 0
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+                None => {
+                    break 1
+                }
+            }
+        }
+    };
+    match decode {
+        0 => None,
+        1 => if l == 0 { None } else { Some(predicate.to_string()) },
+        _ => if l <= 1 { None } else { Some(predicate[..l-1].to_string()) }
     }
 }
 
@@ -704,6 +771,7 @@ fn parse_config(config_file: &str) -> Result<Ini, String> {
         global: GlobalIni {
             cluster: "".to_string(),
             role: "".to_string(),
+            master_if: "".to_string(),
             lockdir: None,
             topic_prefix: None,
         },
@@ -852,15 +920,22 @@ fn parse_config(config_file: &str) -> Result<Ini, String> {
                     ini.global.cluster = value;
                 }
                 "role" => match value.as_str() {
-                    "node" | "master" => {
+                    "node" | "master" | "predicated" => {
                         ini.global.role = value;
                     }
                     _ => {
                         return Err(format!(
-                            "Invalid global.role value `{value}` - node or master required"
+                            "Invalid global.role value `{value}` - node, master, or predicated required"
                         ))
                     }
                 },
+                "master-if" => {
+                    if let Some(p) = decode_master_predicate(&value) {
+                        ini.global.master_if = p;
+                    } else {
+                        return Err("Invalid master predicate".to_string());
+                    }
+                }
                 "lockdir" | "lock-directory" => {
                     ini.global.lockdir = Some(value);
                 }
@@ -1055,6 +1130,15 @@ fn parse_config(config_file: &str) -> Result<Ini, String> {
     }
     if ini.global.role == "" {
         return Err("Missing global.role setting".to_string());
+    }
+    if ini.global.role == "predicated" {
+        if ini.global.master_if == "" {
+            return Err("Missing global.master-if setting".to_string());
+        }
+    } else {
+        if ini.global.master_if != "" {
+            return Err("global.master-if setting not valid for this role".to_string());
+        }
     }
 
     let mut sinks = 0;

@@ -40,7 +40,8 @@ the cadence.
 
 ```
 cluster = <canonical cluster name>
-role = node | master
+role = node | master | predicated
+master-if = <string>                            # default none
 lock-directory = <string>                       # default none
 topic-prefix = <string>                         # default none
 ```
@@ -49,7 +50,18 @@ The `cluster` option is required, eg `fox.educloud.no`.
 
 The `role` determines how this daemon responds to control messages from a remote controller.  It
 must be defined.  Only the string values listed are accepted.  A `node` typically provides sample
-and sysinfo data only, a `master` often only slurm and cluster data.
+and sysinfo data only, a `master` often only slurm and cluster data.  The value `predicated` is
+special and means that the config applies to both node and master; the `master-if` value is the
+predicate that determines the type of node.  In the predicated case, a master provides only slurm
+and cluster data, and a node provides only sample and sysinfo data - even as the config contains all
+four sections.
+
+The `master-if` predicate is allowed with `role` = `predicated`.  It has the form `domain:operation`
+where `domain` is currently always `host`, signifying that the operation applies to the first
+element of the host name of the node.  The operation is a simple pattern: It is either a literal
+string, matched against the entire first element, or a literal string followed by `*`, matched
+against a prefix of the first element.  If the match succeeds, the host is a master, otherwise a
+node.
 
 If there is a `lock-directory` then a lockfile in that directory is acquired when the daemon runs
 and stays acquired for the daemon's lifetime.  If the daemon is reloaded by remote command the lock
