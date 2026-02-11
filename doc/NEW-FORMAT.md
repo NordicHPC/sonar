@@ -731,10 +731,17 @@ the end, a la ps.
 
 #### **`pid`** uint64
 
-Process ID.  For rolled-up samples, this is zero in one-shot mode and a synthesized unique
-Pid outside the system's Pid range in daemon mode.  In pre-v0.18 samples in daemon mode this
-was also zero.  Also see below at the "Rolledup" field and the section "Rolled-up samples" in
-the postamble.
+Process ID.  Normally Pid is non-zero.  For rolled-up samples in daemon mode (where a set of
+similar processes that changes over time is rolled up as one process that has no obvious
+representative Pid), it is a synthesized non-zero value outside the system's Pid range; see
+below at the "Rolledup" field and the section "Rolled-up samples" in the postamble.
+
+However, the Pid may sometimes be zero:
+
+- it is zero for rolled-up samples in one-shot mode
+- it was zero for rolled-up samples in daemon mode before v0.18
+- it may be zero in corner cases where coherent information cannot be collected for a process
+  or the system does not provide a Pid (issue #499 is about documenting this fully)
 
 #### **`ppid`** uint64
 
