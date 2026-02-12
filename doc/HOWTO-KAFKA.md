@@ -207,7 +207,7 @@ this. **NOTE** paths may have to be updated for your system.
 
 #### Authorization
 
-TODO.  Here we will use Kafka ACLs to restrict write access to topics <clustername>.<whatever> to
+TBD.  Here we will use Kafka ACLs to restrict write access to topics <clustername>.<whatever> to
 principals <clustername>, and maybe read access to topics <clustername>.control.<role> ditto.  This
 is all very TBD.
 

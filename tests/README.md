@@ -27,9 +27,14 @@ additionally need to run on these types of nodes:
 - a node with an XPU GPU (Simula n022)
 - a node with a Habana GPU (Simula h001)
 - a node with Slurm (Fox, Saga, Fram or Betzy login nodes would do)
+- a node with docker (a developer workstation is OK)
 
-The tests will probe for GPU and Slurm and enable/disable themselves as appropriate, no
+The tests will probe for GPU and Slurm and Docker and enable/disable themselves as appropriate, no
 configuration is needed.
+
+The tests assume that the GPU API C code has been properly rebuilt into platform-dependent
+libraries after updates.  There are no direct ways of testing that at the moment.  It amounts to
+checking that `gpuapi/*/*.a` were updated in git at least as recently as `gpuapi/*.{c,h}`.
 
 ## Interactive tests
 

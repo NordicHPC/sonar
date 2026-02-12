@@ -129,7 +129,7 @@ exclude-commands = <comma-separated strings>    # default []
 min-cpu-time = <duration value>                 # default none
 ```
 
-These are the normal options for `sonar ps`, see the Sonar documentation.
+These are the normal options for `sonar sample`, see the Sonar documentation.
 
 ### `[sysinfo]` section
 
@@ -254,6 +254,8 @@ When using the stdio sink, the printed data messages are JSON objects with "topi
 
 ## CONTROL MESSAGE FORMATS
 
+(This is not relevant - we currently don't support control messages.  It's a design sketch only.)
+
 Control messages are sent to Sonar under topics `<cluster>.control.<role>` where `<cluster>` is as
 configured in the `[global]` section and `<role>` is `node` or `master`.  If a topic-prefix has been
 set, the topics will also have to be `<prefix>.<cluster>.control.<role>`.  The messages will have
@@ -277,6 +279,6 @@ For example, for a node on a cluster `hpc.xyzzy.no` with a prefix `test`, type t
 test.hpc.xyzzy.no.control.node exit
 ```
 
-TODO: It's quite possible that the key should be either the node name or the empty string, for
+Design note: It's quite possible that the key should be either the node name or the empty string, for
 messages directed at a specific node or at all, and that the command/argument should be in the
 value.
