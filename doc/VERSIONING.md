@@ -1,4 +1,4 @@
-# Versioning and tagging
+# Sonar Release Process
 
 ## Version numbers
 
