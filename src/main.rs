@@ -99,7 +99,7 @@ enum Commands {
     /// Extract slurm job information
     Slurmjobs {
         /// Set the sacct start time to now-`window` and the end time to now, and dump records that
-        /// are relevant for that interval.  Normally the running interval of `sonar slurm` should
+        /// are relevant for that interval.  Normally the running interval of `sonar jobs` should
         /// be less than the window.  Precludes -span.
         window: Option<u32>,
 
@@ -305,7 +305,7 @@ fn command_line(args: Vec<String>) -> Commands {
                 }
                 Commands::Daemon { config_file }
             }
-            "ps" => {
+            "sample" | "ps" => {
                 let mut rollup = false;
                 let mut min_cpu_percent = None;
                 let mut min_mem_percent = None;
@@ -408,7 +408,7 @@ fn command_line(args: Vec<String>) -> Commands {
                     topo_text_cmd,
                 }
             }
-            "slurm" => {
+            "jobs" | "slurm" => {
                 let mut window = None;
                 let mut span = None;
                 let mut deluge = false;
@@ -540,9 +540,9 @@ Usage: sonar <COMMAND>
 
 Commands:
   daemon   Read configuration from file and stay resident
-  ps       Print process and load information
+  sample   Print process and load information (aka `ps`)
   sysinfo  Print system information
-  slurm    Print Slurm job information for a [start,end) time interval
+  jobs     Print Slurm job information for a [start,end) time interval (aka `slurm`)
   cluster  Print current batch cluster partition information and node status
   help     Print this message
 
@@ -550,7 +550,7 @@ Options for `daemon`:
   filename
       Configuration file from which to read commands, arguments, cadences.
 
-Options for `ps`:
+Options for `sample`:
   --rollup
       Merge process records that have the same job ID and command name (on systems
       with stable job IDs only)
@@ -587,7 +587,7 @@ Options for `sysinfo`:
       Optional command to execute to generate text for the topo_text field,
       typically '/path/to/hwloc-ls'
 
-Options for `slurm`:
+Options for `jobs`:
   --window minutes
       Set the `start` time to now-minutes [default: 90] and the `end` time to now+1.
       Precludes --span
