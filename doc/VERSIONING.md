@@ -42,6 +42,8 @@ shipped, the bugfix version number on the branch is incremented.
 Additionally, the tag `util/formats/vM.N.O` must be created in order for the Go modules system to be
 able to reference that version of the Go package `util/formats` (inside Sonar) from other programs.
 
+After tags have been pushed, the `vM.N.O` tag should be marked as a release in the Github UI.
+
 ### Uplifts and backports
 
 With the branches come some additional rules for how to move patches around:
