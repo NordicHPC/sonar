@@ -52,9 +52,9 @@ static rsmi_status_t (*xrsmi_dev_memory_usage_get)(uint32_t, rsmi_memory_type_t,
 static rsmi_status_t (*xrsmi_dev_name_get)(uint32_t, char*, size_t);
 static rsmi_status_t (*xrsmi_dev_pci_id_get)(uint32_t, uint64_t*);
 static rsmi_status_t (*xrsmi_dev_perf_level_get)(uint32_t, rsmi_dev_perf_level_t*);
-static rsmi_status_t (*xrsmi_dev_power_get)(uint32_t, uint64_t*, uint32_t*);
 static rsmi_status_t (*xrsmi_dev_power_cap_get)(uint32_t, uint32_t, uint64_t*);
 static rsmi_status_t (*xrsmi_dev_power_cap_range_get)(uint32_t, uint32_t, uint64_t*, uint64_t*);
+static rsmi_status_t (*xrsmi_dev_power_get)(uint32_t, uint64_t*, uint32_t*);
 static rsmi_status_t (*xrsmi_dev_serial_number_get)(uint32_t, char*, uint32_t);
 static rsmi_status_t (*xrsmi_dev_temp_metric_get)(
     uint32_t, uint32_t, rsmi_temperature_metric_t, int64_t*);
@@ -67,21 +67,6 @@ static rsmi_status_t (*xrsmi_utilization_count_get)(
     uint32_t, rsmi_utilization_counter_t*, uint32_t, uint64_t*);
 
 static int num_gpus = -1;
-
-static rsmi_status_t check_result(int result, const char* desc) {
-    switch(result) {
-        case RSMI_STATUS_INVALID_ARGS:
-            fprintf(stderr, "WARNING: %s - failed - invalid arguments\n", desc);
-            break;;
-        case RSMI_STATUS_NOT_SUPPORTED:
-            fprintf(stderr, "WARNING: %s - failed - not supported\n", desc);
-            break;;
-        default:
-            break;;
-    }
-
-    return result;
-}
 
 static void probe_gpus() {
     if (num_gpus != -1) {
@@ -132,9 +117,9 @@ static int load_rsmi() {
     DLSYM(xrsmi_dev_name_get, "rsmi_dev_name_get");
     DLSYM(xrsmi_dev_pci_id_get, "rsmi_dev_pci_id_get");
     DLSYM(xrsmi_dev_perf_level_get, "rsmi_dev_perf_level_get");
-    DLSYM(xrsmi_dev_power_get, "rsmi_dev_power_get");
     DLSYM(xrsmi_dev_power_cap_get, "rsmi_dev_power_cap_get");
     DLSYM(xrsmi_dev_power_cap_range_get, "rsmi_dev_power_cap_range_get");
+    DLSYM(xrsmi_dev_power_get, "rsmi_dev_power_get");
     DLSYM(xrsmi_dev_serial_number_get, "rsmi_dev_serial_number_get");
     DLSYM(xrsmi_dev_temp_metric_get, "rsmi_dev_temp_metric_get");
     DLSYM(xrsmi_dev_unique_id_get, "rsmi_dev_unique_id_get");
@@ -261,18 +246,13 @@ int amdml_device_get_card_state(uint32_t device, struct amdml_card_state_t* info
     xrsmi_dev_memory_usage_get(device, RSMI_MEM_TYPE_VRAM, &infobuf->mem_used);
 
     uint64_t power;
+    // Power types: RSMI_AVERAGE_POWER, RSMI_CURRENT_POWER, RSMI_INVALID_POWER
     uint32_t power_type;
 
-    // Power types: RSMI_AVERAGE_POWER, RSMI_CURRENT_POWER, RSMI_INVALID_POWER
-    rsmi_status_t ret = xrsmi_dev_current_socket_power_get(device, &power);
-    if (check_result(ret, "dev_current_socket_power_get") == RSMI_STATUS_SUCCESS) {
+    if (xrsmi_dev_current_socket_power_get(device, &power) == 0) {
         infobuf->power = (unsigned)(power / 1000);
-    } else {
-        fprintf(stderr, "WARNING: using fallback: dev_power_get\n");
-        ret = xrsmi_dev_power_get(device, &power, &power_type);
-        if (check_result(ret, "dev_power_get") == RSMI_STATUS_SUCCESS) {
-            infobuf->power = (unsigned)(power / 1000);
-        }
+    } else if (xrsmi_dev_power_get(device, &power, &power_type) == 0) {
+        infobuf->power = (unsigned)(power / 1000);
     }
 
     if (xrsmi_dev_power_cap_get(device, 0, &power) == 0) {
