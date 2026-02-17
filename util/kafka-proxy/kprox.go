@@ -6,8 +6,8 @@
 //
 // Options:
 //
-//	-d  Debug logging
-//	-v  Verbose logging of errors
+//	-d  Debug logging (implies -v)
+//	-v  Verbose - log non-critical errors also
 //	-D  http receive only (for debugging; implies -d)
 //
 // Kafka posts data via http to this proxy.  This proxy decodes the traffic and then speaks the
@@ -16,6 +16,9 @@
 // messages with the messages to the broker.
 //
 // For now, this supports only HTTP, so put it behind a web server to support HTTPS.
+//
+// Logging is to the syslog by default (without options only critical errors, with -v also
+// non-critical errors), and to stderr with -d.
 //
 // # Config file
 //
@@ -102,6 +105,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"log/syslog"
 	"net/http"
 	"os"
 	"strings"
@@ -127,11 +131,14 @@ var (
 	httpEndpoint       = "/"
 	httpListenPort     = 8090
 	debug              = flag.Bool("d", false, "Debug logging")
-	verbose            = flag.Bool("v", false, "Verbose logging")
+	verbose            = flag.Bool("v", false, "Verbose logging of non-critical errors")
 	receiveOnly        = flag.Bool("D", false, "Receive only (for debugging)")
 )
 
-var kafkaCaCert []byte
+var (
+	kafkaCaCert []byte
+	syslogger   *syslog.Writer
+)
 
 type Control struct {
 	Topic        string `json:"topic"`
@@ -148,6 +155,13 @@ type Msg struct {
 }
 
 func main() {
+	var err error
+	syslogger, err = syslog.Dial("", "", syslog.LOG_USER, "kprox")
+	if err != nil {
+		log.Fatalf("Failing to open syslogger: %v", err)
+	}
+	defer syslogger.Close()
+
 	flag.Usage = func() {
 		fmt.Fprintf(flag.CommandLine.Output(), "kprox Kafka REST proxy version %s\n", version)
 		fmt.Fprintf(flag.CommandLine.Output(), "Usage of %s:\n", os.Args[0])
@@ -197,6 +211,9 @@ func main() {
 	if *receiveOnly {
 		*debug = true
 	}
+	if *debug {
+		*verbose = true
+	}
 
 	if kafkaCaFile != "" {
 		var err error
@@ -208,8 +225,19 @@ func main() {
 	ch := make(chan Msg, 100)
 	runKafkaSender(ch)
 	runHttpListener(ch)
-	log.Print(http.ListenAndServe(fmt.Sprintf(":%d", httpListenPort), nil))
+	report(true, "Kafka HTTP proxy exit: %v", http.ListenAndServe(fmt.Sprintf(":%d", httpListenPort), nil))
 	close(ch)
+}
+
+func report(emergency bool, format string, args ...any) {
+	if emergency {
+		syslogger.Emerg(fmt.Sprintf(format, args...))
+	} else if *verbose {
+		syslogger.Err(fmt.Sprintf(format, args...))
+	}
+	if *debug {
+		log.Printf(format, args...)
+	}
 }
 
 func runKafkaSender(ch <-chan Msg) {
@@ -288,11 +316,7 @@ func runKafkaSender(ch <-chan Msg) {
 				}
 				cl, err = kgo.NewClient(opts...)
 				if err != nil {
-					// We want to stay up, if possible, so don't Fatalf here even though this is
-					// bad.
-					if *verbose {
-						log.Printf("Failed to create client: %v", err)
-					}
+					report(true, "Failed to create client: %v", err)
 					continue
 				}
 				clients[clientId] = cl
@@ -312,10 +336,7 @@ func runKafkaSender(ch <-chan Msg) {
 					}
 				}
 				if err != nil {
-					if *verbose {
-						log.Printf("Error produced for id=%s", id)
-						log.Printf("%v", err)
-					}
+					report(true, "Error produced for id=%s: %v", id, err)
 				} else {
 					if *debug {
 						log.Printf("Message delivered id=%s", id)
@@ -334,21 +355,17 @@ func runKafkaSender(ch <-chan Msg) {
 func runHttpListener(ch chan<- Msg) {
 	http.HandleFunc(httpEndpoint, func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != "POST" {
-			if *verbose {
-				log.Printf("Bad method %s", r.Method)
-			}
+			report(false, "Bad method %s", r.Method)
 			w.WriteHeader(403)
 			fmt.Fprintf(w, "Bad method")
 			return
 		}
 		ct, ok := r.Header["Content-Type"]
 		if !ok || ct[0] != "application/octet-stream" {
-			if *verbose {
-				if !ok {
-					log.Printf("No content-type")
-				} else {
-					log.Printf("Bad content-type %s", ct)
-				}
+			if !ok {
+				report(false, "No content-type")
+			} else {
+				report(false, "Bad content-type %s", ct)
 			}
 			w.WriteHeader(400)
 			fmt.Fprintf(w, "Bad content-type")
@@ -370,9 +387,7 @@ func runHttpListener(ch chan<- Msg) {
 				if err == io.EOF && haveRead == int(r.ContentLength) {
 					break
 				}
-				if *verbose {
-					log.Printf("Failed to read content")
-				}
+				report(false, "Failed to read content")
 				w.WriteHeader(400)
 				fmt.Fprintf(w, "Bad content")
 				return
@@ -398,19 +413,14 @@ func parsePayload(ch chan<- Msg, payload []byte) (int, string) {
 		}
 		loc := bytes.IndexByte(payload[ix:], '\n')
 		if loc == -1 {
-			if *verbose {
-				log.Printf("Trailing junk in message")
-			}
+			report(false, "Trailing junk in message")
 			return 400, "Trailing junk"
-			break
 		}
 		var c Control
 		controlObject := payload[ix : ix+loc]
 		err := json.Unmarshal(controlObject, &c)
 		if err != nil {
-			if *verbose {
-				log.Printf("Could not decode a control object: %v\n%s", err, string(controlObject))
-			}
+			report(false, "Could not decode a control object: %v\n%s", err, string(controlObject))
 			return 400, "Malformed control object"
 		}
 		// Consume the control object and single newline we know is there, because we found it
@@ -418,9 +428,7 @@ func parsePayload(ch chan<- Msg, payload []byte) (int, string) {
 		// Extract the data, and forward the control object and data to the Kafka thread.
 		endIx := ix + int(c.DataSize)
 		if endIx > len(payload) {
-			if *verbose {
-				log.Printf("Out of bounds data length for %s", string(controlObject))
-			}
+			report(false, "Out of bounds data length for %s", string(controlObject))
 			return 400, "Out of bounds data length"
 		}
 		ch <- Msg{Control: c, Data: payload[ix:endIx]}
