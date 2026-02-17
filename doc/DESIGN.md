@@ -108,10 +108,12 @@ documentation](NEW-FORMAT.md).
 The JSON data layout was guided by [the json:api specification](https://jsonapi.org) and has proven
 to be resilient in the face of many additions.
 
-The JSON is not exactly compact however, and parsing text can be relatively costly.  The
-hierarchical tree nature of JSON is easily translated to faster and more compact formats such as
-protobuf or fastbuf, should we need to do that in the future.  At the moment, data volumes are not
-such that that is necessary.
+**Implementation:**
+
+The JSON, while smaller than the CSV, is not exactly compact, however, and parsing text can be
+relatively costly.  The hierarchical tree nature of JSON is easily translated to faster and more
+compact formats such as protobuf or fastbuf, should we need to do that in the future.  At the
+moment, data volumes are not such that that is necessary.
 
 
 ### Support for non-SLURM and non-batch-job systems
@@ -144,7 +146,7 @@ For Singularity this appears to be a non-issue, its processes are visible as nor
 For Docker it depends: Docker processes will run as root when started with `docker run`, and it may
 be hard to connect them to a particular "job" or user (and additionally, Sonar would normally be
 configured to ignore processes owned by root to cut down the data volume; including root jobs has an
-efficiency component).  If multiple users run Docker processes at the same time they are easily
+efficiency impact).  If multiple users run Docker processes at the same time they are easily
 confused.  We could consider some way for `sonar jobs` to collect Docker information, maybe, if we
 find some way to reveal more information, but at first blush even `docker stats` does not really
 reveal what's running.
@@ -153,9 +155,9 @@ reveal what's running.
 ### Support for local data aggregation
 
 Especially for cloud installations such as VMs managed by NAIC Orchestrator it is desirable to avoid
-any centralized data aggregation, as that might not easily scale, but instead to allow data on the
-node to be aggregated on the node in a format that is easily transportable and extractable before
-the node is torn down.
+any centralized data aggregation, as that might not easily scale and would be hard to manage, but
+instead to allow data on the node to be aggregated on the node in a format that is easily
+transportable and extractable before the node is torn down.
 
 **Implementation:**
 
@@ -174,8 +176,8 @@ a little bit sensitive.
 
 It must not be possible for a node not on the cluster to submit data for the cluster.
 
-Any subprocesses should be time-limited, should be used sparingly, should not need to be privileged,
-and should (within reason) be possible to disable.
+Any subprocesses of Sonar should be time-limited, should be used sparingly, should not need to be
+privileged, and should (within reason) be possible to disable.
 
 If special group membership is needed to access the GPUs (eg if a card is owned by `video`) then it
 is acceptable to require Sonar to be in this group.
@@ -186,8 +188,8 @@ User-determined commands may be run by `sonar sysinfo` to extract node toplogy i
 Normally these commands are not set and the functionality is inert.
 
 The Slurm `sacct` and `scontrol` commands are currently run by `sonar jobs`, and `sinfo` is run by
-`sonar cluster`.  These can be set to other values than the default but cannot be entirely disabled
-except by pointing to a program that produces no output.
+`sonar cluster`.  These can be set to other values than the default and can be disabled by setting
+them to empty string values.
 
 A timeout mechanism is in place to prevent the preceding subprocesses from hanging indefinitely.
 
@@ -228,7 +230,7 @@ Kafka is a sensible choice here as it is a reliable store-and-forward technology
 of Sonar used a custom HTTPS POST protocol to a custom back-end.
 
 That said, Sonar has its own Kafka HTTP proxy (we found none that suited our needs when those arose)
-and Sonar is doing all our own information collection, not relying on libraries such as `psutil` for
+and Sonar is doing all its own information collection, not relying on libraries such as `psutil` for
 example.
 
 
@@ -297,10 +299,10 @@ Kafka unless additional ports are opened (as Kafka uses TLS but not HTTPS) or a 
 employed to receive the traffic and forward it.  Sonar can use either method; it includes such a
 proxy.
 
+**Implementation:**
+
 Kafka employs fast compression normally, but if the data turn out to be too large still, we can move
 from JSON to a protobuf or fastbuf data representation.
-
-**Implementation:**
 
 Sonar currently uses `curl` to send data to the Kafka HTTP proxy over HTTP(S).  The `curl` process
 is spawned with retry/timeout parameters without Sonar waiting for it to complete.  Using `curl` is
@@ -309,7 +311,7 @@ slightly more expensive than using a built-in solution.
 
 ### Robust and fault-tolerant
 
-Robustness and fault tolerance has multiple aspects.
+Robustness and fault tolerance have multiple aspects.
 
 Sonar itself should not crash and should not produce garbage results.  If Sonar itself is in an
 error state it should either communicate the error or log the error if communication is not working.
@@ -318,7 +320,7 @@ When a node is in an error state, Sonar should produce an error report about the
 processed by the aggregator or back-end.
 
 Additionally, data should not be lost.  This means that if data cannot be sent, sending should be
-retried for some time.  And if data is sent, there should be a sensible chance that the receiver
+retried for some time.  And if data are sent, there should be a sensible chance that the receiver
 will not lose them.
 
 **Implementation:**
@@ -327,7 +329,7 @@ The Sonar daemon tries hard not to exit unless told to (by a signal).  The data 
 space for error reports at both the global and local level and Sonar will report errors through
 this channel.
 
-By default, data is held for a half hour before it is consider undeliverable (the limit can be set
+By default, data are held for a half hour before it is consider undeliverable (the limit can be set
 higher).  This is the case whether the data are sent by native Kafka or via `curl` to the Kafka HTTP
 proxy.
 
@@ -373,23 +375,12 @@ appropriate GPUs.
 
 ### Aware of supply chain security issues
 
-Sonar should not take dependencies on external Rust crated without good reason, so as to reduce the
-impact of supply chain attacks on the Rust ecosystem.  It should be possible to disable features
-that are not needed at as particular site.  "A little copying is better than a little dependency."
+Sonar should not take dependencies on external libraries without good reason, so as to reduce the
+impact of supply chain attacks on the library ecosystem."A little copying is better than a little
+dependency."
+
+It should be possible to disable features that are not needed at as particular site.
 
 **Discussion:**
 
-For a while, we tried to avoid external dependencies except for the libc crate, and small bits of
-code we needed from other crates were copied into Sonar when the license allowed it.  (This was
-pretty helpful in reducing code size too.)  With the introduction of Kafka support in the form of
-the rdkafka crate, which wraps the librdkafka library, this strategy became impossible: there were
-too many dependencies.
-
-As a consequence of the floodgates being open, some more dependencies have been taken (for message
-queues, signal handling, logging, and base64 encoding) and we should probably take some more (for
-command line parsing and maybe for time handling, though pulling in clap and chrono respectively is
-really not appealing).
-
-A site that does not need Kafka can turn that off.  The main outstanding issue at the moment is that
-for a site that will always upload data via the Kafka HTTP proxy, we could disable the rdkafka
-library and leave the HTTP upload support in place, but can't currently do so.
+See [HOWTO-DEVELOP.md](HOWTO-DEVELOP.md#dependencies-and-supply-chain-security).

@@ -292,7 +292,7 @@ WantedBy=multi-user.target
 ```
 
 If SELinux is enabled then the files *must* be in `/usr/local/lib` and the User and Group directives
-in the service filw won't be honored.  Instead, use this workaround:
+in the service file won't be honored.  Instead, use this workaround:
 
 ```
 ExecStart=/usr/sbin/runuser -u sonar -- \
@@ -313,7 +313,7 @@ The four packet types are defined in [NEW-FORMAT.md](NEW-FORMAT.md) by the type 
 [SysinfoEnvelope](NEW-FORMAT.md#type-sysinfoenvelope),
 [JobsEnvelope](NEW-FORMAT.md#type-jobsenvelope), and
 [ClusterEnvelope](NEW-FORMAT.md#type-clusterenvelope), along with their accompanying comments, all
-of which is normative.
+of which are normative.
 
 It is possible to run Sonar operations from the command line without a config file and with output
 to stdout, so as to examine and understand the data more easily.  See [Advanced operation](#advanced-operation).
@@ -321,7 +321,7 @@ to stdout, so as to examine and understand the data more easily.  See [Advanced 
 ### Kafka topics
 
 Kafka messages are sent to *topics*, with a *key* and a *value*.  The value is always a JSON data
-packet as described above.  The key is the name of the host sending the message.  The topic is
+packet as described above.  The key is the name of the node sending the message.  The topic is
 always `<cluster-name>.<packet-type>` where `cluster-name` is the name of the cluster from the
 `global` section and `packet-type` is `sample`, `sysinfo`, `job` [sic!], or `cluster`.  The
 `packet-type` always corresponds to the type of data being transmitted in the value.

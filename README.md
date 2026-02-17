@@ -10,6 +10,9 @@ Sonar examines `/proc` and `/sys` and/or runs diagnostic programs, filters and g
 information, and prints it to stdout, stores it in a local directory tree, or sends it to a remote
 collector.
 
+Sonar proper is GPL-3 but some side components that are crucial for the interaction with other tools
+that might not be GPL carry the MIT license.
+
 ![image of a fish swarm](img/sonar-small.png)
 
 Image: [Midjourney](https://midjourney.com/), [CC BY-NC 4.0](https://creativecommons.org/licenses/by-nc/4.0/legalcode)
@@ -25,9 +28,6 @@ To build it, or to modify it, try [the developer document](doc/HOWTO-DEVELOP.md)
 
 A sample deployment of Sonar on a cluster and a data aggregator on a backend is outlined in
 [doc/HOWTO-DEPLOY.md](doc/HOWTO-DEPLOY.md).
-
-Sonar proper is GPL-3 but some side components that are crucial for the interaction with other tools
-that might not be GPL carry the MIT license.
 
 ## Collecting and analyzing the data
 

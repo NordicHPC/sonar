@@ -14,7 +14,7 @@ At this time we require:
 - Linux
 - 2021 edition of Rust or newer
 - Rust 1.81.0 or newer (can be found with `cargo msrv find`)
-- OpenSSL development libraries / headers for Kafka support installed on the build system
+- OpenSSL development libraries / headers (for Kafka support) installed on the build system
   (on Ubuntu, this is libssl-dev, on Red Hat it is openssl-devel)
 - A "new enough" binutils (2.35 or newer is known to work, 2.30 is too old, 2.32 is unclear),
   this can be an issue on RHEL8 and similarly old systems. Check with `as --version`
@@ -34,10 +34,10 @@ proxy requires Go 1.24 and other programs require Go 1.22.
 
 ### Building with pre-existing GPU shims
 
-For casual development, test builds, and some release builds, `cargo build` or `cargo build --release`
-or even just `make` at the top level will build Sonar and link it with the pre-built GPU
-shims that are included, currently for x86_64 and aarch64 and for NVIDIA, AMD, Intel Habana, and
-Intel XPU GPUs.  For the Intel GPUs the aarch64 libraries are just stubs.
+For casual development, test builds, and some release builds, `cargo build` or `cargo build
+--release` or even just `make` at the top level will build Sonar and link it with the pre-built GPU
+shims that are included in the source tree, currently for x86_64 and aarch64 and for NVIDIA, AMD,
+Intel Habana, and Intel XPU GPUs.  For the Intel and AMD GPUs the aarch64 libraries are just stubs.
 
 The individual GPUs are defined as features in the top-level Cargo.toml and to compile with just
 NVIDIA support, say, run `cargo build --no-default-features --features=daemon,kafka,nvidia` for a
@@ -64,7 +64,7 @@ neither secret nor NRIS-specific.
 ### Regenerating what is generated
 
 Some code is generated from other code; notably, version number files for some of the auxiliary
-artifacts are generated from `Cargo.toml`, and documentation and some Rust code is generated from
+artifacts are generated from `Cargo.toml`, and documentation and some Rust code are generated from
 the Sonar data format specification.  To regenerate these, run `make generate` at the top level
 (requires Go to process the output format specification).
 
@@ -80,7 +80,8 @@ The major components of Sonar are:
 * data sinks in `src/datasink/{directory,kafka,stdio}.rs`
 * GPU interface definition in `src/gpu/mod.rs`
 * GPU interface implementations in `src/gpu/{amd,habana,nvidia,xpu}.rs`
-* GPU SMI shim libraries in `gpuapi/sonar-{amd,habana,nvidia,xpu}.{c,h}`
+* GPU SMI shim libraries lower levels in `gpuapi/sonar-{amd,habana,nvidia,xpu}.{c,h}`
+* GPU SMI shim libraries upper levels in `src/gpu/{amd,habana,nvidia,xpu}_smi.rs`
 * platform interface definition in `src/systemapi.rs` and a Linux implementation in `src/linux/system.rs`
 
 In addition, external to Sonar proper there are these components:
@@ -133,20 +134,25 @@ The `main` branch is used for development and has a version number of the form `
 that this version number form will also be present in the output of Sonar commands, to properly tag
 those data.  If clients are exposed to prerelease data they must be prepared to deal with this.
 
-When a stablization tag is created on main it the version number is temporarily changed to
+When a stablization tag is created on main the version number is temporarily changed to
 `M.N.O-preK` where K increases linearly from 1, but then main itself reverts to the `M.N.O-devel`
-tag.
+version number.
 
 For every freeze of the the minor release number, a new release branch is created in the repo with
 the name `release_<major>_<minor>`, again we expect `<major>` to remain `0` for the foreseeable
 future, ergo, `release_0_12` is the v0.12.x release branch.  At branching time, the minor release
-number is incremented on main (so when we created `release_0_12` for v0.12.1, the version number on
+number is incremented on main (so when we created `release_0_12` for v0.12.0, the version number on
 `main` went to `0.13.0-devel`).
 
 Release candidates on a release branch are given the version number `M.N.O-rcK` along with a
 corresponding tag.
 
 Actual releases on a release branch have a version number of the form `M.N.O`.
+
+#### Propagating the version number
+
+The version is always canonically recorded in `Cargo.toml` at the top level.  To propagate it to
+other parts of the source, run `make generate` at the top level.
 
 #### Tagging
 
@@ -182,7 +188,7 @@ Policy for changing the minimum Rust version:
 - Open a GitHub issue and motivate the change
 - Once we reach agreement in the issue discussion:
   - Update the version inside the test workflow [test-minimal.yml](.github/workflows/test-minimal.yml)
-  - Update the documentation (this section)
+  - Update the version number requirement documentation (first section of this document)
 
 
 ### Release pre-testing
@@ -209,17 +215,24 @@ chain attack.  We made some rules:
 
 There is a useful discussion of these matters [here](https://research.swtch.com/deps).
 
-*The reality is unfortunately different.*  We had to give up on any meaningful control of the supply
-chain around v0.14 as the introduction of the Kafka library required the introduction of a large
-number of crates we must trust on faith.  (Users who don't need Kafka can remove it and likely will
-see the number of dependencies drop significantly.)
+*The reality is unfortunately different.*
+
+For a while, we tried to avoid external dependencies except for the libc crate, and small bits of
+code we needed from other crates were copied into Sonar when the license allowed it.  (This was
+pretty helpful in reducing code size too.)  With the introduction of Kafka support in the form of
+the rdkafka crate around v0.14, which wraps the librdkafka library, this strategy became impossible:
+there were too many dependencies on crates whose security we must trust on faith.
 
 Alas, leaning into the reality of non-control with dependencies, we have since added yet more
-dependencies for multi-threading channels and base64 encoding, which may themselves have added
-further dependencies.  With that in mind, we should probably go back to using all-singing
-all-dancing crates such as Clap (the dependency on which was removed in an effort to control the
-supply chain as well as compiled code size), and we should switch the daemon config file format to
-TOML so that we can use a pre-existing TOML parser.
+dependencies for multi-threading channels, base64 encoding, and logging, which may themselves have
+added further dependencies.  With that in mind, we should probably go back to using all-singing
+all-dancing crates such as Clap and Chrono (the dependencies on which were removed in an effort to
+control the supply chain as well as compiled code size), and we should switch the daemon config file
+format to TOML so that we can use a pre-existing TOML parser.
+
+A site that does not need Kafka can turn that off.  The main outstanding issue at the moment is that
+for a site that will always upload data via the Kafka HTTP proxy, we could disable the rdkafka
+library and leave the HTTP upload support in place, but can't currently do so.
 
 
 ## Bindgen
