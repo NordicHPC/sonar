@@ -6,8 +6,8 @@
 //
 // Options:
 //
-//	-d  Debug logging to stdout (implies -v)
-//	-v  Verbose logging of errors
+//	-d  Debug logging (implies -v)
+//	-v  Verbose - log non-critical errors also
 //	-D  http receive only (for debugging; implies -d)
 //
 // Kafka posts data via http to this proxy.  This proxy decodes the traffic and then speaks the
@@ -16,6 +16,9 @@
 // messages with the messages to the broker.
 //
 // For now, this supports only HTTP, so put it behind a web server to support HTTPS.
+//
+// Logging is to the syslog by default (without options only critical errors, with -v also
+// non-critical errors), and to stderr with -d.
 //
 // # Config file
 //
@@ -128,7 +131,7 @@ var (
 	httpEndpoint       = "/"
 	httpListenPort     = 8090
 	debug              = flag.Bool("d", false, "Debug logging")
-	verbose            = flag.Bool("v", false, "Verbose logging")
+	verbose            = flag.Bool("v", false, "Verbose logging of non-critical errors")
 	receiveOnly        = flag.Bool("D", false, "Receive only (for debugging)")
 )
 
@@ -222,11 +225,11 @@ func main() {
 	ch := make(chan Msg, 100)
 	runKafkaSender(ch)
 	runHttpListener(ch)
-	logPrint(true, "%v", http.ListenAndServe(fmt.Sprintf(":%d", httpListenPort), nil))
+	report(true, "%v", http.ListenAndServe(fmt.Sprintf(":%d", httpListenPort), nil))
 	close(ch)
 }
 
-func logPrint(always bool, format string, args ...any) {
+func report(always bool, format string, args ...any) {
 	if always || *verbose {
 		syslogger.Err(fmt.Sprintf(format, args...))
 	}
@@ -311,7 +314,7 @@ func runKafkaSender(ch <-chan Msg) {
 				}
 				cl, err = kgo.NewClient(opts...)
 				if err != nil {
-					logPrint(true, "Failed to create client: %v", err)
+					report(true, "Failed to create client: %v", err)
 					continue
 				}
 				clients[clientId] = cl
@@ -331,7 +334,7 @@ func runKafkaSender(ch <-chan Msg) {
 					}
 				}
 				if err != nil {
-					logPrint(true, "Error produced for id=%s: %v", id, err)
+					report(true, "Error produced for id=%s: %v", id, err)
 				} else {
 					if *debug {
 						log.Printf("Message delivered id=%s", id)
@@ -350,7 +353,7 @@ func runKafkaSender(ch <-chan Msg) {
 func runHttpListener(ch chan<- Msg) {
 	http.HandleFunc(httpEndpoint, func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != "POST" {
-			logPrint(false, "Bad method %s", r.Method)
+			report(false, "Bad method %s", r.Method)
 			w.WriteHeader(403)
 			fmt.Fprintf(w, "Bad method")
 			return
@@ -358,9 +361,9 @@ func runHttpListener(ch chan<- Msg) {
 		ct, ok := r.Header["Content-Type"]
 		if !ok || ct[0] != "application/octet-stream" {
 			if !ok {
-				logPrint(false, "No content-type")
+				report(false, "No content-type")
 			} else {
-				logPrint(false, "Bad content-type %s", ct)
+				report(false, "Bad content-type %s", ct)
 			}
 			w.WriteHeader(400)
 			fmt.Fprintf(w, "Bad content-type")
@@ -382,7 +385,7 @@ func runHttpListener(ch chan<- Msg) {
 				if err == io.EOF && haveRead == int(r.ContentLength) {
 					break
 				}
-				log.Print("Failed to read content")
+				report(false, "Failed to read content")
 				w.WriteHeader(400)
 				fmt.Fprintf(w, "Bad content")
 				return
@@ -408,14 +411,14 @@ func parsePayload(ch chan<- Msg, payload []byte) (int, string) {
 		}
 		loc := bytes.IndexByte(payload[ix:], '\n')
 		if loc == -1 {
-			log.Print("Trailing junk in message")
+			report(false, "Trailing junk in message")
 			return 400, "Trailing junk"
 		}
 		var c Control
 		controlObject := payload[ix : ix+loc]
 		err := json.Unmarshal(controlObject, &c)
 		if err != nil {
-			logPrint(false, "Could not decode a control object: %v\n%s", err, string(controlObject))
+			report(false, "Could not decode a control object: %v\n%s", err, string(controlObject))
 			return 400, "Malformed control object"
 		}
 		// Consume the control object and single newline we know is there, because we found it
@@ -423,7 +426,7 @@ func parsePayload(ch chan<- Msg, payload []byte) (int, string) {
 		// Extract the data, and forward the control object and data to the Kafka thread.
 		endIx := ix + int(c.DataSize)
 		if endIx > len(payload) {
-			logPrint(false, "Out of bounds data length for %s", string(controlObject))
+			report(false, "Out of bounds data length for %s", string(controlObject))
 			return 400, "Out of bounds data length"
 		}
 		ch <- Msg{Control: c, Data: payload[ix:endIx]}
