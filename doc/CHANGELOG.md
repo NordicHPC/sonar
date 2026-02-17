@@ -9,7 +9,7 @@ auto-generated from a Go data structure that specifies the JSON output format.  
 output format can most easily be be seen by diffing this file against a desired tag, starting with
 "v0.13.0".  Such changes are therefore no longer mentioned specially below.
 
-## Changes in v0.18.0 (on `main`)
+## Changes in v0.18.0 (on `release_0_18`)
 
 * Bug 474 - Add a REST proxy to be used with Kafka when the nodes are behind HTTP proxies.
 * Bug 483 - Synthesize a PID for rolled-up processes.
