@@ -1,7 +1,7 @@
 # Build Sonar RPMs
 
 The configuration assets for Sonar are not bundled in the RPM, so there will typically be one RPM
-that is used on all nodes of a particular hardware and OS configuration.
+that can be used on all nodes of a particular hardware and OS configuration.
 
 The .spec files here build from source.  You normally need to build on the cluster that will take
 the RPM, or on a machine with a compatible OS, to get library versions right.

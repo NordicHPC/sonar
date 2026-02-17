@@ -53,17 +53,17 @@ SONAR_CUSTOM_GPUAPI=$SHIMDIR \
 cargo build --no-default-features --features=daemon,kafka,nvidia --profile=release-with-debug
 
 %install
-mkdir -p %{buildroot}/var/lib/sonar
+mkdir -p %{buildroot}/usr/local/lib/sonar
 
 # Binary
-cp %{_builddir}/sonar-%{version}/target/release-with-debug/sonar %{buildroot}/var/lib/sonar
-cp %{_sourcedir}/sonar-%{version}-assets/* %{buildroot}/var/lib/sonar
+cp %{_builddir}/sonar-%{version}/target/release-with-debug/sonar %{buildroot}/usr/local/lib/sonar
+cp %{_sourcedir}/sonar-%{version}-assets/* %{buildroot}/usr/local/lib/sonar
 
 %files
-/var/lib/sonar/sonar
-/var/lib/sonar/sonar.service
-/var/lib/sonar/sonar.cfg
-/var/lib/sonar/README
+/usr/local/lib/sonar/sonar
+/usr/local/lib/sonar/sonar.service
+/usr/local/lib/sonar/sonar.cfg
+/usr/local/lib/sonar/README
 
 %changelog
 * Fri Feb 06 2026 Lars T Hansen <larstha@uio.no>

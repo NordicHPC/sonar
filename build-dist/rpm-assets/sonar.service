@@ -1,6 +1,6 @@
 [Unit]
-Description=Sonar service for cluster nodes
-Documentation=https://gitlab.sigma2.no/larstha/sonar-deploy/sonar
+Description=Sonar continuous profiling daemon
+Documentation=https://github.com/NordicHPC/sonar
 After=local-fs.target remote-fs.target network.target
 
 [Service]
