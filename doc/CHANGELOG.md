@@ -13,6 +13,10 @@ output format can most easily be be seen by diffing this file against a desired 
 
 * Bug 474 - Add a REST proxy to be used with Kafka when the nodes are behind HTTP proxies.
 * Bug 483 - Synthesize a PID for rolled-up processes.
+* Bug 493 - Assets for building RPMs and other build artifacts
+* Bug 502 - User manual, design doc, developer doc, and general doc cleanup
+* Bug 503 - Use newer power API on AMD GPUs
+* Bug 505 - Log errors to the journal, not to stderr
 * No bug - introduced `sonar sample` as the canonical way to say `sonar ps` (older)
 * No bug - introduced `sonar jobs` as the canonical way to say `sonar slurm` (older)
 * Misc tweaks and cleanup as usual
