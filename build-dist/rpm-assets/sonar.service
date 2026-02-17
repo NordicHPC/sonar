@@ -1,0 +1,13 @@
+[Unit]
+Description=Sonar continuous profiling daemon
+Documentation=https://github.com/NordicHPC/sonar
+After=local-fs.target remote-fs.target network.target
+
+[Service]
+User=sonar
+Group=sonar
+ExecStart=/usr/local/lib/sonar/sonar daemon /usr/local/lib/sonar/sonar.cfg
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target

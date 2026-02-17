@@ -1,0 +1,70 @@
+# RPM build spec for Sonar for a generic Linux node (with support for NVIDIA accelerators only).
+# Note that various Linux distros may need tweaks to the build setup.  See README.md.
+#
+# See ../doc/HOWTO-DEVELOP.md regarding build requirements.
+#
+# Before building:
+#
+# - place a copy of this file in rpmbuild/SPECS as sonar-<version>-all.spec
+# - update the Sonar <version> numbers n.m.k in the copy (two places)
+# - wget the appropriate source into rpmbuild/SOURCES
+# - modify the build commands below if necessary to set up tools and libraries
+# - copy rpm-assets/* into rpmbuild/SOURCES/sonar-<version>-assets
+
+Name:           sonar
+Version:        0.0.1
+Release:        %autorelease
+Summary:        Continuous profiling daemon
+
+License:        GPL-3.0 + MIT
+URL:            https://github.com/NordicHPC/sonar
+Source0:        https://github.com/NordicHPC/sonar/archive/refs/tags/v0.0.1.tar.gz
+
+%description
+Sonar is an unprivileged continuous profiling daemon that collects data about jobs, processes,
+cores, accelerators, and disks.  It stores the data locally or exfiltrates them to a remote
+data collector.
+
+%prep
+%setup -q
+
+%build
+
+# See ../doc/HOWTO-DEVELOP.md regarding build requirements.  Note that we are rebuilding the GPU
+# shim here so CUDA headers must be present.
+
+# The 'rm' on gpuapi/ARCH and the song and dance with gpushim-rpm are there to ensure that we do not
+# accidentally link with pre-existing assets that are currently in the Sonar source repo.  The
+# SONAR_CUSTOM_GPUAPI=gpushim-rpm tells the cargo link phase that we want the link path for the gpu
+# shim to be gpushim-rpm/ instead of gpuapi/ARCH.
+
+# Build the GPU shim
+SHIMDIR=gpushim-rpm
+rm -rf $SHIMDIR
+mkdir -p $SHIMDIR
+cd gpuapi
+rm -rf x86_64 aarch64
+make libsonar-nvidia.a
+mv libsonar-nvidia.a ../$SHIMDIR
+cd ..
+
+# Build sonar, it will show up in target/release-with-debug
+SONAR_CUSTOM_GPUAPI=$SHIMDIR \
+cargo build --no-default-features --features=daemon,kafka,nvidia --profile=release-with-debug
+
+%install
+mkdir -p %{buildroot}/usr/local/lib/sonar
+
+# Binary
+cp %{_builddir}/sonar-%{version}/target/release-with-debug/sonar %{buildroot}/usr/local/lib/sonar
+cp %{_sourcedir}/sonar-%{version}-assets/* %{buildroot}/usr/local/lib/sonar
+
+%files
+/usr/local/lib/sonar/sonar
+/usr/local/lib/sonar/sonar.service
+/usr/local/lib/sonar/sonar.cfg
+/usr/local/lib/sonar/README
+
+%changelog
+* Fri Feb 06 2026 Lars T Hansen <larstha@uio.no>
+- Upstream changelog: https://github.com/NordicHPC/sonar/blob/main/doc/CHANGELOG.md
