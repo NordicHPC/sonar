@@ -1,15 +1,17 @@
-# Build Sonar RPMs for HPC distribution
+# Build Sonar RPMs
 
-The configuration assets for Sonar are bundled in the RPM, so there will typically be one RPM for
-the compute nodes and one for the master node.
+The configuration assets for Sonar are not bundled in the RPM, so there will typically be one RPM
+that is used on all nodes of a particular hardware and OS configuration.
 
 The .spec files here build from source.  You normally need to build on the cluster that will take
 the RPM, or on a machine with a compatible OS, to get library versions right.
 
 The build scripts in the .spec files will typically need to be customized for your system, minimally
-to specify how to initialize dependencies (Rust, C, Binutils, GPU headers).
+to specify how to initialize dependencies (Rust, C, Binutils, GPU headers).  There are instructions
+in the .spec files.
 
-## RPM cookbook with Fake GPU (Fedora workstation)
+
+## RPM cookbook on a Fedora workstation
 
 For the sake of simplicity:
 ```
@@ -20,38 +22,41 @@ $ rpmdev-setuptree
 This creates `~/rpmbuild`, which will hold the RPM assets.  Then:
 
 ```
-$ cp sonar-node-fakegpu.spec ~/rpmbuild/SPECS
-$ ( cd ~/rpmbuild/SOURCES ; wget https://github.com/NordicHPC/sonar/archive/refs/tags/v0.99.1.tar.gz )
+$ cp sonar-allgpu.spec ~/rpmbuild/SPECS
 ```
 
-Obviously the version number matters.  It should be adjusted above, and also in the copied .spec
-file.
-
-The .spec depends on an available C compiler and a Rust compiler.  See that file for instructions.
+and then modify the copy according to instructions in the file, and download and copy assets as
+specified there.
 
 Now to build:
 ```
-$ rpmbuild -bb ~/rpmbuild/SPECS/sonar-node-fakegpu.spec
+$ rpmbuild -bb ~/rpmbuild/SPECS/sonar-allgpu.spec
 ```
 
-## RPM cookbook with real GPU on HPC node with rpmbuild only
+The other .spec file here, `sonar-nvidia.spec`, is the same but instead of using the pre-created GPU
+shim assets that are in the Sonar repo it rebuilds the NVIDIA GPU shim from source and only links
+with that.  While the -allgpu RPM will be able to probe NVIDIA, AMD, Habana and XPU GPUs, the -nvidia
+GPU will only be able to probe NVIDIA GPUs.
 
-Run this to create the rpm tree:
-```
-$ ./setuptree.bash
-```
 
-Once the .spec has been copied (ideally under a name reflecting the GPU chosen) and sources
-downloaded and the version updated in the .spec, it will be necessary to adjust the build tools and
-choosing a GPU.  One can use the diff between sonar-node-fakegpu.spec and sonar-node-nvidia.spec
-(both in this directory) to guide the process.  Fixing the build tools may involve loading modules
-or otherwise installing something.  Choosing the GPU will involve changing the name of the library
-that is built and linked and changing the feature set requested from the rust build to correspond to
-that GPU.
+## Older systems
 
-After that we're back to the build (for the gpu `somegpu`):
+RPM builds on older systems may need to tweak the RPM specs a little since the tools do not always
+do everything they need to do for RPM builds to work.  For example, for RHEL9, the `%autorelease`
+macro does not exist so the `Release` header of the spec must be changed to look like this:
+
 ```
-$ rpmbuild -bb ~/rpmbuild/SPECS/sonar-node-somegpu.spec
+Release:        1%{?dist}
 ```
 
-(Something more here about assets that need to go into the build.)
+Also, the invocation of `cargo build` needs to pass a flag to create a build ID section because that
+does not happen automatically:
+
+```
+SONAR_CUSTOM_GPUAPI=$SHIMDIR \
+RUSTFLAGS="-C link-arg=-Wl,--build-id" \
+cargo build --no-default-features --features=daemon,kafka,nvidia --profile=release-with-debug
+```
+
+For those with access to the NRIS gitlab, look in `larstha/sonar-deploy/sonar/saga.sigma2.no` for
+the .spec for an RHEL9 system.
