@@ -156,7 +156,7 @@ type Msg struct {
 
 func main() {
 	var err error
-	syslogger, err = syslog.Dial("", "", syslog.LOG_INFO|syslog.LOG_USER, "kprox")
+	syslogger, err = syslog.Dial("", "", syslog.LOG_USER, "kprox")
 	if err != nil {
 		log.Fatalf("Failing to open syslogger: %v", err)
 	}
@@ -225,12 +225,14 @@ func main() {
 	ch := make(chan Msg, 100)
 	runKafkaSender(ch)
 	runHttpListener(ch)
-	report(true, "%v", http.ListenAndServe(fmt.Sprintf(":%d", httpListenPort), nil))
+	report(true, "Kafka HTTP proxy exit: %v", http.ListenAndServe(fmt.Sprintf(":%d", httpListenPort), nil))
 	close(ch)
 }
 
-func report(always bool, format string, args ...any) {
-	if always || *verbose {
+func report(emergency bool, format string, args ...any) {
+	if emergency {
+		syslogger.Emerg(fmt.Sprintf(format, args...))
+	} else if *verbose {
 		syslogger.Err(fmt.Sprintf(format, args...))
 	}
 	if *debug {
