@@ -4,16 +4,18 @@ Older sections are at best partial.  Newer sections (since 0.15) aim to be compr
 general, all relevant fixes are uplifted from release branches to main, so a change for v0.16 (say)
 will always be on main and in all later releases.
 
-Since v0.13.0, the output format is documented mainly by the file
-[util/formats/newfmt/types.go](../util/formats/newfmt/types.go), which specifies the JSON output
-format in terms of a Go data structure with JSON annotations.  Changes to the output format can most
-easily be be seen by diffing this file against a desired tag, starting with "v0.13.0".  Such changes
-are therefore no longer mentioned specially below.
+Since v0.13.0, the output format is documented by the file [NEW-FORMAT.md](NEW-FORMAT.md) which is
+auto-generated from a Go data structure that specifies the JSON output format.  Changes to the
+output format can most easily be be seen by diffing this file against a desired tag, starting with
+"v0.13.0".  Such changes are therefore no longer mentioned specially below.
 
 ## Changes in v0.18.0 (on `main`)
 
 * Bug 474 - Add a REST proxy to be used with Kafka when the nodes are behind HTTP proxies.
 * Bug 483 - Synthesize a PID for rolled-up processes.
+* No bug - introduced `sonar sample` as the canonical way to say `sonar ps` (older)
+* No bug - introduced `sonar jobs` as the canonical way to say `sonar slurm` (older)
+* Misc tweaks and cleanup as usual
 
 ## Changes in v0.17.0 (on `release_0_17`)
 

@@ -1,140 +1,45 @@
 [![image](https://github.com/NordicHPC/sonar/workflows/Test/badge.svg)](https://github.com/NordicHPC/sonar/actions)
 [![image](https://img.shields.io/badge/license-%20GPL--v3.0-blue.svg)](LICENSE)
 
-# sonar
+# Sonar
 
-Sonar is a tool to profile usage of HPC resources by regularly sampling processes, accelerators,
+Sonar is a tool to profile usage of HPC resources by regularly sampling processes, jobs, accelerators,
 nodes, queues, and clusters.
 
-Sonar examines `/proc` and `/sys` and/or runs some diagnostic programs, filters and groups the
-information, and prints it to stdout or sends it to a remote collector (notably via Kafka).
+Sonar examines `/proc` and `/sys` and/or runs diagnostic programs, filters and groups the
+information, and prints it to stdout, stores it in a local directory tree, or sends it to a remote
+collector.
+
+Sonar proper is GPL-3 but some side components that are crucial for the interaction with other tools
+that might not be GPL carry the MIT license.
 
 ![image of a fish swarm](img/sonar-small.png)
 
 Image: [Midjourney](https://midjourney.com/), [CC BY-NC 4.0](https://creativecommons.org/licenses/by-nc/4.0/legalcode)
 
-For more about the motivation, design, requirements, and other considerations, see [doc/DESIGN.md](doc/DESIGN.md).
+## Documentation
 
-## Subcommands
+Start by reading [the user manual](doc/MANUAL.md), which explains most things about what it can do
+and how you make it do it.
 
-Sonar has several subcommands that collect information about nodes, jobs, clusters, and processes
-and print it on stdout:
+For a deeper dive into how it works, try [the design document](doc/DESIGN.md).
 
-- `sonar ps` takes a snapshot of the currently running processes on the node and the node itself
-- `sonar sysinfo` extracts hardware information about the node
-- `sonar slurm` extracts information about overall job state from the slurm databases
-- `sonar cluster` extracts information about partitions and node state from the slurm databases
+To build it, or to modify it, try [the developer document](doc/HOWTO-DEVELOP.md).
 
-Those subcommands are all run-once: Sonar exits after producing output.
+A sample deployment of Sonar on a cluster and a data aggregator on a backend is outlined in
+[doc/HOWTO-DEPLOY.md](doc/HOWTO-DEPLOY.md).
 
-Additionally, `sonar daemon` starts Sonar and keeps it memory-resident, running subprograms at
-intervals specified by a configuration file.  In the daemon mode, exfiltration of data is to a
-remote Kafka broker or into a directory tree, also specified in the configuration file.
+## Collecting and analyzing the data
 
-Finally, `sonar help` prints some useful help and `sonar version` prints the version number.
-
-## Compilation and installation
-
-In principle you just do this:
-
-- Make sure you have [Rust installed](https://www.rust-lang.org/learn/get-started) (I install Rust through `rustup`)
-- Clone this project
-- If building with Kafka support (the default), you must have the OpenSSL development libraries installed,
-  [as noted here](https://docs.rs/rdkafka/0.37.0/rdkafka/#installation).
-  On Ubuntu, this is libssl-dev, on Fedora it is openssl-devel.
-- Build it: `cargo build --release`
-- The binary is then located at `target/release/sonar`
-- Copy it to wherever it needs to be
-
-In practice it is a little harder:
-
-- The binutils you have need to be new enough for the assembler to understand `--gdwarf5`
-  (for Kafka) and some other things (to link the GPU probe libraries)
-- Some of the tests in `util/` (if you are going to be running those) require `go`
-
-Some distros, notably RHEL8, have binutils that are too old, you can check by running e.g.
-`as --version`, the major version number is also the version number of binutils.  Binutils 2.32
-are new enough for the GPU probe libraries but may not be new enough for Kafka.  Binutils 2.40
-are known to work for both.  Also see comments in `gpuapi/Makefile`.
-
-## Output format options
-
-As of v0.17 there is only one output format, known as [the new format](doc/NEW-FORMAT.md), a JSON
-encoding.  Support for the older CSV format and an older JSON encoding have been removed.
-
-## Examples
-
-Some illustrative command lines.  For more detailed instructions on how to use it, see "How we run
-sonar on a cluster", below; notably Sonar has a daemon mode and does not have to be run by a cron
-job.  For a full description of the output formats and fields, see the previous section.
-
-### Collect processes with `sonar ps`
-
-It's sensible to run `sonar ps` every 5 minutes on every compute node if you care mostly about
-long-running jobs, or at higher frequency if sbrief jobs are of interest to you.
-
-```console
-$ sonar ps --exclude-system-jobs --min-cpu-time=10
-...
-```
-
-### Collect system information with `sonar sysinfo`
-
-The `sysinfo` subcommand collects information about the system and prints it on stdout.
-
-```console
-$ sonar sysinfo
-...
-```
-
-Typical usage for `sysinfo` is to run the command after reboot and (for hot-swappable systems and
-VMs) once every 24 hours, and to aggregate the information in some database.
-
-### Collecting job information with `sonar slurm`
-
-The `slurm` command runs `sacct` and `scontrol` and extracts job data.  This command exists partly
-to allow clusters to always push data, partly to collect the data for long-term storage, partly to
-offload the Slurm database manager during query processing.
-
-```console
-$ sonar slurm --deluge --json --cluster my.cluster
-...
-```
-
-The `--deluge` option extracts running and pending jobs as well as completed jobs.
-
-### Collecting partition and node information with `sonar cluster`
-
-The `cluster` command runs `sinfo` and extracts cluster (partition) information and node
-information.  This command exists partly to allow clusters to always push data, partly to collect
-the data for long-term storage.
-
-```console
-$ sonar cluster --cluster my.cluster
-...
-```
-
-## Collect and analyze results
-
-Sonar data are used by two other tools:
+Sonar's output data are rigorously specified and you can build your own data collectors,
+post-processors and analyses, but you can also use these existing tools (both under active development):
 
 * [JobAnalyzer](https://github.com/NAICNO/Jobanalyzer) allows Sonar logs to be queried and analyzed, and
   provides dashboards, interactive and batch queries, and reporting of system activity, policy violations,
-  hung jobs, and more.  It is under active development.
-* [JobGraph](https://github.com/NordicHPC/jobgraph) provides high-level plots of system activity. Mapping
-  files for JobGraph can be found in the [data](data) folder.  Its development has been dormant for some
-  time.
-
-## Versions and release procedures
-
-We use semantic versioning.  The major version is expected to remain at zero for the foreseeable
-future, reflecting the experimental nature of Sonar.
-
-At the time of writing we require:
-- 2021 edition of Rust
-- Rust 1.81.0 (can be found with `cargo msrv find`)
-
-For all other versioning information, see [doc/VERSIONING.md](doc/VERSIONING.md).
+  hung jobs, and more.
+* [Slurm-monitor](https://github.com/2maz/slurm-monitor) is complementary to JobAnalyzer and focuses
+  on managing and analyzing slurm queues and clusters, and has a benchmarking facility and other
+  tools for job placement.
 
 ## Authors
 
@@ -142,20 +47,15 @@ For all other versioning information, see [doc/VERSIONING.md](doc/VERSIONING.md)
 - Mathias Bockwoldt
 - [Lars T. Hansen](https://github.com/lars-t-hansen)
 - Henrik Rojas Nagel
-
-## How we run sonar on a cluster
-
-See [doc/HOWTO-DEPLOY.md](doc/HOWTO-DEPLOY.md).
+- [Thomas Roehr](https://github.com/2maz)
 
 ## Similar and related tools
 
-Sonar's original vision was as a very simple, lightweight tool that did some basic things fairly
+Sonar's original vision was to be a very simple, lightweight tool that did some basic things fairly
 cheaply and produced easy-to-process output for subsequent scripting.  Sonar is no longer that: with
 GPU integration, SLURM integration, Kafka exfiltration, memory-resident modes, structured output,
-continual focus on performance and elaborate backends in
-[Jobanalyzer](https://github.com/NAICNO/Jobanalyzer) and
-[Slurm-monitor](https://github.com/2maz/slurm-monitor), it is becoming as complex as the tools it
-was intended to replace or compete with.
+continual focus on performance and several elaborate backends, it is becoming as complex as the
+tools it was intended to replace or compete with.
 
 Here are some of those tools:
 

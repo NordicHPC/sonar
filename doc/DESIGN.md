@@ -1,152 +1,386 @@
-# Design, security, etc
+# Sonar requirements and high-level design issues
 
-## Current (2025Q4) high-level requirements
+This document discusses high-level requirements and some of the high-level design and implementation
+decisions that are implied by those requirements.  The structure of the source code tree and lower
+level implementation matters are discussed in [HOWTO-DEVELOP.md](HOWTO-DEVELOP.md), otherwise UTSL.
 
-These are sometimes post-hoc but they are the requirements guiding the work right now:
+Sonar has evolved quite a lot [over the years](HISTORICAL.md) but mostly stabilized by v0.15 (2025Q3)
+after the output format was redesigned, Kafka data exfiltration was added, and additional data
+collection was implemented to support a sibling project. The following are the requirements guiding
+the work as of 2026Q1.
+
+
+## Purpose and overall primary requirement
+
+The primary requirement is that Sonar should collect data from the nodes of an HPC system, and from
+the system itself, with the purpose of allowing the data to be analyzed so as to expose information
+about users and jobs on the system that might cause system underutilization.
+
+Underutilization can be caused by jobs not using allocated resources, misbalancing processes and
+ranks, overutilizing available resources (thrashing), and similar issues, but also by choosing the
+wrong system, queue, or accelerator for the job.  The list is not exhaustive.
+
+Sonar differs from tools like Seff in two ways: first, in that it collects a continous profile of
+the individual processes of user jobs in addition to overall job data, and allows detailed job
+behavior to be examined post-hoc.  Second, Sonar is itself not the analysis tool, only the data
+collector.  Analysis falls to companion tools (see later for examples).
+
+Sonar's intended users are partly second-line support staff, partly sysadmins, and partly the users
+themselves, who can be exposed to (processed) Sonar data in various ways, not germane here.
+
+
+## High-level requirements
+
+In the context of the primary requirement, the high-level requirements on the primary Sonar
+functions (data collection and exfiltration) are:
 
 - Good enough data to expose interesting behavior
-- Minimal overhead for recording
-- Minimal overhead for data exfiltration
 - Extensible and well-defined output format
-- Extensible, maintainable code and minimal system dependencies
-- Support for non-SLURM (indeed, non-batch-job) systems
-- Support for containers
-- Robust / fault-tolerant
+- Support for non-SLURM and non-batch-job systems
+- Support for containers, including Docker
+- Support for local data aggregation
 - Secure and not dependent on running as root
 - Standard setup (eg as a systemd service)
+- Reuse existing infrastructure when possible
+- Convenient and easy to use
 
-These are mostly met as follows:
+There are additionally some high-level requirements on the implementation:
 
-**Good enough data to expose interesting behavior:** This requirement is a little tricky since it is
-defined by the consumer, primarily [Jobanalyzer](https://github.com/NAICNO/Jobanalyzer) and its
-sibling project [Slurm-monitor](https://github.com/2maz/slurm-monitor), and their use cases, which
-are themselves evolving.  Over time, Sonar has evolved from simple per-process-per-node sampling to
-incorporate much more per-process data, per-node hardware and OS samples, node configuration data,
-and companion cluster and jobs data from SLURM.  For example, in response to requests from users we
-added per-CPU sampling to expose incorrect use of hyperthreading, and we added per-process thread
-counts and per-node load averages which together with node configuration data and job allocation
-data serve to expose imbalances in the node and jobs - a typical case is that a node is overloaded
-with too many runnable threads or, equivalently, that a job is underprovisioned on compute.  More
-data points will be added as they are needed by concrete use cases.
-
-Another aspect of the data is their groundedness - they must be reliable as a view of the system
-being monitored.  Data from one job must be properly separated from data from another job.  (This is
-surprisingly involved on systems without a batch job system and no local Sonar state.)  The data
-must furthermore be relevant and true and have well understood semantics.
-
-**Minimal overhead for recording:** We go directly to /proc and /sys for most data, we load the
-GPUs' SMI libraries for access to GPU data, and we avoid running external programs for process
-sampling (which is the only performance-sensitive operation).
-
-**Minimal overhead for data exfiltration:** The expected setup is to exfiltrate via Kafka over a
-secure channel.  Kafka communications can be batched and held, and the channel can remain open
-between the node and the broker between communications.  If the broker is on-cluster the channel
-does not need to be encrypted (probably).  Our JSON data are large but are compressed in transit at
-the moment.  Should we need higher efficiency we could move to protobuf for transmission.
-
-**Extensible and well-defined output format:** The JSON data structure is formally defined in terms
-of a Go data structure with json annotations for field names and doc comments for documentation.
-This spec is machine-processable and we use it to generate corresponding data in several other
-formats.
-
-**Extensible, maintainable code and minimal system dependencies:** The code is written in portable,
-idiomatic Rust with the Linux dependencies and GPU dependencies isolated in subsystems.  A cursory
-study has indicated that the system is readily ported to, say, FreeBSD, and we now support four
-different GPUs on two different CPU architectures.
-
-**Support for non-SLURM and non-batch-job systems:** Mostly this means that a "job" concept has to
-be layered on the underlying samples (this is easy), and that data analysis must be possible without
-relying on batch system metadata.
-
-**Support for containers:** A job that runs inside a container (often a non-batch-system job in that
-case, or a container that's being run by the batch system) must be visible to Sonar and Sonar,
-running outside the container, must be able to collect meaningful data about the job.
-
-**Robust and fault-tolerant:** Sonar must have well-understood error behavior; errors that are not
-in communication itself must be detectable on the consumer side; and communication errors must be
-detectable on the node.
-
-**Secure and generally not dependent on running as root:** We don't want to have to trust Sonar and
-it needs to be possible for Sonar to collect most meaningful data without root access, running as a
-normal user.
-
-**Standard setup:** It must be possible to set up Sonar in a way that fits in well with the system
-it is running on, ie, it needs to be possible to manage it as one-shot runs via cron, as a daemon
-via systemd, and similar.
-
-## Intermediate (ca 2023/2024) design goals and design decisions
-
-Relative to the "early" goals (below), the needs of
-[Jobanalyzer](https://github.com/NAICNO/Jobanalyzer) and some bug fixes led to some feature creep
-(more data were reported), a bit of redesign (Sonar would go directly to `/proc`, do not run `ps`),
-and some quirky semantics (`cpu%` is only a good number for the first data point but is still always
-reported, and `cputime/sec` is reported to complement it; and there's a distinction between virtual
-and real memory that is possibly more useful on GPU-full and interactive systems than on HPC
-CPU-only compute nodes).
-
-Other than that, the Intermediate goals were a mix of early goals and the current requirements,
-above.
-
-## Early design goals and design decisions
-
-- Easy installation
 - Minimal overhead for recording
-- Can be used as health check tool
-- Does not need root permissions
+- Minimal overhead for data exfiltration
+- Robust / fault-tolerant
+- Extensible, maintainable code and minimal system dependencies
+- Testable
+- Aware of supply chain security issues
 
-**Use `ps` instead of `top`**:
-We started using `top` but it turned out that `top` is dependent on locale, so
-it displays floats with comma instead of decimal point in many non-English
-locales. `ps` always uses decimal points. In addition, `ps` is (arguably) more
-versatile/configurable and does not print the header that `top` prints. All
-these properties make the `ps` output easier to parse than the `top` output.
-
-**Do not interact with the Slurm database at all**:
-The initial version correlated information we gathered from `ps` (what is
-actually running) with information from Slurm (what was requested). This was
-useful and nice to have but became complicated to maintain since Slurm could
-become unresponsive and then processes were piling up.
-
-**Why not also recording the `pid`**?:
-Because we sum over processes of the same name that may be running over many
-cores to have less output so that we can keep logs in plain text
-([csv](https://en.wikipedia.org/wiki/Comma-separated_values)) and don't have to
-maintain a database or such.
+The following sections discuss these requirements in terms of what they mean, how they are met by
+the existing implementation, and occasionally how and why they have evolved.
 
 
-## Security and robustness
+### Good enough data to expose interesting behavior
 
-The tool does **not** need root permissions.  It does not modify anything and writes output to
-stdout (and errors to stderr).
+"Good enough data" means the right data, correct data, and unambiguous data.
 
-No external commands are called by `sonar ps` or `sonar sysinfo`: Sonar reads `/proc` and probes the
-GPUs via their manufacturers' SMI libraries to collect all data.
+The data must be "the right data", but what comprises the right data is tricky since it is defined
+by the consumer and their use cases.  Currently the primary consumers are
+[Jobanalyzer](https://github.com/NAICNO/Jobanalyzer) and its sibling project
+[Slurm-monitor](https://github.com/2maz/slurm-monitor), and these are themselves evolving.
 
-The Slurm `sacct` command is currently run by `sonar slurm` and `sinfo` is run by `sonar cluster`.
-A timeout mechanism is in place to prevent these commands from hanging indefinitely.
+Over time, Sonar has evolved from simple per-process-per-node sampling to incorporate much more
+per-process data, per-node hardware and OS samples, node configuration data, and companion cluster
+and jobs data from SLURM, all in an effort to get "the right data".
 
-Optionally, `sonar` will use a lockfile to avoid a pile-up of processes.
+For example, in response to requests from users we added per-CPU sampling to expose incorrect use of
+hyperthreading, and we added per-process thread counts and per-node load averages which together
+with node configuration data and job allocation data serve to expose imbalances in the node and
+jobs - a typical case is that a node is overloaded with too many runnable threads or, equivalently,
+that a job is underprovisioned on compute.
+
+There are many other examples of data collection being added to aid specific analyses.  As the data
+format is extensible (see next), more data points can be added fairly easily.
+
+The data must be "the correct data", that is, must provide a reliable view of the system being
+monitored.  Data from one job must be properly separated from data from another job, and data from
+multiple strands of the same job (ranks, subcommands) must be relatable to the job.  (This is
+surprisingly involved on systems without a batch job system and no local Sonar state, although as
+Sonar has moved to a daemon model it is becoming easier.)
+
+Finally, the data must be "unambiguous data", with well understood semantics.  This is harder than
+it might seem since frequently the data from the Linux kernel, from the GPU cards, and from I/O
+devices are underspecified and themselves ambiguous.  We try to fix this problem by being very
+explicit in the data definition about the data semantics and grounding the semantics in kernel
+source, kernel and device documentation, and the source of existing libraries such as `psutil`.
 
 
-## Dependencies and updates
+### Extensible and well-defined output format
 
-(This section is obsolete.  We gave up on supply chain security around v0.14 as the introduction of
-the Kafka library required the introduction of a large number of crates we cannot trust.  Users who
-don't need Kafka can remove it and likely will see the number of dependencies drop significantly.
-Alas, leaning into this, we have since added more dependencies for multi-threading channels and
-base64 encoding, which may themselves add dependencies.)
+We use JSON for all data at the moment.  JSON is easily processable in almost any programming
+language and in addition by `jq` at the command line, facilitating easy testing.
 
-Sonar runs everywhere and all the time, and even though it currently runs without privileges it
-strives to have as few dependencies as possible, so as not to become a target through a supply chain
-attack.  There are some rules:
+(Earlier iterations of Sonar produced CSV but the non-hierarchical nature of CSV led to redundancy,
+workarounds for nesting fields within others, questionable extensibility, and larger data overall.)
 
-- It's OK to depend on libc and to incorporate new versions of libc
-- It's better to depend on something from the rust-lang organization than on something else
-- Every dependency needs to be justified
-- Every dependency must have a compatible license
-- Every dependency needs to be vetted as to active development, apparent quality, test cases
-- Every dependency update - even for security issues - is to be considered a code change that needs review
-- Remember that indirect dependencies are dependencies for us, too, and need to be treated the same way
-- If in doubt: copy the parts we need, vet them thoroughly, and maintain them separately
+The JSON data layout is formally defined in terms of a Go data structure with JSON annotations for
+field names and normative doc comments for documentation.  The spec is machine-processable and we
+use it to generate corresponding data in several other formats, as well as [user-facing
+documentation](NEW-FORMAT.md).
 
-There is a useful discussion of these matters [here](https://research.swtch.com/deps).
+The JSON data layout was guided by [the json:api specification](https://jsonapi.org) and has proven
+to be resilient in the face of many additions.
+
+**Implementation:**
+
+The JSON, while smaller than the CSV, is not exactly compact, however, and parsing text can be
+relatively costly.  The hierarchical tree nature of JSON is easily translated to faster and more
+compact formats such as protobuf or fastbuf, should we need to do that in the future.  At the
+moment, data volumes are not such that that is necessary.
+
+
+### Support for non-SLURM and non-batch-job systems
+
+While many HPC systems run Slurm (or something like it), not all do.  At UiO we have a clutch of
+"light HPC" many-core and GPU-enabled systems where users can just run jobs; there are also VM nodes
+(as managed by the NAIC Orchestrator) where there is no batch system but it is interesting to
+collect Sonar data for analysis.  Sonar must thus not be dependent on a batch system but must handle
+the idea of a "job" in a non-batch setting.
+
+**Implementation:**
+
+Linux already has an idea of a "job" - it is a process group.  A little more challenging is that we
+will have no idea about what the job *should* have done, as there is no job script with resource
+requests or similar.  This is not a problem for Sonar, but it does impose a requirement that Sonar
+record the process group and that it not require the availability of eg a Slurm Job ID in the cgroup
+data for a process.
+
+
+### Support for containers, including Docker
+
+It's becoming normal for HPC jobs to run in containers, notably Singularity.  On non-batch and
+unshared nodes, such as in VMs managed by NAIC Orchestrator, it is also common to run workloads in
+Docker.  Sonar needs to be able to collect data about jobs running in these containers while itself
+running outside the container.
+
+**Implementation:**
+
+For Singularity this appears to be a non-issue, its processes are visible as normal user processes.
+For Docker it depends: Docker processes will run as root when started with `docker run`, and it may
+be hard to connect them to a particular "job" or user (and additionally, Sonar would normally be
+configured to ignore processes owned by root to cut down the data volume; including root jobs has an
+efficiency impact).  If multiple users run Docker processes at the same time they are easily
+confused.  We could consider some way for `sonar jobs` to collect Docker information, maybe, if we
+find some way to reveal more information, but at first blush even `docker stats` does not really
+reveal what's running.
+
+
+### Support for local data aggregation
+
+Especially for cloud installations such as VMs managed by NAIC Orchestrator it is desirable to avoid
+any centralized data aggregation, as that might not easily scale and would be hard to manage, but
+instead to allow data on the node to be aggregated on the node in a format that is easily
+transportable and extractable before the node is torn down.
+
+**Implementation:**
+
+Sonar can be told to aggregate the data in a standard format in a directory tree, which can be
+zipped up and copied.
+
+
+### Secure and not dependent on running as root
+
+We don't want to have to trust Sonar or the code that went into it (see later about supply chain
+security), so it needs to be possible for Sonar to collect all meaningful data without root or other
+privileged access, that is, running as a normal user.
+
+Also, any network communication of the collected data must be secure (encrypted) since the data are
+a little bit sensitive.
+
+It must not be possible for a node not on the cluster to submit data for the cluster.
+
+Any subprocesses of Sonar should be time-limited, should be used sparingly, should not need to be
+privileged, and should (within reason) be possible to disable.
+
+If special group membership is needed to access the GPUs (eg if a card is owned by `video`) then it
+is acceptable to require Sonar to be in this group.
+
+**Implementation:**
+
+User-determined commands may be run by `sonar sysinfo` to extract node toplogy information.
+Normally these commands are not set and the functionality is inert.
+
+The Slurm `sacct` and `scontrol` commands are currently run by `sonar jobs`, and `sinfo` is run by
+`sonar cluster`.  These can be set to other values than the default and can be disabled by setting
+them to empty string values.
+
+A timeout mechanism is in place to prevent the preceding subprocesses from hanging indefinitely.
+
+Sonar currently uses `curl` to exfiltrate data to the Kafka HTTP proxy, if that is in use.
+
+With regard to data provenance, each cluster has a dedicated upload password that must remain secret
+that all the nodes use to submit data.  The Kafka broker must be set up to check this password for
+the cluster name / Kafka topic.  This is considered a "good enough" solution, it adds a layer of
+security but not so much management overhead that managing the cluster becomes a hardship.
+
+Finally, a TLS certificate must be installed for encrypted communication with the Kafka broker.  If
+the Kafka HTTP proxy is used then the most sensible setup will use an HTTPS upload point (and the
+proxy will engage in the encrypted, password-checked communication with the broker).
+
+
+### Standard setup
+
+It must be possible to set up Sonar in a way that fits in well with the system it is running on, ie,
+it needs to be possible to manage it both as a daemon via systemd, or as one-shot runs managed by
+cron, if that is desirable.
+
+**Implementation:**
+
+Initially Sonar was one-shot only, with only one kind of data being collected and printed on stdout.
+That one-shot mode persists because it is very useful for testing and experimentation, but for
+production the daemon mode with exfiltration to Kafka or some directory tree (see above under local
+aggregation) is the way to go.
+
+
+### Reuse existing infrastructure when possible
+
+Sonar should rely on existing technologies and not invent its own.
+
+**Implementation:**
+
+To this end, Sonar uses Kafka with TLS or plain HTTPS to a Kafka HTTP proxy for data exfiltration.
+Kafka is a sensible choice here as it is a reliable store-and-forward technology.  Earlier versions
+of Sonar used a custom HTTPS POST protocol to a custom back-end.
+
+That said, Sonar has its own Kafka HTTP proxy (we found none that suited our needs when those arose)
+and Sonar is doing all its own information collection, not relying on libraries such as `psutil` for
+example.
+
+
+### Convenient and easy to use
+
+It needs to be possible to use Sonar in various settings: exploration, production, and testing.  And
+it needs to be possible to manage Sonar installation at a site without having to recompile it everywhere.
+
+**Implementation:**
+
+In its one-shot mode, Sonar allows one to experiment with parameters and settings and to figure out
+how best to process the output.  There is command-line help (`sonar help`) to aid this exploration.
+This is also a good mode for tests, which can process the output with `jq`.
+
+In contrast, the daemon mode is best for production even if it, too, has test features (debug
+settings in the config file and some environment variables that are honored in debug builds).
+
+Sonar can be compiled with support for all GPUs enabled, and will probe for GPUs at run-time.  Or it
+can be compiled with support only for GPUs available at the site.
+
+
+### Minimal overhead for recording
+
+Sonar must avoid running helper programs except in cases where they are expected to be run rarely
+and the output can be controlled tightly.
+
+For frequent operations Sonar must go directly to system databases (/proc, /sys, and system calls)
+for system data, and must use the GPUs' SMI libraries directly for access to GPU data.
+
+The background for those requirements is that early versions of Sonar would run `ps` and parse the
+output, an expensive operation.  Sonar would also run the GPUs' SMI programs and parse the output of
+those, which was not only expensive but limiting (the SMI programs did not expose everything we
+wanted) and fraught with compatibility issues (the output of the SMI programs was not stable).  The
+combined pain from the cost of running subprograms that produced text and the cost and headaches of
+parsing that output was too much to bear.
+
+**Implementation:**
+
+Sonar can be linked with zero or more GPU shims for various GPUs, and at runtime these shims will
+attempt to determine if the GPUs are installed and if so try to load the SMI shared objects.  A
+Sonar binary is GPU-aware, but not GPU-dependent.
+
+
+### Minimal overhead for data exfiltration
+
+Data exfiltration overhead can be incurred on the node, internally on the cluster's local network,
+and on the external net from the cluster to the data collector.
+
+Sonar should strive to minimize the overhead incurred on each of those components by allowing data
+to be communicated efficiently using at least a direct-to-aggregator path (necessarily somewhat
+expensive) and a indirect-via-intermediary path (can be cheaper if it offloads the node and the local
+network).
+
+At the same time, we want data delivery to be reliable so that there is minimal data loss, basically
+requiring TCP and precluding UDP.
+
+As touched upon in the requirement about reusing existing infrastructure, above, Sonar currently
+prefers to use exfiltration via the Apache Kafka protocol, a reliable store-and-forward system.
+This can be set up with a broker off-cluster with TLS data upload, typically incurring a fresh
+connection from each node per data item both on the local network and off-cluster, or it can be set
+up with a broker on-cluster, possibly without encryption, that then forwards all data to the
+off-cluster broker over a single, pretty much permanent connection.
+
+A reality on many HPC systems is that the nodes are behind an HTTP proxy, precluding the use of
+Kafka unless additional ports are opened (as Kafka uses TLS but not HTTPS) or a Kafka HTTP proxy is
+employed to receive the traffic and forward it.  Sonar can use either method; it includes such a
+proxy.
+
+**Implementation:**
+
+Kafka employs fast compression normally, but if the data turn out to be too large still, we can move
+from JSON to a protobuf or fastbuf data representation.
+
+Sonar currently uses `curl` to send data to the Kafka HTTP proxy over HTTP(S).  The `curl` process
+is spawned with retry/timeout parameters without Sonar waiting for it to complete.  Using `curl` is
+slightly more expensive than using a built-in solution.
+
+
+### Robust and fault-tolerant
+
+Robustness and fault tolerance have multiple aspects.
+
+Sonar itself should not crash and should not produce garbage results.  If Sonar itself is in an
+error state it should either communicate the error or log the error if communication is not working.
+
+When a node is in an error state, Sonar should produce an error report about the node that can be
+processed by the aggregator or back-end.
+
+Additionally, data should not be lost.  This means that if data cannot be sent, sending should be
+retried for some time.  And if data are sent, there should be a sensible chance that the receiver
+will not lose them.
+
+**Implementation:**
+
+The Sonar daemon tries hard not to exit unless told to (by a signal).  The data format has ample
+space for error reports at both the global and local level and Sonar will report errors through
+this channel.
+
+By default, data are held for a half hour before it is consider undeliverable (the limit can be set
+higher).  This is the case whether the data are sent by native Kafka or via `curl` to the Kafka HTTP
+proxy.
+
+The use of Kafka adds reliability, as Kafka is both store-and-forward and standard, industrial
+strength technology.  The Kafka broker will hold the data for a configurable time if it is not
+consumed.
+
+
+### Extensible, maintainable code and minimal system dependencies
+
+Sonar should be written in clean way in a portable, efficient language and in such a way that it can
+support at least a modest variety of Unix-like operating systems.
+
+**Implementation:**
+
+The code is written in portable Rust with the Linux dependencies and GPU dependencies isolated in
+subsystems.  A cursory study has indicated that the system is readily ported to, say, FreeBSD, and
+we now support four different GPUs on two different CPU architectures.
+
+Efficiency was studied at length in the past and was found to be more than acceptable, with low CPU
+and memory usage.  Sonar needs to build some data structures during sampling but they are quickly
+discarded and it uses little memory in its quiescent state.
+
+For the most part, Rust has been an OK choice; it is not a fabulous language for prototyping but
+fits the current, stable code well.
+
+While it might seem that the GPU shims, written in C, could have been avoided had Sonar not being
+written in Rust, this is not really so: the shims manage dynamic loading and data cleanup, and the
+code would have been present if perhaps not exactly in the same form.
+
+### Testable
+
+Sonar should have a good test suite and means of letting itself be tested in a variety of scenarios.
+
+**Implementation:**
+
+There's a decent suite of white-box tests using the Rust selftest framework as well as a suite of
+black-box tests that run Sonar in various modes (one-shot and daemon) using a variety of debug
+settings (in the daemon config file or as environment variables).  Parsers are tested with mock
+inputs and real inputs on nodes that can supply them.  GPU layers are tested on nodes with
+appropriate GPUs.
+
+
+### Aware of supply chain security issues
+
+Sonar should not take dependencies on external libraries without good reason, so as to reduce the
+impact of supply chain attacks on the library ecosystem."A little copying is better than a little
+dependency."
+
+It should be possible to disable features that are not needed at as particular site.
+
+**Discussion:**
+
+See [HOWTO-DEVELOP.md](HOWTO-DEVELOP.md#dependencies-and-supply-chain-security).
