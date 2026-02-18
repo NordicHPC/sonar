@@ -55,11 +55,9 @@ environment where the GPU headers are installed.  In `gpuapi/Makefile` there are
 how to do that, and in `gpuapi/` there are many shell scripts that are examples of how to do it in
 various environments.
 
-### RPM builds
+### RPM and DEB builds
 
-TODO.  To be written for #493.  Things will appear in ../build-dist.  I think I want the generic
-sonar-all.spec file there and also the shared assets that are currently in sonar-dist, they are
-neither secret nor NRIS-specific.
+See [build-dist/README.md](../build-dist/README.md).
 
 ### Regenerating what is generated
 
