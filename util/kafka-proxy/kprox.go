@@ -108,7 +108,9 @@ import (
 	"log/syslog"
 	"net/http"
 	"os"
+	"os/signal"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/lars-t-hansen/ini"
@@ -222,11 +224,50 @@ func main() {
 			log.Fatalf("Could not read CA cert file %s", kafkaCaFile)
 		}
 	}
-	ch := make(chan Msg, 100)
-	runKafkaSender(ch)
-	runHttpListener(ch)
-	report(true, "Kafka HTTP proxy exit: %v", http.ListenAndServe(fmt.Sprintf(":%d", httpListenPort), nil))
-	close(ch)
+
+	msgs := make(chan Msg, 100)
+	runKafkaSender(msgs)
+	runHttpListener(msgs)
+
+	go startServer()
+	waitForSignal(syscall.SIGHUP, syscall.SIGTERM, syscall.SIGILL)
+	stopServer()
+
+	close(msgs)
+	// Really want to join with the KafkaSender here, if possible, but with a timeout?
+}
+
+var (
+	server http.Server
+	stop = make(chan bool)
+)
+
+func startServer() {
+	if err := server.ListenAndServe(fmt.Sprintf(":%d", httpListenPort), nil); err != nil {
+		if err != http.ErrServerClosed {
+			report(true, "Kafka HTTP Proxy failure: %s", err.Error())
+		} else {
+			report(false, "Kafka HTTP Proxy exited: %s", err.Error())
+		}
+	}
+	stop <- true
+}
+
+func stopServer() {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if err := server.Shutdown(ctx); err != nil {
+		report(false, "%s", err.Error())
+	}
+	<-stop
+}
+
+func waitForSignal(signals ...any) {
+	stopSignal := make(chan os.Signal, 1)
+	for _, x := range signals {
+		signal.Notify(stopSignal, x.(syscall.Signal))
+	}
+	<-stopSignal
 }
 
 func report(emergency bool, format string, args ...any) {
