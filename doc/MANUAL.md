@@ -269,35 +269,7 @@ cadence = 4h
 
 ### Systemd operation
 
-A typical installation has a user `sonar` in a group `sonar` and installs the Sonar files in
-`/usr/local/lib/sonar`.  In that location is the Sonar binary, the Sonar config file, an maybe a
-subdirectory called `secrets` with the password file and the TLS server certificate for
-communicating with the broker.  In addition, there is a systemd service file, which might look like
-this:
-
-```
-[Unit]
-Description=Sonar continuous profiling service
-Documentation=https://github.com/NordicHPC/sonar
-After=local-fs.target remote-fs.target network.target
-
-[Service]
-User=sonar
-Group=sonar
-ExecStart=/usr/local/lib/sonar/sonar daemon /usr/local/lib/sonar/sonar.cfg
-Restart=on-failure
-
-[Install]
-WantedBy=multi-user.target
-```
-
-If SELinux is enabled then the files *must* be in `/usr/local/lib` and the User and Group directives
-in the service file won't be honored.  Instead, use this workaround:
-
-```
-ExecStart=/usr/sbin/runuser -u sonar -- \
-    /usr/local/lib/sonar/sonar daemon /usr/local/lib/sonar/sonar.cfg
-```
+See [HOWTO-DEPLOY.md](HOWTO-DEPLOY.md#sonar-running-under-systemd).
 
 ## Data
 
@@ -389,6 +361,11 @@ NVIDIA, AMD, Intel XPU and Intel Habana).  The executable appears as `target/rel
 
 See [HOWTO-DEVELOP.md](HOWTO-DEVELOP.md#compilation) for all instructions.
 
-### Building RPMs
+### Building RPMs or DEBs
 
-See [HOWTO-DEVELOP.md](HOWTO-DEVELOP.md#rpm-builds) for RPM-specific instructions.
+See [HOWTO-DEVELOP.md](HOWTO-DEVELOP.md#rpm-builds) for packaging instructions.
+
+
+## Deploying Sonar
+
+See [HOWTO-DEPLOY.md](HOWTO-DEPLOY.md) for deployment instructions.
