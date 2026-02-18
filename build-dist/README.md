@@ -1,15 +1,16 @@
-# Build Sonar RPMs
+# Build Sonar RPMs and DEBs
 
 The configuration assets for Sonar are not bundled in the RPM, so there will typically be one RPM
 that can be used on all nodes of a particular hardware and OS configuration.
 
-The .spec files here build from source.  You normally need to build on the cluster that will take
-the RPM, or on a machine with a compatible OS, to get library versions right.
+The RPM .spec files here build from source.  You normally need to build on the cluster that will
+take the RPM, or on a machine with a compatible OS, to get library versions right.
 
 The build scripts in the .spec files will typically need to be customized for your system, minimally
 to specify how to initialize dependencies (Rust, C, Binutils, GPU headers).  There are instructions
 in the .spec files.
 
+For now, the DEBs are built from already-built RPMs.
 
 ## RPM cookbook on a Fedora workstation
 
@@ -39,7 +40,7 @@ with that.  While the -allgpu RPM will be able to probe NVIDIA, AMD, Habana and 
 GPU will only be able to probe NVIDIA GPUs.
 
 
-## Older systems
+## RPMs on some older systems
 
 RPM builds on older systems may need to tweak the RPM specs a little since the tools do not always
 do everything they need to do for RPM builds to work.  For example, for RHEL9, the `%autorelease`
@@ -60,3 +61,11 @@ cargo build --no-default-features --features=daemon,kafka,nvidia --profile=relea
 
 For those with access to the NRIS gitlab, look in `larstha/sonar-deploy/sonar/saga.sigma2.no` for
 the .spec for an RHEL9 system.
+
+## Debian packages
+
+Build an RPM in the normal manner and convert it to a .deb.  Install `alien` and then:
+
+```
+$ fakeroot alien --to-deb sonar-0.99.5-1.fc43.x86_64.rpm
+```
