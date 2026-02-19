@@ -22,7 +22,8 @@ systems* because they sometimes test system-specific aspects.  Assuming that the
 no GPUs and no Slurm available and will test the no-GPU and non-Slurm paths of the code, we
 additionally need to run on these types of nodes:
 
-- a node with an NVIDIA GPU (UiO ml[1-3,5-9].hpc nodes, or Fox, Saga, or Betzy GPU nodes)
+- a node with an NVIDIA GPU and amd64 (UiO ml[1-3,5-9].hpc nodes, or Fox, Saga, or Betzy GPU nodes)
+- a node with an NVIDIA GPU and aarch64 (Simula n009)
 - a node with an AMD GPU (UiO ml4.hpc node, or Lumi, or any of many Simula nodes)
 - a node with an XPU GPU (Simula n022)
 - a node with a Habana GPU (Simula h001)
