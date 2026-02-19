@@ -119,4 +119,3 @@ To add the user with a home directory matching the default install location:
 ```
 sudo useradd -r -g sonar -M -d /usr/local/lib/sonar -s /sbin/nologin -c "Sonar profiling daemon" sonar
 ```
-

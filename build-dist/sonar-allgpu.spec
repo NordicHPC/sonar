@@ -7,7 +7,6 @@
 # Before building:
 #
 # - place a copy of this file in rpmbuild/SPECS as sonar-<version>-all.spec
-# - update the Sonar <version> numbers n.m.k in the copy (two places)
 # - wget the appropriate source into rpmbuild/SOURCES
 # - modify the build commands below if necessary to set up tools and libraries
 
