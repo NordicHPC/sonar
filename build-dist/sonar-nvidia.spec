@@ -23,15 +23,15 @@ Source0:        https://github.com/NordicHPC/sonar/archive/refs/tags/v0.0.1.tar.
 %description
 Sonar is an unprivileged continuous profiling daemon that collects data about jobs, processes,
 cores, accelerators, and disks.  It stores the data locally or exfiltrates them to a remote
-data collector.
+data collector, under control of a configuration file.
 
 %prep
 %setup -q
 
 %build
 
-# See ../doc/HOWTO-DEVELOP.md regarding build requirements.  Note that we are rebuilding the GPU
-# shim here so CUDA headers must be present.
+# See ../doc/HOWTO-DEVELOP.md regarding build requirements.
+# Note that we are rebuilding the GPU shim here so CUDA headers must be present.
 
 # The 'rm' on gpuapi/ARCH and the song and dance with gpushim-rpm are there to ensure that we do not
 # accidentally link with pre-existing assets that are currently in the Sonar source repo.  The
@@ -52,18 +52,17 @@ cd ..
 SONAR_CUSTOM_GPUAPI=$SHIMDIR \
 cargo build --no-default-features --features=daemon,kafka,nvidia --profile=release-with-debug
 
+# Assets go into /usr/local/lib/sonar because that makes SELinux happy when running with systemd.
 %install
-mkdir -p %{buildroot}/usr/local/lib/sonar
-
-# Binary
-cp %{_builddir}/sonar-%{version}/target/release-with-debug/sonar %{buildroot}/usr/local/lib/sonar
-cp %{_sourcedir}/sonar-%{version}-assets/* %{buildroot}/usr/local/lib/sonar
+install -p -D -m 0755 \
+        -t %{buildroot}/usr/local/lib/sonar \
+        %{_builddir}/sonar-%{version}/target/release-with-debug/sonar
+install -p -D -m 0644 \
+        -t %{buildroot}/usr/local/lib/sonar \
+        %{_sourcedir}/sonar-%{version}-assets/*
 
 %files
-/usr/local/lib/sonar/sonar
-/usr/local/lib/sonar/sonar.service
-/usr/local/lib/sonar/sonar.cfg
-/usr/local/lib/sonar/README
+/usr/local/lib/sonar
 
 %changelog
 * Fri Feb 06 2026 Lars T Hansen <larstha@uio.no>

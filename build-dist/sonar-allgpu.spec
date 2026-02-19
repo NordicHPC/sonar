@@ -1,6 +1,6 @@
 # RPM build spec for Sonar for a generic, modern Linux node (with support for all accelerators,
-# using the prebuilt GPU shim libraries).  Note that various Linux distros may need tweaks to the
-# build setup.  See README.md.
+# using the prebuilt GPU shim libraries).
+# Note that various Linux distros may need tweaks to the build setup.  See README.md.
 #
 # See ../doc/HOWTO-DEVELOP.md regarding build requirements.
 #
@@ -9,7 +9,7 @@
 # - place a copy of this file in rpmbuild/SPECS as sonar-<version>-all.spec
 # - update the Sonar <version> numbers n.m.k in the copy (two places)
 # - wget the appropriate source into rpmbuild/SOURCES
-# - modify the build commands below if necessary to set up tools
+# - modify the build commands below if necessary to set up tools and libraries
 # - copy rpm-assets/* into rpmbuild/SOURCES/sonar-<version>-assets
 
 Name:           sonar
@@ -24,7 +24,7 @@ Source0:        https://github.com/NordicHPC/sonar/archive/refs/tags/v0.0.1.tar.
 %description
 Sonar is an unprivileged continuous profiling daemon that collects data about jobs, processes,
 cores, accelerators, and disks.  It stores the data locally or exfiltrates them to a remote
-data collector.
+data collector, under control of a configuration file.
 
 %prep
 %setup -q
@@ -37,28 +37,16 @@ data collector.
 cargo build --profile=release-with-debug
 
 # Assets go into /usr/local/lib/sonar because that makes SELinux happy when running with systemd.
-# Sonar always runs as sonar/sonar and gets a home dir in /var/log, so that data can go in there if
-# the config wants.
-
-%pre
-getent group sonar >/dev/null || groupadd -r sonar
-getent passwd sonar >/dev/null || useradd -r -g sonar -d /var/log/sonar -s /sbin/nologin -c "Sonar profiling daemon" sonar
-
 %install
-mkdir -p %{buildroot}/usr/local/lib/sonar
-mkdir -p %{buildroot}/usr/local/lib/sonar/secrets
-
-# Binary
-cp %{_builddir}/sonar-%{version}/target/release-with-debug/sonar %{buildroot}/usr/local/lib/sonar
-cp %{_sourcedir}/sonar-%{version}-assets/* %{buildroot}/usr/local/lib/sonar
+install -p -D -m 0755 \
+        -t %{buildroot}/usr/local/lib/sonar \
+        %{_builddir}/sonar-%{version}/target/release-with-debug/sonar
+install -p -D -m 0644 \
+        -t %{buildroot}/usr/local/lib/sonar \
+        %{_sourcedir}/sonar-%{version}-assets/*
 
 %files
-%dir %attr(755, sonar, sonar) /usr/local/lib/sonar
-%attr(755, sonar, sonar) /usr/local/lib/sonar/sonar
-%attr(644, sonar, sonar) /usr/local/lib/sonar/sonar.service
-%attr(644, sonar, sonar) /usr/local/lib/sonar/sonar.cfg
-%attr(644, sonar, sonar) /usr/local/lib/sonar/README
-%dir %attr(700, sonar, sonar) /usr/local/lib/sonar/secrets
+/usr/local/lib/sonar
 
 %changelog
 * Fri Feb 06 2026 Lars T Hansen <larstha@uio.no>
