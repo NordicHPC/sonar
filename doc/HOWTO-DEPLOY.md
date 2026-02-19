@@ -60,6 +60,22 @@ ExecStart=/usr/sbin/runuser -u sonar -- \
     /usr/local/lib/sonar/sonar daemon /usr/local/lib/sonar/sonar.cfg
 ```
 
+### Secrets
+
+A typical install will have a subdirectory `/usr/local/lib/sonar/secrets` owned by `sonar/sonar` and
+*with restrictive permissions*.  In that directory are typically the upload password file (see
+[MANUAL.md](MANUAL.md#shared-kafka-setings)) and optionally the certificate for communicating with
+the broker.  These are not created by the default RPM installation but have to be managed manually.
+
+Thus the Sonar configuration ends up looking like this, for example:
+
+```
+[kafka]
+broker-address = my-aggregator.uio.no:1234
+ca-file = /usr/local/lib/sonar/secrets/my-aggregator-ca.crt
+sasl-password-file = /usr/local/lib/sonar/secrets/my-aggregator-upload-password.txt
+```
+
 ## Back-end
 
 The specific back-ends have their own instructions for how they are set up but there are
