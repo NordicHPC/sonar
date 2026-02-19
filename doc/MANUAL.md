@@ -105,7 +105,7 @@ Example:
 ```
 [kafka]
 broker-address = my-aggregator.uio.no:1234
-ca-file = /var/lib/sonar/secrets/my-aggregator-ca.crt
+ca-file = /usr/local/lib/sonar/secrets/my-aggregator-ca.crt
 ```
 
 ##### HTTP proxy connection
@@ -143,7 +143,7 @@ Example:
 [kafka]
 sending-window = 4m
 timeout = 1h
-sasl-password-file = /var/lib/sonar/secrets/my-aggregator-upload-password.txt
+sasl-password-file = /usr/local/lib/sonar/secrets/my-aggregator-upload-password.txt
 ```
 
 #### Output to directory tree

@@ -33,7 +33,19 @@ communicating with the broker.  In addition, there is a systemd service file.  T
 by default for RPM builds is in
 [build-dist/rpm-assets/sonar.service](../build-dist/rpm-assets/sonar.service).
 
-Of notable interest in the `[Service]` section of that file is this:
+NOTE!  By default, the service file requires user/group `sonar/sonar`, which must exist before
+starting the service.  See below.
+
+### SELinux
+
+If SELinux is enabled then, as I understand it, the files *must* be in `/usr/local/lib` (on recent
+systems).
+
+Another SELinux matter is the User and Group settings for the service.  Under some configurations,
+at least (RHEL8 but not FC43), the User and Group directives in the service file won't be honored
+and a workaround may be needed.
+
+Modify the `[Service]` section of the service file from this:
 
 ```
 User=sonar
@@ -41,12 +53,27 @@ Group=sonar
 ExecStart=/usr/local/lib/sonar/sonar daemon /usr/local/lib/sonar/sonar.cfg
 ```
 
-If SELinux is enabled then the files *must* be in `/usr/local/lib` and the User and Group directives
-in the service file won't be honored.  Instead, use this workaround:
+to this, working around the problem:
 
 ```
 ExecStart=/usr/sbin/runuser -u sonar -- \
     /usr/local/lib/sonar/sonar daemon /usr/local/lib/sonar/sonar.cfg
+```
+
+### Secrets
+
+A typical install will have a subdirectory `/usr/local/lib/sonar/secrets` owned by `sonar/sonar` and
+*with restrictive permissions*.  In that directory are typically the upload password file (see
+[MANUAL.md](MANUAL.md#shared-kafka-setings)) and optionally the certificate for communicating with
+the broker.  These are not created by the default RPM installation but have to be managed manually.
+
+Thus the Sonar configuration ends up looking like this, for example:
+
+```
+[kafka]
+broker-address = my-aggregator.uio.no:1234
+ca-file = /usr/local/lib/sonar/secrets/my-aggregator-ca.crt
+sasl-password-file = /usr/local/lib/sonar/secrets/my-aggregator-upload-password.txt
 ```
 
 ## Back-end
@@ -78,3 +105,17 @@ broker address and TLS certificate, if necessary.
 There are current, adapted install artifacts for Sonar on NRIS systems in [a Sigma2 gitlab
 repo](https://gitlab.sigma2.no/larstha/sonar-deploy).  Currently this is available only to NRIS
 members.  Ideally it will be opened up eventually.
+
+## Users and groups
+
+To add the group:
+
+```
+sudo groupadd sonar
+```
+
+To add the user with a home directory matching the default install location:
+
+```
+sudo useradd -r -g sonar -M -d /usr/local/lib/sonar -s /sbin/nologin -c "Sonar profiling daemon" sonar
+```
