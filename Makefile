@@ -44,6 +44,7 @@ format:
 
 # (Re)generate all files that are generated
 generate:
+	( cd build-dist ; $(MAKE) generate )
 	( cd util ; $(MAKE) generate )
 	( cd tests ; $(MAKE) generate )
 
