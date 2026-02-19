@@ -27,7 +27,8 @@ To run some of the selftests, or to build the Kafka HTTP proxy, or to rebuild th
 from the formal specification of the output data, you will need a recent version of Go, we strive to
 require no more than the previous major release and two dot releases behind tip on that (see
 https://go.dev/doc/devel/release); older versions may work.  At the time of writing, the Kafka HTTP
-proxy requires Go 1.24 and other programs require Go 1.22.
+proxy requires Go 1.24 and other programs require Go 1.22.  Note that recent Go installs will
+usually download whatever version they need, should it not already be available.
 
 
 ## Compilation
