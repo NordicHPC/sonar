@@ -9,7 +9,6 @@
 # - update the Sonar <version> numbers n.m.k in the copy (two places)
 # - wget the appropriate source into rpmbuild/SOURCES
 # - modify the build commands below if necessary to set up tools and libraries
-# - copy rpm-assets/* into rpmbuild/SOURCES/sonar-<version>-assets
 
 Name:           sonar
 Version:        0.0.1
@@ -59,7 +58,7 @@ install -p -D -m 0755 \
         %{_builddir}/sonar-%{version}/target/release-with-debug/sonar
 install -p -D -m 0644 \
         -t %{buildroot}/usr/local/lib/sonar \
-        %{_sourcedir}/sonar-%{version}-assets/*
+        %{_builddir}/sonar-%{version}/build-dist/rpm-assets/*
 
 %files
 /usr/local/lib/sonar
