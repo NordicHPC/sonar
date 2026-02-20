@@ -46,6 +46,7 @@ pub struct GlobalIni {
     pub role: String,
     pub lockdir: Option<String>,
     pub topic_prefix: Option<String>,
+    pub hostname_only: bool,
 }
 
 #[cfg(feature = "kafka")]
@@ -233,6 +234,9 @@ pub fn daemon_mode(
 
     if let Some(ref p) = ini.cluster.domain {
         system = system.with_node_domain(p);
+    }
+    if ini.global.hostname_only {
+        system = system.with_hostname_only();
     }
 
     if let Some(ref p) = ini.programs.topo_svg_cmd {
@@ -706,6 +710,7 @@ fn parse_config(config_file: &str) -> Result<Ini, String> {
             role: "".to_string(),
             lockdir: None,
             topic_prefix: None,
+            hostname_only: false,
         },
         #[cfg(feature = "kafka")]
         kafka: KafkaIni {
@@ -867,6 +872,9 @@ fn parse_config(config_file: &str) -> Result<Ini, String> {
                 "topic-prefix" => {
                     ini.global.topic_prefix = Some(value);
                     have_prefix = true;
+                }
+                "hostname-only" => {
+                    ini.global.hostname_only = parse_bool(&value)?;
                 }
                 _ => return Err(format!("Invalid [global] setting name `{name}`")),
             },
@@ -1056,6 +1064,9 @@ fn parse_config(config_file: &str) -> Result<Ini, String> {
     }
     if ini.global.role == "" {
         return Err("Missing global.role setting".to_string());
+    }
+    if ini.global.hostname_only && ini.cluster.domain.is_some() {
+        return Err("Can't have both global.hostname-only and cluster.domain".to_string());
     }
 
     let mut sinks = 0;

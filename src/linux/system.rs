@@ -44,6 +44,7 @@ pub struct Builder {
     jm: Option<Box<dyn jobsapi::JobManager>>,
     cluster: String,
     node_domain: Option<Vec<String>>,
+    hostname_only: bool,
     sacct: String,
     scontrol: String,
     sinfo: String,
@@ -57,6 +58,7 @@ impl Builder {
             jm: None,
             cluster: "".to_string(),
             node_domain: None,
+            hostname_only: false,
             sacct: "sacct".to_string(),
             scontrol: "scontrol".to_string(),
             sinfo: "sinfo".to_string(),
@@ -69,6 +71,14 @@ impl Builder {
     pub fn with_node_domain(self, domain: &[String]) -> Builder {
         Builder {
             node_domain: Some(domain.to_vec()),
+            ..self
+        }
+    }
+
+    #[allow(dead_code)]
+    pub fn with_hostname_only(self) -> Builder {
+        Builder {
+            hostname_only: true,
             ..self
         }
     }
@@ -131,10 +141,22 @@ impl Builder {
     pub fn freeze(self) -> Result<System, String> {
         let fs = RealProcFS {};
         let boot_time = procfs::get_boot_time_in_secs_since_epoch(&fs)?;
-        let hostname = hostname::get();
+        let hostname = {
+            let hn = hostname::get();
+            if self.hostname_only {
+                if let Some((a, _)) = hn.split_once('.') {
+                    a.to_string()
+                } else {
+                    hn
+                }
+            } else {
+                hn
+            }
+        };
         Ok(System {
             hostname: hostname.clone(),
             node_domain: self.node_domain,
+            hostname_only: self.hostname_only,
             cluster: self.cluster,
             jm: if let Some(x) = self.jm {
                 x
@@ -218,6 +240,7 @@ const ARCHITECTURE: &'static str = "aarch64";
 pub struct System {
     hostname: String,
     node_domain: Option<Vec<String>>,
+    hostname_only: bool,
     cluster: String,
     fs: RealProcFS,
     gpus: realgpu::RealGpu,
@@ -260,6 +283,10 @@ impl systemapi::SystemAPI for System {
 
     fn get_node_domain(&self) -> &Option<Vec<String>> {
         &self.node_domain
+    }
+
+    fn get_hostname_only(&self) -> bool {
+        self.hostname_only
     }
 
     fn get_hostname(&self) -> String {
