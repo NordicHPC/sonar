@@ -36,7 +36,7 @@ ErrorObject:
       doc: >
         A sensible English-language error message describing the error
     cluster:
-      type: 'Hostname'
+      type: 'Clustername'
       doc: >
         Canonical cluster name for node generating the error
     node:
@@ -84,7 +84,7 @@ SysinfoAttributes:
       doc: >
         Time the current data were obtained
     cluster:
-      type: 'Hostname'
+      type: 'Clustername'
       doc: >
         The canonical cluster name
     node:
@@ -232,7 +232,7 @@ SampleAttributes:
       doc: >
         Time the current data were obtained
     cluster:
-      type: 'Hostname'
+      type: 'Clustername'
       doc: >
         The canonical cluster name whence the datum originated
     node:
@@ -502,7 +502,7 @@ JobsAttributes:
       doc: >
         Time the current data were obtained
     cluster:
-      type: 'Hostname'
+      type: 'Clustername'
       doc: >
         The canonical cluster name
     slurm_jobs:
@@ -568,7 +568,7 @@ SlurmJob:
       doc: >
         The name of the reservation.  sacct: `Reservation`  slurm: `JOB_INFO.resv_name`
     nodes:
-      type: '[]string'
+      type: '[]HostnameRange'
       doc: >
         The nodes allocated to the job or step.  sacct: `NodeList`  slurm: `JOB_INFO.nodes`
     priority:
@@ -700,7 +700,7 @@ ClusterAttributes:
       doc: >
         Time the current data were obtained
     cluster:
-      type: 'Hostname'
+      type: 'Clustername'
       doc: >
         The canonical cluster name
     slurm:
@@ -722,13 +722,13 @@ ClusterPartition:
       doc: >
         Partition name
     nodes:
-      type: '[]NodeRange'
+      type: '[]HostnameRange'
       doc: >
         Nodes in the partition
 ClusterNodes:
   fields:
     names:
-      type: '[]NodeRange'
+      type: '[]HostnameRange'
       doc: >
         Constraint: The array of names may not be empty
     states:

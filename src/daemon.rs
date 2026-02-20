@@ -998,6 +998,7 @@ fn parse_config(config_file: &str) -> Result<Ini, String> {
                     ini.cluster.cadence = Some(parse_duration("cluster.cadence", &value, false)?);
                 }
                 "domain" => {
+                    // FIXME: Bug #459 / #516: This setting should not be attached to cluster.
                     let mut xs = value
                         .split(".")
                         .map(|x| x.to_string())

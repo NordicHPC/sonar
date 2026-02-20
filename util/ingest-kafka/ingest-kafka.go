@@ -58,7 +58,7 @@ func main() {
 		kgo.ConsumeTopics(topicNames...),
 	)
 	if err != nil {
-		log.Fatalf("%s: Failed to create client", *cluster, err)
+		log.Fatalf("%s: Failed to create client: %v", *cluster, err)
 	}
 	defer cl.Close()
 	if *verbose {
@@ -88,11 +88,11 @@ func main() {
 			}
 			err := topics[record.Topic](record.Value)
 			if err != nil {
-				log.Printf("%s: SOFT ERROR: Topic handler failed", *cluster, record.Topic, err)
+				log.Printf("%s: SOFT ERROR: Topic handler for %s failed: %v", *cluster, record.Topic, err)
 			}
 		}
 		if err := cl.CommitUncommittedOffsets(ctx); err != nil {
-			log.Printf("%s: SOFT ERROR: Commit records failed", *cluster, err)
+			log.Printf("%s: SOFT ERROR: Commit records failed: %v", *cluster, err)
 		}
 	}
 }
@@ -104,7 +104,12 @@ func handleSample(data []byte) error {
 		return err
 	}
 	if info.Data != nil {
-		return appendToFile(newfmt.DataTagSample, info.Data.Attributes.Node, info.Data.Attributes.Time, data)
+		return appendToFile(
+			newfmt.DataTagSample,
+			newfmt.NonemptyString(info.Data.Attributes.Node),
+			info.Data.Attributes.Time,
+			data,
+		)
 	}
 	reportError(newfmt.DataTagSample, info.Errors)
 	return nil
@@ -117,7 +122,12 @@ func handleSysinfo(data []byte) error {
 		return err
 	}
 	if info.Data != nil {
-		return appendToFile(newfmt.DataTagSysinfo, info.Data.Attributes.Node, info.Data.Attributes.Time, data)
+		return appendToFile(
+			newfmt.DataTagSysinfo,
+			newfmt.NonemptyString(info.Data.Attributes.Node),
+			info.Data.Attributes.Time,
+			data,
+		)
 	}
 	reportError(newfmt.DataTagSysinfo, info.Errors)
 	return nil
@@ -130,7 +140,12 @@ func handleJobs(data []byte) error {
 		return err
 	}
 	if info.Data != nil {
-		return appendToFile(newfmt.DataTagJobs, info.Data.Attributes.Cluster, info.Data.Attributes.Time, data)
+		return appendToFile(
+			newfmt.DataTagJobs,
+			newfmt.NonemptyString(info.Data.Attributes.Cluster),
+			info.Data.Attributes.Time,
+			data,
+		)
 	}
 	reportError(newfmt.DataTagJobs, info.Errors)
 	return nil
@@ -143,14 +158,24 @@ func handleCluster(data []byte) error {
 		return err
 	}
 	if info.Data != nil {
-		return appendToFile(newfmt.DataTagCluster, info.Data.Attributes.Cluster, info.Data.Attributes.Time, data)
+		return appendToFile(
+			newfmt.DataTagCluster,
+			newfmt.NonemptyString(info.Data.Attributes.Cluster),
+			info.Data.Attributes.Time,
+			data,
+		)
 	}
 	reportError(newfmt.DataTagCluster, info.Errors)
 	return nil
 }
 
-func appendToFile(tag newfmt.DataType, host newfmt.Hostname, timestamp newfmt.Timestamp, data []byte) error {
-	basename := string(tag) + "-" + string(host) + ".json"
+func appendToFile(
+	tag newfmt.DataType,
+	hostOrCluster newfmt.NonemptyString,
+	timestamp newfmt.Timestamp,
+	data []byte,
+) error {
+	basename := string(tag) + "-" + string(hostOrCluster) + ".json"
 	t, err := time.Parse(time.RFC3339, string(timestamp))
 	if err != nil {
 		return err
