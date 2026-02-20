@@ -16,7 +16,9 @@ ROLLUP_TARGETS=rollup rollup2 daemon-rollup2 rollupchild rollupchild2 \
 rollup-programs: $(ROLLUP_TARGETS)
 
 format:
-	clang-format -i --style=file:../clang-format.txt *.c
+	if [[ -n $$(command -v clang-format) ]]; then \
+		clang-format -i --style=file:../clang-format.txt *.c; \
+	fi
 
 generate:
 
