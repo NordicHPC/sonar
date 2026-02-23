@@ -8,7 +8,7 @@
 //
 //	-d  Debug logging (implies -v)
 //	-v  Verbose - log non-critical errors also
-//	-D  http receive only (for debugging; implies -d)
+//	-D  http receive only (for debugging; implies -d) with dump to kafka-proxy.dat
 //
 // Kafka posts data via http to this proxy.  This proxy decodes the traffic and then speaks the
 // normal Kafka protocol to the broker, forwarding individual messages to it.  It is not necessary
@@ -19,6 +19,9 @@
 //
 // Logging is to the syslog by default (without options only critical errors, with -v also
 // non-critical errors), and to stderr with -d.
+//
+// With -D, all validated incoming data are appended to kafka-proxy.dat in the proxy's working
+// directory.
 //
 // # Config file
 //
@@ -223,7 +226,11 @@ func main() {
 		}
 	}
 	ch := make(chan Msg, 100)
-	runKafkaSender(ch)
+	if *receiveOnly {
+		runDebugDumper(ch)
+	} else {
+		runKafkaSender(ch)
+	}
 	runHttpListener(ch)
 	report(true, "Kafka HTTP proxy exit: %v", http.ListenAndServe(fmt.Sprintf(":%d", httpListenPort), nil))
 	close(ch)
@@ -238,6 +245,38 @@ func report(emergency bool, format string, args ...any) {
 	if *debug {
 		log.Printf(format, args...)
 	}
+}
+
+func runDebugDumper(ch <-chan Msg) {
+	go (func() {
+		dump, err := os.OpenFile("kafka-proxy.dat", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+		if err != nil {
+			log.Fatal(err)
+		}
+		defer dump.Close()
+		id := uint64(0)
+		nl := []byte{'\n'}
+		for {
+			msg, gotOne := <-ch
+			if !gotOne {
+				break
+			}
+			msgId := id
+			id++
+			if *debug {
+				log.Printf(
+					"Message #%d received: %s %s %s %s %s %d",
+					msgId, msg.Topic, msg.Key, msg.Client, msg.SaslUser, msg.SaslPassword, msg.DataSize,
+				)
+				log.Printf("Dumping message to kafka-proxy.dat, not sending to Kafka")
+			}
+			bs, _ := json.Marshal(msg.Control)
+			_, _ = dump.Write(bs)
+			_, _ = dump.Write(nl)
+			_, _ = dump.Write(msg.Data)
+			_, _ = dump.Write(nl)
+		}
+	})()
 }
 
 func runKafkaSender(ch <-chan Msg) {
@@ -266,12 +305,6 @@ func runKafkaSender(ch <-chan Msg) {
 			if kafkaRequireSasl && saslUser == "" && saslPassword == "" {
 				if *debug {
 					log.Printf("Rejecting message b/c no Sasl credentials")
-				}
-				continue
-			}
-			if *receiveOnly {
-				if *debug {
-					log.Printf("Dropping message on the floor (receive-only)")
 				}
 				continue
 			}
