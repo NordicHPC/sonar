@@ -6,9 +6,10 @@
 //
 // Options:
 //
-//	-d  Debug logging (implies -v)
-//	-v  Verbose - log non-critical errors also
-//	-D  http receive only (for debugging; implies -d) with dump to kafka-proxy.dat
+//	-v          Verbose - log non-critical errors also
+//	-d          Debug logging (implies -v)
+//	-D          http receive only (for debugging; implies -d) with dump to kafka-proxy.dat
+//	-P password Password for use with -D exclusively
 //
 // Kafka posts data via http to this proxy.  This proxy decodes the traffic and then speaks the
 // normal Kafka protocol to the broker, forwarding individual messages to it.  It is not necessary
@@ -21,7 +22,8 @@
 // non-critical errors), and to stderr with -d.
 //
 // With -D, all validated incoming data are appended to kafka-proxy.dat in the proxy's working
-// directory.
+// directory.  With -P, the sasl-password field must be set in the control object and must match
+// this password or the message is rejected, not dumped.
 //
 // # Config file
 //
@@ -135,7 +137,8 @@ var (
 	httpListenPort     = 8090
 	debug              = flag.Bool("d", false, "Debug logging")
 	verbose            = flag.Bool("v", false, "Verbose logging of non-critical errors")
-	receiveOnly        = flag.Bool("D", false, "Receive only (for debugging)")
+	receiveOnly        = flag.Bool("D", false, "Receive only (for debugging) + dumping")
+	password           = flag.String("P", "", "Password (for -D only)")
 )
 
 var (
@@ -263,6 +266,15 @@ func runDebugDumper(ch <-chan Msg) {
 			}
 			msgId := id
 			id++
+			// If no -P then accept everything.
+			if *password != "" {
+				if msg.Control.SaslPassword != *password {
+					if *debug {
+						log.Printf("Dropping message, bad password")
+					}
+					continue
+				}
+			}
 			if *debug {
 				log.Printf(
 					"Message #%d received: %s %s %s %s %s %d",
@@ -296,13 +308,7 @@ func runKafkaSender(ch <-chan Msg) {
 					msgId, msg.Topic, msg.Key, msg.Client, msg.SaslUser, msg.SaslPassword, msg.DataSize,
 				)
 			}
-			// TODO: Should we launder these even more?
-			saslUser := strings.TrimSpace(msg.SaslUser)
-			saslPassword := strings.TrimSpace(msg.SaslPassword)
-			topic := strings.TrimSpace(msg.Topic)
-			key := strings.TrimSpace(msg.Key)
-			client := strings.TrimSpace(msg.Client)
-			if kafkaRequireSasl && saslUser == "" && saslPassword == "" {
+			if kafkaRequireSasl && msg.SaslUser == "" && msg.SaslPassword == "" {
 				if *debug {
 					log.Printf("Rejecting message b/c no Sasl credentials")
 				}
@@ -312,15 +318,15 @@ func runKafkaSender(ch <-chan Msg) {
 			// each node that sends us data.  So attach client as a header to the record, to
 			// indicate the originating client.
 			record := &kgo.Record{
-				Key:   []byte(key),
-				Topic: topic,
+				Key:   []byte(msg.Key),
+				Topic: msg.Topic,
 				Value: msg.Data,
 				Headers: []kgo.RecordHeader{
-					kgo.RecordHeader{Key: "Originator", Value: []byte(client)},
+					kgo.RecordHeader{Key: "Originator", Value: []byte(msg.Client)},
 					kgo.RecordHeader{Key: "Id", Value: []byte(fmt.Sprint(msgId))},
 				},
 			}
-			clientId := saslUser + "|" + saslPassword
+			clientId := msg.SaslUser + "|" + msg.SaslPassword
 			cl := clients[clientId]
 			if cl == nil {
 				if len(clients) == maxCredentials {
@@ -335,10 +341,10 @@ func runKafkaSender(ch <-chan Msg) {
 					kgo.SeedBrokers(kafkaBrokerAddress),
 					kgo.AllowAutoTopicCreation(),
 				}
-				if saslUser != "" || saslPassword != "" {
+				if msg.SaslUser != "" || msg.SaslPassword != "" {
 					opts = append(opts, kgo.SASL(plain.Auth{
-						User: saslUser,
-						Pass: saslPassword,
+						User: msg.SaslUser,
+						Pass: msg.SaslPassword,
 					}.AsMechanism()))
 				}
 				if kafkaCaCert != nil {
@@ -456,15 +462,27 @@ func parsePayload(ch chan<- Msg, payload []byte) (int, string) {
 			report(false, "Could not decode a control object: %v\n%s", err, string(controlObject))
 			return 400, "Malformed control object"
 		}
+
 		// Consume the control object and single newline we know is there, because we found it
 		ix += loc + 1
+
 		// Extract the data, and forward the control object and data to the Kafka thread.
 		endIx := ix + int(c.DataSize)
 		if endIx > len(payload) {
 			report(false, "Out of bounds data length for %s", string(controlObject))
 			return 400, "Out of bounds data length"
 		}
+
+		// Launder the control fields.
+		c.SaslUser = strings.TrimSpace(c.SaslUser)
+		c.SaslPassword = strings.TrimSpace(c.SaslPassword)
+		c.Topic = strings.TrimSpace(c.Topic)
+		c.Key = strings.TrimSpace(c.Key)
+		c.Client = strings.TrimSpace(c.Client)
+
+		// Produce it.
 		ch <- Msg{Control: c, Data: payload[ix:endIx]}
+
 		// Consume the data
 		ix = endIx
 	}
