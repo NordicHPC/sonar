@@ -202,10 +202,6 @@ func main() {
 	rest := flag.Args()
 	if len(rest) > 0 {
 		iniName := rest[0]
-		f, err := os.Open(iniName)
-		if err != nil {
-			log.Fatalf("Ini file %s not found.\nTry -h", iniName)
-		}
 		iniParser := ini.NewParser()
 		kafkaSect := iniParser.AddSection("kafka")
 		kBrokerAddr := kafkaSect.AddString("broker-address")
@@ -215,11 +211,16 @@ func main() {
 		httpSect := iniParser.AddSection("http")
 		hEndpoint := httpSect.AddString("endpoint")
 		hListenPort := httpSect.AddUint64("listen-port")
-		store, err := iniParser.Parse(f)
 		debugSect := iniParser.AddSection("debug")
 		dDump := debugSect.AddString("dump")
 		dUser := debugSect.AddString("user")
 		dPassword := debugSect.AddString("password")
+
+		f, err := os.Open(iniName)
+		if err != nil {
+			log.Fatalf("Ini file %s not found.\nTry -h", iniName)
+		}
+		store, err := iniParser.Parse(f)
 		f.Close()
 		if err != nil {
 			log.Fatalf("Could not parse ini file: %v", err)
@@ -281,7 +282,7 @@ func runDebugDumper(ch <-chan Msg) {
 		var dump *os.File
 		if dumpFile != "" {
 			var err error
-			dump, err = os.OpenFile("kafka-proxy.dat", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+			dump, err = os.OpenFile(dumpFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 			if err != nil {
 				log.Fatal(err)
 			}
@@ -301,7 +302,7 @@ func runDebugDumper(ch <-chan Msg) {
 					"Message #%d received: %s %s %s %s %s %d",
 					msgId, msg.Topic, msg.Key, msg.Client, msg.SaslUser, msg.SaslPassword, msg.DataSize,
 				)
-				log.Printf("Dumping message to kafka-proxy.dat, not sending to Kafka")
+				log.Printf("Dumping message to %s, not sending to Kafka", dumpFile)
 			}
 			if dump != nil {
 				bs, _ := json.Marshal(msg.Control)

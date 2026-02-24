@@ -1,10 +1,10 @@
-{"topic":"my topic", "key":"my key", "client":"my client", "sasl-user":"my user", "sasl-password":"my password", "data-size":72}
+{"topic":"my topic", "key":"my key", "client":"my client", "sasl-user":"my.user", "sasl-password":"my.password", "data-size":72}
 this is just some arbitrary data
 over a few lines
 
 with embedded newline
 
-{"topic":"my second topic", "key":"my second key", "client":"my second client", "sasl-user":"my second user", "sasl-password":"my second password", "data-size":59}
+{"topic":"my second topic", "key":"my second key", "client":"my second client", "sasl-user":"my.user", "sasl-password":"my.password", "data-size":59}
 some more arbitrary data with an embedded trailing newline
 
 
