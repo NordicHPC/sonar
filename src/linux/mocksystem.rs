@@ -235,6 +235,7 @@ pub struct MockSystem {
     jm: Box<dyn jobsapi::JobManager>,
     hostname: String,
     cluster: String,
+    #[allow(unused)]
     hostname_only: bool,
     os_name: String,
     os_release: String,

@@ -179,6 +179,7 @@ const ARCHITECTURE: &'static str = "aarch64";
 
 pub struct System {
     hostname: String,
+    #[allow(unused)]
     hostname_only: bool,
     cluster: String,
     fs: RealProcFS,
