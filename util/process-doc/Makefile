@@ -1,4 +1,4 @@
-.PHONY: all generate install
+.PHONY: all generate format test install
 
 INPUT=../formats/newfmt/types.go
 OUTPUTS=NEW-FORMAT.md json_tags.rs types.spec.yaml
@@ -25,3 +25,9 @@ types.spec.yaml: $(INPUT) process-doc
 
 process-doc: process-doc.go version.go go.mod
 	go build
+
+format:
+	go fmt
+
+test:
+	go test

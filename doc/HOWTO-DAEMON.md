@@ -43,6 +43,7 @@ cluster = <canonical cluster name>
 role = node | master
 lock-directory = <string>                       # default none
 topic-prefix = <string>                         # default none
+hostname-only = <bool>                          # default false
 ```
 
 The `cluster` option is required, eg `fox.educloud.no`.
@@ -58,6 +59,11 @@ is relinquished temporarily (and the restarted config file may name a different 
 If there is a `topic-prefix` then it is prefixed to each data packet's topic.  A popular value would
 be `test` to tag the data coming from test setups.  (See "DATA MESSAGE FORMATS" below for more about
 topics.)  It is a bad idea to use characters other than a-z, 0-9, or hyphen within the prefix.
+
+If `hostname-only` is set then node names are always reported as leaf names only, ie, `c1-10.fox` is
+reported as `c1-10` in all contexts.  Without this setting, host names can variously be reported in
+full (how the node is known to itself) or as the leaf only (how Slurm knows it), requiring the
+back-end to deal with the diversity.
 
 ### `[kafka]` section
 
@@ -171,7 +177,9 @@ on-startup = <bool>                             # default true
 ```
 
 If there is a `domain` then it must have the form `.x.y.z` with at least one element.  It will be
-appended to all slurm prefix names in every NodeRange value to form full node names.
+appended to all slurm prefix names in every NodeRange value to form full node names.  (Bug in v0.18:
+it is not actually appended in nodelists in jobs.)  The `domain` setting is disallowed if the
+`global.hostname-only` setting is true.
 
 If `on-startup` is `true` then a cluster operation will be executed every time the daemon is
 started, in addition to according to the cadence.

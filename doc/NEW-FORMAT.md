@@ -165,7 +165,13 @@ Timestamp, or empty string for missing data
 
 ### Type: `Hostname`
 
-Dotted host name or prefix of same, with standard restrictions on character set.
+Dotted host name or prefix of same, with standard restrictions on character set.  Sonar options
+may cause Hostname values to be truncated to their leaf value or extended with a subdomain.
+
+### Type: `Clustername`
+
+The cluster name is a string with the same restrictions on character set as Hostname.  Typically
+the cluster name is an FQDN (a Hostname ending in a TLD), but it need not be.
 
 ### Type: `ExtendedUint`
 
@@ -221,7 +227,7 @@ Time when the error was generated
 
 A sensible English-language error message describing the error
 
-#### **`cluster`** Hostname
+#### **`cluster`** Clustername
 
 Canonical cluster name for node generating the error
 
@@ -297,7 +303,7 @@ NOTE: The number of logical cores is sockets * cores_per_socket * threads_per_co
 
 Time the current data were obtained
 
-#### **`cluster`** Hostname
+#### **`cluster`** Clustername
 
 The canonical cluster name
 
@@ -475,7 +481,7 @@ node, or a recoverable error situation if errors is not empty.
 
 Time the current data were obtained
 
-#### **`cluster`** Hostname
+#### **`cluster`** Clustername
 
 The canonical cluster name whence the datum originated
 
@@ -887,7 +893,7 @@ the decoder will populate the correct field.  Other fields will be nil.
 
 Time the current data were obtained
 
-#### **`cluster`** Hostname
+#### **`cluster`** Clustername
 
 The canonical cluster name
 
@@ -1036,7 +1042,7 @@ sacct: `Reservation`
 
 slurm: `JOB_INFO.resv_name`
 
-#### **`nodes`** []string
+#### **`nodes`** []HostnameRange
 
 The nodes allocated to the job or step.
 
@@ -1236,7 +1242,7 @@ NOTE: All clusters are assumed to have some unmanaged jobs.
 
 Time the current data were obtained
 
-#### **`cluster`** Hostname
+#### **`cluster`** Clustername
 
 The canonical cluster name
 
@@ -1260,7 +1266,7 @@ A Partition has a unique name and some nodes.  Nodes may be in multiple partitio
 
 Partition name
 
-#### **`nodes`** []NodeRange
+#### **`nodes`** []HostnameRange
 
 Nodes in the partition
 
@@ -1271,7 +1277,7 @@ ways (some of them really are "flags" on more general states); we expose as many
 
 NOTE: Node state depends on the cluster type.  For Slurm, see sinfo(1), it's a long list.
 
-#### **`names`** []NodeRange
+#### **`names`** []HostnameRange
 
 Constraint: The array of names may not be empty
 
@@ -1281,15 +1287,18 @@ The state(s) of the nodes in the range.  This is the output of sinfo as for the
 StateComplete specifier, split into individual states, and the state names are always folded
 to upper case.
 
-### Type: `NodeRange`
+### Type: `HostnameRange`
 
-A NodeRange is a nonempty-string representing a list of hostnames compactly using a simple
+A HostnameRange is a nonempty-string representing a list of Hostnames compactly using a simple
 syntax: brackets introduce a list of individual numbered nodes and ranges, these are expanded to
 yield a list of node names.  For example, `c[1-3,5]-[2-4].fox` yields `c1-2.fox`, `c1-3.fox`,
 `c1-4.fox`, `c2-2.fox`, `c2-3.fox`, `c2-4.fox`, `c3-2.fox`, `c3-3.fox`, `c3-4.fox`, `c5-2.fox`,
 `c5-3.fox`, `c5-4.fox`.  In a valid range, the first number is no greater than the second
 number, and numbers are not repeated.  (The motivation for this feature is that some clusters
 have very many nodes and that they group well this way.)
+
+Note that as this represents a set of Hostnames, the names can be modified by Sonar options in
+the same way as the Hostnames themselves.
 
 ## Slurm Job ID structure
 

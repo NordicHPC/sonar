@@ -45,8 +45,11 @@ enum Commands {
     },
     /// Take a snapshot of the currently running processes
     PS {
-        /// Merge process records that have the same job ID and command name
-        rollup: bool,
+        /// Cluster name
+        cluster: Option<String>,
+
+        /// Prune all hostname values to their leaf value
+        hostname_only: bool,
 
         /// Include records for jobs that have on average used at least this percentage of CPU,
         /// note this is nonmonotonic [default: none]
@@ -77,18 +80,24 @@ enum Commands {
         /// the per-cpu usage since boot.
         load: bool,
 
-        /// Cluster name
-        cluster: Option<String>,
+        /// Merge process records that have the same job ID and command name
+        rollup: bool,
     },
     /// Extract cluster information
     Cluster {
         /// Cluster name
         cluster: Option<String>,
+
+        /// Prune all hostname values to their leaf value
+        hostname_only: bool,
     },
     /// Extract node information
     Sysinfo {
         /// Cluster name
         cluster: Option<String>,
+
+        /// Prune all hostname values to their leaf value
+        hostname_only: bool,
 
         /// Command to execute for the topo_svg field
         topo_svg_cmd: Option<String>,
@@ -98,6 +107,12 @@ enum Commands {
     },
     /// Extract slurm job information
     Slurmjobs {
+        /// Cluster name
+        cluster: Option<String>,
+
+        /// Prune all hostname values to their leaf value
+        hostname_only: bool,
+
         /// Set the sacct start time to now-`window` and the end time to now, and dump records that
         /// are relevant for that interval.  Normally the running interval of `sonar jobs` should
         /// be less than the window.  Precludes -span.
@@ -112,9 +127,6 @@ enum Commands {
 
         /// If set, split output in multiple messages if the number of job records exceed this
         batch_size: Option<usize>,
-
-        /// Cluster name
-        cluster: Option<String>,
     },
     Version {},
 }
@@ -167,7 +179,8 @@ fn main() {
             }
         }
         Commands::PS {
-            rollup,
+            cluster,
+            hostname_only,
             min_cpu_percent,
             min_mem_percent,
             min_cpu_time,
@@ -176,7 +189,7 @@ fn main() {
             exclude_commands,
             lockdir,
             load,
-            cluster,
+            rollup,
         } => {
             let opts = ps::PsOptions {
                 rollup: *rollup,
@@ -201,12 +214,8 @@ fn main() {
                 token,
             };
 
+            let system = attach_common(system, cluster, *hostname_only);
             let system = system.with_jobmanager(Box::new(jobsapi::AnyJobManager::new(force_slurm)));
-            let system = if cluster.is_some() {
-                system.with_cluster(cluster.as_ref().unwrap())
-            } else {
-                system
-            };
             ps::create_snapshot(
                 writer,
                 &system.freeze().expect("System initialization"),
@@ -215,14 +224,11 @@ fn main() {
         }
         Commands::Sysinfo {
             cluster,
+            hostname_only,
             topo_svg_cmd,
             topo_text_cmd,
         } => {
-            let system = if cluster.is_some() {
-                system.with_cluster(cluster.as_ref().unwrap())
-            } else {
-                system
-            };
+            let system = attach_common(system, cluster, *hostname_only);
             let system = if let Some(ref c) = topo_svg_cmd {
                 system.with_topo_svg_cmd(c)
             } else {
@@ -241,17 +247,14 @@ fn main() {
             );
         }
         Commands::Slurmjobs {
+            cluster,
+            hostname_only,
             window,
             span,
             deluge,
             batch_size,
-            cluster,
         } => {
-            let system = if cluster.is_some() {
-                system.with_cluster(cluster.as_ref().unwrap())
-            } else {
-                system
-            };
+            let system = attach_common(system, cluster, *hostname_only);
             slurmjobs::show_slurm_jobs(
                 writer,
                 window,
@@ -263,12 +266,11 @@ fn main() {
                 slurmjobs::Format::JSON,
             );
         }
-        Commands::Cluster { cluster } => {
-            let system = if cluster.is_some() {
-                system.with_cluster(cluster.as_ref().unwrap())
-            } else {
-                system
-            };
+        Commands::Cluster {
+            cluster,
+            hostname_only,
+        } => {
+            let system = attach_common(system, cluster, *hostname_only);
             cluster::show_cluster(
                 writer,
                 &system.freeze().expect("System initialization"),
@@ -280,6 +282,24 @@ fn main() {
         }
     }
     let _ = writer.flush();
+}
+
+fn attach_common(
+    mut system: linux::system::Builder,
+    cluster: &Option<String>,
+    hostname_only: bool,
+) -> linux::system::Builder {
+    system = if cluster.is_some() {
+        system.with_cluster(cluster.as_ref().unwrap())
+    } else {
+        system
+    };
+    system = if hostname_only {
+        system.with_hostname_only()
+    } else {
+        system
+    };
+    system
 }
 
 // For the sake of simplicity:
@@ -306,7 +326,8 @@ fn command_line(args: Vec<String>) -> Commands {
                 Commands::Daemon { config_file }
             }
             "sample" | "ps" => {
-                let mut rollup = false;
+                let mut cluster = None;
+                let mut hostname_only = false;
                 let mut min_cpu_percent = None;
                 let mut min_mem_percent = None;
                 let mut min_cpu_time = None;
@@ -315,7 +336,7 @@ fn command_line(args: Vec<String>) -> Commands {
                 let mut exclude_commands = None;
                 let mut lockdir = None;
                 let mut load = false;
-                let mut cluster = None;
+                let mut rollup = false;
                 while next < args.len() {
                     let arg = args[next].as_ref();
                     next += 1;
@@ -360,12 +381,15 @@ fn command_line(args: Vec<String>) -> Commands {
                         string_arg(arg, &args, next, "--cluster")
                     {
                         (next, cluster) = (new_next, Some(value));
+                    } else if let Some(new_next) = bool_arg(arg, &args, next, "--hostname-only") {
+                        (next, hostname_only) = (new_next, true);
                     } else {
                         usage(true);
                     }
                 }
                 Commands::PS {
-                    rollup,
+                    cluster,
+                    hostname_only,
                     min_cpu_percent,
                     min_mem_percent,
                     min_cpu_time,
@@ -374,11 +398,12 @@ fn command_line(args: Vec<String>) -> Commands {
                     exclude_commands,
                     lockdir,
                     load,
-                    cluster,
+                    rollup,
                 }
             }
             "sysinfo" => {
                 let mut cluster = None;
+                let mut hostname_only = false;
                 let mut topo_svg_cmd = None;
                 let mut topo_text_cmd = None;
                 while next < args.len() {
@@ -390,6 +415,8 @@ fn command_line(args: Vec<String>) -> Commands {
                         string_arg(arg, &args, next, "--cluster")
                     {
                         (next, cluster) = (new_next, Some(value));
+                    } else if let Some(new_next) = bool_arg(arg, &args, next, "--hostname-only") {
+                        (next, hostname_only) = (new_next, true);
                     } else if let Some((new_next, value)) =
                         string_arg(arg, &args, next, "--topo-svg-cmd")
                     {
@@ -404,16 +431,18 @@ fn command_line(args: Vec<String>) -> Commands {
                 }
                 Commands::Sysinfo {
                     cluster,
+                    hostname_only,
                     topo_svg_cmd,
                     topo_text_cmd,
                 }
             }
             "jobs" | "slurm" => {
+                let mut cluster = None;
+                let mut hostname_only = false;
                 let mut window = None;
                 let mut span = None;
                 let mut deluge = false;
                 let mut batch_size = None;
-                let mut cluster = None;
                 while next < args.len() {
                     let arg = args[next].as_ref();
                     next += 1;
@@ -435,6 +464,8 @@ fn command_line(args: Vec<String>) -> Commands {
                         string_arg(arg, &args, next, "--cluster")
                     {
                         (next, cluster) = (new_next, Some(value));
+                    } else if let Some(new_next) = bool_arg(arg, &args, next, "--hostname-only") {
+                        (next, hostname_only) = (new_next, true);
                     } else {
                         usage(true);
                     }
@@ -443,15 +474,17 @@ fn command_line(args: Vec<String>) -> Commands {
                     usage(true);
                 }
                 Commands::Slurmjobs {
+                    cluster,
+                    hostname_only,
                     window,
                     span,
-                    cluster,
                     deluge,
                     batch_size,
                 }
             }
             "cluster" => {
                 let mut cluster = None;
+                let mut hostname_only = false;
                 while next < args.len() {
                     let arg = args[next].as_ref();
                     next += 1;
@@ -462,12 +495,17 @@ fn command_line(args: Vec<String>) -> Commands {
                         string_arg(arg, &args, next, "--cluster")
                     {
                         (next, cluster) = (new_next, Some(value));
+                    } else if let Some(new_next) = bool_arg(arg, &args, next, "--hostname-only") {
+                        (next, hostname_only) = (new_next, true);
                     } else {
                         usage(true);
                     }
                 }
                 // The only output format supported is "new JSON", so require `--cluster` always
-                Commands::Cluster { cluster }
+                Commands::Cluster {
+                    cluster,
+                    hostname_only,
+                }
             }
             "version" => Commands::Version {},
             "help" => {
@@ -551,9 +589,10 @@ Options for `daemon`:
       Configuration file from which to read commands, arguments, cadences.
 
 Options for `sample`:
-  --rollup
-      Merge process records that have the same job ID and command name (on systems
-      with stable job IDs only)
+  --cluster name
+      Optional cluster name with which to tag output
+  --hostname-only
+      Prune all hostname values to their leaf value [default: false]
   --min-cpu-time seconds
       Include records for jobs that have used at least this much CPU time
       [default: none]
@@ -574,12 +613,15 @@ Options for `sample`:
       exists on startup [default: none]
   --load
       Print per-cpu and per-gpu load data
-  --cluster name
-      Optional cluster name with which to tag output
+  --rollup
+      Merge process records that have the same job ID and command name (on systems
+      with stable job IDs only)
 
 Options for `sysinfo`:
   --cluster name
       Optional cluster name with which to tag output
+  --hostname-only
+      Prune all hostname values to their leaf value [default: false]
   --topo-svg-cmd
       Optional command to execute to generate SVG source for the topo_svg field,
       typically '/path/to/lstopo -of svg'
@@ -588,6 +630,10 @@ Options for `sysinfo`:
       typically '/path/to/hwloc-ls'
 
 Options for `jobs`:
+  --cluster name
+      Optional cluster name with which to tag output
+  --hostname-only
+      Prune all hostname values to their leaf value [default: false]
   --window minutes
       Set the `start` time to now-minutes [default: 90] and the `end` time to now+1.
       Precludes --span
@@ -598,12 +644,12 @@ Options for `jobs`:
       Include PENDING and RUNNING jobs in the output, not just completed jobs.
   --batch-size
       Split into multiple JSON messages after this many job records.
-  --cluster name
-      Optional cluster name with which to tag output
 
 Options for `cluster`:
   --cluster name
       Optional cluster name with which to tag output
+  --hostname-only
+      Prune all hostname values to their leaf value [default: false]
 ",
     );
     let _ = out.flush();

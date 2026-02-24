@@ -32,6 +32,7 @@ pub struct Builder {
     architecture: Option<String>,
     jm: Option<Box<dyn jobsapi::JobManager>>,
     cards: cell::RefCell<Vec<gpu::Card>>,
+    hostname_only: bool,
 }
 
 #[allow(dead_code)]
@@ -114,6 +115,13 @@ impl Builder {
         }
     }
 
+    pub fn with_hostname_only(self) -> Builder {
+        Builder {
+            hostname_only: true,
+            ..self
+        }
+    }
+
     pub fn with_os(self, name: &str, release: &str) -> Builder {
         Builder {
             os_name: Some(name.to_string()),
@@ -174,6 +182,8 @@ impl Builder {
             },
             hostname: if let Some(x) = self.hostname {
                 x
+            } else if self.hostname_only {
+                "no".to_string()
             } else {
                 "no.host.com".to_string()
             },
@@ -183,6 +193,7 @@ impl Builder {
                 "no.cluster.com".to_string()
             },
             node_domain: self.node_domain,
+            hostname_only: self.hostname_only,
             os_name: if let Some(x) = self.os_name {
                 x
             } else {
@@ -234,6 +245,7 @@ pub struct MockSystem {
     hostname: String,
     cluster: String,
     node_domain: Option<Vec<String>>,
+    hostname_only: bool,
     os_name: String,
     os_release: String,
     architecture: String,
@@ -274,6 +286,10 @@ impl systemapi::SystemAPI for MockSystem {
 
     fn get_node_domain(&self) -> &Option<Vec<String>> {
         &self.node_domain
+    }
+
+    fn get_hostname_only(&self) -> bool {
+        self.hostname_only
     }
 
     fn get_os_name(&self) -> String {

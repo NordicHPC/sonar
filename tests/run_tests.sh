@@ -14,6 +14,7 @@ tests="amd-gpu \
      command-line \
      daemon \
      daemon-directory \
+     daemon-hostname \
      daemon-http \
      daemon-http-no-curl \
      daemon-interrupt \

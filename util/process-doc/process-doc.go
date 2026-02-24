@@ -224,7 +224,7 @@ func typeName(t ast.Expr) string {
 		}
 		return "[]" + typeName(item.Elt)
 	default:
-		fail(t, fmt.Sprint("Unmanaged type %#v", t))
+		fail(t, fmt.Sprintf("Unmanaged type %#v", t))
 		return "*bad*"
 	}
 }
