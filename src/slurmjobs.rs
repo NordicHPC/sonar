@@ -5,8 +5,8 @@
 use crate::json_tags::*;
 use crate::nodelist;
 use crate::output;
+use crate::posix::time;
 use crate::systemapi;
-use crate::time;
 
 use once_cell::sync::Lazy;
 

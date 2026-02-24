@@ -67,7 +67,7 @@ pub struct Rng {
 impl Rng {
     pub fn new() -> Rng {
         Rng {
-            state: crate::time::unix_now() as u32,
+            state: crate::posix::time::unix_now() as u32,
         }
     }
 
