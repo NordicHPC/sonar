@@ -10,13 +10,13 @@
 # - modify the build commands below if necessary to set up tools and libraries
 
 Name:           sonar
-Version:        0.18.0
+Version:        0.18.1
 Release:        %autorelease
 Summary:        Continuous profiling daemon
 
 License:        GPL-3.0 + MIT
 URL:            https://github.com/NordicHPC/sonar
-Source0:        https://github.com/NordicHPC/sonar/archive/refs/tags/v0.18.0.tar.gz
+Source0:        https://github.com/NordicHPC/sonar/archive/refs/tags/v0.18.1.tar.gz
 
 %description
 Sonar is an unprivileged continuous profiling daemon that collects data about jobs, processes,
