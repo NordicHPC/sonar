@@ -98,7 +98,6 @@ pub struct JobsIni {
 pub struct ClusterIni {
     pub on_startup: bool,
     pub cadence: Option<Dur>,
-    pub domain: Option<Vec<String>>,
 }
 
 pub struct ProgramsIni {
@@ -232,9 +231,6 @@ pub fn daemon_mode(
         system = system.with_jobmanager(Box::new(jobsapi::AnyJobManager::new(force_slurm)));
     }
 
-    if let Some(ref p) = ini.cluster.domain {
-        system = system.with_node_domain(p);
-    }
     if ini.global.hostname_only {
         system = system.with_hostname_only();
     }
@@ -710,7 +706,7 @@ fn parse_config(config_file: &str) -> Result<Ini, String> {
             role: "".to_string(),
             lockdir: None,
             topic_prefix: None,
-            hostname_only: false,
+            hostname_only: true,
         },
         #[cfg(feature = "kafka")]
         kafka: KafkaIni {
@@ -761,7 +757,6 @@ fn parse_config(config_file: &str) -> Result<Ini, String> {
         cluster: ClusterIni {
             on_startup: true,
             cadence: None,
-            domain: None,
         },
     };
 
@@ -1006,20 +1001,7 @@ fn parse_config(config_file: &str) -> Result<Ini, String> {
                     ini.cluster.cadence = Some(parse_duration("cluster.cadence", &value, false)?);
                 }
                 "domain" => {
-                    // FIXME: Bug #459 / #516: This setting should not be attached to cluster.
-                    let mut xs = value
-                        .split(".")
-                        .map(|x| x.to_string())
-                        .collect::<Vec<String>>();
-                    if xs.len() < 2 || xs[0] != "" || xs[1..].iter().any(|x| x == "") {
-                        return Err(format!(
-                            "Invalid global.domain value `{value}` - form .x.y.z required"
-                        ));
-                    }
-                    // Drop initial, empty element
-                    xs.rotate_left(1);
-                    xs.pop();
-                    ini.cluster.domain = Some(xs);
+                    // No longer does anything.
                 }
                 _ => return Err(format!("Invalid [cluster] setting name `{name}`")),
             },
@@ -1064,9 +1046,6 @@ fn parse_config(config_file: &str) -> Result<Ini, String> {
     }
     if ini.global.role == "" {
         return Err("Missing global.role setting".to_string());
-    }
-    if ini.global.hostname_only && ini.cluster.domain.is_some() {
-        return Err("Can't have both global.hostname-only and cluster.domain".to_string());
     }
 
     let mut sinks = 0;
@@ -1341,7 +1320,6 @@ pub fn test_parser() {
 
     assert!(ini.cluster.cadence == Some(Dur::Minutes(15)));
     assert!(!ini.cluster.on_startup);
-    assert!(ini.cluster.domain == Some(vec!["fox".to_string(), "nux".to_string()]));
 
     let ini = parse_config("src/testdata/daemon-stdio-config2.txt").unwrap();
 

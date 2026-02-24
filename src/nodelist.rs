@@ -1,22 +1,11 @@
 use crate::output;
-use crate::systemapi::SystemAPI;
 
 // Parse a nodelist and render it into an output object as an array of strings.
 
-pub fn parse_and_render(system: &dyn SystemAPI, xs: &str) -> Result<output::Array, String> {
+pub fn parse_nodelist(xs: &str) -> Result<output::Array, String> {
     let mut a = output::Array::new();
-    let suffix = if system.get_hostname_only() {
-        "".to_string()
-    } else if let Some(xs) = system.get_node_domain() {
-        ".".to_string() + &xs.join(".")
-    } else {
-        "".to_string()
-    };
     for v in parse(xs)? {
-        // One could argue that if system.get_hostname_only() then the parsed value should be
-        // stripped here.  In practice, I've never seen slurm report node names as anything other
-        // than leaf names, so it should not matter.
-        a.push_s(v + &suffix);
+        a.push_s(v);
     }
     Ok(a)
 }

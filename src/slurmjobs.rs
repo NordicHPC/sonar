@@ -383,10 +383,6 @@ fn parse_sacct_jobs_newfmt(
                 }
                 "NodeList" => {
                     if fieldvals[i] != "" {
-                        // FIXME: Bug #459 / #516: we really must use parse_and_render() here or in
-                        // the final rendering to attach a domain if it is set, but that will change
-                        // the output format and it would also depend on the cluster.domain setting,
-                        // which is suprising for the jobs output.
                         if let Ok(nodes) = nodelist::parse(&fieldvals[i]) {
                             output_line.nodes = nodes;
                         }

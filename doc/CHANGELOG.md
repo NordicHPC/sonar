@@ -11,6 +11,15 @@ output format can most easily be be seen by diffing this file against a desired 
 
 ## Changes in v0.19.0 (on `main`)
 
+* Bug 516 - **IMPORTANT FUNCTIONALITY.** Introduce `global.hostname-only` as a better way of managing
+  how node names are reported, default true (differs from v0.18)
+* Bug 459 - **REMOVED FUNCTIONALITY.** Remove the half-implemented (and poorly-implemented) `cluster.domain`
+  setting.
+
+## Changes in v0.18.1 (on `release_0_18`)
+
+* Bug 516 - **IMPORTANT FUNCTIONALITY.** Introduce `global.hostname-only` as a better way of managing
+  how node names are reported, default false.
 
 ## Changes in v0.18.0 (on `release_0_18`)
 
@@ -20,8 +29,6 @@ output format can most easily be be seen by diffing this file against a desired 
 * Bug 502 - User manual, design doc, developer doc, and general doc cleanup
 * Bug 503 - Use newer power API on AMD GPUs
 * Bug 505 - Log errors to the journal, not to stderr
-* Bug 516 - **IMPORTANT FUNCTIONALITY.** Introduce `global.hostname-only` as a better way of managing
-  how node names are reported.
 * No bug - introduced `sonar sample` as the canonical way to say `sonar ps` (older)
 * No bug - introduced `sonar jobs` as the canonical way to say `sonar slurm` (older)
 * Misc tweaks and cleanup as usual
