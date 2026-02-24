@@ -68,10 +68,7 @@ fn do_show_cluster(
     let mut nodes = output::Array::new();
     for (nodelist, statelist) in system.compute_cluster_nodes()? {
         let mut p = output::Object::new();
-        p.push_a(
-            CLUSTER_NODES_NAMES,
-            nodelist::parse_nodelist(&nodelist)?,
-        );
+        p.push_a(CLUSTER_NODES_NAMES, nodelist::parse_nodelist(&nodelist)?);
         let mut states = output::Array::new();
         for s in statelist.split('+') {
             states.push_s(s.to_ascii_uppercase());
