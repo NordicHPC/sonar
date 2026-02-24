@@ -5,7 +5,6 @@ mod daemon;
 #[cfg(feature = "daemon")]
 mod datasink;
 mod gpu;
-mod hostname;
 mod jobsapi;
 mod json_tags;
 mod linux;
@@ -17,6 +16,7 @@ mod output;
 mod output_test;
 #[cfg(feature = "daemon")]
 mod pidmap;
+mod posix;
 mod ps;
 mod ps_newfmt;
 #[cfg(test)]
@@ -26,9 +26,7 @@ mod sysinfo;
 #[cfg(test)]
 mod sysinfo_test;
 mod systemapi;
-mod time;
 mod types;
-mod users;
 mod util;
 
 use std::io;

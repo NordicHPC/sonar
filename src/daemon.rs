@@ -27,11 +27,11 @@ use crate::datasink::DataSink;
 use crate::jobsapi;
 use crate::json_tags;
 use crate::linux;
+use crate::posix::time::{unix_now, unix_time_components};
 use crate::ps;
 use crate::slurmjobs;
 use crate::sysinfo;
 use crate::systemapi::SystemAPI;
-use crate::time::{unix_now, unix_time_components};
 
 use std::io::BufRead;
 use std::thread;

@@ -3,9 +3,9 @@
 use crate::gpu;
 use crate::json_tags::*;
 use crate::output;
+use crate::posix::time::{format_iso8601, unix_time_to_tm};
 use crate::ps::{CState, ProcInfo, PsOptions, SampleData};
 use crate::systemapi;
-use crate::time::{format_iso8601, unix_time_to_tm};
 use crate::types::JobID;
 use crate::util::three_places;
 

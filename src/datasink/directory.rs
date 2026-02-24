@@ -1,7 +1,7 @@
 use crate::daemon::Operation;
 use crate::datasink::DataSink;
+use crate::posix::time;
 use crate::systemapi::SystemAPI;
-use crate::time;
 
 use std::io::Write;
 

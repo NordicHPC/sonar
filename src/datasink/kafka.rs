@@ -28,9 +28,9 @@
 
 use crate::daemon::{Dur, Ini, Operation};
 use crate::datasink::DataSink;
-use crate::systemapi::SystemAPI;
 #[cfg(debug_assertions)]
-use crate::time::unix_now;
+use crate::posix::time::unix_now;
+use crate::systemapi::SystemAPI;
 use crate::util;
 
 use std::cmp::min;

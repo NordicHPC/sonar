@@ -2,8 +2,8 @@
 
 use crate::daemon::Dur;
 use crate::datasink::DataSink;
+use crate::posix::time::unix_now;
 use crate::systemapi::SystemAPI;
-use crate::time::unix_now;
 
 struct Msg {
     topic_prefix: Option<String>,

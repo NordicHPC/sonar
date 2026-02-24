@@ -4,14 +4,14 @@
 use crate::command;
 use crate::gpu;
 use crate::gpu::realgpu;
-use crate::hostname;
 use crate::jobsapi;
 use crate::linux::procfs;
 use crate::linux::slurm;
+use crate::posix::hostname;
+use crate::posix::time;
+use crate::posix::users;
 use crate::systemapi;
-use crate::time;
 use crate::types::{JobID, Pid, Uid};
-use crate::users;
 use crate::util;
 
 use std::boxed::Box;

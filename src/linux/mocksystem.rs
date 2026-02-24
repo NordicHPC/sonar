@@ -3,8 +3,8 @@ use crate::gpu::mockgpu;
 use crate::jobsapi;
 use crate::json_tags;
 use crate::linux::{procfs, system};
+use crate::posix::time;
 use crate::systemapi;
-use crate::time;
 use crate::types::{JobID, Pid, Uid};
 
 use std::cell;
