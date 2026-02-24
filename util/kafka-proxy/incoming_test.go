@@ -16,8 +16,8 @@ func TestParseIncoming(t *testing.T) {
 		if msg.Topic != "my topic" ||
 			msg.Key != "my key" ||
 			msg.Client != "my client" ||
-			msg.SaslUser != "my user" ||
-			msg.SaslPassword != "my password" ||
+			msg.SaslUser != "my.user" ||
+			msg.SaslPassword != "my.password" ||
 			msg.DataSize != uint64(len(msg.Data)) {
 			t.Fatal(msg)
 		}
@@ -29,8 +29,8 @@ func TestParseIncoming(t *testing.T) {
 		if msg.Topic != "my second topic" ||
 			msg.Key != "my second key" ||
 			msg.Client != "my second client" ||
-			msg.SaslUser != "my second user" ||
-			msg.SaslPassword != "my second password" ||
+			msg.SaslUser != "my.user" ||
+			msg.SaslPassword != "my.password" ||
 			msg.DataSize != uint64(len(msg.Data)) {
 			t.Fatal(msg)
 		}
