@@ -50,11 +50,17 @@ name can be given to the cluster; usually it takes the form of a domain name, bu
 The `role` setting is either `node` for a compute node or `master` for a cluster master node.  The
 setting is required.
 
+The `hostname-only` setting is false by default but it is recommended to set it to true.  When set,
+it causes Sonar to strip all domain information from the node names; node names may otherwise be
+reported either with a domain or without, depending on the source of the information, and this must
+then be dealt with in the back-end.
+
 Example:
 ```
 [global]
 cluster = saga.sigma2.no
 role = node
+hostname-only = true
 ```
 
 #### Programs section

@@ -164,8 +164,13 @@ type Timestamp NonemptyString
 // Timestamp, or empty string for missing data
 type OptionalTimestamp string
 
-// Dotted host name or prefix of same, with standard restrictions on character set.
+// Dotted host name or prefix of same, with standard restrictions on character set.  Sonar options
+// may cause Hostname values to be truncated to their leaf value or extended with a subdomain.
 type Hostname NonemptyString
+
+// The cluster name is a string with the same restrictions on character set as Hostname.  Typically
+// the cluster name is an FQDN (a Hostname ending in a TLD), but it need not be.
+type Clustername NonemptyString
 
 // An unsigned value that carries two additional values: unset and infinite.  It has a more limited
 // value range than regular unsigned.  The representation is: 0 for unset, 1 for infinite, and v+2
@@ -250,7 +255,7 @@ type ErrorObject struct {
 	Detail NonemptyString `json:"detail"`
 
 	// Canonical cluster name for node generating the error
-	Cluster Hostname `json:"cluster"`
+	Cluster Clustername `json:"cluster"`
 
 	// name of node generating the error
 	Node Hostname `json:"node"`
@@ -312,7 +317,7 @@ type SysinfoAttributes struct {
 	Time Timestamp `json:"time"`
 
 	// The canonical cluster name
-	Cluster Hostname `json:"cluster"`
+	Cluster Clustername `json:"cluster"`
 
 	// The name of the host as it is known to itself
 	Node Hostname `json:"node"`
@@ -451,7 +456,7 @@ type SampleAttributes struct {
 	Time Timestamp `json:"time"`
 
 	// The canonical cluster name whence the datum originated
-	Cluster Hostname `json:"cluster"`
+	Cluster Clustername `json:"cluster"`
 
 	// The name of the node as it is known to the node itself
 	Node Hostname `json:"node"`
@@ -790,7 +795,7 @@ type JobsAttributes struct {
 	Time Timestamp `json:"time"`
 
 	// The canonical cluster name
-	Cluster Hostname `json:"cluster"`
+	Cluster Clustername `json:"cluster"`
 
 	// Individual job records.  There may be multiple records per job, one per job step.
 	SlurmJobs []SlurmJob `json:"slurm_jobs,omitempty"`
@@ -926,7 +931,7 @@ type SlurmJob struct {
 	// sacct: `NodeList`
 	//
 	// slurm: `JOB_INFO.nodes`
-	NodeList []string `json:"nodes,omitempty"`
+	NodeList []HostnameRange `json:"nodes,omitempty"`
 
 	// The job priority.
 	//
@@ -1087,7 +1092,7 @@ type ClusterAttributes struct {
 	Time Timestamp `json:"time"`
 
 	// The canonical cluster name
-	Cluster Hostname `json:"cluster"`
+	Cluster Clustername `json:"cluster"`
 
 	// The `slurm` attribute is true if at least some nodes are under Slurm management.
 	Slurm bool `json:"slurm,omitempty"`
@@ -1105,7 +1110,7 @@ type ClusterPartition struct {
 	Name NonemptyString `json:"name"`
 
 	// Nodes in the partition
-	Nodes []NodeRange `json:"nodes,omitempty"`
+	Nodes []HostnameRange `json:"nodes,omitempty"`
 }
 
 // A managed node is always on some state.  A node may be multiple states, in cluster-dependent
@@ -1114,7 +1119,7 @@ type ClusterPartition struct {
 // NOTE: Node state depends on the cluster type.  For Slurm, see sinfo(1), it's a long list.
 type ClusterNodes struct {
 	// Constraint: The array of names may not be empty
-	Names []NodeRange `json:"names,omitempty"`
+	Names []HostnameRange `json:"names,omitempty"`
 
 	// The state(s) of the nodes in the range.  This is the output of sinfo as for the
 	// StateComplete specifier, split into individual states, and the state names are always folded
@@ -1122,14 +1127,17 @@ type ClusterNodes struct {
 	States []string `json:"states,omitempty"`
 }
 
-// A NodeRange is a nonempty-string representing a list of hostnames compactly using a simple
+// A HostnameRange is a nonempty-string representing a list of Hostnames compactly using a simple
 // syntax: brackets introduce a list of individual numbered nodes and ranges, these are expanded to
 // yield a list of node names.  For example, `c[1-3,5]-[2-4].fox` yields `c1-2.fox`, `c1-3.fox`,
 // `c1-4.fox`, `c2-2.fox`, `c2-3.fox`, `c2-4.fox`, `c3-2.fox`, `c3-3.fox`, `c3-4.fox`, `c5-2.fox`,
 // `c5-3.fox`, `c5-4.fox`.  In a valid range, the first number is no greater than the second
 // number, and numbers are not repeated.  (The motivation for this feature is that some clusters
 // have very many nodes and that they group well this way.)
-type NodeRange NonemptyString
+//
+// Note that as this represents a set of Hostnames, the names can be modified by Sonar options in
+// the same way as the Hostnames themselves.
+type HostnameRange NonemptyString
 
 // ## Slurm Job ID structure
 //

@@ -290,7 +290,7 @@ func TestNewJSONSlurmJobs(t *testing.T) {
 			assert(t, j.Timelimit == 100, "#0 time limit")
 			assert(t, j.Partition == "normal", "#0 partition")
 			assert(t, j.Reservation == "big-cheese", "#0 reservation")
-			assert(t, reflect.DeepEqual(j.NodeList, []string{"c1-[10-20]", "bigmem-1"}), "#0 nodelist")
+			assert(t, reflect.DeepEqual(j.NodeList, []newfmt.HostnameRange{"c1-[10-20]", "bigmem-1"}), "#0 nodelist")
 			p, err := j.Priority.ToUint()
 			if err != nil {
 				t.Fatal(err)
