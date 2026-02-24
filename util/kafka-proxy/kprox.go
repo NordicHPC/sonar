@@ -1,15 +1,14 @@
 // SPDX-License-Identifier: MIT
 
-// Kprox is a very simple Kafka REST proxy for Sonar traffic specifically.
+// Kprox is a very simple Kafka REST proxy, written for Sonar but probably generally useful.
 //
 // Usage: kprox [options] [inifile-name]
 //
 // Options:
 //
-//	-v          Verbose - log non-critical errors also
-//	-d          Debug logging (implies -v)
-//	-D          http receive only (for debugging; implies -d) with dump to kafka-proxy.dat
-//	-P password Password for use with -D exclusively
+//	-v          Verbose logging - log non-critical errors also
+//	-d          Debug logging (implies -v) - log message traffic
+//	-D          Enable [debug] section (implies -d)
 //
 // Kafka posts data via http to this proxy.  This proxy decodes the traffic and then speaks the
 // normal Kafka protocol to the broker, forwarding individual messages to it.  It is not necessary
@@ -21,9 +20,8 @@
 // Logging is to the syslog by default (without options only critical errors, with -v also
 // non-critical errors), and to stderr with -d.
 //
-// With -D, all validated incoming data are appended to kafka-proxy.dat in the proxy's working
-// directory.  With -P, the sasl-password field must be set in the control object and must match
-// this password or the message is rejected, not dumped.
+// With -D, messages are not forwarded to Kafka, only dumped to a file and/or logged, as controlled
+// by [debug].
 //
 // # Config file
 //
@@ -48,6 +46,17 @@
 // below) then the message is rejected.
 //
 // kafka.timeout is how long to hold messages without broker contact before discarding them.
+//
+// If -D is present, the [debug] section is honored:
+//
+//	[debug]
+//	dump = filename
+//	user = username
+//	password = password
+//
+// If there is a debug.dump, all validated incoming data are appended to that file.  If there are
+// debug.user and/or debug.password then the sasl-user / sasl-password fields must be set in the
+// control object and must match the user / password or the message is rejected, not dumped.
 //
 // # Protocol
 //
@@ -98,6 +107,12 @@
 //   - A flood of too many bogus sasl-user:sasl-password credential pairs can fill up the credential
 //     table and cause subsequent legitimate ones to be rejected.  We could partly purge the
 //     credential table when it fills up using some simple LRU / timestamping scheme.
+//
+// The use-for-testing aspect can be further refined but that does not seem important yet:
+//
+//   - There could be multiple users/passwords.
+//   - There could be a passthrough mode in the test setup so that data are both dumped and passed
+//     through to Kafka.
 package main
 
 import (
@@ -135,10 +150,12 @@ var (
 	kafkaCaFile        = ""
 	httpEndpoint       = "/"
 	httpListenPort     = 8090
+	dumpFile           = ""
+	debugUser          = ""
+	debugPassword      = ""
 	debug              = flag.Bool("d", false, "Debug logging")
 	verbose            = flag.Bool("v", false, "Verbose logging of non-critical errors")
-	receiveOnly        = flag.Bool("D", false, "Receive only (for debugging) + dumping")
-	password           = flag.String("P", "", "Password (for -D only)")
+	debugMode          = flag.Bool("D", false, "Receive only, enable [debug]")
 )
 
 var (
@@ -176,6 +193,12 @@ func main() {
 		flag.PrintDefaults()
 	}
 	flag.Parse()
+	if *debugMode {
+		*debug = true
+	}
+	if *debug {
+		*verbose = true
+	}
 	rest := flag.Args()
 	if len(rest) > 0 {
 		iniName := rest[0]
@@ -193,6 +216,10 @@ func main() {
 		hEndpoint := httpSect.AddString("endpoint")
 		hListenPort := httpSect.AddUint64("listen-port")
 		store, err := iniParser.Parse(f)
+		debugSect := iniParser.AddSection("debug")
+		dDump := debugSect.AddString("dump")
+		dUser := debugSect.AddString("user")
+		dPassword := debugSect.AddString("password")
 		f.Close()
 		if err != nil {
 			log.Fatalf("Could not parse ini file: %v", err)
@@ -213,12 +240,11 @@ func main() {
 		if hListenPort.Present(store) {
 			httpListenPort = int(hListenPort.Uint64Val(store))
 		}
-	}
-	if *receiveOnly {
-		*debug = true
-	}
-	if *debug {
-		*verbose = true
+		if *debugMode {
+			dumpFile = dDump.StringVal(store)
+			debugUser = dUser.StringVal(store)
+			debugPassword = dPassword.StringVal(store)
+		}
 	}
 
 	if kafkaCaFile != "" {
@@ -229,7 +255,7 @@ func main() {
 		}
 	}
 	ch := make(chan Msg, 100)
-	if *receiveOnly {
+	if *debugMode {
 		runDebugDumper(ch)
 	} else {
 		runKafkaSender(ch)
@@ -252,9 +278,13 @@ func report(emergency bool, format string, args ...any) {
 
 func runDebugDumper(ch <-chan Msg) {
 	go (func() {
-		dump, err := os.OpenFile("kafka-proxy.dat", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-		if err != nil {
-			log.Fatal(err)
+		var dump *os.File
+		if dumpFile != "" {
+			var err error
+			dump, err = os.OpenFile("kafka-proxy.dat", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+			if err != nil {
+				log.Fatal(err)
+			}
 		}
 		defer dump.Close()
 		id := uint64(0)
@@ -266,15 +296,6 @@ func runDebugDumper(ch <-chan Msg) {
 			}
 			msgId := id
 			id++
-			// If no -P then accept everything.
-			if *password != "" {
-				if msg.Control.SaslPassword != *password {
-					if *debug {
-						log.Printf("Dropping message, bad password")
-					}
-					continue
-				}
-			}
 			if *debug {
 				log.Printf(
 					"Message #%d received: %s %s %s %s %s %d",
@@ -282,13 +303,27 @@ func runDebugDumper(ch <-chan Msg) {
 				)
 				log.Printf("Dumping message to kafka-proxy.dat, not sending to Kafka")
 			}
-			bs, _ := json.Marshal(msg.Control)
-			_, _ = dump.Write(bs)
-			_, _ = dump.Write(nl)
-			_, _ = dump.Write(msg.Data)
-			_, _ = dump.Write(nl)
+			if dump != nil {
+				bs, _ := json.Marshal(msg.Control)
+				_, _ = dump.Write(bs)
+				_, _ = dump.Write(nl)
+				_, _ = dump.Write(msg.Data)
+				_, _ = dump.Write(nl)
+			}
 		}
 	})()
+}
+
+func checkCredentials(c Control) bool {
+	// If no -U then accept every user
+	if debugUser != "" && c.SaslUser != debugUser {
+		return false
+	}
+	// If no -P then accept every password
+	if debugPassword != "" && c.SaslPassword != debugPassword {
+		return false
+	}
+	return true
 }
 
 func runKafkaSender(ch <-chan Msg) {
@@ -479,6 +514,16 @@ func parsePayload(ch chan<- Msg, payload []byte) (int, string) {
 		c.Topic = strings.TrimSpace(c.Topic)
 		c.Key = strings.TrimSpace(c.Key)
 		c.Client = strings.TrimSpace(c.Client)
+
+		// In -D mode, check credentials.  Logically this test belongs in runDebugDumper, but by
+		// having it here we can return a sensible response code and thus the client can test the
+		// transmission of the credentials.
+		if *debugMode {
+			if !checkCredentials(c) {
+				report(false, "Bad credentials")
+				return 401, "Bad credentials"
+			}
+		}
 
 		// Produce it.
 		ch <- Msg{Control: c, Data: payload[ix:endIx]}
