@@ -107,6 +107,12 @@
 //   - A flood of too many bogus sasl-user:sasl-password credential pairs can fill up the credential
 //     table and cause subsequent legitimate ones to be rejected.  We could partly purge the
 //     credential table when it fills up using some simple LRU / timestamping scheme.
+//
+// The use-for-testing aspect can be further refined but that does not seem important yet:
+//
+//   - There could be multiple users/passwords.
+//   - There could be a passthrough mode in the test setup so that data are both dumped and passed
+//     through to Kafka.
 package main
 
 import (
