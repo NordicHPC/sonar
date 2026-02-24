@@ -1,41 +1,4 @@
-#![allow(unused_imports)]
-#![allow(unused_macros)]
-
 use std::ffi::CStr;
-
-// Populate a HashSet.
-#[cfg(test)]
-macro_rules! set(
-    { $($key:expr),+ } => {
-        {
-            let mut m = ::std::collections::HashSet::new();
-            $(
-                m.insert($key);
-            )+
-            m
-        }
-     };
-);
-
-// Populate a HashMap.
-#[cfg(test)]
-macro_rules! map(
-    { $($key:expr => $value:expr),+ } => {
-        {
-            let mut m = ::std::collections::HashMap::new();
-            $(
-                m.insert($key, $value);
-            )+
-            m
-        }
-     };
-);
-
-#[cfg(test)]
-pub(crate) use map;
-
-#[cfg(test)]
-pub(crate) use set;
 
 // Round `n` to 3 decimal places.
 pub fn three_places(n: f64) -> f64 {
