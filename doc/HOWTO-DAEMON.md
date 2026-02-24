@@ -43,7 +43,7 @@ cluster = <canonical cluster name>
 role = node | master
 lock-directory = <string>                       # default none
 topic-prefix = <string>                         # default none
-hostname-only = <bool>                          # default false
+hostname-only = <bool>                          # default true
 ```
 
 The `cluster` option is required, eg `fox.educloud.no`.
@@ -172,14 +172,8 @@ may become so large that they cause transmission issues, notably by default Kafk
 
 ```
 cadence = <duration value>
-domain = <string>                               # default none
 on-startup = <bool>                             # default true
 ```
-
-If there is a `domain` then it must have the form `.x.y.z` with at least one element.  It will be
-appended to all slurm prefix names in every NodeRange value to form full node names.  (Bug in v0.18:
-it is not actually appended in nodelists in jobs.)  The `domain` setting is disallowed if the
-`global.hostname-only` setting is true.
 
 If `on-startup` is `true` then a cluster operation will be executed every time the daemon is
 started, in addition to according to the cadence.

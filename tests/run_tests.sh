@@ -22,7 +22,6 @@ tests="amd-gpu \
      daemon-read-config \
      daemon-rollup \
      daemon-rollup2 \
-     daemon-slurm \
      daemon-startup \
      docker-run \
      exclude-commands \

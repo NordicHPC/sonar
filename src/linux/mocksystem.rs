@@ -25,7 +25,6 @@ pub struct Builder {
     timestamp: Option<String>,
     hostname: Option<String>,
     cluster: Option<String>,
-    node_domain: Option<Vec<String>>,
     version: Option<String>,
     os_name: Option<String>,
     os_release: Option<String>,
@@ -108,13 +107,6 @@ impl Builder {
         }
     }
 
-    pub fn with_node_domain(self, domain: &[String]) -> Builder {
-        Builder {
-            node_domain: Some(domain.iter().map(|x| x.clone()).collect::<Vec<String>>()),
-            ..self
-        }
-    }
-
     pub fn with_hostname_only(self) -> Builder {
         Builder {
             hostname_only: true,
@@ -192,7 +184,6 @@ impl Builder {
             } else {
                 "no.cluster.com".to_string()
             },
-            node_domain: self.node_domain,
             hostname_only: self.hostname_only,
             os_name: if let Some(x) = self.os_name {
                 x
@@ -244,7 +235,6 @@ pub struct MockSystem {
     jm: Box<dyn jobsapi::JobManager>,
     hostname: String,
     cluster: String,
-    node_domain: Option<Vec<String>>,
     hostname_only: bool,
     os_name: String,
     os_release: String,
@@ -282,10 +272,6 @@ impl systemapi::SystemAPI for MockSystem {
 
     fn get_cluster(&self) -> String {
         self.cluster.clone()
-    }
-
-    fn get_node_domain(&self) -> &Option<Vec<String>> {
-        &self.node_domain
     }
 
     fn get_hostname_only(&self) -> bool {
