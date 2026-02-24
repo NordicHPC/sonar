@@ -9,6 +9,12 @@ auto-generated from a Go data structure that specifies the JSON output format.  
 output format can most easily be be seen by diffing this file against a desired tag, starting with
 "v0.13.0".  Such changes are therefore no longer mentioned specially below.
 
+## Changes in v0.18.1 (on `release_0_18`)
+
+* Bug 516 - **IMPORTANT FUNCTIONALITY.** Introduce `global.hostname-only` as a better way of managing
+  how node names are reported, default false.
+* Build/infra: Do not require clang-format to be present during building.
+
 ## Changes in v0.18.0 (on `release_0_18`)
 
 * Bug 474 - Add a REST proxy to be used with Kafka when the nodes are behind HTTP proxies.
@@ -17,8 +23,6 @@ output format can most easily be be seen by diffing this file against a desired 
 * Bug 502 - User manual, design doc, developer doc, and general doc cleanup
 * Bug 503 - Use newer power API on AMD GPUs
 * Bug 505 - Log errors to the journal, not to stderr
-* Bug 516 - **IMPORTANT FUNCTIONALITY.** Introduce `global.hostname-only` as a better way of managing
-  how node names are reported.
 * No bug - introduced `sonar sample` as the canonical way to say `sonar ps` (older)
 * No bug - introduced `sonar jobs` as the canonical way to say `sonar slurm` (older)
 * Misc tweaks and cleanup as usual
