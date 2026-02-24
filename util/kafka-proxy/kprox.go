@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-// Kprox is a very simple Kafka REST proxy for Sonar traffic specifically.
+// Kprox is a very simple Kafka REST proxy, written for Sonar but probably generally useful.
 //
 // Usage: kprox [options] [inifile-name]
 //
@@ -9,7 +9,8 @@
 //	-v          Verbose - log non-critical errors also
 //	-d          Debug logging (implies -v)
 //	-D          http receive only (for debugging; implies -d) with dump to kafka-proxy.dat
-//	-P password Password for use with -D exclusively
+//	-U user     User, for use with -D exclusively
+//	-P password Password, for use with -D exclusively
 //
 // Kafka posts data via http to this proxy.  This proxy decodes the traffic and then speaks the
 // normal Kafka protocol to the broker, forwarding individual messages to it.  It is not necessary
@@ -22,8 +23,8 @@
 // non-critical errors), and to stderr with -d.
 //
 // With -D, all validated incoming data are appended to kafka-proxy.dat in the proxy's working
-// directory.  With -P, the sasl-password field must be set in the control object and must match
-// this password or the message is rejected, not dumped.
+// directory.  With -U and -P, the sasl-user / sasl-password fields must be set in the control
+// object and must match the user / password or the message is rejected, not dumped.
 //
 // # Config file
 //
@@ -138,7 +139,8 @@ var (
 	debug              = flag.Bool("d", false, "Debug logging")
 	verbose            = flag.Bool("v", false, "Verbose logging of non-critical errors")
 	receiveOnly        = flag.Bool("D", false, "Receive only (for debugging) + dumping")
-	password           = flag.String("P", "", "Password (for -D only)")
+	debugUser          = flag.String("U", "", "User (for -D only)")
+	debugPassword      = flag.String("P", "", "Password (for -D only)")
 )
 
 var (
@@ -266,15 +268,6 @@ func runDebugDumper(ch <-chan Msg) {
 			}
 			msgId := id
 			id++
-			// If no -P then accept everything.
-			if *password != "" {
-				if msg.Control.SaslPassword != *password {
-					if *debug {
-						log.Printf("Dropping message, bad password")
-					}
-					continue
-				}
-			}
 			if *debug {
 				log.Printf(
 					"Message #%d received: %s %s %s %s %s %d",
@@ -289,6 +282,18 @@ func runDebugDumper(ch <-chan Msg) {
 			_, _ = dump.Write(nl)
 		}
 	})()
+}
+
+func checkCredentials(c Control) bool {
+	// If no -U then accept every user
+	if *debugUser != "" && c.SaslUser != *debugUser {
+		return false
+	}
+	// If no -P then accept every password
+	if *debugPassword != "" && c.SaslPassword != *debugPassword {
+		return false
+	}
+	return true
 }
 
 func runKafkaSender(ch <-chan Msg) {
@@ -479,6 +484,16 @@ func parsePayload(ch chan<- Msg, payload []byte) (int, string) {
 		c.Topic = strings.TrimSpace(c.Topic)
 		c.Key = strings.TrimSpace(c.Key)
 		c.Client = strings.TrimSpace(c.Client)
+
+		// In -D mode, check credentials.  Logically this test belongs in runDebugDumper, but by
+		// having it here we can return a sensible response code and thus the client can test the
+		// transmission of the credentials.
+		if *receiveOnly {
+			if !checkCredentials(c) {
+				report(false, "Bad credentials")
+				return 401, "Bad credentials"
+			}
+		}
 
 		// Produce it.
 		ch <- Msg{Control: c, Data: payload[ix:endIx]}
