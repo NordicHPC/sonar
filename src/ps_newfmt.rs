@@ -7,7 +7,7 @@ use crate::posix::time::{format_iso8601, unix_time_to_tm};
 use crate::ps::{CState, ProcInfo, PsOptions, SampleData};
 use crate::systemapi;
 use crate::types::JobID;
-use crate::util::three_places;
+use crate::util::format;
 
 use std::collections::HashMap;
 
@@ -220,11 +220,14 @@ fn format_newfmt_sample(proc_info: &ProcInfo) -> output::Object {
     if proc_info.cpu_percentage != 0.0 {
         fields.push_f(
             SAMPLE_PROCESS_CPU_AVG,
-            three_places(proc_info.cpu_percentage),
+            format::three_places(proc_info.cpu_percentage),
         );
     }
     if proc_info.cpu_util != 0.0 {
-        fields.push_f(SAMPLE_PROCESS_CPU_UTIL, three_places(proc_info.cpu_util));
+        fields.push_f(
+            SAMPLE_PROCESS_CPU_UTIL,
+            format::three_places(proc_info.cpu_util),
+        );
     }
     if proc_info.cputime_sec != 0 {
         fields.push_u(SAMPLE_PROCESS_CPU_TIME, proc_info.cputime_sec);

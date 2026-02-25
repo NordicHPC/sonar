@@ -1,5 +1,4 @@
 mod cluster;
-mod command;
 #[cfg(feature = "daemon")]
 mod daemon;
 #[cfg(feature = "daemon")]

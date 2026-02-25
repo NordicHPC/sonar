@@ -7,7 +7,7 @@
 
 use crate::json_tags::*;
 use crate::systemapi;
-use crate::util;
+use crate::util::format;
 
 use std::io;
 
@@ -222,7 +222,7 @@ fn write_json_object(writer: &mut dyn io::Write, o: &Object) {
 
 fn write_json_string(writer: &mut dyn io::Write, s: &str) {
     let _ = writer.write(b"\"");
-    write_chars(writer, &util::json_quote(s));
+    write_chars(writer, &format::json_quote(s));
     let _ = writer.write(b"\"");
 }
 

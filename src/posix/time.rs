@@ -5,7 +5,7 @@
 // and tzset() should be called before using it (at least once).  Need to figure that out somehow.
 // So far it seems we've not needed to do this.
 
-use crate::util::cstrdup;
+use crate::util::cstrdup::cstrdup;
 use std::num::ParseIntError;
 use std::time::{SystemTime, UNIX_EPOCH};
 
