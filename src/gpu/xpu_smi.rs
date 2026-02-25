@@ -5,7 +5,7 @@
 use crate::gpu::{self, xpu::XpuGPU};
 use crate::ps;
 use crate::types::{Pid, Uid};
-use crate::util::cstrdup;
+use crate::util::cstrdup::cstrdup;
 
 use std::path::Path;
 

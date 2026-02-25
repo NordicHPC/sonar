@@ -1,7 +1,6 @@
 #![allow(clippy::comparison_to_empty)]
 #![allow(clippy::len_zero)]
 
-use crate::command;
 use crate::gpu;
 use crate::gpu::realgpu;
 use crate::jobsapi;
@@ -12,7 +11,8 @@ use crate::posix::time;
 use crate::posix::users;
 use crate::systemapi;
 use crate::types::{JobID, Pid, Uid};
-use crate::util;
+use crate::util::command;
+use crate::util::cstrdup::cstrdup;
 
 use std::boxed::Box;
 use std::cell::{Cell, RefCell};
@@ -235,7 +235,7 @@ impl systemapi::SystemAPI for System {
             if libc::uname(&mut utsname) != 0 {
                 return "".to_string();
             }
-            util::cstrdup(&utsname.sysname)
+            cstrdup(&utsname.sysname)
         }
     }
 
@@ -245,7 +245,7 @@ impl systemapi::SystemAPI for System {
             if libc::uname(&mut utsname) != 0 {
                 return "".to_string();
             }
-            util::cstrdup(&utsname.release)
+            cstrdup(&utsname.release)
         }
     }
 

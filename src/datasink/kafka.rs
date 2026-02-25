@@ -32,6 +32,7 @@ use crate::datasink::DataSink;
 use crate::posix::time::unix_now;
 use crate::systemapi::SystemAPI;
 use crate::util;
+use crate::util::rng::Rng;
 
 use std::cmp::min;
 use std::io::{Read, Write};
@@ -219,7 +220,7 @@ fn kafka_producer(
         make_sender_adapter(cfg, control_and_errors.clone()).expect("Producer creation error");
 
     let mut id = 0usize;
-    let mut rng = util::Rng::new();
+    let mut rng = Rng::new();
     let mut timeout: channel::Receiver<Instant> = channel::never();
     let mut armed = false;
     let mut must_arm = false;
@@ -436,7 +437,7 @@ fn http_producer(
         next = min(600, next * 2);
         retry_count += 1;
     }
-    let mut rng = util::Rng::new();
+    let mut rng = Rng::new();
     let mut timeout: channel::Receiver<Instant> = channel::never();
     let mut armed = false;
     let mut must_arm = false;

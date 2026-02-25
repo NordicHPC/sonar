@@ -1,7 +1,7 @@
 // Rust wrapper around ../../gpuapi/sonar-habana.{c,h}.
 
 use crate::gpu;
-use crate::util::cstrdup;
+use crate::util::cstrdup::cstrdup;
 
 ////// C library API //////////////////////////////////////////////////////////////////////////////
 

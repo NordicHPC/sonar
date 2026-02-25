@@ -5,7 +5,7 @@
 use crate::gpu::{self, amd::AmdGPU};
 use crate::ps;
 use crate::types::Pid;
-use crate::util::cstrdup;
+use crate::util::cstrdup::cstrdup;
 
 ////// C library API //////////////////////////////////////////////////////////////////////////////
 
