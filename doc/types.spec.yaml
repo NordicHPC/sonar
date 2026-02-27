@@ -621,10 +621,6 @@ SlurmJob:
         Data specific to sacct output
 SacctData:
   fields:
-    MinCPU:
-      type: 'uint64'
-      doc: >
-        Minimum (system + user) CPU time of all tasks in job.
     AllocTRES:
       type: 'string'
       doc: >
@@ -653,14 +649,6 @@ SacctData:
       type: 'uint64'
       doc: >
         The job's elapsed time in seconds.
-    SystemCPU:
-      type: 'uint64'
-      doc: >
-        The amount of system CPU time used by the job or job step.
-    UserCPU:
-      type: 'uint64'
-      doc: >
-        The amount of user CPU time used by the job or job step.
     MaxRSS:
       type: 'uint64'
       doc: >
@@ -669,6 +657,18 @@ SacctData:
       type: 'uint64'
       doc: >
         Maximum Virtual Memory size of all tasks in job, in kilobytes.
+    MinCPU:
+      type: 'uint64'
+      doc: >
+        Minimum (system + user) CPU time of all tasks in job.
+    SystemCPU:
+      type: 'uint64'
+      doc: >
+        The amount of system CPU time used by the job or job step.
+    UserCPU:
+      type: 'uint64'
+      doc: >
+        The amount of user CPU time used by the job or job step.
 ClusterEnvelope:
   fields:
     meta:

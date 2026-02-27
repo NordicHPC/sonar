@@ -1020,10 +1020,14 @@ type SlurmJob struct {
 // SacctData are data aggregated by sacct and available if the sampling was done by sacct (as
 // opposed to via the Slurm REST API).  The fields are named as they are in the sacct output, and
 // the field documentation is mostly copied from the sacct man page.
+//
+// NOTE: For the "averages across all tasks in a job" it is unclear how this is computed, whether it
+// is simply the sum of all CPU time (say) used by all the tasks divided by the number of tasks, or
+// whether it is the average CPU time computed individually for each task, further averaged.  I'm
+// going to assume it is the former.  The reason for the confusion is that "average of all tasks" is
+// not precise phrasing.  (The interpretation matters not just for analyzing the data, but for when
+// SacctData must be synthesized from Sonar sample data.)
 type SacctData struct {
-	// Minimum (system + user) CPU time of all tasks in job.
-	MinCPU uint64 `json:"MinCPU,omitempty"`
-
 	// Requested resources.  These are the resources allocated to the job/step after the job
 	// started running.
 	AllocTRES string `json:"AllocTRES,omitempty"`
@@ -1046,17 +1050,20 @@ type SacctData struct {
 	// The job's elapsed time in seconds.
 	ElapsedRaw uint64 `json:"ElapsedRaw,omitempty"`
 
-	// The amount of system CPU time used by the job or job step.
-	SystemCPU uint64 `json:"SystemCPU,omitempty"`
-
-	// The amount of user CPU time used by the job or job step.
-	UserCPU uint64 `json:"UserCPU,omitempty"`
-
 	// Maximum resident set size of all tasks in job, in kilobytes.
 	MaxRSS uint64 `json:"MaxRSS,omitempty"`
 
 	// Maximum Virtual Memory size of all tasks in job, in kilobytes.
 	MaxVMSize uint64 `json:"MaxVMSize,omitempty"`
+
+	// Minimum (system + user) CPU time of all tasks in job.
+	MinCPU uint64 `json:"MinCPU,omitempty"`
+
+	// The amount of system CPU time used by the job or job step.
+	SystemCPU uint64 `json:"SystemCPU,omitempty"`
+
+	// The amount of user CPU time used by the job or job step.
+	UserCPU uint64 `json:"UserCPU,omitempty"`
 }
 
 // On clusters that have centralized cluster management (eg Slurm), the Cluster data reveal

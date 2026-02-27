@@ -1151,9 +1151,12 @@ SacctData are data aggregated by sacct and available if the sampling was done by
 opposed to via the Slurm REST API).  The fields are named as they are in the sacct output, and
 the field documentation is mostly copied from the sacct man page.
 
-#### **`MinCPU`** uint64
-
-Minimum (system + user) CPU time of all tasks in job.
+NOTE: For the "averages across all tasks in a job" it is unclear how this is computed, whether it
+is simply the sum of all CPU time (say) used by all the tasks divided by the number of tasks, or
+whether it is the average CPU time computed individually for each task, further averaged.  I'm
+going to assume it is the former.  The reason for the confusion is that "average of all tasks" is
+not precise phrasing.  (The interpretation matters not just for analyzing the data, but for when
+SacctData must be synthesized from Sonar sample data.)
 
 #### **`AllocTRES`** string
 
@@ -1184,14 +1187,6 @@ Average Virtual Memory size of all tasks in job, in kilobytes.
 
 The job's elapsed time in seconds.
 
-#### **`SystemCPU`** uint64
-
-The amount of system CPU time used by the job or job step.
-
-#### **`UserCPU`** uint64
-
-The amount of user CPU time used by the job or job step.
-
 #### **`MaxRSS`** uint64
 
 Maximum resident set size of all tasks in job, in kilobytes.
@@ -1199,6 +1194,18 @@ Maximum resident set size of all tasks in job, in kilobytes.
 #### **`MaxVMSize`** uint64
 
 Maximum Virtual Memory size of all tasks in job, in kilobytes.
+
+#### **`MinCPU`** uint64
+
+Minimum (system + user) CPU time of all tasks in job.
+
+#### **`SystemCPU`** uint64
+
+The amount of system CPU time used by the job or job step.
+
+#### **`UserCPU`** uint64
+
+The amount of user CPU time used by the job or job step.
 
 ### Type: `ClusterEnvelope`
 
