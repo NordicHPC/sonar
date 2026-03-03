@@ -9,6 +9,11 @@ auto-generated from a Go data structure that specifies the JSON output format.  
 output format can most easily be be seen by diffing this file against a desired tag, starting with
 "v0.13.0".  Such changes are therefore no longer mentioned specially below.
 
+## Changes in v0.18.2 (on `release_0_18`)
+
+* Bug 527 - **IMPORTANT FIX.** Parse non-integral volumes coming from Slurm, notably average disk
+  traffic volumes.
+
 ## Changes in v0.18.1 (on `release_0_18`)
 
 * Bug 516 - **IMPORTANT FUNCTIONALITY.** Introduce `global.hostname-only` as a better way of managing
