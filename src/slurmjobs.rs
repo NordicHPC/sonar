@@ -516,18 +516,41 @@ fn parse_duration(mut val: &str) -> u64 {
 fn parse_volume_kb(val: &str) -> u64 {
     if val != "" {
         let (val, scale) = if let Some(suffix) = val.strip_suffix('K') {
-            (suffix, 1024)
+            (suffix, 1024.0)
         } else if let Some(suffix) = val.strip_suffix('M') {
-            (suffix, 1024 * 1024)
+            (suffix, 1024.0 * 1024.0)
         } else if let Some(suffix) = val.strip_suffix('G') {
-            (suffix, 1024 * 1024 * 1024)
+            (suffix, 1024.0 * 1024.0 * 1024.0)
+        } else if let Some(suffix) = val.strip_suffix('T') {
+            (suffix, 1024.0 * 1024.0 * 1024.0 * 1024.0)
+        } else if let Some(suffix) = val.strip_suffix('P') {
+            (suffix, 1024.0 * 1024.0 * 1024.0 * 1024.0 * 1024.0)
         } else {
-            (val, 1)
+            (val, 1.0)
         };
-        (val.parse::<u64>().unwrap_or(0) * scale).div_ceil(1024)
+        ((val.parse::<f64>().unwrap_or(0.0) * scale) / 1024.0).ceil() as u64
     } else {
         0
     }
+}
+
+#[test]
+pub fn test_parse_volume_kb() {
+    let m = 1024;
+    let g = 1024 * 1024;
+    let t = 1024 * 1024 * 1024;
+    let p = 1024 * 1024 * 1024 * 1024;
+    assert!(parse_volume_kb("1") == 1);
+    assert!(parse_volume_kb("1K") == 1);
+    assert!(parse_volume_kb("1.5K") == 2);
+    assert!(parse_volume_kb("1M") == m);
+    assert!(parse_volume_kb("1.5M") == m + m / 2);
+    assert!(parse_volume_kb("1G") == g);
+    assert!(parse_volume_kb("1.5G") == g + g / 2);
+    assert!(parse_volume_kb("1T") == t);
+    assert!(parse_volume_kb("1.5T") == t + t / 2);
+    assert!(parse_volume_kb("1P") == p);
+    assert!(parse_volume_kb("1.5P") == p + p / 2);
 }
 
 fn render_jobs_newfmt(jobs: &[Box<JobAll>]) -> output::Array {
