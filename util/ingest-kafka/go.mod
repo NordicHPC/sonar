@@ -1,6 +1,6 @@
 module ingest-kafka
 
-go 1.22.1
+go 1.24.10
 
 require (
 	github.com/NordicHPC/sonar/util/formats v0.0.0-00010101000000-000000000000

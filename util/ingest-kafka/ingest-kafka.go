@@ -15,8 +15,10 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"maps"
 	"os"
 	"path"
+	"slices"
 	"time"
 
 	"github.com/NordicHPC/sonar/util/formats/newfmt"
@@ -48,14 +50,10 @@ func main() {
 		*cluster + "." + string(newfmt.DataTagCluster): handleCluster,
 	}
 
-	topicNames := make([]string, 0)
-	for n := range topics {
-		topicNames = append(topicNames, n)
-	}
 	cl, err := kgo.NewClient(
 		kgo.SeedBrokers(*broker),
 		kgo.ConsumerGroup("sonar-ingest"),
-		kgo.ConsumeTopics(topicNames...),
+		kgo.ConsumeTopics(slices.Collect(maps.Keys(topics))...),
 	)
 	if err != nil {
 		log.Fatalf("%s: Failed to create client: %v", *cluster, err)
