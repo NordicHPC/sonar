@@ -1021,12 +1021,24 @@ type SlurmJob struct {
 // opposed to via the Slurm REST API).  The fields are named as they are in the sacct output, and
 // the field documentation is mostly copied from the sacct man page.
 //
-// NOTE: For the "averages across all tasks in a job" it is unclear how this is computed, whether it
-// is simply the sum of all CPU time (say) used by all the tasks divided by the number of tasks, or
-// whether it is the average CPU time computed individually for each task, further averaged.  I'm
-// going to assume it is the former.  The reason for the confusion is that "average of all tasks" is
-// not precise phrasing.  (The interpretation matters not just for analyzing the data, but for when
-// SacctData must be synthesized from Sonar sample data.)
+// NOTE: About the "averages across all tasks in a job": The precise interpretation matters not just
+// for analyzing the data, but for when SacctData must be synthesized from Sonar sample data.  But
+// the interpretation is not always clear.
+//
+// For AveCPU, AveDiskRead, and AveDiskWrite we sum the latest values of Cpu time, Bytes read, and
+// Bytes written, respectively, and divide by the current number of tasks in the job.  (For
+// completed jobs this is obvious, for running tasks it is the values at the time the reading is
+// taken.)
+//
+// For AveRSS and AveVMSize it is less obvious, as these are not cumulative and there's not an
+// obvious "final" or "most recent" value.  Is AveRSS the average across tasks of the tasks' average
+// RSS, or is it the average across time over the sums of RSS across processes at each time point
+// (aka the sum of all readings divided by the number of readings times the number of tasks)?  These
+// two are not the same unless the sample points are somehow closely synchronized, and there's no
+// reason they should be, nor why there should be the same number of samples in each task.  And it's
+// not given that there isn't a "max" hidden somewhere, as in, AveRSS could be the average across
+// tasks of their max RSS.  The most sensible interpretation is probably the former: an average RSS
+// is computed per task, and then these are averaged for the job.
 type SacctData struct {
 	// Requested resources.  These are the resources allocated to the job/step after the job
 	// started running.
