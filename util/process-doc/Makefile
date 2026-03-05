@@ -1,4 +1,4 @@
-.PHONY: all generate format test install
+.PHONY: all generate format test install clean
 
 INPUT=../formats/newfmt/types.go
 OUTPUTS=NEW-FORMAT.md json_tags.rs types.spec.yaml
@@ -31,3 +31,6 @@ format:
 
 test:
 	go test
+
+clean:
+	go clean

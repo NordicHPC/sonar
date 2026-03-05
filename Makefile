@@ -26,6 +26,8 @@ install: target/release/sonar
 clean:
 	( if [[ -n "$(MODULES)" ]]; then module load $(MODULES) ; fi ; \
 	  cargo clean )
+	( if [[ -n "$(MODULES)" ]]; then module load $(MODULES) ; fi ; \
+	  cd util ; $(MAKE) clean )
 	rm -f configure.mk
 
 # This is where the real action is, see doc/HOWTO-DEVELOP.md.

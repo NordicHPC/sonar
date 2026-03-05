@@ -1,29 +1,18 @@
-SHELL=/bin/bash
-
-.PHONY: all test format generate
+.PHONY: all test format generate clean
 
 all:
 	@echo "Pick an explicit target"
 
+clean:
+	go clean
+
 generate:
-	@if [[ $$(command -v go) != "" ]]; then \
-		( cd newfmt ; go generate ); \
-	else \
-		echo "Skipping formats generation - no go executable"; \
-	fi
+	( cd newfmt ; go generate )
 
 test:
-	@if [[ $$(command -v go) != "" ]]; then \
-		go test; \
-		( cd newfmt ; go test ); \
-	else \
-		echo "Skipping formats test - no go executable"; \
-	fi
+	go test
+	( cd newfmt ; go test )
 
 format:
-	@if [[ $$(command -v go) != "" ]]; then \
-		go fmt; \
-		( cd newfmt ; go fmt ); \
-	else \
-		echo "Skipping formats fmt - no go executable"; \
-	fi
+	go fmt
+	( cd newfmt ; go fmt )

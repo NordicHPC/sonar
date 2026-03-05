@@ -1,4 +1,7 @@
-.PHONY: generate test format
+.PHONY: generate test format clean
+
+clean:
+	go clean
 
 generate:
 

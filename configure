@@ -7,7 +7,7 @@ modules=""
 rust=""
 gcc=""
 go=""
-module purge
+module -q purge
 if [[ -n $(command -v module) ]]; then
     # Hard to believe how difficult it is to get module to provide a sensible list
     if [[ -z $(command -v cargo) ]]; then
