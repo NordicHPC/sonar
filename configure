@@ -1,0 +1,41 @@
+#!/usr/bin/env bash
+#
+# Very poor man's configure.  This generates configure.mk based on the environment.  No options are
+# provided.
+
+modules=""
+rust=""
+gcc=""
+go=""
+module purge
+if [[ -n $(command -v module) ]]; then
+    # Hard to believe how difficult it is to get module to provide a sensible list
+    if [[ -z $(command -v cargo) ]]; then
+        rust=$(module -r --terse spider '^Rust/' 2>&1 | grep Rust/ | tail -n 1)
+        module load $rust
+    fi
+    # Usually, loading rust will load gcc
+    if [[ -z $(command -v gcc) ]]; then
+        rust=$(module -r --terse spider '^GCC/' 2>&1 | grep GCC/ | tail -n 1)
+        module load $gcc
+    fi
+    if [[ -z $(command -v go) ]]; then
+        go=$(module -r --terse spider '^Go/' 2>&1 | grep Go/ | tail -n 1)
+        module load $go
+    fi
+fi
+
+if [[ -z $(command -v cargo) ]]; then
+    echo "No Rust"
+    exit 1
+fi
+if [[ -z $(command -v gcc) ]]; then
+    echo "No GCC"
+    exit 1
+fi
+if [[ -z $(command -v go) ]]; then
+    echo "No Go"
+    exit 1
+fi
+
+echo "MODULES=$rust $gcc $go" > configure.mk
