@@ -1,4 +1,4 @@
-.PHONY: all release test format generate
+.PHONY: all release test format generate clean
 
 all:
 	@echo "Select a specific target"
@@ -28,3 +28,5 @@ test:
 format:
 	go fmt
 
+clean:
+	go clean
