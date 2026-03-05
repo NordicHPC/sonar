@@ -2,6 +2,14 @@
 #
 # Very poor man's configure.  This generates configure.mk based on the environment.  No options are
 # accepted.  This tries to use `module` to load things not present, not always a smooth ride.
+#
+# At the moment, this is here just to enable a configure && make && make install workflow.
+#
+# This does not yet deal with figuring out whether, say, headers for specific GPUs are available on
+# the system so as to allow GPU shims to be rebuilt.  That would be a little involved: if nvidia
+# recompilation is enabled, try compiling with #include <nvml.h>; if it fails, try finding a Cuda
+# module and loading that and retrying; etc.  The default should still be to just link with all the
+# prebuilt shims.
 
 modules=""
 rust=""
@@ -11,6 +19,7 @@ if [[ -n $(command -v module) ]]; then
     # Not all versions of `module` like -q and not all print errors on stderr
     module -q purge 2>&1 > /dev/null
     # Hard to believe how difficult it is to get module to provide a sensible list
+    # TODO: There's an assumption here that at least one version will be found for each key.
     if [[ -z $(command -v cargo) ]]; then
         rust=$(module -r --terse spider '^Rust/' 2>&1 | grep Rust/ | tail -n 1)
         module load $rust
