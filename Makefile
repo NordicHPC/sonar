@@ -17,6 +17,9 @@ src/json_tags.rs: util/formats/newfmt/types.go
 
 # FIXME: This needs to deal with a prefix for the target dir, not sure what yet.  The sources are
 # assumed to be relative to the current directory in a build setting.
+#
+# FIXME: target/release/sonar does not update target/release-with-debug/sonar!  But the latter
+# is required by RPM builds.
 
 install: target/release/sonar
 	$(INSTALL) -p -D -m 0755 -t /usr/local/lib/sonar target/release-with-debug/sonar
