@@ -10,8 +10,7 @@ include configure.mk
 default: target/release/sonar
 
 target/release/sonar: src/*.rs src/*/*.rs gpuapi/$(ARCH)/*.a
-	( for module in $(MODULES) ; do module load $$module ; done ; \
-	  if [[ -n "$(MODULES)" ]]; then module list ; fi ; \
+	( if [[ -n "$(MODULES)" ]]; then module load $(MODULES) ; fi ; \
 	  cargo build --release )
 
 src/json_tags.rs: util/formats/newfmt/types.go
@@ -25,37 +24,50 @@ install: target/release/sonar
 	@echo ""
 
 clean:
-	cargo clean
+	( if [[ -n "$(MODULES)" ]]; then module load $(MODULES) ; fi ; \
+	  cargo clean )
 	rm -f configure.mk
 
 # This is where the real action is, see doc/HOWTO-DEVELOP.md.
 
 debug:
-	CARGO_TARGET_DIR=target/$(ARCH) cargo build
+	( if [[ -n "$(MODULES)" ]]; then module load $(MODULES) ; fi ; \
+	  CARGO_TARGET_DIR=target/$(ARCH) cargo build )
 
 release:
-	CARGO_TARGET_DIR=target/$(ARCH) cargo build --release
+	( if [[ -n "$(MODULES)" ]]; then module load $(MODULES) ; fi ; \
+	  CARGO_TARGET_DIR=target/$(ARCH) cargo build --release )
 
 build: generate format release
 
 # Build everything then run all test suites
 test: debug release
-	cargo test
-	( cd util ; $(MAKE) test )
-	( cd tests; $(MAKE) test )
+	( if [[ -n "$(MODULES)" ]]; then module load $(MODULES) ; fi ; \
+	  cargo test )
+	( if [[ -n "$(MODULES)" ]]; then module load $(MODULES) ; fi ; \
+	  cd util ; $(MAKE) test )
+	( if [[ -n "$(MODULES)" ]]; then module load $(MODULES) ; fi ; \
+	  cd tests; $(MAKE) test )
 
 # Reformat all sources
 format:
-	cargo fmt
-	( cd util ; $(MAKE) format )
-	( cd tests ; $(MAKE) format )
-	( cd gpuapi ; $(MAKE) format )
+	( if [[ -n "$(MODULES)" ]]; then module load $(MODULES) ; fi ; \
+	  cargo fmt )
+	( if [[ -n "$(MODULES)" ]]; then module load $(MODULES) ; fi ; \
+	  cd util ; $(MAKE) format )
+	( if [[ -n "$(MODULES)" ]]; then module load $(MODULES) ; fi ; \
+	  cd tests ; $(MAKE) format )
+	( if [[ -n "$(MODULES)" ]]; then module load $(MODULES) ; fi ; \
+	  cd gpuapi ; $(MAKE) format )
 
 # (Re)generate all files that are generated
 generate:
-	( cd build-dist ; $(MAKE) generate )
-	( cd util ; $(MAKE) generate )
-	( cd tests ; $(MAKE) generate )
+	( if [[ -n "$(MODULES)" ]]; then module load $(MODULES) ; fi ; \
+	  cd build-dist ; $(MAKE) generate )
+	( if [[ -n "$(MODULES)" ]]; then module load $(MODULES) ; fi ; \
+	  cd util ; $(MAKE) generate )
+	( if [[ -n "$(MODULES)" ]]; then module load $(MODULES) ; fi ; \
+          cd tests ; $(MAKE) generate )
 
 # https://github.com/lars-t-hansen/gotags, you can also use etags here for less interesting info
 RSSRC=$(shell find src -name '*.rs')
