@@ -368,7 +368,7 @@ SampleDisk:
     stats:
       type: '[]uint64'
       doc: >
-        Disk stats values in the order present in /proc/diskstats, see https://github.com/torvalds/linux/blob/master/Documentation/admin-guide/iostats.rst for full documentation.  Note counters may sometimes wrap around, and they will be reset on reboot. See also the Boot field.
+        Disk stats values in the order present in /proc/diskstats.  Documentation: Linux 6.x has Documentation/admin-guide/iostats.rst [1].  Older kernels have Documentation/iostats.txt [2].  Note: - The layout of this array changes between kernel versions and may require knowledge of   the kernel version to interpret.  See the OsRelease field in SysinfoAttributes. - In particular, the length of the array is not constant across kernel versions, though it   appears new fields are always appended. - Counters may sometimes wrap around, and they will be reset on reboot.  See also the Boot   field in SampleSystem. - Field interpretation may also vary between versions. - The field should be considered experimental; when it was introduced, we did not know which   data would be interesting.  It may be augmented by other fields in the future.  [1] https://github.com/torvalds/linux/blob/master/Documentation/admin-guide/iostats.rst. [2] https://elixir.bootlin.com/linux/v4.18.20/source/Documentation/iostats.txt.
 SampleJob:
   fields:
     job:
