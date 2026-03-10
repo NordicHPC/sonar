@@ -21,6 +21,10 @@ that run Sonar in one-shot mode and captures stdout output.)
 Again, the user manual describes how to write configuration files, generate crypto materials, and so
 on.
 
+Alternatively, the Sonar data can be captured in a directory tree on the node itself.  This is
+useful for single-node cloud deployments where there can be no central aggregator, and for
+experimental work.  See [Cloud deployment](#cloud-deployment) below.
+
 ## Sonar running under systemd
 
 Sonar can be installed from RPMs into system directories so that it can be run under systemd.  See
@@ -119,3 +123,49 @@ To add the user with a home directory matching the default install location:
 ```
 sudo useradd -r -g sonar -M -d /usr/local/lib/sonar -s /sbin/nologin -c "Sonar profiling daemon" sonar
 ```
+
+## Cloud deployment
+
+In a simple cloud setting, the nodes are individual VMs that don't communicate and there is no
+single aggregator to exfiltrate data to.  In this case, Sonar will be installed in the normal manner
+(eg from RPM) and will run under systemd, or will be started in the background from a shell, and the
+configuration file will specify a directory as the data sink.  Typically for a systemd setup this
+directory will be placed in `/var/log` and will be writable by the sonar user, it must be created by
+the install process.
+
+A Sonar config file for relatively high-frequency sampling might look like this (from
+`../example/system-vm-deploy.cfg`):
+
+```
+[global]
+cluster = my-cluster
+role = node
+
+[directory]
+data-directory = /var/log/sonar/my-cluster
+
+[sysinfo]
+cadence = 1h
+
+[sample]
+cadence = 30s
+min-cpu-time = 60s
+exclude-commands = bash,ssh,zsh,tmux,systemd
+```
+
+There is nothing special about the directory tree, it contains no references outside itself and can
+be moved freely to other machines for storage, safekeeping, and subsequent analysis.  Then
+[Jobanalyzer](https://github.com/NAICNO/Jobanalyzer) can be used to examine the data using its
+`sonalyze` program, for example in the simplest form to list jobs:
+
+```
+sonalyze jobs -user - -data-dir /var/log/sonar/my-cluster
+```
+
+or the VM configuration:
+
+```
+sonalyze node -data-dir /var/log/sonar/my-cluster
+```
+
+See the sonalyze manual for more or run `sonalyze help`.
