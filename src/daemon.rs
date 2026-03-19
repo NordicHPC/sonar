@@ -178,6 +178,7 @@ impl Dur {
 // - it fails to setup an interrupt handler
 // - an exit control message is received from the broker
 // - a signal is received from the OS or user that signifies an exit condition
+// - it fails to run a crucial program (eg curl if using http exfiltration)
 //
 // Other errors require threads to post messages back to the main thread.
 //

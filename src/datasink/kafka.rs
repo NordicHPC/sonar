@@ -481,7 +481,7 @@ fn http_producer(
 // sure never to exceed that.
 
 fn http_send_messages(
-    cmd: &str,
+    cmd_name: &str,
     api_endpoint: &str,
     http_proxy: &str,
     client_id: &str,
@@ -506,7 +506,8 @@ fn http_send_messages(
     args.push(api_endpoint.to_string());
 
     // Really want to merge stdout and stderr
-    let mut cmd = std::process::Command::new(cmd);
+    let mut cmd = std::process::Command::new(cmd_name);
+    log::debug!("Curl: {cmd_name} {:?}", args);
     cmd.args(args)
         .stdin(std::process::Stdio::piped())
         .stdout(std::process::Stdio::piped())
