@@ -457,7 +457,16 @@ fn http_producer(
                 armed = false;
                 // Note, the /Sending {} items/ pattern is used by regression tests.
                 log::debug!("Sending window open.  Sending {} items", backlog.len());
-                http_send_messages(cmd, api_endpoint, http_proxy, client_id, retry_count, &sasl_identity, &control_and_errors, backlog);
+                http_send_messages(
+                    cmd,
+                    api_endpoint,
+                    http_proxy,
+                    client_id,
+                    retry_count,
+                    &sasl_identity,
+                    &control_and_errors,
+                    backlog,
+                );
                 backlog = vec![];
             }
             recv(incoming_message_queue) -> msg => match msg {
@@ -466,9 +475,18 @@ fn http_producer(
                     must_arm = !armed;
                 }
                 Ok(Message::Stop) | Err(_) => {
-            if backlog.len() > 0 {
-                        http_send_messages(cmd, api_endpoint, http_proxy, client_id, retry_count, &sasl_identity, &control_and_errors, backlog);
-            }
+                    if backlog.len() > 0 {
+                        http_send_messages(
+                            cmd,
+                            api_endpoint,
+                            http_proxy,
+                            client_id,
+                            retry_count,
+                            &sasl_identity,
+                            &control_and_errors,
+                            backlog,
+                        );
+                    }
                     break 'producer_loop;
                 }
             }
