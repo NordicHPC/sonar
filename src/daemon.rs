@@ -201,10 +201,10 @@ pub fn daemon_mode(
     let mut ini = match parse_config(config_file) {
         Ok(ini) => {
             install_logger(if ini.debug.verbose {
-                    log::LevelFilter::Debug
-                } else {
-                    log::LevelFilter::Warn
-                });
+                log::LevelFilter::Debug
+            } else {
+                log::LevelFilter::Warn
+            });
             ini
         }
         Err(e) => {

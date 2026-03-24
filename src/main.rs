@@ -309,12 +309,50 @@ fn attach_common(
     system
 }
 
+struct Logger {
+    level: log::LevelFilter,
+    console_logger: simple_logger::SimpleLogger,
+    syslog_logger: syslog::BasicLogger,
+}
+
+impl log::Log for Logger {
+    fn enabled(&self, metadata: &log::Metadata<'_>) -> bool {
+        self.level >= log::LevelFilter::Error && metadata.level() <= self.level
+    }
+
+    fn log(&self, record: &log::Record<'_>) {
+        if self.level >= log::LevelFilter::Error && record.level() <= self.level {
+            self.console_logger.log(record);
+            if record.level() <= log::LevelFilter::Warn {
+                self.syslog_logger.log(record);
+            }
+        }
+    }
+
+    fn flush(&self) {
+        self.console_logger.flush();
+        self.syslog_logger.flush();
+    }
+}
+
 pub fn install_logger(level: log::LevelFilter) {
-    let log = Box::new(simple_logger::SimpleLogger::new()
-                       .with_level(level)
-                       .env());
+    let console_logger = simple_logger::SimpleLogger::new().with_level(level).env();
+    let syslog_formatter = syslog::Formatter3164 {
+        facility: syslog::Facility::LOG_USER,
+        hostname: None,
+        process: "sonar".to_string(),
+        pid: 0,
+    };
+    let syslog_logger = syslog::BasicLogger::new(
+        syslog::unix(syslog_formatter).expect("Syslog formatter should work"),
+    );
+    let logger = Logger {
+        level,
+        console_logger,
+        syslog_logger,
+    };
     log::set_max_level(level);
-    log::set_boxed_logger(log).expect("Logger should be set up");
+    log::set_boxed_logger(Box::new(logger)).expect("Logger should be set up");
 }
 
 // For the sake of simplicity:
