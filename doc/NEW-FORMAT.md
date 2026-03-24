@@ -517,11 +517,14 @@ The node's boot time
 
 #### **`cpus`** []SampleCpu
 
-The state of individual cores
+The state of individual cores.  These are sorted in index order, and the array is always dense and
+of length Sockets * CoresPerSocket * ThreadsPerCore (from SysinfoAttributes for the node).
 
 #### **`gpus`** []SampleGpu
 
-The state of individual GPU devices
+The state of individual GPU devices.  These are sorted in card index order, but the array may
+be sparse (some indices missing) and may in principle change in length and index set from
+sample to sample.
 
 #### **`disks`** []SampleDisk
 
