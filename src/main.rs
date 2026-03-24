@@ -336,7 +336,9 @@ impl log::Log for Logger {
 }
 
 pub fn install_logger(initial_level: log::LevelFilter) {
-    let console_logger = simple_logger::SimpleLogger::new().with_level(initial_level).env();
+    let console_logger = simple_logger::SimpleLogger::new()
+        .with_level(initial_level)
+        .env();
     // The simple_logger will have read the environment.
     let level = console_logger.max_level();
     let syslog_formatter = syslog::Formatter3164 {
