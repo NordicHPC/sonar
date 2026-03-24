@@ -1288,6 +1288,11 @@ pub fn test_parser() {
     assert!(parse_duration("", "35", true).is_err());
     assert!(parse_duration("", "12m35s", true).is_err());
     assert!(parse_duration("", "3H12M35X", true).is_err());
+    assert!(parse_volume("", "37").unwrap() == 37);
+    assert!(parse_volume("", "5K").unwrap() == 1024 * 5);
+    assert!(parse_volume("", "30M").unwrap() == 1024 * 1024 * 30);
+    assert!(parse_volume("", "3G").unwrap() == 1024 * 1024 * 1024 * 3);
+    assert!(parse_volume("", "3T").is_err());
 
     let ini = parse_config("src/testdata/daemon-stdio-config.txt").unwrap();
 
