@@ -118,13 +118,17 @@ ca-file = /usr/local/lib/sonar/secrets/my-aggregator-ca.crt
 
 For proxied access, the address of the Kafka HTTP proxy endpoint (a URL that will receive a POST) is
 given by `rest-endpoint`, and if the local HTTP proxy settings are not given by the environment in
-which Sonar is running then they can be specified using the `http-proxy` setting.
+which Sonar is running then they can be specified using the `http-proxy` setting.  The
+`http-payload-limit` can be set if a lot of data are to be transmitted (as when the `[jobs]`
+operation reports pending and running jobs) and the HTTP server at the endpoint complains about too
+large packets; it is typically combined with `batch-size` in that section.
 
 Example:
 ```bash
 [kafka]
 rest-endpoint = https://my-aggregator.uio.no/kprox
 http-proxy = http://proxy.saga:1234/
+http-payload-limit = 1M
 ```
 
 The protocol used for communicating with the Kafka HTTP proxy is custom and requires a custom proxy
@@ -249,7 +253,8 @@ completed) activity.
 The `batch-size` attribute is used to divide up the data into packets of a sensible size, and this
 may be particularly important if `uncompleted` is true.  Too-large packets may be rejected by a
 Kafka broker if it has not been configured correctly.  A value of 500 seems to fit well with the
-default Kafka packet limit of 1MB.
+default Kafka packet limit of 1MB.  Also see the related `http-payload-limit` in the `[kafka]`
+section.
 
 Example:
 ```

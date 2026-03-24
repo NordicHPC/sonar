@@ -22,9 +22,10 @@ section has a `[section-name]` header on a line by itself.  Within the sections,
 may be quoted with `'`, `"`, or "`"; these quotes are stripped.  Blanks before and after names and
 values are stripped.
 
-Boolean values are `true` or `false`.  Duration values express a time value using the syntax `__h`,
-`__m`, or `__s`, denoting hour, minute, or second values (uppercase HMS also allowed); values must
-be nonzero. For cadences, second values must divide a minute evently and be < 60, minute values must
+Boolean values are `true` or `false`.  Volume values are either a number of bytes or a number
+followed by `K`, `M`, or `G`.  Duration values express a time value using the syntax `__h`, `__m`,
+or `__s`, denoting hour, minute, or second values (uppercase HMS also allowed); values must be
+nonzero. For cadences, second values must divide a minute evently and be < 60, minute values must
 divide an hour evenly and < 60, and hour values must divide a day evenly or be a positive multiple
 of 24.  (Some sensible cadences such as 80m aka 1h20m, which divides the day evenly, are not
 currently expressible.)
@@ -71,6 +72,7 @@ back-end to deal with the diversity.
 broker-address = <hostname and port>
 rest-endpoint = <url>
 http-proxy = <url>
+http-payload-limit = <volume value>             # default none
 sending-window = <duration value>               # default 5m
 timeout = <duration value>                      # default 30m
 ca-file = <filename>                            # default none
@@ -87,9 +89,13 @@ HTTP proxy), the `rest-endpoint` should be set instead of the `broker-address`, 
 full URL for an API endpoint that will receive a POST with data destined for the Kafka broker.  In
 this case, `ca-file` will currently be ignored - normally the URL will be https to protect the
 credentials and data and the system's normal https crypto materials will be used for authenticating
-the connection.  When `rest-endpoint` is used, `http-proxy` can be used to set the local proxy
-address, in the event this is not set in the environment.  See the "Kafka REST proxy" section of
-[HOWTO-KAFKA](HOWTO-KAFKA.md) for more.
+the connection.
+
+When `rest-endpoint` is used, `http-proxy` can be used to set the local proxy address, in the event
+this is not set in the environment, and `http-payload-limit` can be set to limit message sizes sent
+by the POST (many web servers have a set limit, for example, nginx limits messages to 1MB by
+default).  See the "Kafka REST proxy" section of [HOWTO-KAFKA](HOWTO-KAFKA.md) for more, and also
+note the `batch-size` in the `[jobs]` section, which can be used to control message sizes.
 
 All available data are sent to the data sink at some random time within the `sending-window`, which
 starts at the point when data become available to send.
@@ -166,7 +172,9 @@ transmissions for the job in the PENDING state will be seen.
 If `batch-size` is set it provides the maximum number of job records per output message.  This is
 basically a hack, but if `uncompleted` is true the message volume can be very large, and messages
 may become so large that they cause transmission issues, notably by default Kafka limits messages to
-1MB in size.  Setting `batch-size` can alleviate some of these problems.
+1MB in size and some web servers (if using `rest-endpoint`) limit the size of payloads.  Setting
+`batch-size` in `[jobs]` (and setting `http-payload-limit` in `[kafka]`) can alleviate some of these
+problems.
 
 ### `[cluster]` section
 

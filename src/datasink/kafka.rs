@@ -53,6 +53,13 @@ struct Msg {
     value: String,
 }
 
+impl Msg {
+    // This can return an estimate, but it's better to overestimate than underestimate.
+    fn size(&self) -> usize {
+        return self.topic.len() + self.key.len() + self.value.len() + 20;
+    }
+}
+
 enum Message {
     Stop,
     M(Msg),
@@ -101,6 +108,7 @@ impl KafkaSink {
                     );
                 })
             } else {
+                let cutoff = kafka.http_payload_limit.clone();
                 let rest_endpoint = kafka.rest_endpoint.clone();
                 let http_proxy = kafka.http_proxy.clone();
                 let curl_cmd = if let Some(ref curl) = ini.programs.curl_cmd {
@@ -110,6 +118,7 @@ impl KafkaSink {
                 };
                 thread::spawn(move || {
                     http_producer(
+                        cutoff,
                         &curl_cmd,
                         &rest_endpoint,
                         &http_proxy,
@@ -418,6 +427,7 @@ fn make_sender_adapter(
 // stdin/stdout/stderr and the final wait.
 
 fn http_producer(
+    cutoff: Option<usize>,
     cmd: &str,
     api_endpoint: &str,
     http_proxy: &str,
@@ -458,6 +468,7 @@ fn http_producer(
                 // Note, the /Sending {} items/ pattern is used by regression tests.
                 log::debug!("Sending window open.  Sending {} items", backlog.len());
                 http_send_messages(
+                    cutoff,
                     cmd,
                     api_endpoint,
                     http_proxy,
@@ -477,6 +488,7 @@ fn http_producer(
                 Ok(Message::Stop) | Err(_) => {
                     if backlog.len() > 0 {
                         http_send_messages(
+                            cutoff,
                             cmd,
                             api_endpoint,
                             http_proxy,
@@ -497,10 +509,8 @@ fn http_producer(
     thread::sleep(Duration::from_millis(5000));
 }
 
-// TODO: Must control message volume!  The broker limits the content-length to 1GB and we must be
-// sure never to exceed that.
-
 fn http_send_messages(
+    cutoff: Option<usize>,
     cmd_name: &str,
     api_endpoint: &str,
     http_proxy: &str,
@@ -508,7 +518,64 @@ fn http_send_messages(
     retry_count: i32,
     sasl_identity: &Option<(String, String)>,
     control_and_errors: &channel::Sender<Operation>,
-    backlog: Vec<Msg>,
+    mut backlog: Vec<Msg>,
+) {
+    if let Some(cutoff) = cutoff {
+        while backlog.len() > 0 {
+            let mut i = 0;
+            let mut sz = 0usize;
+            while i < backlog.len() {
+                // "100" is for punctuation, field names, etc, of the control object.
+                let newsz = sz + backlog[i].size() + 100;
+                if newsz >= cutoff {
+                    break;
+                }
+                sz = newsz;
+                i += 1;
+            }
+            if i == 0 {
+                log::error!(
+                    "Message of size {} is too large to send, should not happen",
+                    backlog[0].size()
+                );
+            }
+            let new_backlog = backlog.split_off(i);
+            let to_send = backlog;
+            backlog = new_backlog;
+            http_send_some_messages(
+                cmd_name,
+                api_endpoint,
+                http_proxy,
+                client_id,
+                retry_count,
+                sasl_identity,
+                control_and_errors,
+                to_send,
+            );
+        }
+    } else {
+        http_send_some_messages(
+            cmd_name,
+            api_endpoint,
+            http_proxy,
+            client_id,
+            retry_count,
+            sasl_identity,
+            control_and_errors,
+            backlog,
+        );
+    }
+}
+
+fn http_send_some_messages(
+    cmd_name: &str,
+    api_endpoint: &str,
+    http_proxy: &str,
+    client_id: &str,
+    retry_count: i32,
+    sasl_identity: &Option<(String, String)>,
+    control_and_errors: &channel::Sender<Operation>,
+    msgs: Vec<Msg>,
 ) {
     let mut args = vec![
         "--silent".to_string(),
@@ -553,7 +620,7 @@ fn http_send_messages(
                         topic,
                         key,
                         value,
-                    } in backlog
+                    } in msgs
                     {
                         let _ = timestamp;
                         let data_size = value.len();
