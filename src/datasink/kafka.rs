@@ -457,7 +457,16 @@ fn http_producer(
                 armed = false;
                 // Note, the /Sending {} items/ pattern is used by regression tests.
                 log::debug!("Sending window open.  Sending {} items", backlog.len());
-                http_send_messages(cmd, api_endpoint, http_proxy, client_id, retry_count, &sasl_identity, &control_and_errors, backlog);
+                http_send_messages(
+                    cmd,
+                    api_endpoint,
+                    http_proxy,
+                    client_id,
+                    retry_count,
+                    &sasl_identity,
+                    &control_and_errors,
+                    backlog,
+                );
                 backlog = vec![];
             }
             recv(incoming_message_queue) -> msg => match msg {
@@ -466,7 +475,18 @@ fn http_producer(
                     must_arm = !armed;
                 }
                 Ok(Message::Stop) | Err(_) => {
-                    http_send_messages(cmd, api_endpoint, http_proxy, client_id, retry_count, &sasl_identity, &control_and_errors, backlog);
+                    if backlog.len() > 0 {
+                        http_send_messages(
+                            cmd,
+                            api_endpoint,
+                            http_proxy,
+                            client_id,
+                            retry_count,
+                            &sasl_identity,
+                            &control_and_errors,
+                            backlog,
+                        );
+                    }
                     break 'producer_loop;
                 }
             }
@@ -481,7 +501,7 @@ fn http_producer(
 // sure never to exceed that.
 
 fn http_send_messages(
-    cmd: &str,
+    cmd_name: &str,
     api_endpoint: &str,
     http_proxy: &str,
     client_id: &str,
@@ -506,7 +526,8 @@ fn http_send_messages(
     args.push(api_endpoint.to_string());
 
     // Really want to merge stdout and stderr
-    let mut cmd = std::process::Command::new(cmd);
+    let mut cmd = std::process::Command::new(cmd_name);
+    log::debug!("Curl: {cmd_name} {:?}", args);
     cmd.args(args)
         .stdin(std::process::Stdio::piped())
         .stdout(std::process::Stdio::piped())
@@ -539,9 +560,15 @@ fn http_send_messages(
                         let ctrl = format!(
                             "\n{{\"topic\":\"{topic}\",\"key\":\"{key}\",\"client\":\"{client}\",{cred}\"data-size\":{data_size}}}\n"
                         );
-                        let _ = stdin.write_all(ctrl.as_bytes());
-                        let _ = stdin.write_all(value.as_bytes());
+                        if let Err(err) = stdin.write_all(ctrl.as_bytes()) {
+                            log::debug!("Failed to write control object: {:?}", err);
+                        }
+                        if let Err(err) = stdin.write_all(value.as_bytes()) {
+                            log::debug!("Failed to write data blob size {data_size}: {:?}", err);
+                        }
                     }
+                    // Does this happen too soon?  As in, if there's enough data, will the consumer
+                    // not have finished consuming?  Or will it just flush things and all will be fine?
                     drop(stdin);
                 }));
                 // Separate threads do the output consuming and waiting for curl to finish, in order to
@@ -558,6 +585,8 @@ fn http_send_messages(
                 // to fork off these thread until writing has completed.  We could maybe combine the
                 // two reader threads into one using some kind of nonblocking I/O.  Maybe there are
                 // other tricks.
+                //
+                // 1K buffer is enough to see interesting errors.
                 drop(std::thread::spawn(move || {
                     let mut buf = [0; 1024];
                     loop {
@@ -565,7 +594,14 @@ fn http_send_messages(
                             Err(_) | Ok(0) => {
                                 break;
                             }
-                            Ok(_) => {}
+                            Ok(n) => {
+                                // This is the common case even when curl fails to deliver when
+                                // the server rejects the message.
+                                log::debug!(
+                                    "Curl succeeded with output: {}",
+                                    String::from_utf8_lossy(&buf[..n])
+                                );
+                            }
                         }
                     }
                     drop(stdout);
@@ -577,7 +613,12 @@ fn http_send_messages(
                             Err(_) | Ok(0) => {
                                 break;
                             }
-                            Ok(_) => {}
+                            Ok(n) => {
+                                log::debug!(
+                                    "Curl failed with output {}",
+                                    String::from_utf8_lossy(&buf[..n])
+                                );
+                            }
                         }
                     }
                     drop(stderr);
