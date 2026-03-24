@@ -525,13 +525,16 @@ fn http_send_messages(
             // "100" is for punctuation, field names, etc, of the control object.
             let newsz = sz + backlog[i].size() + 100;
             if newsz >= XMIT_CUTOFF {
-                break
+                break;
             }
             sz = newsz;
             i += 1;
         }
         if i == 0 {
-            log::error!("Message of size {} is too large to send, should not happen", backlog[0].size());
+            log::error!(
+                "Message of size {} is too large to send, should not happen",
+                backlog[0].size()
+            );
         }
         let new_backlog = backlog.split_off(i);
         let to_send = backlog;
