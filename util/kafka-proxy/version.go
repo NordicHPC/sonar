@@ -2,4 +2,4 @@
 
 package main
 
-const version = "0.18.3"
+const version = "0.18.4"
