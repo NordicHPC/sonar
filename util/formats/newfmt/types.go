@@ -482,10 +482,13 @@ type SampleSystem struct {
 	// The node's boot time
 	Boot Timestamp `json:"boot"`
 
-	// The state of individual cores
+	// The state of individual cores.  These are sorted in index order, and the array is always dense and
+	// of length Sockets * CoresPerSocket * ThreadsPerCore (from SysinfoAttributes for the node).
 	Cpus []SampleCpu `json:"cpus,omitempty"`
 
-	// The state of individual GPU devices
+	// The state of individual GPU devices.  These are sorted in card index order, but the array may
+	// be sparse (some indices missing) and may in principle change in length and index set from
+	// sample to sample.
 	Gpus []SampleGpu `json:"gpus,omitempty"`
 
 	// The state of individual disks
