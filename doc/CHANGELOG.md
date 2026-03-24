@@ -19,6 +19,7 @@ output format can most easily be be seen by diffing this file against a desired 
 ## Changes in v0.18.4 (on `release_0_18`)
 
 * Bug 535 - Log warnings and errors to the syslog
+* Bug 536 - Implement a setting to limit the amount of data transmitted at one time
 
 ## Changes in v0.18.2 (on `release_0_18`)
 
