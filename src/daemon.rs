@@ -1272,8 +1272,8 @@ pub fn test_parser() {
     let (a, b) = parse_setting("X_fact0r=`10 + 20`").unwrap();
     assert!(a == "X_fact0r");
     assert!(b == "10 + 20");
-    assert!(parse_bool("true") == Ok(true));
-    assert!(parse_bool("false") == Ok(false));
+    assert!(parse_bool("", "true") == Ok(true));
+    assert!(parse_bool("", "false") == Ok(false));
     assert!(parse_strings("").unwrap().len() == 0);
     assert!(parse_strings("a,b").unwrap().len() == 2);
     assert!(parse_duration("", "30s", true).unwrap() == Dur::Seconds(30));
@@ -1284,7 +1284,7 @@ pub fn test_parser() {
     assert!(parse_setting("zappa = ").is_err());
     assert!(parse_setting("zappa = `abracadabra").is_err());
     assert!(parse_setting("zapp! = true").is_err());
-    assert!(parse_bool("tru").is_err());
+    assert!(parse_bool("", "tru").is_err());
     assert!(parse_duration("", "35", true).is_err());
     assert!(parse_duration("", "12m35s", true).is_err());
     assert!(parse_duration("", "3H12M35X", true).is_err());
