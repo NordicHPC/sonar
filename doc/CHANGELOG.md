@@ -9,6 +9,10 @@ auto-generated from a Go data structure that specifies the JSON output format.  
 output format can most easily be be seen by diffing this file against a desired tag, starting with
 "v0.13.0".  Such changes are therefore no longer mentioned specially below.
 
+## Changes in v0.18.4 (on `release_0_18`)
+
+* Bug 535 - Log warnings and errors to the syslog
+
 ## Changes in v0.18.3 (on `release_0_18`)
 
 * No bug - Cargo.lock did not have the right version number (trivial).
