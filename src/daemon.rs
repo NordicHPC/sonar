@@ -24,6 +24,7 @@ use crate::datasink::directory::DirectorySink;
 use crate::datasink::kafka::KafkaSink;
 use crate::datasink::stdio::StdioSink;
 use crate::datasink::DataSink;
+use crate::install_logger;
 use crate::jobsapi;
 use crate::json_tags;
 use crate::linux;
@@ -188,7 +189,8 @@ impl Dur {
 // Note that installing the logger is delegated to the daemon mode (in order to get the log level
 // from the config file) and the daemon mode is required to install the logger before returning,
 // even if there are errors in parsing the config file.  Higher levels will depend on the logger
-// having been installed in order to signal any errors the daemon mode returns.
+// having been installed in order to signal any errors the daemon mode returns.  Note, logging
+// during ini file parsing won't work.
 
 pub fn daemon_mode(
     config_file: &str,
@@ -198,23 +200,15 @@ pub fn daemon_mode(
     #[allow(unused_mut)]
     let mut ini = match parse_config(config_file) {
         Ok(ini) => {
-            simple_logger::SimpleLogger::new()
-                .with_level(if ini.debug.verbose {
+            install_logger(if ini.debug.verbose {
                     log::LevelFilter::Debug
                 } else {
                     log::LevelFilter::Warn
-                })
-                .env()
-                .init()
-                .unwrap();
+                });
             ini
         }
         Err(e) => {
-            simple_logger::SimpleLogger::new()
-                .with_level(log::LevelFilter::Warn)
-                .env()
-                .init()
-                .unwrap();
+            install_logger(log::LevelFilter::Warn);
             return Err(e);
         }
     };
