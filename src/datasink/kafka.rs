@@ -54,6 +54,16 @@ struct Msg {
     value: String,
 }
 
+impl Msg {
+    // This can return an estimate, but it's better to overestimate than underestimate.
+    fn size(&self) -> usize {
+        return self.topic.len() + self.key.len() + self.value.len() + 20;
+    }
+}
+
+// We want 1MB but let's add a little headroom
+const XMIT_CUTOFF: usize = 1024 * 1000;
+
 enum Message {
     Stop,
     M(Msg),
@@ -498,9 +508,6 @@ fn http_producer(
     thread::sleep(Duration::from_millis(5000));
 }
 
-// TODO: Must control message volume!  The broker limits the content-length to 1GB and we must be
-// sure never to exceed that.
-
 fn http_send_messages(
     cmd_name: &str,
     api_endpoint: &str,
@@ -509,7 +516,48 @@ fn http_send_messages(
     retry_count: i32,
     sasl_identity: &Option<(String, String)>,
     control_and_errors: &channel::Sender<Operation>,
-    backlog: Vec<Msg>,
+    mut backlog: Vec<Msg>,
+) {
+    while backlog.len() > 0 {
+        let mut i = 0;
+        let mut sz = 0usize;
+        while i < backlog.len() {
+            // "100" is for punctuation, field names, etc, of the control object.
+            let newsz = sz + backlog[i].size() + 100;
+            if newsz >= XMIT_CUTOFF {
+                break
+            }
+            sz = newsz;
+            i += 1;
+        }
+        if i == 0 {
+            log::error!("Message of size {} is too large to send, should not happen", backlog[0].size());
+        }
+        let new_backlog = backlog.split_off(i);
+        let to_send = backlog;
+        backlog = new_backlog;
+        http_send_some_messages(
+            cmd_name,
+            api_endpoint,
+            http_proxy,
+            client_id,
+            retry_count,
+            sasl_identity,
+            control_and_errors,
+            to_send,
+        );
+    }
+}
+
+fn http_send_some_messages(
+    cmd_name: &str,
+    api_endpoint: &str,
+    http_proxy: &str,
+    client_id: &str,
+    retry_count: i32,
+    sasl_identity: &Option<(String, String)>,
+    control_and_errors: &channel::Sender<Operation>,
+    msgs: Vec<Msg>,
 ) {
     let mut args = vec![
         "--silent".to_string(),
@@ -554,7 +602,7 @@ fn http_send_messages(
                         topic,
                         key,
                         value,
-                    } in backlog
+                    } in msgs
                     {
                         let _ = timestamp;
                         let data_size = value.len();
