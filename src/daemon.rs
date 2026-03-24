@@ -55,6 +55,7 @@ pub struct KafkaIni {
     pub broker_address: String,
     pub rest_endpoint: String,
     pub http_proxy: String,
+    pub http_payload_limit: Option<usize>,
     pub sending_window: Dur,
     pub timeout: Dur,
     pub ca_file: Option<String>,
@@ -708,6 +709,7 @@ fn parse_config(config_file: &str) -> Result<Ini, String> {
             broker_address: "".to_string(),
             rest_endpoint: "".to_string(),
             http_proxy: "".to_string(),
+            http_payload_limit: None,
             sending_window: Dur::Minutes(5),
             timeout: Dur::Minutes(30),
             ca_file: None,
@@ -864,7 +866,7 @@ fn parse_config(config_file: &str) -> Result<Ini, String> {
                     have_prefix = true;
                 }
                 "hostname-only" => {
-                    ini.global.hostname_only = parse_bool(&value)?;
+                    ini.global.hostname_only = parse_bool("global.hostname-only", &value)?;
                 }
                 _ => return Err(format!("Invalid [global] setting name `{name}`")),
             },
@@ -880,6 +882,10 @@ fn parse_config(config_file: &str) -> Result<Ini, String> {
                 }
                 "http-proxy" | "rest-proxy" => {
                     ini.kafka.http_proxy = value;
+                }
+                "http-payload-limit" => {
+                    ini.kafka.http_payload_limit =
+                        Some(parse_volume("kafka.http-payload-limit", &value)?);
                 }
                 "sending-window" => {
                     ini.kafka.sending_window =
@@ -915,10 +921,10 @@ fn parse_config(config_file: &str) -> Result<Ini, String> {
                         Some(parse_duration("debug.output-delay", &value, true)?);
                 }
                 "oneshot" => {
-                    ini.debug.oneshot = parse_bool(&value)?;
+                    ini.debug.oneshot = parse_bool("debug.oneshot", &value)?;
                 }
                 "verbose" => {
-                    ini.debug.verbose = parse_bool(&value)?;
+                    ini.debug.verbose = parse_bool("debug.verbose", &value)?;
                 }
                 _ => return Err(format!("Invalid [debug] setting name `{name}`")),
             },
@@ -927,10 +933,11 @@ fn parse_config(config_file: &str) -> Result<Ini, String> {
                     ini.sample.cadence = Some(parse_duration("sample.cadence", &value, false)?);
                 }
                 "exclude-system-jobs" => {
-                    ini.sample.exclude_system_jobs = parse_bool(&value)?;
+                    ini.sample.exclude_system_jobs =
+                        parse_bool("sample.exclude-system-jobs", &value)?;
                 }
                 "load" => {
-                    ini.sample.load = parse_bool(&value)?;
+                    ini.sample.load = parse_bool("sample.load", &value)?;
                 }
                 "exclude-users" => {
                     ini.sample.exclude_users = parse_strings(&value)?;
@@ -939,10 +946,10 @@ fn parse_config(config_file: &str) -> Result<Ini, String> {
                     ini.sample.exclude_commands = parse_strings(&value)?;
                 }
                 "batchless" => {
-                    ini.sample.batchless = parse_bool(&value)?;
+                    ini.sample.batchless = parse_bool("sample.batchless", &value)?;
                 }
                 "rollup" => {
-                    ini.sample.rollup = parse_bool(&value)?;
+                    ini.sample.rollup = parse_bool("sample.rollup", &value)?;
                 }
                 "min-cpu-time" => {
                     ini.sample.min_cpu_time =
@@ -952,7 +959,7 @@ fn parse_config(config_file: &str) -> Result<Ini, String> {
             },
             Section::Sysinfo => match name.as_str() {
                 "on-startup" => {
-                    ini.sysinfo.on_startup = parse_bool(&value)?;
+                    ini.sysinfo.on_startup = parse_bool("sysinfo.on-startup", &value)?;
                 }
                 "cadence" => {
                     ini.sysinfo.cadence = Some(parse_duration("sysinfo.cadence", &value, false)?);
@@ -977,7 +984,7 @@ fn parse_config(config_file: &str) -> Result<Ini, String> {
                     ini.jobs.window = Some(parse_duration("jobs.window", &value, true)?);
                 }
                 "uncompleted" | "incomplete" => {
-                    ini.jobs.uncompleted = parse_bool(&value)?;
+                    ini.jobs.uncompleted = parse_bool("jobs.uncompleted", &value)?;
                 }
                 "batch-size" => {
                     ini.jobs.batch_size = Some(
@@ -990,7 +997,7 @@ fn parse_config(config_file: &str) -> Result<Ini, String> {
             },
             Section::Cluster => match name.as_str() {
                 "on-startup" => {
-                    ini.cluster.on_startup = parse_bool(&value)?;
+                    ini.cluster.on_startup = parse_bool("cluster.on-startup", &value)?;
                 }
                 "cadence" => {
                     ini.cluster.cadence = Some(parse_duration("cluster.cadence", &value, false)?);
@@ -1145,12 +1152,30 @@ fn parse_setting(l: &str) -> Result<(String, String), String> {
     }
 }
 
-fn parse_bool(l: &str) -> Result<bool, String> {
+fn parse_bool(context: &str, l: &str) -> Result<bool, String> {
     match l {
         "true" => Ok(true),
         "false" => Ok(false),
-        _ => Err(format!("Invalid boolean value {l}")),
+        _ => Err(format!("Invalid boolean value {l} in {context}")),
     }
+}
+
+fn parse_volume(context: &str, l: &str) -> Result<usize, String> {
+    let (val, scale) = if let Some(prefix) = l.strip_suffix('K') {
+        (prefix, 1024)
+    } else if let Some(prefix) = l.strip_suffix('M') {
+        (prefix, 1024 * 1024)
+    } else if let Some(prefix) = l.strip_suffix('G') {
+        (prefix, 1024 * 1024 * 1024)
+    } else {
+        (l, 1)
+    };
+    if let Ok(n) = val.parse::<usize>() {
+        if let Some(v) = n.checked_mul(scale) {
+            return Ok(v);
+        }
+    }
+    Err(format!("Invalid volume {l} in {context}"))
 }
 
 fn parse_duration(context: &str, l: &str, lenient: bool) -> Result<Dur, String> {
@@ -1247,8 +1272,8 @@ pub fn test_parser() {
     let (a, b) = parse_setting("X_fact0r=`10 + 20`").unwrap();
     assert!(a == "X_fact0r");
     assert!(b == "10 + 20");
-    assert!(parse_bool("true") == Ok(true));
-    assert!(parse_bool("false") == Ok(false));
+    assert!(parse_bool("", "true") == Ok(true));
+    assert!(parse_bool("", "false") == Ok(false));
     assert!(parse_strings("").unwrap().len() == 0);
     assert!(parse_strings("a,b").unwrap().len() == 2);
     assert!(parse_duration("", "30s", true).unwrap() == Dur::Seconds(30));
@@ -1259,10 +1284,15 @@ pub fn test_parser() {
     assert!(parse_setting("zappa = ").is_err());
     assert!(parse_setting("zappa = `abracadabra").is_err());
     assert!(parse_setting("zapp! = true").is_err());
-    assert!(parse_bool("tru").is_err());
+    assert!(parse_bool("", "tru").is_err());
     assert!(parse_duration("", "35", true).is_err());
     assert!(parse_duration("", "12m35s", true).is_err());
     assert!(parse_duration("", "3H12M35X", true).is_err());
+    assert!(parse_volume("", "37").unwrap() == 37);
+    assert!(parse_volume("", "5K").unwrap() == 1024 * 5);
+    assert!(parse_volume("", "30M").unwrap() == 1024 * 1024 * 30);
+    assert!(parse_volume("", "3G").unwrap() == 1024 * 1024 * 1024 * 3);
+    assert!(parse_volume("", "3T").is_err());
 
     let ini = parse_config("src/testdata/daemon-stdio-config.txt").unwrap();
 
