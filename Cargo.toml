@@ -34,3 +34,4 @@ signal-hook = "0.3.18"
 base64 = "0.22.1"
 simple_logger = { version = "5.1.0", default-features = false, features = [ "stderr", "timestamps" ] }
 log = "0.4.28"
+syslog = "7.0.0"

@@ -131,14 +131,21 @@ enum Commands {
 fn main() {
     let args = std::env::args().collect::<Vec<String>>();
 
-    // In daemon mode the logging level must be set after command line parsing.  We could avoid this
-    // wrinkle by implementing our own logging engine trait.
+    // In daemon mode the logging level must be set after command line parsing.  (We could avoid
+    // this wrinkle by implementing our own logging engine trait.)
+
+    #[cfg(debug_assertions)]
+    let log_level = if std::env::var("SONARTEST_LOGGING").is_ok() {
+        log::LevelFilter::Trace
+    } else {
+        log::LevelFilter::Warn
+    };
+
+    #[cfg(not(debug_assertions))]
+    let log_level = log::LevelFilter::Warn;
+
     if args.len() < 2 || args[1] != "daemon" {
-        simple_logger::SimpleLogger::new()
-            .with_level(log::LevelFilter::Warn)
-            .env()
-            .init()
-            .unwrap();
+        install_logger(log_level);
     }
 
     let mut stdout = io::stdout();
@@ -299,10 +306,63 @@ fn attach_common(
     system
 }
 
+struct Logger {
+    level: log::LevelFilter,
+    console_logger: simple_logger::SimpleLogger,
+    syslog_logger: syslog::BasicLogger,
+}
+
+impl log::Log for Logger {
+    fn enabled(&self, metadata: &log::Metadata<'_>) -> bool {
+        self.level >= log::LevelFilter::Error && metadata.level() <= self.level
+    }
+
+    fn log(&self, record: &log::Record<'_>) {
+        if self.level >= log::LevelFilter::Error && record.level() <= self.level {
+            self.console_logger.log(record);
+            if record.level() <= log::LevelFilter::Warn {
+                self.syslog_logger.log(record);
+            }
+        }
+    }
+
+    fn flush(&self) {
+        self.console_logger.flush();
+        self.syslog_logger.flush();
+    }
+}
+
+pub fn install_logger(initial_level: log::LevelFilter) {
+    let console_logger = simple_logger::SimpleLogger::new()
+        .with_level(initial_level)
+        .env();
+    // The simple_logger will have read the environment.
+    let level = console_logger.max_level();
+    let syslog_formatter = syslog::Formatter3164 {
+        facility: syslog::Facility::LOG_USER,
+        hostname: None,
+        process: "sonar".to_string(),
+        pid: 0,
+    };
+    let syslog_logger = syslog::BasicLogger::new(
+        syslog::unix(syslog_formatter).expect("Syslog formatter should work"),
+    );
+    let logger = Logger {
+        level,
+        console_logger,
+        syslog_logger,
+    };
+    log::set_max_level(level);
+    log::set_boxed_logger(Box::new(logger)).expect("Logger should be set up");
+}
+
 // For the sake of simplicity:
 //  - allow repeated options to overwrite earlier values
 //  - all error reporting is via a generic "usage" message, without specificity as to what was wrong
 //  - --json does nothing, while --csv and --oldfmt cause errors
+//
+// Note, logging will not do anything during command line parsing because the logger has not been
+// initialized yet (see comment in main()).
 
 fn command_line(args: Vec<String>) -> Commands {
     let mut next = 1;
