@@ -1,32 +1,27 @@
+// Low-level HTTP upload logic.  HttpUploader is a simple back-end that will HTTP POST some data to
+// an endpoint, while handling proxies, timeouts, retries, etc.
+
 use std::cmp::min;
 use std::io::{Read, Write};
 
 use crossbeam::channel;
 
-// A simple back-end that will HTTP POST some data to an endpoint, while handling proxies and
-// timeouts.
 pub struct HttpUploader<'a> {
     curl_cmd: &'a str,
-    api_endpoint: &'a str,
     http_proxy: &'a str,
     retry_count: i32,
 }
 
 impl<'a> HttpUploader<'a> {
-    // Create the uploader.  Using the provided curl_cmd, it will POST data to the given
-    // api_endpoint, possibly via the given http_proxy, retrying periodically until timeout seconds
-    // have elapsed.  After creating the uploader, call start() to fork off a curl process that will
-    // perform the upload; this is represented by the returned HttpUploadStream.  Call put()
+    // Create the uploader.  Using the provided curl_cmd, it will POST data to a URL, possibly via
+    // the given http_proxy, retrying periodically until timeout seconds have elapsed.  After
+    // creating the uploader, call start() to fork off a curl process that will perform the upload
+    // to a particular URL; this is represented by the returned HttpUploadStream.  Call put()
     // repeatedly on the stream to send data, and finally end() to close down the upload.  It is
-    // possible to call start() repeatedly on the same uploader, it will create independent
-    // subprocesses and threads to handle the additional uploads, all of which will be performed
-    // concurrently.
-    pub fn new(
-        curl_cmd: &'a str,
-        api_endpoint: &'a str,
-        http_proxy: &'a str,
-        mut timeout: u64,
-    ) -> HttpUploader<'a> {
+    // possible to call start() repeatedly on the same uploader with different URLs, it will create
+    // independent subprocesses and threads to handle the additional uploads, all of which will be
+    // performed concurrently.
+    pub fn new(curl_cmd: &'a str, http_proxy: &'a str, mut timeout: u64) -> HttpUploader<'a> {
         // Curl will retry for 1s, 2s, 4s, ..., 10m and then stick to 10m
         let mut retry_count = 0;
         let mut next = 1;
@@ -37,13 +32,21 @@ impl<'a> HttpUploader<'a> {
         }
         HttpUploader {
             curl_cmd,
-            api_endpoint,
             http_proxy,
             retry_count,
         }
     }
 
-    pub fn start(&self) -> Result<HttpUploadStream, String> {
+    // Start an upload to a target address, see doc at new().
+    pub fn start(&self, url: &str, cred: Option<(&str, &str)>) -> Result<HttpUploadStream, String> {
+        // FIXME.  The best solution is probably to store user/pass in a netrc file (in which case
+        // we need the host name from the url, which is a mess) in the temp dir.  But then the
+        // temp file must be deleted at some point.  Probably we should do all of that in the daemon
+        // code, except we only know that we need the netrc file right here, where we use curl.
+        // That could be finessed somehow, but I don't like it.  The alternative is to pass user/pass
+        // on the command line to curl.  This is bad: even though the command line is privileged
+        // information, ps exposes it.
+        assert!(cred.is_none());
         // For now, the logic here is that to send a data package we fork off a curl and make it
         // send the output and handle retries, it will automatically pick up proxy settings from the
         // environment.  The main thread does not wait for it to finish but spins up threads to
@@ -61,7 +64,7 @@ impl<'a> HttpUploader<'a> {
             args.push(format!("{}", self.retry_count));
             args.push("--retry-connrefused".to_string());
         }
-        args.push(self.api_endpoint.to_string());
+        args.push(url.to_string());
 
         // Really want to merge stdout and stderr if we can.
         let mut cmd = std::process::Command::new(self.curl_cmd);

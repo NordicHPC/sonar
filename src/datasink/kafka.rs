@@ -49,8 +49,21 @@ use rdkafka::message::DeliveryResult;
 use rdkafka::producer::base_producer::ThreadedProducer;
 use rdkafka::producer::{BaseProducer, BaseRecord, NoCustomPartitioner, ProducerContext};
 
+pub struct KafkaMsg {
+    pub topic: String,
+    pub key: String,
+    pub value: String,
+}
+
+impl Size for KafkaMsg {
+    // This can return an estimate, but it's better to overestimate than underestimate.
+    fn size(&self) -> usize {
+        self.topic.len() + self.key.len() + self.value.len() + 20
+    }
+}
+
 pub struct KafkaSink {
-    outgoing_message_queue: channel::Sender<Message>,
+    outgoing_message_queue: channel::Sender<Message<KafkaMsg>>,
     producer: Option<thread::JoinHandle<()>>,
 }
 
@@ -126,7 +139,7 @@ impl KafkaSink {
 impl DataSink for KafkaSink {
     fn post(
         &mut self,
-        system: &dyn SystemAPI,
+        _system: &dyn SystemAPI,
         topic_prefix: &Option<String>,
         cluster: &str,
         data_tag: &str,
@@ -141,12 +154,9 @@ impl DataSink for KafkaSink {
             topic = prefix.clone() + "." + &topic;
         }
         let key = hostname.to_string();
-        let _ignored = self.outgoing_message_queue.send(Message::M(Msg {
-            timestamp: system.get_now_in_secs_since_epoch(),
-            topic,
-            key,
-            value,
-        }));
+        let _ignored = self
+            .outgoing_message_queue
+            .send(Message::M(KafkaMsg { topic, key, value }));
     }
 
     fn stop(&mut self, _system: &dyn SystemAPI) {
@@ -178,7 +188,7 @@ struct SonarProducerContext {
 
 impl ClientContext for SonarProducerContext {}
 
-const KAFKA_BUFFER_MS: usize = 1000;
+const KAFKA_BUFFER_MS: u64 = 1000;
 
 fn kafka_producer(
     broker: String,
@@ -187,7 +197,7 @@ fn kafka_producer(
     sasl_identity: Option<(String, String)>,
     sending_window: u64,
     timeout: u64,
-    incoming_message_queue: channel::Receiver<Message>,
+    incoming_message_queue: channel::Receiver<Message<KafkaMsg>>,
     control_and_errors: channel::Sender<Operation>,
 ) {
     let mut cfg = ClientConfig::new();
@@ -212,18 +222,20 @@ fn kafka_producer(
         make_sender_adapter(cfg, control_and_errors.clone()).expect("Producer creation error");
     let op = KafkaBackgroundProducer {
         producer,
+        sending_window,
         control_and_errors,
     };
-    background_producer(None, sending_window, incoming_message_queue, &op);
+    background_producer(incoming_message_queue, &op);
 }
 
 struct KafkaBackgroundProducer {
     producer: Box<dyn SenderAdapter>,
+    sending_window: u64,
     control_and_errors: channel::Sender<Operation>,
 }
 
-impl BackgroundSender for KafkaBackgroundProducer {
-    fn send_all(&self, mut id: usize, backlog: Vec<Msg>) {
+impl BackgroundSender<KafkaMsg> for KafkaBackgroundProducer {
+    fn send_all(&self, mut id: usize, backlog: Vec<KafkaMsg>) {
         // We always try to send everything.  Messages that fail are dropped, because the only failure
         // is failure to be enqueued - in that case, the message is probably fatally flawed.
         for msg in backlog.iter() {
@@ -248,8 +260,16 @@ impl BackgroundSender for KafkaBackgroundProducer {
         }
     }
 
-    fn shutdown_delay_ms(&self) -> usize {
+    fn sending_window_s(&self) -> u64 {
+        self.sending_window
+    }
+
+    fn shutdown_delay_ms(&self) -> u64 {
         KAFKA_BUFFER_MS * 2
+    }
+
+    fn batch_size(&self) -> Option<usize> {
+        None
     }
 
     fn metadata_size(&self) -> (usize, usize) {
@@ -391,29 +411,35 @@ fn kafka_http_producer(
     sasl_identity: Option<(String, String)>,
     sending_window: u64,
     timeout: u64,
-    incoming_message_queue: channel::Receiver<Message>,
+    incoming_message_queue: channel::Receiver<Message<KafkaMsg>>,
     control_and_errors: channel::Sender<Operation>,
 ) {
-    let uploader = http_upload::HttpUploader::new(curl_cmd, api_endpoint, http_proxy, timeout);
+    let uploader = http_upload::HttpUploader::new(curl_cmd, http_proxy, timeout);
     let op = KafkaHttpBackgroundProducer {
         uploader,
+        cutoff,
+        sending_window,
         client_id,
+        api_endpoint,
         sasl_identity: &sasl_identity,
         control_and_errors,
     };
-    background_producer(cutoff, sending_window, incoming_message_queue, &op);
+    background_producer(incoming_message_queue, &op);
 }
 
 struct KafkaHttpBackgroundProducer<'a> {
     uploader: http_upload::HttpUploader<'a>,
+    cutoff: Option<usize>,
+    sending_window: u64,
     client_id: &'a str,
+    api_endpoint: &'a str,
     sasl_identity: &'a Option<(String, String)>,
     control_and_errors: channel::Sender<Operation>,
 }
 
-impl<'a> BackgroundSender for KafkaHttpBackgroundProducer<'a> {
-    fn send_all(&self, _id: usize, backlog: Vec<Msg>) {
-        match self.uploader.start() {
+impl<'a> BackgroundSender<KafkaMsg> for KafkaHttpBackgroundProducer<'a> {
+    fn send_all(&self, _id: usize, backlog: Vec<KafkaMsg>) {
+        match self.uploader.start(self.api_endpoint, None) {
             Ok(stream) => {
                 let cred = if let Some((user, pass)) = &self.sasl_identity {
                     format!("\"sasl-user\":\"{user}\", \"sasl-password\":\"{pass}\",")
@@ -421,10 +447,7 @@ impl<'a> BackgroundSender for KafkaHttpBackgroundProducer<'a> {
                     "".to_string()
                 };
                 let client = self.client_id.to_string();
-                for Msg {
-                    topic, key, value, ..
-                } in backlog
-                {
+                for KafkaMsg { topic, key, value } in backlog {
                     let data_size = value.len();
                     let ctrl = format!(
                         "\n{{\"topic\":\"{topic}\",\"key\":\"{key}\",\"client\":\"{client}\",{cred}\"data-size\":{data_size}}}\n"
@@ -453,8 +476,16 @@ impl<'a> BackgroundSender for KafkaHttpBackgroundProducer<'a> {
         }
     }
 
-    fn shutdown_delay_ms(&self) -> usize {
+    fn sending_window_s(&self) -> u64 {
+        self.sending_window
+    }
+
+    fn shutdown_delay_ms(&self) -> u64 {
         5000
+    }
+
+    fn batch_size(&self) -> Option<usize> {
+        self.cutoff
     }
 
     fn metadata_size(&self) -> (usize, usize) {

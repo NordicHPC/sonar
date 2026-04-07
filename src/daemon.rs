@@ -20,6 +20,8 @@
 use crate::cluster;
 use crate::datasink::delay::DelaySink;
 use crate::datasink::directory::DirectorySink;
+#[cfg(feature = "http")]
+use crate::datasink::http::HttpSink;
 #[cfg(feature = "kafka")]
 use crate::datasink::kafka::KafkaSink;
 use crate::datasink::stdio::StdioSink;
@@ -61,6 +63,18 @@ pub struct KafkaIni {
     pub ca_file: Option<String>,
     pub sasl_password: Option<String>,
     pub sasl_password_file: Option<String>,
+}
+
+#[cfg(feature = "http")]
+#[derive(Clone)]
+pub struct HttpIni {
+    pub api_root: String,
+    pub http_proxy: String,
+    pub http_payload_limit: Option<usize>,
+    pub sending_window: Dur,
+    pub timeout: Dur,
+    pub upload_password: Option<String>,
+    pub upload_password_file: Option<String>,
 }
 
 pub struct DebugIni {
@@ -115,6 +129,8 @@ pub struct Ini {
     pub global: GlobalIni,
     #[cfg(feature = "kafka")]
     pub kafka: KafkaIni,
+    #[cfg(feature = "http")]
+    pub http: HttpIni,
     pub directory: DirectoryIni,
     pub programs: ProgramsIni,
     pub debug: DebugIni,
@@ -219,7 +235,17 @@ pub fn daemon_mode(
             Ok(s) => {
                 ini.kafka.sasl_password = Some(s.trim().to_string());
             }
-            Err(e) => return Err(format!("Failed to read password file: {e}")),
+            Err(e) => return Err(format!("Failed to read kafka password file: {e}")),
+        }
+    }
+
+    #[cfg(feature = "http")]
+    if let Some(ref pwfile) = ini.http.upload_password_file {
+        match std::fs::read_to_string(pwfile) {
+            Ok(s) => {
+                ini.http.upload_password = Some(s.trim().to_string());
+            }
+            Err(e) => return Err(format!("Failed to read http password file: {e}")),
         }
     }
 
@@ -320,6 +346,9 @@ pub fn daemon_mode(
 
     let mut data_sink: Box<dyn DataSink> =
         if let Some(s) = try_make_kafka_sink(&ini, &event_sender, &client_id, &control_topic) {
+            s
+        } else if let Some(s) = try_make_http_sink(&ini, &event_sender, &client_id) {
+            // HM, TODO
             s
         } else if let Some(s) = try_make_directory_sink(&ini, &event_sender) {
             s
@@ -502,6 +531,33 @@ fn try_make_kafka_sink(
             ini,
             client_id.to_string(),
             control_topic.to_string(),
+            event_sender.clone(),
+        )))
+    } else {
+        None
+    }
+}
+
+#[cfg(not(feature = "http"))]
+fn try_make_http_sink(
+    _: &Ini,
+    _: &channel::Sender<Operation>,
+    _: &str,
+    _: &str,
+) -> Option<Box<dyn DataSink>> {
+    None
+}
+
+#[cfg(feature = "http")]
+fn try_make_http_sink(
+    ini: &Ini,
+    event_sender: &channel::Sender<Operation>,
+    client_id: &str,
+) -> Option<Box<dyn DataSink>> {
+    if ini.http.api_root != "" {
+        Some(Box::new(HttpSink::new(
+            ini,
+            client_id.to_string(),
             event_sender.clone(),
         )))
     } else {
@@ -716,6 +772,16 @@ fn parse_config(config_file: &str) -> Result<Ini, String> {
             sasl_password: None,
             sasl_password_file: None,
         },
+        #[cfg(feature = "http")]
+        http: HttpIni {
+            api_root: "".to_string(),
+            http_proxy: "".to_string(),
+            http_payload_limit: None,
+            sending_window: Dur::Minutes(5),
+            timeout: Dur::Minutes(30),
+            upload_password: None,
+            upload_password_file: None,
+        },
         directory: DirectoryIni { data_dir: None },
         debug: DebugIni {
             time_limit: None,
@@ -762,6 +828,8 @@ fn parse_config(config_file: &str) -> Result<Ini, String> {
         Global,
         #[cfg(feature = "kafka")]
         Kafka,
+        #[cfg(feature = "http")]
+        Http,
         Directory,
         Debug,
         Programs,
@@ -777,6 +845,10 @@ fn parse_config(config_file: &str) -> Result<Ini, String> {
     let mut have_kafka_broker = false;
     #[cfg(feature = "kafka")]
     let mut have_kafka_rest_endpoint = false;
+    #[cfg(feature = "http")]
+    let mut have_http = false;
+    #[cfg(feature = "http")]
+    let mut have_http_api_root = false;
     let mut have_directory = false;
     let mut have_prefix = false;
     let file = match std::fs::File::open(config_file) {
@@ -807,6 +879,12 @@ fn parse_config(config_file: &str) -> Result<Ini, String> {
         if l == "[kafka]" {
             curr_section = Section::Kafka;
             have_kafka = true;
+            continue;
+        }
+        #[cfg(feature = "http")]
+        if l == "[http]" {
+            curr_section = Section::Http;
+            have_http = true;
             continue;
         }
         if l == "[directory]" {
@@ -904,6 +982,33 @@ fn parse_config(config_file: &str) -> Result<Ini, String> {
                     ini.kafka.sasl_password_file = Some(value);
                 }
                 _ => return Err(format!("Invalid [kafka] setting name `{name}`")),
+            },
+            #[cfg(feature = "http")]
+            Section::Http => match name.as_str() {
+                "api-root" => {
+                    ini.http.api_root = value;
+                    have_http_api_root = true;
+                }
+                "http-proxy" => {
+                    ini.http.http_proxy = value;
+                }
+                "http-payload-limit" => {
+                    ini.http.http_payload_limit =
+                        Some(parse_volume("http.http-payload-limit", &value)?);
+                }
+                "sending-window" => {
+                    ini.http.sending_window = parse_duration("http.sending-window", &value, true)?;
+                }
+                "timeout" => {
+                    ini.http.timeout = parse_duration("http.timeout", &value, true)?;
+                }
+                "upload-password" => {
+                    ini.http.upload_password = Some(value);
+                }
+                "upload-password-file" => {
+                    ini.http.upload_password_file = Some(value);
+                }
+                _ => return Err(format!("Invalid [http] setting name `{name}`")),
             },
             Section::Directory => match name.as_str() {
                 "data-directory" => {
@@ -1058,6 +1163,10 @@ fn parse_config(config_file: &str) -> Result<Ini, String> {
     if have_kafka {
         sinks += 1
     }
+    #[cfg(feature = "http")]
+    if have_http {
+        sinks += 1
+    }
     if sinks > 1 {
         return Err("More than one data sink configured".to_string());
     }
@@ -1093,6 +1202,21 @@ fn parse_config(config_file: &str) -> Result<Ini, String> {
                             .to_string(),
                     );
                 }
+            }
+        }
+    }
+
+    #[cfg(feature = "http")]
+    if have_http {
+        if !have_http_api_root {
+            return Err("Missing http.api-root setting".to_string());
+        }
+        if ini.http.upload_password.is_some() || ini.http.upload_password_file.is_some() {
+            if ini.http.upload_password.is_some() && ini.http.upload_password_file.is_some() {
+                return Err(
+                    "http.upload-password and http.upload-password-file are mutually exclusive"
+                        .to_string(),
+                );
             }
         }
     }

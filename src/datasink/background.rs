@@ -1,35 +1,36 @@
+// Generic logic for sending messages in the background with time delays and batching.
+
 use crate::util::rng::Rng;
 use crossbeam::channel;
+use std::cmp::max;
 use std::thread;
 use std::time::{Duration, Instant};
 
-pub struct Msg {
-    #[allow(unused)]
-    pub timestamp: u64,
-    pub topic: String,
-    pub key: String,
-    pub value: String,
+pub trait Size {
+    // Estimate the size of a message.  This can return an estimate, but it's better to overestimate
+    // than underestimate, as the value will be used in creating batches that don't blow by network,
+    // proxy, or server limits.
+    fn size(&self) -> usize;
 }
 
-impl Msg {
-    // This can return an estimate, but it's better to overestimate than underestimate.
-    pub fn size(&self) -> usize {
-        self.topic.len() + self.key.len() + self.value.len() + 20
-    }
-}
-
-pub enum Message {
+pub enum Message<Msg: Size> {
     Stop,
     M(Msg),
 }
 
-pub trait BackgroundSender {
+pub trait BackgroundSender<Msg: Size> {
     // Send all the messages in msgs, together if possible (batching is done at a higher level).
     fn send_all(&self, id: usize, msgs: Vec<Msg>);
 
+    // If random delay before sending, this is the ceiling on how log to delay, may be zero.
+    fn sending_window_s(&self) -> u64;
+
     // How long to wait for a backgrounded sender to send things when shutting down Sonar, may be
     // zero.
-    fn shutdown_delay_ms(&self) -> usize;
+    fn shutdown_delay_ms(&self) -> u64;
+
+    // Ceiling on the batch size, if messages can be batched.
+    fn batch_size(&self) -> Option<usize>;
 
     // Estimated size of metadata in bytes, when batching: per-batch and per-message.  If batching
     // is disabled (cutoff is zero) then this will not be called, but otherwise it should
@@ -38,19 +39,14 @@ pub trait BackgroundSender {
 }
 
 // Call background_producer from a dedicated producer thread (or spawn it as a thread).  It will
-// loop on the incoming message queue until it receives a stop message.  The messages received are
-// held for a suitable random interval and then sent.
-pub fn background_producer(
-    cutoff: Option<usize>,
-    sending_window: u64,
-    incoming_message_queue: channel::Receiver<Message>,
-    sender: &dyn BackgroundSender,
+// loop on the incoming_message_queue until it receives a stop message.  The messages received are
+// held for a suitable random interval in the sending_window and then sent.
+pub fn background_producer<Msg: Size>(
+    incoming_message_queue: channel::Receiver<Message<Msg>>,
+    sender: &dyn BackgroundSender<Msg>,
 ) {
-    let sending_window = if sending_window == 0 {
-        1
-    } else {
-        sending_window
-    };
+    // Simplifying assumption for now, if no window then make a window of 1s.
+    let sending_window = max(sender.sending_window_s(), 1);
     let mut id = 0usize;
     let mut rng = Rng::new();
     let mut timeout: channel::Receiver<Instant> = channel::never();
@@ -73,7 +69,7 @@ pub fn background_producer(
                 armed = false;
                 log::debug!("Sending window open.");
                 let num = backlog.len();
-                send_all(sender, cutoff, id, backlog);
+                send_all(sender, id, backlog);
                 backlog = vec![];
                 id += num;
             }
@@ -83,7 +79,7 @@ pub fn background_producer(
                     must_arm = !armed;
                 }
                 Ok(Message::Stop) | Err(_) => {
-                    send_all(sender, cutoff, id, backlog);
+                    send_all(sender, id, backlog);
                     break 'producer_loop;
                 }
             }
@@ -96,45 +92,45 @@ pub fn background_producer(
 
 // Send all messages in the backlog, but apply batching if appropriate.
 // Note backlog length may be zero, do nothing if so.
-fn send_all(
-    sender: &dyn BackgroundSender,
-    cutoff: Option<usize>,
-    mut id: usize,
-    mut backlog: Vec<Msg>,
-) {
-    if !backlog.is_empty() {
-        // Note, the /Sending {} items/ pattern is used by regression tests.
-        log::debug!("Sending {} items", backlog.len());
-        let (batch_overhead, msg_overhead) = sender.metadata_size();
-        if let Some(cutoff) = cutoff {
-            while !backlog.is_empty() {
-                let mut i = 0;
-                let mut sz = batch_overhead;
-                while i < backlog.len() {
-                    let newsz = sz + backlog[i].size() + msg_overhead;
-                    if newsz >= cutoff {
-                        break;
-                    }
-                    sz = newsz;
-                    i += 1;
-                }
-                if i == 0 {
-                    log::error!(
-                        "Message of size {} is too large to send, should not happen",
-                        backlog[0].size()
-                    );
-                    // Try to send it anyway, take the consequences elsewhere.
-                    i = 1;
-                }
-                let new_backlog = backlog.split_off(i);
-                let to_send = backlog;
-                let num_sent = to_send.len();
-                backlog = new_backlog;
-                sender.send_all(id, to_send);
-                id += num_sent;
+fn send_all<Msg: Size>(sender: &dyn BackgroundSender<Msg>, mut id: usize, mut backlog: Vec<Msg>) {
+    if backlog.is_empty() {
+        return;
+    }
+
+    // Note, the /Sending {} items/ pattern is used by regression tests.
+    log::debug!("Sending {} items", backlog.len());
+
+    let cutoff = sender.batch_size().unwrap_or(0);
+    if cutoff == 0 {
+        sender.send_all(id, backlog);
+        return;
+    }
+
+    let (batch_overhead, msg_overhead) = sender.metadata_size();
+    while !backlog.is_empty() {
+        let mut i = 0;
+        let mut sz = batch_overhead;
+        while i < backlog.len() {
+            let newsz = sz + backlog[i].size() + msg_overhead;
+            if newsz >= cutoff {
+                break;
             }
-        } else {
-            sender.send_all(id, backlog);
+            sz = newsz;
+            i += 1;
         }
+        if i == 0 {
+            log::error!(
+                "Message of size {} is too large to send, should not happen",
+                backlog[0].size()
+            );
+            // Try to send it anyway, take the consequences elsewhere.
+            i = 1;
+        }
+        let new_backlog = backlog.split_off(i);
+        let to_send = backlog;
+        let num_sent = to_send.len();
+        backlog = new_backlog;
+        sender.send_all(id, to_send);
+        id += num_sent;
     }
 }

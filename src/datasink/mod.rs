@@ -2,6 +2,8 @@
 mod background;
 pub mod delay;
 pub mod directory;
+#[cfg(feature = "http")]
+pub mod http;
 #[cfg(feature = "kafka")]
 mod http_upload;
 #[cfg(feature = "kafka")]
