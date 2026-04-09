@@ -27,6 +27,7 @@
 #![allow(dead_code)]
 
 use crate::daemon::{Dur, Ini, Operation};
+use crate::datasink::background::*;
 use crate::datasink::DataSink;
 #[cfg(debug_assertions)]
 use crate::posix::time::unix_now;
@@ -46,25 +47,6 @@ use rdkafka::config::ClientConfig;
 use rdkafka::message::DeliveryResult;
 use rdkafka::producer::base_producer::ThreadedProducer;
 use rdkafka::producer::{BaseProducer, BaseRecord, NoCustomPartitioner, ProducerContext};
-
-struct Msg {
-    timestamp: u64,
-    topic: String,
-    key: String,
-    value: String,
-}
-
-impl Msg {
-    // This can return an estimate, but it's better to overestimate than underestimate.
-    fn size(&self) -> usize {
-        return self.topic.len() + self.key.len() + self.value.len() + 20;
-    }
-}
-
-enum Message {
-    Stop,
-    M(Msg),
-}
 
 pub struct KafkaSink {
     outgoing_message_queue: channel::Sender<Message>,
@@ -197,6 +179,9 @@ impl ClientContext for SonarProducerContext {}
 
 const KAFKA_BUFFER_MS: usize = 1000;
 
+// kafka_producer and http_producer are both instances of a background_producer, that is parameterized by
+// "something that sends.
+
 fn kafka_producer(
     broker: String,
     client_id: String,
@@ -227,76 +212,47 @@ fn kafka_producer(
     }
     let producer =
         make_sender_adapter(cfg, control_and_errors.clone()).expect("Producer creation error");
-
-    let mut id = 0usize;
-    let mut rng = Rng::new();
-    let mut timeout: channel::Receiver<Instant> = channel::never();
-    let mut armed = false;
-    let mut must_arm = false;
-    let mut backlog = Vec::new();
-
-    'producer_loop: loop {
-        if must_arm {
-            assert!(!armed);
-            let sleep = rng.next() as u64 % sending_window;
-            // Note, the /Sleeping {} before sending/ pattern is used by regression tests.
-            log::debug!("Sleeping {sleep} before sending");
-            timeout = channel::after(Duration::from_secs(sleep));
-            armed = true;
-            must_arm = false;
-        }
-        channel::select! {
-            recv(timeout) -> _ => {
-                armed = false;
-                // Note, the /Sending {} items/ pattern is used by regression tests.
-                log::debug!("Sending window open.  Sending {} items", backlog.len());
-                id = kafka_send_messages(&*producer, &control_and_errors, id, &backlog);
-                backlog.clear();
-            }
-            recv(incoming_message_queue) -> msg => match msg {
-                Ok(Message::M(msg)) => {
-                    backlog.push(msg);
-                    must_arm = !armed;
-                }
-                Ok(Message::Stop) | Err(_) => {
-                    _ = kafka_send_messages(&*producer, &control_and_errors, id, &backlog);
-                    break 'producer_loop;
-                }
-            }
-        }
-    }
-
-    // Best effort: give the Kafka thread an opportunity to send what it has.
-    thread::sleep(Duration::from_millis(2 * KAFKA_BUFFER_MS as u64));
+    let op = KafkaBackgroundProducer {
+        producer: producer,
+        control_and_errors: control_and_errors,
+    };
+    background_producer(sending_window, incoming_message_queue, &op);
 }
 
-fn kafka_send_messages(
-    producer: &dyn SenderAdapter,
-    control_and_errors: &channel::Sender<Operation>,
-    mut id: usize,
-    backlog: &[Msg],
-) -> usize {
-    // We always try to send everything.  Messages that fail are dropped, because the only failure
-    // is failure to be enqueued - in that case, the message is probably fatally flawed.
-    for msg in backlog.iter() {
-        id += 1; // Always give it a new ID, even if it is later dropped.
-        log::debug!("Sending to topic: {} with id {id}", msg.topic);
-        match producer.send(
-            BaseRecord::with_opaque_to(&msg.topic, id)
-                .payload(&msg.value)
-                .key(&msg.key),
-        ) {
-            Ok(()) => {}
-            Err(m) => {
-                // An error here only means that the message could not be enqueued; sending errors
-                // are discovered in the ProducerContext.  So an error here is pretty much fatal for
-                // the message, hence we drop it.
-                let msg = format!("Message #{id}: {m}");
-                let _ = control_and_errors.send(Operation::MessageDeliveryError(msg));
+struct KafkaBackgroundProducer {
+    producer: Box<dyn SenderAdapter>,
+    control_and_errors: channel::Sender<Operation>,
+}
+
+impl BackgroundSender for KafkaBackgroundProducer {
+    fn send_all(&self, mut id: usize, backlog: Vec<Msg>) {
+        // We always try to send everything.  Messages that fail are dropped, because the only failure
+        // is failure to be enqueued - in that case, the message is probably fatally flawed.
+        for msg in backlog.iter() {
+            id += 1; // Always give it a new ID, even if it is later dropped.
+            log::debug!("Sending to topic: {} with id {id}", msg.topic);
+            match self.producer.send(
+                BaseRecord::with_opaque_to(&msg.topic, id)
+                    .payload(&msg.value)
+                    .key(&msg.key),
+            ) {
+                Ok(()) => {}
+                Err(m) => {
+                    // An error here only means that the message could not be enqueued; sending errors
+                    // are discovered in the ProducerContext.  So an error here is pretty much fatal for
+                    // the message, hence we drop it.
+                    let msg = format!("Message #{id}: {m}");
+                    let _ = self
+                        .control_and_errors
+                        .send(Operation::MessageDeliveryError(msg));
+                }
             }
         }
     }
-    id
+
+    fn shutdown_delay_ms(&self) -> usize {
+        KAFKA_BUFFER_MS
+    }
 }
 
 impl ProducerContext for SonarProducerContext {
@@ -447,67 +403,49 @@ fn http_producer(
         next = min(600, next * 2);
         retry_count += 1;
     }
-    let mut rng = Rng::new();
-    let mut timeout: channel::Receiver<Instant> = channel::never();
-    let mut armed = false;
-    let mut must_arm = false;
-    let mut backlog = Vec::new();
 
-    'producer_loop: loop {
-        if must_arm {
-            assert!(!armed);
-            let sleep = rng.next() as u64 % sending_window;
-            // Note, the /Sleeping {} before sending/ pattern is used by regression tests.
-            log::debug!("Sleeping {sleep} before sending");
-            timeout = channel::after(Duration::from_secs(sleep));
-            armed = true;
-            must_arm = false;
-        }
-        channel::select! {
-            recv(timeout) -> _ => {
-                armed = false;
-                // Note, the /Sending {} items/ pattern is used by regression tests.
-                log::debug!("Sending window open.  Sending {} items", backlog.len());
-                http_send_messages(
-                    cutoff,
-                    cmd,
-                    api_endpoint,
-                    http_proxy,
-                    client_id,
-                    retry_count,
-                    &sasl_identity,
-                    &control_and_errors,
-                    backlog,
-                );
-                backlog = vec![];
-            }
-            recv(incoming_message_queue) -> msg => match msg {
-                Ok(Message::M(msg)) => {
-                    backlog.push(msg);
-                    must_arm = !armed;
-                }
-                Ok(Message::Stop) | Err(_) => {
-                    if backlog.len() > 0 {
-                        http_send_messages(
-                            cutoff,
-                            cmd,
-                            api_endpoint,
-                            http_proxy,
-                            client_id,
-                            retry_count,
-                            &sasl_identity,
-                            &control_and_errors,
-                            backlog,
-                        );
-                    }
-                    break 'producer_loop;
-                }
-            }
-        }
+    let op = HttpBackgroundProducer {
+        cutoff,
+        cmd,
+        api_endpoint,
+        http_proxy,
+        client_id,
+        retry_count,
+        sasl_identity: &sasl_identity,
+        control_and_errors,
+    };
+    background_producer(sending_window, incoming_message_queue, &op);
+}
+
+struct HttpBackgroundProducer<'a> {
+    cutoff: Option<usize>,
+    cmd: &'a str,
+    api_endpoint: &'a str,
+    http_proxy: &'a str,
+    client_id: &'a str,
+    retry_count: i32,
+    sasl_identity: &'a Option<(String, String)>,
+    control_and_errors: channel::Sender<Operation>,
+}
+
+impl<'a> BackgroundSender for HttpBackgroundProducer<'a> {
+    fn send_all(&self, _id: usize, backlog: Vec<Msg>) {
+        http_send_messages(
+            self.cutoff,
+            &self.cmd,
+            &self.api_endpoint,
+            &self.http_proxy,
+            &self.client_id,
+            self.retry_count,
+            &self.sasl_identity,
+            &self.control_and_errors,
+            backlog,
+        );
     }
 
-    // Best effort: give worker threads an opportunity to send what they have.
-    thread::sleep(Duration::from_millis(5000));
+    fn shutdown_delay_ms(&self) -> usize {
+        5000
+    }
 }
 
 fn http_send_messages(
