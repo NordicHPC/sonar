@@ -437,8 +437,8 @@ impl<'a> BackgroundSender for KafkaHttpBackgroundProducer<'a> {
                     let ctrl = format!(
                         "\n{{\"topic\":\"{topic}\",\"key\":\"{key}\",\"client\":\"{client}\",{cred}\"data-size\":{data_size}}}\n"
                     );
-                    stream.put(ctrl.as_bytes());
-                    stream.put(value.as_bytes());
+                    stream.put_string(ctrl);
+                    stream.put_string(value);
                 }
                 // This catches synchronous errors.  For async errors we're going to need a callback.
                 // Possibly the callback is a parameter to start().

@@ -1,4 +1,7 @@
+use std::io::{Read, Write};
 use std::cmp::min;
+
+use crossbeam::channel;
 
 // The abstraction here will be a "http poster" that encapsulates the sending method and a bunch of
 // the other stuff, and into which we can pump a bunch of data.  Then it does not matter if that
@@ -68,7 +71,7 @@ impl<'a> HttpUploader<'a> {
                 if let (Some(stdin), Some(stdout), Some(stderr)) =
                     (child.stdin.take(), child.stdout.take(), child.stderr.take())
                 {
-                    HttpUploadStream::start(child, stdin, stdout, stderr)
+                    Ok(HttpUploadStream::start(child, stdin, stdout, stderr))
                 } else {
                     // Should never happen, probably
                     Err("Failed to get stdin/stdout/stderr".to_string())
@@ -82,35 +85,35 @@ impl<'a> HttpUploader<'a> {
 }
 
 pub struct HttpUploadStream {
-    child: std::process::Child,
-    stdin: std::process::ChildStdin,
-    stdout: std::process::ChildStdout,
-    stderr: std::process::ChildStderr,
+    sending: channel::Sender<Option<String>>,
 }
 
-// There will be a writer thread, two reader threads, and a waiter thread.  It's possible there
-// must be a queue sending data, in which case this becomes a copy - not what I want, but I can
-// live with it.  Probably we can arrange for bytes to be moved instead.
-
-// This needs a drop() thing that calls end().  Is end() even required?
+// FIXME: This needs a drop() thing that calls end().
 
 impl HttpUploadStream {
     fn start(
-        child: std::process::Child,
-        stdin: std::process::ChildStdin,
-        stdout: std::process::ChildStdout,
-        stderr: std::process::ChildStderr,
-    ) {
+        mut child: std::process::Child,
+        mut stdin: std::process::ChildStdin,
+        mut stdout: std::process::ChildStdout,
+        mut stderr: std::process::ChildStderr,
+    ) -> HttpUploadStream {
+        let (sending, receiving) = channel::unbounded::<Option<String>>();
+
         // Writer thread
+
         drop(std::thread::spawn(move || {
             // get byte blobs from stream and write them to stdin.  There must be a signal for this
             // to exit, otherwise nothing will work.  So end() should send an empty array or something.
-            for ... {
-                if let Err(err) = stdin.write_all(ctrl.as_bytes()) {
-                    log::debug!("Failed to write control object: {:?}", err);
-                }
-                if let Err(err) = stdin.write_all(value.as_bytes()) {
-                    log::debug!("Failed to write data blob size {data_size}: {:?}", err);
+            loop {
+                match receiving.recv() {
+                    Ok(Some(payload)) => {
+                        if let Err(err) = stdin.write_all(payload.as_bytes()) {
+                            log::debug!("Failed to write payload: {:?}", err);
+                        }
+                    }
+                    Ok(None) | Err(_) => {
+                        break;
+                    }
                 }
             }
             // Does this happen too soon?  As in, if there's enough data, will the consumer
@@ -129,7 +132,7 @@ impl HttpUploadStream {
         //  - the child does not linger once it's ready to exit
         //
         // We can't use wait_with_output() because that will close stdin, and we can't wait
-        // to fork off these thread until writing has completed.  We could maybe combine the
+        // to fork off these threads until writing has completed.  We could maybe combine the
         // two reader threads into one using some kind of nonblocking I/O.  Maybe there are
         // other tricks.
         //
@@ -176,12 +179,16 @@ impl HttpUploadStream {
         drop(std::thread::spawn(move || {
             let _ = child.wait();
         }));
+
+        HttpUploadStream{sending}
     }
 
-    pub fn put(&self, _bytes: &[u8]) {
+    pub fn put_string(&self, s: String) {
+        let _ = self.sending.send(Some(s));
     }
 
     pub fn end(&self) -> Result<(), String> {
+        let _ = self.sending.send(None);
         Ok(())
     }
 }
