@@ -28,6 +28,7 @@
 
 use crate::daemon::{Dur, Ini, Operation};
 use crate::datasink::background::*;
+use crate::datasink::http_upload;
 use crate::datasink::DataSink;
 #[cfg(debug_assertions)]
 use crate::posix::time::unix_now;
@@ -379,10 +380,7 @@ fn make_sender_adapter(
     Ok(Box::new(KafkaSender::new(cfg, control_and_errors.clone())?))
 }
 
-// Http REST API sender.  The logic here is that to send a data package we fork off a curl and make
-// it send the output and handle retries, it will automatically pick up proxy settings from the
-// environment.  The main thread does not wait for it to finish but spins up threads to handle its
-// stdin/stdout/stderr and the final wait.
+// Http REST API sender.  We use our own http uploader subsystem to do the actual pushing of bits.
 
 fn kafka_http_producer(
     cutoff: Option<usize>,
@@ -396,7 +394,7 @@ fn kafka_http_producer(
     incoming_message_queue: channel::Receiver<Message>,
     control_and_errors: channel::Sender<Operation>,
 ) {
-    let uploader = HttpUploader::new(
+    let uploader = http_upload::HttpUploader::new(
         curl_cmd,
         api_endpoint,
         http_proxy,
@@ -412,7 +410,7 @@ fn kafka_http_producer(
 }
 
 struct KafkaHttpBackgroundProducer<'a> {
-    uploader: HttpUploader,
+    uploader: http_upload::HttpUploader<'a>,
     client_id: &'a str,
     sasl_identity: &'a Option<(String, String)>,
     control_and_errors: channel::Sender<Operation>,
@@ -443,12 +441,12 @@ impl<'a> BackgroundSender for KafkaHttpBackgroundProducer<'a> {
                     stream.put(value.as_bytes());
                 }
                 // This catches synchronous errors.  For async errors we're going to need a callback.
-                // Possibly the callback is a parameter to end().
+                // Possibly the callback is a parameter to start().
                 match stream.end() {
                     Ok(()) => {}
                     Err(e) => {
                         let _ = self.control_and_errors
-                            .send(Operation::Error(format!("Failed to send some data: {:?}", e)));
+                            .send(Operation::MessageDeliveryError(e));
                     }
                 }
             }
