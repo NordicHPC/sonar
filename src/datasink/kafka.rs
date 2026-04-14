@@ -179,9 +179,6 @@ impl ClientContext for SonarProducerContext {}
 
 const KAFKA_BUFFER_MS: usize = 1000;
 
-// kafka_producer and http_producer are both instances of a background_producer, that is parameterized by
-// "something that sends.
-
 fn kafka_producer(
     broker: String,
     client_id: String,
@@ -216,7 +213,7 @@ fn kafka_producer(
         producer: producer,
         control_and_errors: control_and_errors,
     };
-    background_producer(sending_window, incoming_message_queue, &op);
+    background_producer(None, sending_window, incoming_message_queue, &op);
 }
 
 struct KafkaBackgroundProducer {
@@ -252,6 +249,10 @@ impl BackgroundSender for KafkaBackgroundProducer {
 
     fn shutdown_delay_ms(&self) -> usize {
         KAFKA_BUFFER_MS
+    }
+
+    fn metadata_size(&self) -> (usize, usize) {
+        (0, 0)
     }
 }
 
@@ -391,9 +392,70 @@ fn http_producer(
     client_id: &str,
     sasl_identity: Option<(String, String)>,
     sending_window: u64,
-    mut timeout: u64,
+    timeout: u64,
     incoming_message_queue: channel::Receiver<Message>,
     control_and_errors: channel::Sender<Operation>,
+) {
+    let op = HttpBackgroundProducer {
+        cmd,
+        api_endpoint,
+        http_proxy,
+        client_id,
+        sasl_identity: &sasl_identity,
+        timeout,
+        control_and_errors,
+    };
+    background_producer(cutoff, sending_window, incoming_message_queue, &op);
+}
+
+struct HttpBackgroundProducer<'a> {
+    cmd: &'a str,
+    api_endpoint: &'a str,
+    http_proxy: &'a str,
+    client_id: &'a str,
+    sasl_identity: &'a Option<(String, String)>,
+    timeout: u64,
+    control_and_errors: channel::Sender<Operation>,
+}
+
+impl<'a> BackgroundSender for HttpBackgroundProducer<'a> {
+    fn send_all(&self, _id: usize, backlog: Vec<Msg>) {
+        http_send_messages(
+            &self.cmd,
+            &self.api_endpoint,
+            &self.http_proxy,
+            &self.client_id,
+            &self.sasl_identity,
+            self.timeout,
+            &self.control_and_errors,
+            backlog,
+        );
+    }
+
+    fn shutdown_delay_ms(&self) -> usize {
+        5000
+    }
+
+    fn metadata_size(&self) -> (usize, usize) {
+        // Conservative overhead for punctuation, field names, etc of the control object
+        (10 /* per batch */, 100 /* per message */)
+    }
+}
+
+// The abstraction here will be a "http poster" that encapsulates the sending method and a bunch of
+// the other stuff, and into which we can pump a bunch of data.  Then it does not matter if that
+// uses curl or some other method.  The http poster can be shared between the kafka code and the
+// pure http POST code, and has the same general shape as the kafka poster code.
+
+fn http_send_messages(
+    cmd_name: &str,
+    api_endpoint: &str,
+    http_proxy: &str,
+    client_id: &str,
+    sasl_identity: &Option<(String, String)>,
+    mut timeout: u64,
+    control_and_errors: &channel::Sender<Operation>,
+    msgs: Vec<Msg>,
 ) {
     // Curl will retry for 1s, 2s, 4s, ..., 10m and then stick to 10m
     let mut retry_count = 0;
@@ -403,119 +465,6 @@ fn http_producer(
         next = min(600, next * 2);
         retry_count += 1;
     }
-
-    let op = HttpBackgroundProducer {
-        cutoff,
-        cmd,
-        api_endpoint,
-        http_proxy,
-        client_id,
-        retry_count,
-        sasl_identity: &sasl_identity,
-        control_and_errors,
-    };
-    background_producer(sending_window, incoming_message_queue, &op);
-}
-
-struct HttpBackgroundProducer<'a> {
-    cutoff: Option<usize>,
-    cmd: &'a str,
-    api_endpoint: &'a str,
-    http_proxy: &'a str,
-    client_id: &'a str,
-    retry_count: i32,
-    sasl_identity: &'a Option<(String, String)>,
-    control_and_errors: channel::Sender<Operation>,
-}
-
-impl<'a> BackgroundSender for HttpBackgroundProducer<'a> {
-    fn send_all(&self, _id: usize, backlog: Vec<Msg>) {
-        http_send_messages(
-            self.cutoff,
-            &self.cmd,
-            &self.api_endpoint,
-            &self.http_proxy,
-            &self.client_id,
-            self.retry_count,
-            &self.sasl_identity,
-            &self.control_and_errors,
-            backlog,
-        );
-    }
-
-    fn shutdown_delay_ms(&self) -> usize {
-        5000
-    }
-}
-
-fn http_send_messages(
-    cutoff: Option<usize>,
-    cmd_name: &str,
-    api_endpoint: &str,
-    http_proxy: &str,
-    client_id: &str,
-    retry_count: i32,
-    sasl_identity: &Option<(String, String)>,
-    control_and_errors: &channel::Sender<Operation>,
-    mut backlog: Vec<Msg>,
-) {
-    if let Some(cutoff) = cutoff {
-        while backlog.len() > 0 {
-            let mut i = 0;
-            let mut sz = 0usize;
-            while i < backlog.len() {
-                // "100" is for punctuation, field names, etc, of the control object.
-                let newsz = sz + backlog[i].size() + 100;
-                if newsz >= cutoff {
-                    break;
-                }
-                sz = newsz;
-                i += 1;
-            }
-            if i == 0 {
-                log::error!(
-                    "Message of size {} is too large to send, should not happen",
-                    backlog[0].size()
-                );
-            }
-            let new_backlog = backlog.split_off(i);
-            let to_send = backlog;
-            backlog = new_backlog;
-            http_send_some_messages(
-                cmd_name,
-                api_endpoint,
-                http_proxy,
-                client_id,
-                retry_count,
-                sasl_identity,
-                control_and_errors,
-                to_send,
-            );
-        }
-    } else {
-        http_send_some_messages(
-            cmd_name,
-            api_endpoint,
-            http_proxy,
-            client_id,
-            retry_count,
-            sasl_identity,
-            control_and_errors,
-            backlog,
-        );
-    }
-}
-
-fn http_send_some_messages(
-    cmd_name: &str,
-    api_endpoint: &str,
-    http_proxy: &str,
-    client_id: &str,
-    retry_count: i32,
-    sasl_identity: &Option<(String, String)>,
-    control_and_errors: &channel::Sender<Operation>,
-    msgs: Vec<Msg>,
-) {
     let mut args = vec![
         "--silent".to_string(),
         "--show-error".to_string(),

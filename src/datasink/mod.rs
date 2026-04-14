@@ -1,3 +1,4 @@
+#[cfg(feature = "kafka")]
 mod background;
 pub mod delay;
 pub mod directory;

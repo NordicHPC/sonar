@@ -1160,6 +1160,7 @@ fn parse_bool(context: &str, l: &str) -> Result<bool, String> {
     }
 }
 
+#[cfg(feature = "kafka")]
 fn parse_volume(context: &str, l: &str) -> Result<usize, String> {
     let (val, scale) = if let Some(prefix) = l.strip_suffix('K') {
         (prefix, 1024)
