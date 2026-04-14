@@ -92,7 +92,7 @@ impl KafkaSink {
                     );
                 })
             } else {
-                let cutoff = kafka.http_payload_limit.clone();
+                let cutoff = kafka.http_payload_limit;
                 let rest_endpoint = kafka.rest_endpoint.clone();
                 let http_proxy = kafka.http_proxy.clone();
                 let curl_cmd = if let Some(ref curl) = ini.programs.curl_cmd {
@@ -211,8 +211,8 @@ fn kafka_producer(
     let producer =
         make_sender_adapter(cfg, control_and_errors.clone()).expect("Producer creation error");
     let op = KafkaBackgroundProducer {
-        producer: producer,
-        control_and_errors: control_and_errors,
+        producer,
+        control_and_errors,
     };
     background_producer(None, sending_window, incoming_message_queue, &op);
 }

@@ -14,7 +14,7 @@ pub struct Msg {
 impl Msg {
     // This can return an estimate, but it's better to overestimate than underestimate.
     pub fn size(&self) -> usize {
-        return self.topic.len() + self.key.len() + self.value.len() + 20;
+        self.topic.len() + self.key.len() + self.value.len() + 20
     }
 }
 
@@ -102,12 +102,12 @@ fn send_all(
     mut id: usize,
     mut backlog: Vec<Msg>,
 ) {
-    if backlog.len() > 0 {
+    if !backlog.is_empty() {
         // Note, the /Sending {} items/ pattern is used by regression tests.
         log::debug!("Sending {} items", backlog.len());
         let (boverhead, moverhead) = sender.metadata_size();
         if let Some(cutoff) = cutoff {
-            while backlog.len() > 0 {
+            while !backlog.is_empty() {
                 let mut i = 0;
                 let mut sz = boverhead;
                 while i < backlog.len() {

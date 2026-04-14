@@ -111,16 +111,9 @@ impl HttpUploadStream {
         drop(std::thread::spawn(move || {
             // get byte blobs from stream and write them to stdin.  There must be a signal for this
             // to exit, otherwise nothing will work.  So end() should send an empty array or something.
-            loop {
-                match receiving.recv() {
-                    Ok(Some(payload)) => {
-                        if let Err(err) = stdin.write_all(payload.as_bytes()) {
-                            log::debug!("Failed to write payload: {:?}", err);
-                        }
-                    }
-                    Ok(None) | Err(_) => {
-                        break;
-                    }
+            while let Ok(Some(payload)) = receiving.recv() {
+                if let Err(err) = stdin.write_all(payload.as_bytes()) {
+                    log::debug!("Failed to write payload: {:?}", err);
                 }
             }
             // Does this happen too soon?  As in, if there's enough data, will the consumer
