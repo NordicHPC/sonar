@@ -249,7 +249,7 @@ impl BackgroundSender for KafkaBackgroundProducer {
     }
 
     fn shutdown_delay_ms(&self) -> usize {
-        KAFKA_BUFFER_MS
+        KAFKA_BUFFER_MS * 2
     }
 
     fn metadata_size(&self) -> (usize, usize) {
@@ -458,7 +458,8 @@ impl<'a> BackgroundSender for KafkaHttpBackgroundProducer<'a> {
     }
 
     fn metadata_size(&self) -> (usize, usize) {
-        // Conservative overhead for punctuation, field names, etc of the control object
-        (10 /* per batch */, 200 /* per message */)
+        // Conservative overhead for punctuation, field names, etc of the control object, note topic
+        // and key have already been accounted for by the size() method.
+        (10 /* per batch */, 100 /* per message */)
     }
 }

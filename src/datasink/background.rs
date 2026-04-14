@@ -91,7 +91,7 @@ pub fn background_producer(
     }
 
     // Best effort: give the sending thread an opportunity to send what it has.
-    thread::sleep(Duration::from_millis(2 * sender.shutdown_delay_ms() as u64));
+    thread::sleep(Duration::from_millis(sender.shutdown_delay_ms() as u64));
 }
 
 // Send all messages in the backlog, but apply batching if appropriate.
@@ -105,13 +105,13 @@ fn send_all(
     if !backlog.is_empty() {
         // Note, the /Sending {} items/ pattern is used by regression tests.
         log::debug!("Sending {} items", backlog.len());
-        let (boverhead, moverhead) = sender.metadata_size();
+        let (batch_overhead, msg_overhead) = sender.metadata_size();
         if let Some(cutoff) = cutoff {
             while !backlog.is_empty() {
                 let mut i = 0;
-                let mut sz = boverhead;
+                let mut sz = batch_overhead;
                 while i < backlog.len() {
-                    let newsz = sz + backlog[i].size() + moverhead;
+                    let newsz = sz + backlog[i].size() + msg_overhead;
                     if newsz >= cutoff {
                         break;
                     }
@@ -123,7 +123,8 @@ fn send_all(
                         "Message of size {} is too large to send, should not happen",
                         backlog[0].size()
                     );
-                    // TODO: Must drop it or send it!!
+                    // Try to send it anyway, take the consequences elsewhere.
+                    i = 1;
                 }
                 let new_backlog = backlog.split_off(i);
                 let to_send = backlog;
