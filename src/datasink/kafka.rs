@@ -459,7 +459,8 @@ impl<'a> BackgroundSender for KafkaHttpBackgroundProducer<'a> {
 
     fn metadata_size(&self) -> (usize, usize) {
         // Conservative overhead for punctuation, field names, etc of the control object, note topic
-        // and key have already been accounted for by the size() method.
-        (10 /* per batch */, 100 /* per message */)
+        // and key have already been accounted for by the size() method, but other fields are
+        // surprisingly large.
+        (10 /* per batch */, 150 /* per message */)
     }
 }
