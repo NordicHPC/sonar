@@ -27,6 +27,8 @@
 #![allow(dead_code)]
 
 use crate::daemon::{Dur, Ini, Operation};
+use crate::datasink::background::*;
+use crate::datasink::http_upload;
 use crate::datasink::DataSink;
 #[cfg(debug_assertions)]
 use crate::posix::time::unix_now;
@@ -46,25 +48,6 @@ use rdkafka::config::ClientConfig;
 use rdkafka::message::DeliveryResult;
 use rdkafka::producer::base_producer::ThreadedProducer;
 use rdkafka::producer::{BaseProducer, BaseRecord, NoCustomPartitioner, ProducerContext};
-
-struct Msg {
-    timestamp: u64,
-    topic: String,
-    key: String,
-    value: String,
-}
-
-impl Msg {
-    // This can return an estimate, but it's better to overestimate than underestimate.
-    fn size(&self) -> usize {
-        return self.topic.len() + self.key.len() + self.value.len() + 20;
-    }
-}
-
-enum Message {
-    Stop,
-    M(Msg),
-}
 
 pub struct KafkaSink {
     outgoing_message_queue: channel::Sender<Message>,
@@ -109,7 +92,7 @@ impl KafkaSink {
                     );
                 })
             } else {
-                let cutoff = kafka.http_payload_limit.clone();
+                let cutoff = kafka.http_payload_limit;
                 let rest_endpoint = kafka.rest_endpoint.clone();
                 let http_proxy = kafka.http_proxy.clone();
                 let curl_cmd = if let Some(ref curl) = ini.programs.curl_cmd {
@@ -118,7 +101,7 @@ impl KafkaSink {
                     "curl".to_string()
                 };
                 thread::spawn(move || {
-                    http_producer(
+                    kafka_http_producer(
                         cutoff,
                         &curl_cmd,
                         &rest_endpoint,
@@ -227,76 +210,51 @@ fn kafka_producer(
     }
     let producer =
         make_sender_adapter(cfg, control_and_errors.clone()).expect("Producer creation error");
-
-    let mut id = 0usize;
-    let mut rng = Rng::new();
-    let mut timeout: channel::Receiver<Instant> = channel::never();
-    let mut armed = false;
-    let mut must_arm = false;
-    let mut backlog = Vec::new();
-
-    'producer_loop: loop {
-        if must_arm {
-            assert!(!armed);
-            let sleep = rng.next() as u64 % sending_window;
-            // Note, the /Sleeping {} before sending/ pattern is used by regression tests.
-            log::debug!("Sleeping {sleep} before sending");
-            timeout = channel::after(Duration::from_secs(sleep));
-            armed = true;
-            must_arm = false;
-        }
-        channel::select! {
-            recv(timeout) -> _ => {
-                armed = false;
-                // Note, the /Sending {} items/ pattern is used by regression tests.
-                log::debug!("Sending window open.  Sending {} items", backlog.len());
-                id = kafka_send_messages(&*producer, &control_and_errors, id, &backlog);
-                backlog.clear();
-            }
-            recv(incoming_message_queue) -> msg => match msg {
-                Ok(Message::M(msg)) => {
-                    backlog.push(msg);
-                    must_arm = !armed;
-                }
-                Ok(Message::Stop) | Err(_) => {
-                    _ = kafka_send_messages(&*producer, &control_and_errors, id, &backlog);
-                    break 'producer_loop;
-                }
-            }
-        }
-    }
-
-    // Best effort: give the Kafka thread an opportunity to send what it has.
-    thread::sleep(Duration::from_millis(2 * KAFKA_BUFFER_MS as u64));
+    let op = KafkaBackgroundProducer {
+        producer,
+        control_and_errors,
+    };
+    background_producer(None, sending_window, incoming_message_queue, &op);
 }
 
-fn kafka_send_messages(
-    producer: &dyn SenderAdapter,
-    control_and_errors: &channel::Sender<Operation>,
-    mut id: usize,
-    backlog: &[Msg],
-) -> usize {
-    // We always try to send everything.  Messages that fail are dropped, because the only failure
-    // is failure to be enqueued - in that case, the message is probably fatally flawed.
-    for msg in backlog.iter() {
-        id += 1; // Always give it a new ID, even if it is later dropped.
-        log::debug!("Sending to topic: {} with id {id}", msg.topic);
-        match producer.send(
-            BaseRecord::with_opaque_to(&msg.topic, id)
-                .payload(&msg.value)
-                .key(&msg.key),
-        ) {
-            Ok(()) => {}
-            Err(m) => {
-                // An error here only means that the message could not be enqueued; sending errors
-                // are discovered in the ProducerContext.  So an error here is pretty much fatal for
-                // the message, hence we drop it.
-                let msg = format!("Message #{id}: {m}");
-                let _ = control_and_errors.send(Operation::MessageDeliveryError(msg));
+struct KafkaBackgroundProducer {
+    producer: Box<dyn SenderAdapter>,
+    control_and_errors: channel::Sender<Operation>,
+}
+
+impl BackgroundSender for KafkaBackgroundProducer {
+    fn send_all(&self, mut id: usize, backlog: Vec<Msg>) {
+        // We always try to send everything.  Messages that fail are dropped, because the only failure
+        // is failure to be enqueued - in that case, the message is probably fatally flawed.
+        for msg in backlog.iter() {
+            id += 1; // Always give it a new ID, even if it is later dropped.
+            log::debug!("Sending to topic: {} with id {id}", msg.topic);
+            match self.producer.send(
+                BaseRecord::with_opaque_to(&msg.topic, id)
+                    .payload(&msg.value)
+                    .key(&msg.key),
+            ) {
+                Ok(()) => {}
+                Err(m) => {
+                    // An error here only means that the message could not be enqueued; sending errors
+                    // are discovered in the ProducerContext.  So an error here is pretty much fatal for
+                    // the message, hence we drop it.
+                    let msg = format!("Message #{id}: {m}");
+                    let _ = self
+                        .control_and_errors
+                        .send(Operation::MessageDeliveryError(msg));
+                }
             }
         }
     }
-    id
+
+    fn shutdown_delay_ms(&self) -> usize {
+        KAFKA_BUFFER_MS * 2
+    }
+
+    fn metadata_size(&self) -> (usize, usize) {
+        (0, 0)
+    }
 }
 
 impl ProducerContext for SonarProducerContext {
@@ -422,289 +380,87 @@ fn make_sender_adapter(
     Ok(Box::new(KafkaSender::new(cfg, control_and_errors.clone())?))
 }
 
-// Http REST API sender.  The logic here is that to send a data package we fork off a curl and make
-// it send the output and handle retries, it will automatically pick up proxy settings from the
-// environment.  The main thread does not wait for it to finish but spins up threads to handle its
-// stdin/stdout/stderr and the final wait.
+// Http REST API sender.  We use our own http uploader subsystem to do the actual pushing of bits.
 
-fn http_producer(
+fn kafka_http_producer(
     cutoff: Option<usize>,
-    cmd: &str,
+    curl_cmd: &str,
     api_endpoint: &str,
     http_proxy: &str,
     client_id: &str,
     sasl_identity: Option<(String, String)>,
     sending_window: u64,
-    mut timeout: u64,
+    timeout: u64,
     incoming_message_queue: channel::Receiver<Message>,
     control_and_errors: channel::Sender<Operation>,
 ) {
-    // Curl will retry for 1s, 2s, 4s, ..., 10m and then stick to 10m
-    let mut retry_count = 0;
-    let mut next = 1;
-    while timeout > 0 {
-        timeout -= min(next, timeout);
-        next = min(600, next * 2);
-        retry_count += 1;
-    }
-    let mut rng = Rng::new();
-    let mut timeout: channel::Receiver<Instant> = channel::never();
-    let mut armed = false;
-    let mut must_arm = false;
-    let mut backlog = Vec::new();
-
-    'producer_loop: loop {
-        if must_arm {
-            assert!(!armed);
-            let sleep = rng.next() as u64 % sending_window;
-            // Note, the /Sleeping {} before sending/ pattern is used by regression tests.
-            log::debug!("Sleeping {sleep} before sending");
-            timeout = channel::after(Duration::from_secs(sleep));
-            armed = true;
-            must_arm = false;
-        }
-        channel::select! {
-            recv(timeout) -> _ => {
-                armed = false;
-                // Note, the /Sending {} items/ pattern is used by regression tests.
-                log::debug!("Sending window open.  Sending {} items", backlog.len());
-                http_send_messages(
-                    cutoff,
-                    cmd,
-                    api_endpoint,
-                    http_proxy,
-                    client_id,
-                    retry_count,
-                    &sasl_identity,
-                    &control_and_errors,
-                    backlog,
-                );
-                backlog = vec![];
-            }
-            recv(incoming_message_queue) -> msg => match msg {
-                Ok(Message::M(msg)) => {
-                    backlog.push(msg);
-                    must_arm = !armed;
-                }
-                Ok(Message::Stop) | Err(_) => {
-                    if backlog.len() > 0 {
-                        http_send_messages(
-                            cutoff,
-                            cmd,
-                            api_endpoint,
-                            http_proxy,
-                            client_id,
-                            retry_count,
-                            &sasl_identity,
-                            &control_and_errors,
-                            backlog,
-                        );
-                    }
-                    break 'producer_loop;
-                }
-            }
-        }
-    }
-
-    // Best effort: give worker threads an opportunity to send what they have.
-    thread::sleep(Duration::from_millis(5000));
+    let uploader = http_upload::HttpUploader::new(curl_cmd, api_endpoint, http_proxy, timeout);
+    let op = KafkaHttpBackgroundProducer {
+        uploader,
+        client_id,
+        sasl_identity: &sasl_identity,
+        control_and_errors,
+    };
+    background_producer(cutoff, sending_window, incoming_message_queue, &op);
 }
 
-fn http_send_messages(
-    cutoff: Option<usize>,
-    cmd_name: &str,
-    api_endpoint: &str,
-    http_proxy: &str,
-    client_id: &str,
-    retry_count: i32,
-    sasl_identity: &Option<(String, String)>,
-    control_and_errors: &channel::Sender<Operation>,
-    mut backlog: Vec<Msg>,
-) {
-    if let Some(cutoff) = cutoff {
-        while backlog.len() > 0 {
-            let mut i = 0;
-            let mut sz = 0usize;
-            while i < backlog.len() {
-                // "100" is for punctuation, field names, etc, of the control object.
-                let newsz = sz + backlog[i].size() + 100;
-                if newsz >= cutoff {
-                    break;
-                }
-                sz = newsz;
-                i += 1;
-            }
-            if i == 0 {
-                log::error!(
-                    "Message of size {} is too large to send, should not happen",
-                    backlog[0].size()
-                );
-            }
-            let new_backlog = backlog.split_off(i);
-            let to_send = backlog;
-            backlog = new_backlog;
-            http_send_some_messages(
-                cmd_name,
-                api_endpoint,
-                http_proxy,
-                client_id,
-                retry_count,
-                sasl_identity,
-                control_and_errors,
-                to_send,
-            );
-        }
-    } else {
-        http_send_some_messages(
-            cmd_name,
-            api_endpoint,
-            http_proxy,
-            client_id,
-            retry_count,
-            sasl_identity,
-            control_and_errors,
-            backlog,
-        );
-    }
+struct KafkaHttpBackgroundProducer<'a> {
+    uploader: http_upload::HttpUploader<'a>,
+    client_id: &'a str,
+    sasl_identity: &'a Option<(String, String)>,
+    control_and_errors: channel::Sender<Operation>,
 }
 
-fn http_send_some_messages(
-    cmd_name: &str,
-    api_endpoint: &str,
-    http_proxy: &str,
-    client_id: &str,
-    retry_count: i32,
-    sasl_identity: &Option<(String, String)>,
-    control_and_errors: &channel::Sender<Operation>,
-    msgs: Vec<Msg>,
-) {
-    let mut args = vec![
-        "--silent".to_string(),
-        "--show-error".to_string(),
-        "--data-binary".to_string(),
-        "@-".to_string(),
-        "-H".to_string(),
-        "Content-Type: application/octet-stream".to_string(),
-    ];
-    if retry_count > 0 {
-        args.push("--retry".to_string());
-        args.push(format!("{}", retry_count));
-        args.push("--retry-connrefused".to_string());
-    }
-    args.push(api_endpoint.to_string());
-
-    // Really want to merge stdout and stderr
-    let mut cmd = std::process::Command::new(cmd_name);
-    log::debug!("Curl: {cmd_name} {:?}", args);
-    cmd.args(args)
-        .stdin(std::process::Stdio::piped())
-        .stdout(std::process::Stdio::piped())
-        .stderr(std::process::Stdio::piped());
-    if http_proxy != "" {
-        cmd.env("http_proxy", http_proxy)
-            .env("https_proxy", http_proxy);
-    }
-    match cmd.spawn() {
-        Ok(mut child) => {
-            if let (Some(mut stdin), Some(mut stdout), Some(mut stderr)) =
-                (child.stdin.take(), child.stdout.take(), child.stderr.take())
-            {
-                let cred = if let Some((user, pass)) = sasl_identity {
+impl<'a> BackgroundSender for KafkaHttpBackgroundProducer<'a> {
+    fn send_all(&self, _id: usize, backlog: Vec<Msg>) {
+        match self.uploader.start() {
+            Ok(stream) => {
+                let cred = if let Some((user, pass)) = &self.sasl_identity {
                     format!("\"sasl-user\":\"{user}\", \"sasl-password\":\"{pass}\",")
                 } else {
                     "".to_string()
                 };
-                let client = client_id.to_string();
-                drop(std::thread::spawn(move || {
-                    for Msg {
-                        timestamp,
-                        topic,
-                        key,
-                        value,
-                    } in msgs
-                    {
-                        let _ = timestamp;
-                        let data_size = value.len();
-                        let ctrl = format!(
-                            "\n{{\"topic\":\"{topic}\",\"key\":\"{key}\",\"client\":\"{client}\",{cred}\"data-size\":{data_size}}}\n"
-                        );
-                        if let Err(err) = stdin.write_all(ctrl.as_bytes()) {
-                            log::debug!("Failed to write control object: {:?}", err);
-                        }
-                        if let Err(err) = stdin.write_all(value.as_bytes()) {
-                            log::debug!("Failed to write data blob size {data_size}: {:?}", err);
-                        }
+                let client = self.client_id.to_string();
+                for Msg {
+                    topic, key, value, ..
+                } in backlog
+                {
+                    let data_size = value.len();
+                    let ctrl = format!(
+                        "\n{{\"topic\":\"{topic}\",\"key\":\"{key}\",\"client\":\"{client}\",{cred}\"data-size\":{data_size}}}\n"
+                    );
+                    stream.put_string(ctrl);
+                    stream.put_string(value);
+                }
+                // This catches synchronous errors.  For async errors we're going to need a callback.
+                // Possibly the callback is a parameter to start().
+                match stream.end() {
+                    Ok(()) => {}
+                    Err(e) => {
+                        let _ = self
+                            .control_and_errors
+                            .send(Operation::MessageDeliveryError(e));
                     }
-                    // Does this happen too soon?  As in, if there's enough data, will the consumer
-                    // not have finished consuming?  Or will it just flush things and all will be fine?
-                    drop(stdin);
-                }));
-                // Separate threads do the output consuming and waiting for curl to finish, in order to
-                // guarantee several things:
-                //
-                //  - if the curl does not terminate immediately (because it is retrying, not
-                //    reaching the host, bandwidth-limited, ...) then Sonar does not hang waiting
-                //    for it, but can get on with its work.
-                //  - curl will not block writing its output on a full pipe
-                //  - sonar will not block on writing to curl because curl is blocked
-                //  - the child does not linger once it's ready to exit
-                //
-                // We can't use wait_with_output() because that will close stdin, and we can't wait
-                // to fork off these thread until writing has completed.  We could maybe combine the
-                // two reader threads into one using some kind of nonblocking I/O.  Maybe there are
-                // other tricks.
-                //
-                // 1K buffer is enough to see interesting errors.
-                drop(std::thread::spawn(move || {
-                    let mut buf = [0; 1024];
-                    loop {
-                        match stdout.read(&mut buf[..]) {
-                            Err(_) | Ok(0) => {
-                                break;
-                            }
-                            Ok(n) => {
-                                // This is the common case even when curl fails to deliver when
-                                // the server rejects the message.
-                                log::debug!(
-                                    "Curl succeeded with output: {}",
-                                    String::from_utf8_lossy(&buf[..n])
-                                );
-                            }
-                        }
-                    }
-                    drop(stdout);
-                }));
-                drop(std::thread::spawn(move || {
-                    let mut buf = [0; 1024];
-                    loop {
-                        match stderr.read(&mut buf[..]) {
-                            Err(_) | Ok(0) => {
-                                break;
-                            }
-                            Ok(n) => {
-                                log::debug!(
-                                    "Curl failed with output {}",
-                                    String::from_utf8_lossy(&buf[..n])
-                                );
-                            }
-                        }
-                    }
-                    drop(stderr);
-                }));
-                drop(std::thread::spawn(move || {
-                    let _ = child.wait();
-                }));
-            } else {
-                // Should never happen
-                let _ = control_and_errors.send(Operation::MessageDeliveryError(
-                    "Failed to get stdin/stdout/stderr".to_string(),
-                ));
+                }
+            }
+            Err(e) => {
+                // Not found, permission denied, etc.
+                let _ = self.control_and_errors.send(Operation::Fatal(format!(
+                    "Failed to start uploader: {:?}",
+                    e
+                )));
             }
         }
-        Err(e) => {
-            // Not found, permission denied, etc.
-            let _ = control_and_errors
-                .send(Operation::Fatal(format!("Failed to launch curl: {:?}", e)));
-        }
+    }
+
+    fn shutdown_delay_ms(&self) -> usize {
+        5000
+    }
+
+    fn metadata_size(&self) -> (usize, usize) {
+        // Conservative overhead for punctuation, field names, etc of the control object, note topic
+        // and key have already been accounted for by the size() method, but other fields are
+        // surprisingly large.
+        (10 /* per batch */, 150 /* per message */)
     }
 }
