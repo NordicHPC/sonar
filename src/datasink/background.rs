@@ -4,6 +4,7 @@ use std::thread;
 use std::time::{Duration, Instant};
 
 pub struct Msg {
+    #[allow(unused)]
     pub timestamp: u64,
     pub topic: String,
     pub key: String,
@@ -45,7 +46,11 @@ pub fn background_producer(
     incoming_message_queue: channel::Receiver<Message>,
     sender: &dyn BackgroundSender,
 ) {
-    let sending_window = if sending_window == 0 { 1 } else { sending_window };
+    let sending_window = if sending_window == 0 {
+        1
+    } else {
+        sending_window
+    };
     let mut id = 0usize;
     let mut rng = Rng::new();
     let mut timeout: channel::Receiver<Instant> = channel::never();
@@ -91,7 +96,12 @@ pub fn background_producer(
 
 // Send all messages in the backlog, but apply batching if appropriate.
 // Note backlog length may be zero, do nothing if so.
-fn send_all(sender: &dyn BackgroundSender, cutoff: Option<usize>, mut id: usize, mut backlog: Vec<Msg>) {
+fn send_all(
+    sender: &dyn BackgroundSender,
+    cutoff: Option<usize>,
+    mut id: usize,
+    mut backlog: Vec<Msg>,
+) {
     if backlog.len() > 0 {
         // Note, the /Sending {} items/ pattern is used by regression tests.
         log::debug!("Sending {} items", backlog.len());

@@ -394,12 +394,7 @@ fn kafka_http_producer(
     incoming_message_queue: channel::Receiver<Message>,
     control_and_errors: channel::Sender<Operation>,
 ) {
-    let uploader = http_upload::HttpUploader::new(
-        curl_cmd,
-        api_endpoint,
-        http_proxy,
-        timeout,
-    );
+    let uploader = http_upload::HttpUploader::new(curl_cmd, api_endpoint, http_proxy, timeout);
     let op = KafkaHttpBackgroundProducer {
         uploader,
         client_id,
@@ -427,10 +422,7 @@ impl<'a> BackgroundSender for KafkaHttpBackgroundProducer<'a> {
                 };
                 let client = self.client_id.to_string();
                 for Msg {
-                    topic,
-                    key,
-                    value,
-                    ..
+                    topic, key, value, ..
                 } in backlog
                 {
                     let data_size = value.len();
@@ -445,15 +437,18 @@ impl<'a> BackgroundSender for KafkaHttpBackgroundProducer<'a> {
                 match stream.end() {
                     Ok(()) => {}
                     Err(e) => {
-                        let _ = self.control_and_errors
+                        let _ = self
+                            .control_and_errors
                             .send(Operation::MessageDeliveryError(e));
                     }
                 }
             }
             Err(e) => {
                 // Not found, permission denied, etc.
-                let _ = self.control_and_errors
-                    .send(Operation::Fatal(format!("Failed to start uploader: {:?}", e)));
+                let _ = self.control_and_errors.send(Operation::Fatal(format!(
+                    "Failed to start uploader: {:?}",
+                    e
+                )));
             }
         }
     }

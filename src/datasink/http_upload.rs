@@ -1,5 +1,5 @@
-use std::io::{Read, Write};
 use std::cmp::min;
+use std::io::{Read, Write};
 
 use crossbeam::channel;
 
@@ -16,8 +16,13 @@ pub struct HttpUploader<'a> {
 }
 
 impl<'a> HttpUploader<'a> {
-    pub fn new(curl_cmd: &'a str, api_endpoint: &'a str, http_proxy: &'a str, timeout: u64) -> HttpUploader<'a> {
-        HttpUploader{
+    pub fn new(
+        curl_cmd: &'a str,
+        api_endpoint: &'a str,
+        http_proxy: &'a str,
+        timeout: u64,
+    ) -> HttpUploader<'a> {
+        HttpUploader {
             curl_cmd,
             api_endpoint,
             http_proxy,
@@ -77,9 +82,7 @@ impl<'a> HttpUploader<'a> {
                     Err("Failed to get stdin/stdout/stderr".to_string())
                 }
             }
-            Err(e) => {
-                Err(format!("Failed to spawn curl: {:?}", e))
-            }
+            Err(e) => Err(format!("Failed to spawn curl: {:?}", e)),
         }
     }
 }
@@ -88,7 +91,11 @@ pub struct HttpUploadStream {
     sending: channel::Sender<Option<String>>,
 }
 
-// FIXME: This needs a drop() thing that calls end().
+impl Drop for HttpUploadStream {
+    fn drop(&mut self) {
+        let _ = self.end();
+    }
+}
 
 impl HttpUploadStream {
     fn start(
@@ -180,7 +187,7 @@ impl HttpUploadStream {
             let _ = child.wait();
         }));
 
-        HttpUploadStream{sending}
+        HttpUploadStream { sending }
     }
 
     pub fn put_string(&self, s: String) {
