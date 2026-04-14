@@ -3,30 +3,43 @@ use std::io::{Read, Write};
 
 use crossbeam::channel;
 
-// The abstraction here will be a "http poster" that encapsulates the sending method and a bunch of
-// the other stuff, and into which we can pump a bunch of data.  Then it does not matter if that
-// uses curl or some other method.  The http poster can be shared between the kafka code and the
-// pure http POST code, and has the same general shape as the kafka poster code.
-
+// A simple back-end that will HTTP POST some data to an endpoint, while handling proxies and
+// timeouts.
 pub struct HttpUploader<'a> {
     curl_cmd: &'a str,
     api_endpoint: &'a str,
     http_proxy: &'a str,
-    timeout: u64,
+    retry_count: i32,
 }
 
 impl<'a> HttpUploader<'a> {
+    // Create the uploader.  Using the provided curl_cmd, it will POST data to the given
+    // api_endpoint, possibly via the given http_proxy, retrying periodically until timeout seconds
+    // have elapsed.  After creating the uploader, call start() to fork off a curl process that will
+    // perform the upload; this is represented by the returned HttpUploadStream.  Call put()
+    // repeatedly on the stream to send data, and finally end() to close down the upload.  It is
+    // possible to call start() repeatedly on the same uploader, it will create independent
+    // subprocesses and threads to handle the additional uploads, all of which will be performed
+    // concurrently.
     pub fn new(
         curl_cmd: &'a str,
         api_endpoint: &'a str,
         http_proxy: &'a str,
-        timeout: u64,
+        mut timeout: u64,
     ) -> HttpUploader<'a> {
+        // Curl will retry for 1s, 2s, 4s, ..., 10m and then stick to 10m
+        let mut retry_count = 0;
+        let mut next = 1;
+        while timeout > 0 {
+            timeout -= min(next, timeout);
+            next = min(600, next * 2);
+            retry_count += 1;
+        }
         HttpUploader {
             curl_cmd,
             api_endpoint,
             http_proxy,
-            timeout,
+            retry_count,
         }
     }
 
@@ -35,16 +48,6 @@ impl<'a> HttpUploader<'a> {
         // send the output and handle retries, it will automatically pick up proxy settings from the
         // environment.  The main thread does not wait for it to finish but spins up threads to
         // handle its stdin/stdout/stderr and the final wait.
-
-        // Curl will retry for 1s, 2s, 4s, ..., 10m and then stick to 10m
-        let mut retry_count = 0;
-        let mut next = 1;
-        let mut timeout = self.timeout;
-        while timeout > 0 {
-            timeout -= min(next, timeout);
-            next = min(600, next * 2);
-            retry_count += 1;
-        }
         let mut args = vec![
             "--silent".to_string(),
             "--show-error".to_string(),
@@ -53,9 +56,9 @@ impl<'a> HttpUploader<'a> {
             "-H".to_string(),
             "Content-Type: application/octet-stream".to_string(),
         ];
-        if retry_count > 0 {
+        if self.retry_count > 0 {
             args.push("--retry".to_string());
-            args.push(format!("{}", retry_count));
+            args.push(format!("{}", self.retry_count));
             args.push("--retry-connrefused".to_string());
         }
         args.push(self.api_endpoint.to_string());
@@ -82,7 +85,10 @@ impl<'a> HttpUploader<'a> {
                     Err("Failed to get stdin/stdout/stderr".to_string())
                 }
             }
-            Err(e) => Err(format!("Failed to spawn curl: {:?}", e)),
+            Err(e) => {
+                // Note, tests depend on this error message
+                Err(format!("Failed to launch curl: {:?}", e))
+            }
         }
     }
 }
