@@ -6,6 +6,69 @@ use std::io::{Read, Write};
 
 use crossbeam::channel;
 
+pub struct Credential {
+    user: String,
+    passwd: String,
+    promiscuous: bool,
+    netrc: std::cell::RefCell<Option<tempfile::NamedTempFile>>,
+}
+
+impl Credential {
+    pub fn from_user_passwd(user: &str, passwd: &str, promiscuous: bool) -> Credential {
+        Credential {
+            user: user.to_string(),
+            passwd: passwd.to_string(),
+            promiscuous,
+            netrc: std::cell::RefCell::new(None),
+        }
+    }
+
+    fn netrc_file(&self) -> Option<String> {
+        if let Some(temp) = self.netrc.borrow().as_ref() {
+            // What an absolute travesty
+            Some(format!("{:?}", temp.path()))
+        } else {
+            // The way to do this is to use the tempfile crate (five more deps) and then use NamedTempFile
+            // and store the ref to that in the Credential, then it will (normally) be deleted for us.
+            //
+            // Unfortunately linux might just nuke the netrc from /tmp if it becomes old enough.  So
+            // either we refresh it from time to time or we use a different /tmp directory, but then
+            // that directory must be writable.  We can *probably* depend on the home directory
+            // being writable, but do we want to?
+            //
+            // It's an interesting point that we can overwrite the temp file with the same content
+            // repeatedly, or we can touch the file, to keep it alive?  Gemini says that as of Rust 1.75,
+            // we can:
+            /*
+            use std::fs::{File, FileTimes};
+            use std::time::SystemTime;
+
+            fn update_timestamps(path: &str) -> std::io::Result<()> {
+               let file = File::options().write(true).open(path)?;
+               let now = SystemTime::now();
+               let times = FileTimes::new().set_accessed(now).set_modified(now);
+               file.set_times(times)?;
+               Ok(())
+             }
+             */
+
+            // TODO: Lazily construct a temp file on netrc form that has a "default" host name, with
+            // the user and passwd.  Make sure it is not readable.  Make sure that when the
+            // Credential is dropped, the file is unlinked.  If the file can't be created then
+            // return None.
+            None
+        }
+    }
+
+    fn user_passwd(&self) -> Option<(String,String)> {
+        if self.promiscuous {
+            Some((self.user.clone(), self.passwd.clone()))
+        } else {
+            None
+        }
+    }
+}
+
 pub struct HttpUploader<'a> {
     curl_cmd: &'a str,
     http_proxy: &'a str,
@@ -38,15 +101,7 @@ impl<'a> HttpUploader<'a> {
     }
 
     // Start an upload to a target address, see doc at new().
-    pub fn start(&self, url: &str, cred: Option<(&str, &str)>) -> Result<HttpUploadStream, String> {
-        // FIXME.  The best solution is probably to store user/pass in a netrc file (in which case
-        // we need the host name from the url, which is a mess) in the temp dir.  But then the
-        // temp file must be deleted at some point.  Probably we should do all of that in the daemon
-        // code, except we only know that we need the netrc file right here, where we use curl.
-        // That could be finessed somehow, but I don't like it.  The alternative is to pass user/pass
-        // on the command line to curl.  This is bad: even though the command line is privileged
-        // information, ps exposes it.
-        assert!(cred.is_none());
+    pub fn start(&self, url: &str, cred: &Option<Credential>) -> Result<HttpUploadStream, String> {
         // For now, the logic here is that to send a data package we fork off a curl and make it
         // send the output and handle retries, it will automatically pick up proxy settings from the
         // environment.  The main thread does not wait for it to finish but spins up threads to
@@ -63,6 +118,15 @@ impl<'a> HttpUploader<'a> {
             args.push("--retry".to_string());
             args.push(format!("{}", self.retry_count));
             args.push("--retry-connrefused".to_string());
+        }
+        if let Some(c) = cred {
+            if let Some(netrc) = c.netrc_file() {
+                args.push("--netrc-file".to_string());
+                args.push(netrc);
+            } else if let Some((user, pass)) = c.user_passwd() {
+                args.push("--user".to_string());
+                args.push(user + ":" + &pass);
+            }
         }
         args.push(url.to_string());
 

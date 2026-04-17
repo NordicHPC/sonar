@@ -18,6 +18,13 @@ use crate::systemapi::SystemAPI;
 
 pub trait DataSink {
     // Queue the message for sending, to be sent within the sending window (when applicable).
+    //
+    // TODO: Would be meaningful to pass a struct here to avoid order-of-argument confusion.
+    //
+    // TODO: Would be meaningful to pass in the timestamp that is in the message itself (the Time
+    // field that is always at the top level of an Attributes object), instead of having the sink
+    // get a timestamp from the system (and that is the only reason we're passing the system object
+    // at all).  That way, the timestamp would meaningfully aid the back-end in placing the data.
     fn post(
         &mut self,
         system: &dyn SystemAPI,
