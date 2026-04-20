@@ -1,10 +1,10 @@
-#[cfg(feature = "kafka")]
+#[cfg(any(feature = "kafka", feature = "http"))]
 mod background;
 pub mod delay;
 pub mod directory;
 #[cfg(feature = "http")]
 pub mod http;
-#[cfg(feature = "kafka")]
+#[cfg(any(feature = "kafka", feature = "http"))]
 mod http_upload;
 #[cfg(feature = "kafka")]
 pub mod kafka;

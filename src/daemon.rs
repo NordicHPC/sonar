@@ -347,8 +347,7 @@ pub fn daemon_mode(
     let mut data_sink: Box<dyn DataSink> =
         if let Some(s) = try_make_kafka_sink(&ini, &event_sender, &client_id, &control_topic) {
             s
-        } else if let Some(s) = try_make_http_sink(&ini, &event_sender, &client_id) {
-            // HM, TODO
+        } else if let Some(s) = try_make_http_sink(&ini, &event_sender) {
             s
         } else if let Some(s) = try_make_directory_sink(&ini, &event_sender) {
             s
@@ -539,12 +538,7 @@ fn try_make_kafka_sink(
 }
 
 #[cfg(not(feature = "http"))]
-fn try_make_http_sink(
-    _: &Ini,
-    _: &channel::Sender<Operation>,
-    _: &str,
-    _: &str,
-) -> Option<Box<dyn DataSink>> {
+fn try_make_http_sink(_: &Ini, _: &channel::Sender<Operation>) -> Option<Box<dyn DataSink>> {
     None
 }
 
@@ -552,14 +546,9 @@ fn try_make_http_sink(
 fn try_make_http_sink(
     ini: &Ini,
     event_sender: &channel::Sender<Operation>,
-    client_id: &str,
 ) -> Option<Box<dyn DataSink>> {
     if ini.http.api_root != "" {
-        Some(Box::new(HttpSink::new(
-            ini,
-            client_id.to_string(),
-            event_sender.clone(),
-        )))
+        Some(Box::new(HttpSink::new(ini, event_sender.clone())))
     } else {
         None
     }
@@ -1284,7 +1273,7 @@ fn parse_bool(context: &str, l: &str) -> Result<bool, String> {
     }
 }
 
-#[cfg(feature = "kafka")]
+#[cfg(any(feature = "kafka", feature = "http"))]
 fn parse_volume(context: &str, l: &str) -> Result<usize, String> {
     let (val, scale) = if let Some(prefix) = l.strip_suffix('K') {
         (prefix, 1024)

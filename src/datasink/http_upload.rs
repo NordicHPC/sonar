@@ -9,62 +9,69 @@ use crossbeam::channel;
 pub struct Credential {
     user: String,
     passwd: String,
-    promiscuous: bool,
-    netrc: std::cell::RefCell<Option<tempfile::NamedTempFile>>,
+    sloppy: bool,
 }
 
 impl Credential {
-    pub fn from_user_passwd(user: &str, passwd: &str, promiscuous: bool) -> Credential {
+    #[allow(dead_code)]
+    pub fn from_user_passwd(user: &str, passwd: &str, sloppy: bool) -> Credential {
         Credential {
             user: user.to_string(),
             passwd: passwd.to_string(),
-            promiscuous,
-            netrc: std::cell::RefCell::new(None),
+            sloppy,
         }
     }
 
-    fn netrc_file(&self) -> Option<String> {
-        if let Some(temp) = self.netrc.borrow().as_ref() {
-            // What an absolute travesty
-            Some(format!("{:?}", temp.path()))
-        } else {
-            // The way to do this is to use the tempfile crate (five more deps) and then use NamedTempFile
-            // and store the ref to that in the Credential, then it will (normally) be deleted for us.
-            //
-            // Unfortunately linux might just nuke the netrc from /tmp if it becomes old enough.  So
-            // either we refresh it from time to time or we use a different /tmp directory, but then
-            // that directory must be writable.  We can *probably* depend on the home directory
-            // being writable, but do we want to?
-            //
-            // It's an interesting point that we can overwrite the temp file with the same content
-            // repeatedly, or we can touch the file, to keep it alive?  Gemini says that as of Rust 1.75,
-            // we can:
-            /*
-            use std::fs::{File, FileTimes};
-            use std::time::SystemTime;
-
-            fn update_timestamps(path: &str) -> std::io::Result<()> {
-               let file = File::options().write(true).open(path)?;
-               let now = SystemTime::now();
-               let times = FileTimes::new().set_accessed(now).set_modified(now);
-               file.set_times(times)?;
-               Ok(())
-             }
-             */
-
-            // TODO: Lazily construct a temp file on netrc form that has a "default" host name, with
-            // the user and passwd.  Make sure it is not readable.  Make sure that when the
-            // Credential is dropped, the file is unlinked.  If the file can't be created then
-            // return None.
+    fn netrc_file(&self) -> Option<tempfile::NamedTempFile> {
+        if self.passwd == "" {
             None
+        } else {
+            // I don't like this but it's the right API.  With curl, we'd like not to pass
+            // credentials on the command line.  (Curl cleans them out but a determined attacker
+            // with the ability to run jobs on many nodes could get lucky and observe the full
+            // command line with ps and see the password.)  The "easy" way around that is to create
+            // a netrc file containing the credentials and pass the name of that file.  For that, we
+            // need a named temp file.
+            //
+            // Named temp files are surprisingly hard.  We've promised that Sonar only writes to the
+            // temp dir, which on Linux is shared, and subject to periodic file cleaning by systemd
+            // (so long-lived named temp files require maintenance in the form of replacements or
+            // refreshes, and good luck testing that functionality reliably).  Hence short-lived
+            // temp files in the shared temp dir are the easy path.  The file will be readable only
+            // to the Sonar user, but the shared temp directory is writeable to everyone, so there's
+            // at least the possibility of a malicious user deleting or replacing the file
+            // before/while curl is running, leading to a DoS situation (though no leaked
+            // credentials).  This malicious user needs elevated privileges I think, since files in
+            // the temp dir owned by X aren't deletable by Y (at least on my system), so the problem
+            // seems remote on current evidence.
+            //
+            // Anyway, what we do here is create a temp netrc file per request, that is deleted once
+            // curl exits.  The longer-term fix is to get rid of the use of curl.  The contents of
+            // the file are `default login {cluster} password {pass}`, so we don't have to parse the
+            // upload URL, a small win.
+            match tempfile::Builder::new()
+                .prefix("s")
+                .rand_bytes(10)
+                .suffix(".txt")
+                .tempfile()
+            {
+                Ok(f) => match std::fs::write(
+                    f.path(),
+                    format!("default login {} password {}", self.user, self.passwd).as_bytes(),
+                ) {
+                    Ok(_) => Some(f),
+                    Err(_) => None,
+                },
+                Err(_) => None,
+            }
         }
     }
 
-    fn user_passwd(&self) -> Option<(String,String)> {
-        if self.promiscuous {
+    fn user_passwd(&self) -> Option<(String, String)> {
+        if self.passwd == "" || !self.sloppy {
+            None
+        } else {
             Some((self.user.clone(), self.passwd.clone()))
-        } else {
-            None
         }
     }
 }
@@ -119,15 +126,26 @@ impl<'a> HttpUploader<'a> {
             args.push(format!("{}", self.retry_count));
             args.push("--retry-connrefused".to_string());
         }
-        if let Some(c) = cred {
-            if let Some(netrc) = c.netrc_file() {
-                args.push("--netrc-file".to_string());
-                args.push(netrc);
-            } else if let Some((user, pass)) = c.user_passwd() {
-                args.push("--user".to_string());
-                args.push(user + ":" + &pass);
+        let tempfile = match cred {
+            None => None,
+            Some(c) => {
+                if let Some(tempfile) = c.netrc_file() {
+                    if let Some(s) = tempfile.path().to_str() {
+                        args.push("--netrc-file".to_string());
+                        args.push(s.to_string());
+                        Some(tempfile)
+                    } else {
+                        None
+                    }
+                } else if let Some((user, pass)) = c.user_passwd() {
+                    args.push("--user".to_string());
+                    args.push(user + ":" + &pass);
+                    None
+                } else {
+                    None
+                }
             }
-        }
+        };
         args.push(url.to_string());
 
         // Really want to merge stdout and stderr if we can.
@@ -146,7 +164,9 @@ impl<'a> HttpUploader<'a> {
                 if let (Some(stdin), Some(stdout), Some(stderr)) =
                     (child.stdin.take(), child.stdout.take(), child.stderr.take())
                 {
-                    Ok(HttpUploadStream::start(child, stdin, stdout, stderr))
+                    Ok(HttpUploadStream::start(
+                        child, stdin, stdout, stderr, tempfile,
+                    ))
                 } else {
                     // Should never happen, probably
                     Err("Failed to get stdin/stdout/stderr".to_string())
@@ -176,6 +196,7 @@ impl HttpUploadStream {
         mut stdin: std::process::ChildStdin,
         mut stdout: std::process::ChildStdout,
         mut stderr: std::process::ChildStderr,
+        tempfile: Option<tempfile::NamedTempFile>,
     ) -> HttpUploadStream {
         let (sending, receiving) = channel::unbounded::<Option<String>>();
 
@@ -251,6 +272,8 @@ impl HttpUploadStream {
 
         drop(std::thread::spawn(move || {
             let _ = child.wait();
+            // The netrc tempfile has credentials and must live this long
+            drop(tempfile);
         }));
 
         HttpUploadStream { sending }

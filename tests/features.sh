@@ -22,4 +22,14 @@ for amd in "" "amd"; do
     done
 done
 
+# "no features" is tested above
+# daemon with neither kafka or http is tested above
+# daemon with both kafka and http is the default and is tested everywhere
+
+echo "daemon with kafka only"
+cargo build --no-default-features --features "kafka"
+
+echo "daemon with http only"
+cargo build --no-default-features --features "http"
+
 echo " Ok"

@@ -45,11 +45,7 @@ pub struct HttpSink {
 }
 
 impl HttpSink {
-    pub fn new(
-        ini: &Ini,
-        _client_id: String,
-        control_and_errors: channel::Sender<Operation>,
-    ) -> HttpSink {
+    pub fn new(ini: &Ini, control_and_errors: channel::Sender<Operation>) -> HttpSink {
         let (outgoing_message_queue, incoming_message_queue) = channel::unbounded();
         let settings = ini.http.clone();
         let curl = if let Some(curl) = &ini.programs.curl_cmd {
@@ -136,11 +132,10 @@ impl<'a> BackgroundSender<HttpMsg> for HttpBackgroundProducer<'a> {
         } in backlog
         {
             let cred = if let Some(passwd) = &self.settings.upload_password {
-                let promiscuous = self.settings.upload_password_file.is_none();
                 Some(http_upload::Credential::from_user_passwd(
                     cluster.as_str(),
                     passwd.as_str(),
-                    promiscuous,
+                    self.settings.upload_password_file.is_none(),
                 ))
             } else {
                 None
