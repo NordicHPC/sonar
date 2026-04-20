@@ -9,14 +9,18 @@ cluster status.  It is always running and can be used for post-hoc and on-line a
 system usage from a system user's point of view.
 
 In normal operation, Sonar exfiltrates its data to a central data aggregator, often off-cluster,
-where they are stored in a database that can be mined for further insight.  [Companion
-tools](#companion-tools) exist for data access and analysis.
+where they are stored in a database that can be mined for further insight.
 
 Alternatively, data can be stored on-node in a directory tree; this is mostly useful for single-node
 non-Slurm configurations, as in some cloud deployments.
 
 Sonar operation is driven by a configuration file that determines how and how often to collect and
 exfiltrate the data.
+
+[Companion tools](#companion-tools) exist for data access and analysis.
+
+Sonar will need to be allowed to create (small, short-lived) temp files on the local file system's
+shared temp directory.
 
 
 ## Normal operation

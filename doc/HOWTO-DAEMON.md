@@ -108,6 +108,34 @@ The `ca-file`, `sasl-password` and `sasl-password-file` are explained in
 [HOWTO-KAFKA](HOWTO-KAFKA.md), basically the former triggers the use of TLS for the connection and
 the latter two additionally add authentication.
 
+### `[http]` section
+
+```
+api-root = <url>
+http-proxy = <url>
+http-payload-limit = <volume value>             # default none
+sending-window = <duration value>               # default 5m
+timeout = <duration value>                      # default 30m
+upload-password = <string>                      # default none
+upload-password-file = <string>                 # default none
+```
+
+The `api-root` is the root of the upload URL, see "HTTP sink" below.  For the Sonalyze v0 API it
+would normally be `https://<sonalyze-server-and-port>/api/v0/insert`.
+
+The `http-proxy`, `http-payload-limit`, `sending-window`, and `timeout` are as for Kafka, above.
+
+The `upload-password` and contents of the referenced `upload-password-file` are strings, these
+options are mutually exclusive.  The password will be transmitted as a credential via HTTP Basic
+Authentication in the POST, using the cluster name for the user name.
+
+Security note: When Sonar uses curl to upload data (as it does at present), the credentials will be
+written to a private, temporary .netrc file in the system tmp directory, if possible.  This is
+believed to be secure enough.  If the temp file can't be written then the credentials are passed on
+the curl command line only if the password was provided by `upload-password`, never if it was
+provided by `upload-password-file`.
+
+
 ### `[directory]` section
 
 ```
@@ -244,9 +272,11 @@ has passed.
 
 ## DATA MESSAGE FORMATS
 
+### Kafka sink
+
 Data messages are sent to a topic with a key and a value.
 
-Data messages are sent from Sonar to the broker under topics `<cluster>.<data-type>` where
+Data messages are sent from Sonar to the Kafka broker under topics `<cluster>.<data-type>` where
 `<cluster>` is as configured in the `[global]` section and `<data-type>` is `sample`, `sysinfo`,
 `job`, `cluster`.  If a topic prefix is configured, the topics become
 `<prefix>.<cluster>.<data-type>`.
@@ -258,6 +288,23 @@ The values sent with these messages are opaque.  They may be a JSON object (alwa
 see [NEW-FORMAT.md](NEW-FORMAT.md)), compressed text, and/or otherwise transformed.  Currently there
 is no way of requesting anything other than JSON, and if there is compression it is applied
 transparently.
+
+### HTTP sink
+
+The data are sent to an api /ROOT/CLUSTER/NODE/TOPIC/TIMESTAMP where /ROOT is configurable, CLUSTER
+is the cluster name, NODE is the originating node name, TOPIC is the `<data-type>` or
+`<prefix>.<data-type>` if a topic-prefix is configure, and TIMESTAMP is a second count since epoch
+that repreents the time of message production (ideally it is the same timestamp as is in the data
+package).
+
+### Directory sink
+
+When using the directory sink, the topic prefix and cluster are lost (unless encoded in the data):
+the cluster is implicit in the directory name or path, and the topic prefix is considered
+irrelevant.  The data type is encoded in the file name, and the data in the files are the raw JSON
+data.
+
+### Stdio sink
 
 When using the stdio sink, the printed data messages are JSON objects with "topic", "key",
 "client", and "value" members.

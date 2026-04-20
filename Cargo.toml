@@ -17,11 +17,9 @@ xpu = []
 habana = []
 fakegpu = [] # for testing
 daemon = []
-# It's sort of a bug that kafka depends on rdkafka, since rdkafka is only one of several transports
-# for Kafka traffic (the other one currently being https to the REST proxy).  It should be possible
-# to compile Sonar with only some transports.
-kafka = [ "dep:rdkafka" ]
-default = [ "nvidia", "amd", "xpu", "habana", "daemon", "kafka" ]
+kafka = [ "dep:rdkafka", "daemon" ]
+http = [ "daemon" ]
+default = [ "nvidia", "amd", "xpu", "habana", "daemon", "kafka", "http" ]
 
 [dependencies]
 cty = "0.2.2"
@@ -35,3 +33,4 @@ base64 = "0.22.1"
 simple_logger = { version = "5.1.0", default-features = false, features = [ "stderr", "timestamps" ] }
 log = "0.4.28"
 syslog = "7.0.0"
+tempfile = { version = "3.27.0", default-features = false }
