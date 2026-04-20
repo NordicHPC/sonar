@@ -1,8 +1,5 @@
 // The HttpSink provides exfiltration over HTTP POST in a native way, not to the Kafka proxy.
 //
-// This shares a lot of structure with the Kafka sink, especially the Kafka-over-HTTP proxy
-// part, but this is so simple I've not bothered to factor common parts.
-//
 // Messages are POSTed to "{api_root}/{cluster}/{node}/{topic}/{timestamp}".  Topic is either the
 // <data-type> ("sample", etc) or <prefix>.<data-type> if a topic prefix has been configured.  The
 // back-end must handle this, or disallow the use of prefixes.  The timestamp is a second count
@@ -54,7 +51,7 @@ impl HttpSink {
             "curl".to_string()
         };
         let producer = thread::spawn(move || {
-            http_producer(&curl, settings, incoming_message_queue, control_and_errors)
+            http_producer(curl, settings, incoming_message_queue, control_and_errors)
         });
         HttpSink {
             outgoing_message_queue,
@@ -96,13 +93,13 @@ impl DataSink for HttpSink {
 }
 
 fn http_producer(
-    curl_cmd: &str,
+    curl_cmd: String,
     settings: HttpIni,
     incoming_message_queue: channel::Receiver<Message<HttpMsg>>,
     control_and_errors: channel::Sender<Operation>,
 ) {
     let uploader = http_upload::HttpUploader::new(
-        curl_cmd,
+        &curl_cmd,
         &settings.http_proxy,
         settings.timeout.to_seconds(),
     );
@@ -170,7 +167,8 @@ impl<'a> BackgroundSender<HttpMsg> for HttpBackgroundProducer<'a> {
     }
 
     fn batch_size(&self) -> Option<usize> {
-        self.settings.http_payload_limit
+        // No batching for HTTP POST upload, see top comment.
+        None
     }
 
     fn metadata_size(&self) -> (usize, usize) {

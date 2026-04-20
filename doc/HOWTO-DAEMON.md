@@ -121,13 +121,13 @@ upload-password-file = <string>                 # default none
 ```
 
 The `api-root` is the root of the upload URL, see "HTTP sink" below.  For the Sonalyze v0 API it
-would normallly be `https://<sonalyze-server-and-port>/api/v0`.
+would normally be `https://<sonalyze-server-and-port>/api/v0/insert`.
 
 The `http-proxy`, `http-payload-limit`, `sending-window`, and `timeout` are as for Kafka, above.
 
-The `upload-password` and `upload-password-file` are strings, mutually exclusive.  These will be
-transmitted as credentials with HTTP Basic Authentication in the POST, using the cluster name for
-the user name.
+The `upload-password` and contents of the referenced `upload-password-file` are strings, these
+options are mutually exclusive.  The password will be transmitted as a credential via HTTP Basic
+Authentication in the POST, using the cluster name for the user name.
 
 Security note: When Sonar uses curl to upload data (as it does at present), the credentials will be
 written to a private, temporary .netrc file in the system tmp directory, if possible.  This is

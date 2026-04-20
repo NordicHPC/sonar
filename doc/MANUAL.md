@@ -19,7 +19,8 @@ exfiltrate the data.
 
 [Companion tools](#companion-tools) exist for data access and analysis.
 
-Sonar will need to be allowed to create (small, short-lived) temp files on the local file system.
+Sonar will need to be allowed to create (small, short-lived) temp files on the local file system's
+shared temp directory.
 
 
 ## Normal operation
