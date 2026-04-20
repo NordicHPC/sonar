@@ -279,8 +279,9 @@ transparently.
 
 The data are sent to an api /ROOT/CLUSTER/NODE/TOPIC/TIMESTAMP where /ROOT is configurable, CLUSTER
 is the cluster name, NODE is the originating node name, TOPIC is the `<data-type>` or
-`<prefix>.<data-type>` if a topic-prefix is configure, and TIMESTAMP is the ISO time stamp of
-message production.
+`<prefix>.<data-type>` if a topic-prefix is configure, and TIMESTAMP is a second count since epoch
+that repreents the time of message production (ideally it is the same timestamp as is in the data
+package).
 
 ### Directory sink
 
