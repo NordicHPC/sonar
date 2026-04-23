@@ -1,18 +1,13 @@
 // The HttpSink provides exfiltration over HTTP POST in a native way, not to the Kafka proxy.
 //
-// Messages are POSTed to "{api_root}/{cluster}/{node}/{topic}/{timestamp}".  Topic is either the
+// Messages are POSTed to "{api_root}/{topic}".  Topic is either the
 // <data-type> ("sample", etc) or <prefix>.<data-type> if a topic prefix has been configured.  The
-// back-end must handle this, or disallow the use of prefixes.  The timestamp is a second count
-// since epoch and is the time of generation of the message, though not necessarily exactly the same
-// time as is *in* the message.
+// back-end must handle this, or disallow the use of prefixes.
 //
-// Note HTTP messages are not batched.  Partly this is because the URL contains the timestamp so
-// they can't be batched, and partly we'd have to set up the server so that it can handle multiple
-// data for the same host and type in the same batch.  This is generally a headache.  It's better to
-// instead look forward to when the connection may be kept open.  In reality, for most nodes,
-// traffic will be low and non-batching is not an issue.
-//
-// TODO: Should we require the timestamp in the envelope to match the message?
+// Note HTTP messages are not batched.  For that to happen we'd have to set up the server so that it
+// can handle multiple data packets for the same type in the same batch.  This is generally a
+// headache.  It's better to instead look forward to when the connection may be kept open.  In
+// reality, for most nodes, traffic will be low and non-batching is not an issue.
 
 use crate::daemon::{HttpIni, Ini, Operation};
 use crate::datasink::background::{background_producer, BackgroundSender, Message, Size};
@@ -24,9 +19,7 @@ use std::thread;
 
 pub struct HttpMsg {
     pub cluster: String,
-    pub node: String,
     pub topic: String,
-    pub timestamp: u64,
     pub value: String,
 }
 
@@ -63,11 +56,11 @@ impl HttpSink {
 impl DataSink for HttpSink {
     fn post(
         &mut self,
-        system: &dyn SystemAPI,
+        _system: &dyn SystemAPI,
         topic_prefix: &Option<String>,
         cluster: &str,
         data_type: &str,
-        hostname: &str,
+        _hostname: &str,
         value: String,
     ) {
         let topic = if let Some(prefix) = topic_prefix {
@@ -77,9 +70,7 @@ impl DataSink for HttpSink {
         };
         let _ = self.outgoing_message_queue.send(Message::M(HttpMsg {
             cluster: cluster.to_string(),
-            node: hostname.to_string(),
             topic,
-            timestamp: system.get_now_in_secs_since_epoch(),
             value,
         }));
     }
@@ -122,10 +113,9 @@ impl<'a> BackgroundSender<HttpMsg> for HttpBackgroundProducer<'a> {
         let api_root = &self.settings.api_root;
         for HttpMsg {
             cluster,
-            node,
             topic,
-            timestamp,
             value,
+            ..
         } in backlog
         {
             let cred = if let Some(passwd) = &self.settings.upload_password {
@@ -137,7 +127,7 @@ impl<'a> BackgroundSender<HttpMsg> for HttpBackgroundProducer<'a> {
             } else {
                 None
             };
-            let url = format!("{api_root}/{cluster}/{node}/{topic}/{timestamp}");
+            let url = format!("{api_root}/{topic}");
             match self.uploader.start(&url, &cred) {
                 Ok(stream) => {
                     stream.put_string(value);

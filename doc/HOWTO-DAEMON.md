@@ -291,11 +291,10 @@ transparently.
 
 ### HTTP sink
 
-The data are sent to an api /ROOT/CLUSTER/NODE/TOPIC/TIMESTAMP where /ROOT is configurable, CLUSTER
-is the cluster name, NODE is the originating node name, TOPIC is the `<data-type>` or
-`<prefix>.<data-type>` if a topic-prefix is configure, and TIMESTAMP is a second count since epoch
-that repreents the time of message production (ideally it is the same timestamp as is in the data
-package).
+The data are sent to an api ROOT/TOPIC where ROOT is configurable as `http.api-root` in the config
+file (see above) and TOPIC is the `<data-type>` (see above) or `<prefix>.<data-type>` if a
+topic-prefix is configured.  Data about cluster, node, and time are taken from the data packet.  The
+response for a successful upload can be just an HTTP result code, Sonar does not look at it.
 
 ### Directory sink
 
