@@ -6,13 +6,14 @@ command line parameter is the name of a config file.
 The daemon is a multi-threaded system that performs system sampling, communicates with the sink, and
 handles signals and lock files.
 
-If a sink is configured - currently Kafka or a directory tree - then that is used for all data
-storage.  Otherwise, data are printed on stdout.  Data formats are defined later.
+If a sink is configured - currently a Kafka broker, an HTTP endpoint, or a directory tree - then
+that is used for all data storage.  Otherwise, data are printed on stdout.  Data formats are defined
+later.
 
-The sink may also provide control messages.  The default sink reads control messages from stdin.
-The directory tree sink does not read control messages.  The Kafka sink currently does not read
-control messages, but this is mostly a matter of programming.  Control messages are described at the
-end of this file.
+Some sinks may also provide control messages.  The default sink reads control messages from stdin.
+The directory tree and HTTP sinks do not (and will not) read control messages.  The Kafka sink
+currently does not read control messages, but this is mostly a matter of programming.  Control
+messages are described at the end of this file.
 
 ## CONFIG FILE
 
@@ -31,11 +32,11 @@ of 24.  (Some sensible cadences such as 80m aka 1h20m, which divides the day eve
 currently expressible.)
 
 The config file has `[global]` and `[debug]` sections that control general operation; an optional
-section for the transport type chosen, currently `[kafka]` or `[directory]` (otherwise terminal I/O
-is used for transport); and a section each for the sonar operations, controlling their cadence and
-operation in the same way as normal command line switches.  For the Sonar operations, the cadence
-setting is required for the operation to be run, the command will be run at a time that is zero mod
-the cadence.
+section for the transport type chosen, currently `[kafka]`, `[http]`, or `[directory]` (otherwise
+terminal I/O is used for transport); and a section each for the sonar operations, controlling their
+cadence and operation in the same way as normal command line switches.  For the Sonar operations,
+the cadence setting is required for the operation to be run, the command will be run at a time that
+is zero mod the cadence.
 
 ### `[global]` section
 
@@ -154,7 +155,7 @@ leaves, provided Slurm data extraction is only run on one master node, as it sho
 
 If the `data-directory` does not exist, Sonar will attempt to create it when producing output.  If
 creation of the directory or the file fails, or a write fails, a soft error is signalled (same as if
-Kafka message delivery fails).
+Kafka or HTTP message delivery fails).
 
 ### `[sample]` section aka `[ps]` section
 
@@ -200,9 +201,9 @@ transmissions for the job in the PENDING state will be seen.
 If `batch-size` is set it provides the maximum number of job records per output message.  This is
 basically a hack, but if `uncompleted` is true the message volume can be very large, and messages
 may become so large that they cause transmission issues, notably by default Kafka limits messages to
-1MB in size and some web servers (if using `rest-endpoint`) limit the size of payloads.  Setting
-`batch-size` in `[jobs]` (and setting `http-payload-limit` in `[kafka]`) can alleviate some of these
-problems.
+1MB in size and some HTTP servers (if using `rest-endpoint` with Kafka or if using the HTTP sink)
+limit the size of payloads.  Setting `batch-size` in `[jobs]` (and setting `http-payload-limit` in
+`[kafka]` or `[http]`) can alleviate some of these problems.
 
 ### `[cluster]` section
 
@@ -225,8 +226,8 @@ topo-svg-command = <string>                     # default none
 topo-text-command = <string>                    # default none
 ```
 
-The `curl-command` is used for sending data to the Kafka REST proxy, if that is in use; see
-`kafka.rest-endpoint` above.
+The `curl-command` is used for sending data to the Kafka REST proxy or to the HTTP endpoint, if
+either is in use; see `kafka.rest-endpoint` and `http.api-root` above.
 
 The `sacct-command`, `scontrol-command` and `sinfo-command` commands are used to obtain slurm data
 for the `[jobs]` and `[cluster]` operations.  If specified, they *must* be absolute paths without
