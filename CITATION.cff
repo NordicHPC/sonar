@@ -2,7 +2,7 @@
 # Visit https://bit.ly/cffinit to generate yours today!
 
 cff-version: 1.2.0
-title: "sonar: Tool to profile usage of HPC resources by regularly probing processes using ps."
+title: "sonar: Tool to profile usage of HPC resources by regularly probing processes, jobs, nodes, clusters."
 message: "If you use this software, please cite it as below."
 type: software
 authors:
@@ -25,4 +25,4 @@ keywords:
   - processes
   - resource usage
 license: GPL-3.0
-version: '0.6.2'
+version: '0.19.0'
