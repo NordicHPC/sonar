@@ -108,7 +108,12 @@ impl<'a> HttpUploader<'a> {
     }
 
     // Start an upload to a target address, see doc at new().
-    pub fn start(&self, url: &str, cred: &Option<Credential>) -> Result<HttpUploadStream, String> {
+    pub fn start(
+        &self,
+        url: &str,
+        mime_type: &str,
+        cred: &Option<Credential>,
+    ) -> Result<HttpUploadStream, String> {
         // For now, the logic here is that to send a data package we fork off a curl and make it
         // send the output and handle retries, it will automatically pick up proxy settings from the
         // environment.  The main thread does not wait for it to finish but spins up threads to
@@ -119,7 +124,7 @@ impl<'a> HttpUploader<'a> {
             "--data-binary".to_string(),
             "@-".to_string(),
             "-H".to_string(),
-            "Content-Type: application/octet-stream".to_string(),
+            "Content-Type: ".to_string() + mime_type,
         ];
         if self.retry_count > 0 {
             args.push("--retry".to_string());
