@@ -439,7 +439,10 @@ struct KafkaHttpBackgroundProducer<'a> {
 
 impl<'a> BackgroundSender<KafkaMsg> for KafkaHttpBackgroundProducer<'a> {
     fn send_all(&self, _id: usize, backlog: Vec<KafkaMsg>) {
-        match self.uploader.start(self.api_endpoint, &None) {
+        match self
+            .uploader
+            .start(self.api_endpoint, "application/octet-stream", &None)
+        {
             Ok(stream) => {
                 let cred = if let Some((user, pass)) = &self.sasl_identity {
                     format!("\"sasl-user\":\"{user}\", \"sasl-password\":\"{pass}\",")

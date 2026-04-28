@@ -128,7 +128,7 @@ impl<'a> BackgroundSender<HttpMsg> for HttpBackgroundProducer<'a> {
                 None
             };
             let url = format!("{api_root}/{topic}");
-            match self.uploader.start(&url, &cred) {
+            match self.uploader.start(&url, "application/json", &cred) {
                 Ok(stream) => {
                     stream.put_string(value);
                     if let Err(e) = stream.end() {
