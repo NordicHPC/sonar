@@ -12,8 +12,8 @@ programs and test code in Go.
 At this time we require:
 
 - Linux
-- 2021 edition of Rust or newer
-- Rust 1.81.0 or newer (can be found with `cargo msrv find`)
+- 2024 edition of Rust or newer
+- Rust 1.88.0 or newer (can be found with `cargo msrv find`)
 - OpenSSL development libraries / headers (for Kafka support) installed on the build system
   (on Ubuntu, this is libssl-dev, on Red Hat it is openssl-devel)
 - A "new enough" binutils (2.35 or newer is known to work, 2.30 is too old, 2.32 is unclear),
