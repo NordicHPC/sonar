@@ -11,12 +11,15 @@ output format can most easily be be seen by diffing this file against a desired 
 
 ## Changes in v0.19.0 (on `main`)
 
+* Bug 549 - **IMPORTANT FUNCTIONALITY.** If ca-file is added to the sonar config for HTTP POST or the
+  Kafka REST API then it will be used to check / encrypt an HTTPS channel.
 * Bug 540 - **IMPORTANT FUNCTIONALITY.** Added the ability to exfiltrate data by HTTP POST to a REST API
   endpoint (subject to some further tweaks).
 * Bug 516 - **IMPORTANT FUNCTIONALITY.** Introduce `global.hostname-only` as a better way of managing
   how node names are reported, default true (differs from v0.18)
 * Bug 459 - **REMOVED FUNCTIONALITY.** Remove the half-implemented (and poorly-implemented) `cluster.domain`
   setting.
+* Sundry bug fixes.
 
 ## Changes in v0.18.4 (on `release_0_18`)
 
