@@ -217,8 +217,22 @@ If the nodes running Sonar are behind an http proxy then the Kafka broker cannot
 directly, but must be contacted through a Kafka proxy that accepts the data via an http REST call
 and forwards them to the broker.  The proxy in `util/kafka-proxy` can be used for this and Sonar
 knows how to talk to it.  In this case, configure the `[kafka]` section of Sonar's config with a
-`rest-endpoint` instead of a `broker-address` and leave out the `ca-file`.  Run the proxy behind a
-web server, eg, for nginx I use this:
+`rest-endpoint` instead of a `broker-address`.  The 8090 port is the default for the proxy.
+
+On the backend, there are two possible configurations, one for a standard TLS certificate on a host
+with a well-known name, one one for use with self-signed certificates for other setups.
+
+Note in the following that there are two .ini files, one for Sonar on the nodes and one for the
+Kafka proxy on the backend.  Both of those have `[kafka]` and `[http]` sections.  Do not confuse
+them.
+
+### Well-known host names, standard cert
+
+A host such as `naic-monitor.uio.no` has a fully qualified, globally visible name, and a cert from a
+normal CA.  In this case, Sonar on the cluster nodes is configured *without* a `kafka.ca-file`
+property but *with* an HTTPS `kafka.rest-endpoint`.  On the backend, a standard web server takes
+care of TLS and forwards traffic over plain HTTP to the kafka proxy that runs on the backend but is
+not externally visible.  For example, for nginx I use this:
 
 ```
 	location /kprox {
@@ -226,10 +240,23 @@ web server, eg, for nginx I use this:
 	}
 ```
 
-and set up the `rest-endpoint` to be `https://my-kafka-host.uio.no/kprox`.  The 8090 port is the
-default for the proxy.  Then the ini file *for the proxy* is usually pretty simple, these values are
-exactly those that were used in the Sonar config file when it was speaking directly to the Kafka
-broker:
+For Sonar on the cluster nodes, I set up the corresponding `rest-endpoint` to be
+`https://my-kafka-host.uio.no/kprox`.
+
+### Private or no host name, self-signed cert
+
+For test setups or hosts that have no names or at least not globally or organization-wide visible
+names, a self-signed certificate can be used for HTTPS.  In this case we have two files, the server
+certificate (call it sonar-ca.crt) and the secret key (sonar-ca-key.pem).  The certificate is not
+secret and is distributed to all the cluter nodes.  For Sonar, `kafka.ca-file` is set to point to
+that file, along with a `kafka.rest-endpoint` using HTTPS (as above).  On the proxy, the
+`http.ca-file` points to the server certificate and `http.key-file` points to the secret key.  This
+is sufficient for Sonar and the proxy to be communicating over HTTPS.
+
+### Proxy-to-Kafka communication
+
+Then the ini file for the proxy is usually pretty simple, these values are exactly those that were
+used in the Sonar config file when it was speaking directly to the Kafka broker:
 
 ```
 [kafka]

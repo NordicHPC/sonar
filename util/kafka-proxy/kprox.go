@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-
+//
 // Copyright (c) 2023-2026 Norwegian Ai Cloud
 
 // Kprox is a very simple Kafka REST proxy, written for Sonar but probably generally useful.
@@ -25,19 +25,24 @@
 //
 // # Config file
 //
-// The config file is on .ini format with http, kafka, and debug sections:
+// The config file is on .ini format with http, kafka, and debug sections, all settings have
+// defaults.
+//
+// The http section configures the connection between the remote Sonar and the proxy:
 //
 //	[http]
 //	endpoint = ...        # default /
 //	listen-port = ...     # default 8090
-//  ca-file = ...         # default ""
-//  key-file = ...        # default ""
+//	ca-file = ...         # default ""
+//	key-file = ...        # default ""
 //
 // The proxy listens on for incoming traffic the interface ":{http.listen-port}{http.endpoint}",
 // by default ":8090/".
 //
 // If http.ca-file has a value then http.key-file must also have a value (and vice versa), and
 // the proxy will listen for https traffic only, using that information.
+//
+// The kafka section configures the connection between the proxy and the Kafka broker:
 //
 //	[kafka]
 //	broker-address = ...  # default localhost:9099
@@ -53,7 +58,7 @@
 //
 // kafka.timeout is how long to hold messages without broker contact before discarding them.
 //
-// If -D is present, the [debug] section is honored:
+// The [debug] section is honored if -D is present on the command line:
 //
 //	[debug]
 //	dump = filename
@@ -61,8 +66,8 @@
 //	password = password
 //
 // If there is a debug.dump, all validated incoming data are appended to that file.  If there are
-// debug.user and/or debug.password then the sasl-user / sasl-password fields must be set in the
-// control object and must match the user / password or the message is rejected, not dumped.
+// debug.user and/or debug.password properties then the sasl-user / sasl-password fields must be set
+// in the control object and must match the user / password or the message is rejected, not dumped.
 //
 // # Protocol
 //
