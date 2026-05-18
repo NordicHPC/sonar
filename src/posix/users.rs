@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+
 // Origin of this code: https://github.com/ogham/rust-users.  That library is not maintained as of
 // 2024/02/22 and we need very little of it for Sonar, so the relevant bits have been moved here and
 // heavily pruned to provide only what we need.

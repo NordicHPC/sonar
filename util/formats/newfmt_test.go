@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: MIT
 
+// Copyright (c) 2023-2026 Norwegian Ai Cloud
+
 // The purpose of this test:
 //
 // - touch every defined data field at least once and make sure it has the expected value
