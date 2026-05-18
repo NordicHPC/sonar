@@ -7,7 +7,7 @@ in [HOWTO-DEPLOY.md](HOWTO-DEPLOY.md).
 ## Build Requirements
 
 Sonar is written primarily in Rust, with some support code for GPU access in C and some helper
-programs and test code in Go.
+programs and test code in Go and Bash.
 
 At this time we require:
 
@@ -20,15 +20,21 @@ At this time we require:
   this can be an issue on RHEL8 and similarly old systems. Check with `as --version`
 
 To rebuild the GPU shims (which are included precompiled for some CPU architectures in
-subdirectories of `gpuapi/`) you need a recent C compiler (gcc11 is fine) and you must compile on a
-host that has the GPU libraries / headers installed.
+subdirectories of `gpuapi/`) you need a recent C compiler:
+
+- gcc11 or newer is fine
+
+and you must compile on a host that has the GPU libraries / headers installed.
 
 To run some of the selftests, or to build the Kafka HTTP proxy, or to rebuild the artifacts built
 from the formal specification of the output data, you will need a recent version of Go, we strive to
 require no more than the previous major release and two dot releases behind tip on that (see
-https://go.dev/doc/devel/release); older versions may work.  At the time of writing, the Kafka HTTP
-proxy requires Go 1.24 and other programs require Go 1.22.  Note that recent Go installs will
-usually download whatever version they need, should it not already be available.
+https://go.dev/doc/devel/release); older versions may work.  At the time of writing, we require:
+
+- Go 1.24.10
+
+Note that recent Go installs will usually download whatever version they need, should it not already
+be installed.
 
 
 ## Compilation
@@ -100,8 +106,8 @@ Sonar is Linux-only and is known to work on systems at least as old as RHEL8 and
 43; it has been used at various times on both Red Hat and Ubuntu distros.  It does not use exotic
 aspects of the kernel or specific distros.
 
-We believe to be possible to port Sonar to at least BSD Unix, and the system API abstraction is set
-up to make this easy.  However, we have not attempted such a port.
+We believe to be possible to port Sonar to at least BSD Unix (MacOS/NetBSD or FreeBSD), and the
+system API abstraction is set up to make this easy.  However, we have not attempted such a port.
 
 
 ## Versions and release process
