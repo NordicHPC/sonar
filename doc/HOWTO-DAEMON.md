@@ -109,6 +109,12 @@ The `ca-file`, `sasl-password` and `sasl-password-file` are explained in
 [HOWTO-KAFKA](HOWTO-KAFKA.md), basically the former triggers the use of TLS for the connection and
 the latter two additionally add authentication.
 
+In the case of a `rest-endpoint`, the `ca-file`, if present, is a certificate that is used for
+validating the server and encrypting an https connection.  Often, this is self-signed.  It is
+better, if possible, to provide the host with an official certificate.
+
+Security note: Passing authentication information over a plain http connection is a Bad Idea.
+
 ### `[http]` section
 
 ```
@@ -117,6 +123,7 @@ http-proxy = <url>
 http-payload-limit = <volume value>             # default none
 sending-window = <duration value>               # default 5m
 timeout = <duration value>                      # default 30m
+ca-file = <filename>                            # default none
 upload-password = <string>                      # default none
 upload-password-file = <string>                 # default none
 ```
@@ -136,6 +143,11 @@ believed to be secure enough.  If the temp file can't be written then the creden
 the curl command line only if the password was provided by `upload-password`, never if it was
 provided by `upload-password-file`.
 
+Security note: Passing authentication information over a plain http connection is a Bad Idea.
+
+The `ca-file`, if present, is a certificate that is used for validating the server and encrypting an
+https connection.  Often, this is self-signed.  It is better, if possible, to provide the host with
+an official certificate.
 
 ### `[directory]` section
 
