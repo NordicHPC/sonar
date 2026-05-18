@@ -12,12 +12,10 @@
 //	-d          Debug logging (implies -v) - log message traffic
 //	-D          Enable [debug] section (implies -d)
 //
-// Kafka posts data via http to this proxy.  This proxy decodes the traffic and then speaks the
-// normal Kafka protocol to the broker, forwarding individual messages to it.  It is not necessary
-// for the broker to trust this proxy: the proxy will forward the SASL credentials included in the
-// messages with the messages to the broker.
-//
-// For now, this supports only HTTP, so put it behind a web server to support HTTPS.
+// Sonar posts data via http/https to this proxy.  This proxy decodes the traffic and then speaks
+// the normal Kafka protocol to the broker, forwarding individual messages to it.  It is not
+// necessary for the broker to trust this proxy: the proxy will forward the SASL credentials
+// included in the messages with the messages to the broker.
 //
 // Logging is to the syslog by default (without options only critical errors, with -v also
 // non-critical errors), and to stderr with -d.
@@ -27,13 +25,19 @@
 //
 // # Config file
 //
-// The config file is on .ini format with these sections:
+// The config file is on .ini format with http, kafka, and debug sections:
 //
 //	[http]
 //	endpoint = ...        # default /
 //	listen-port = ...     # default 8090
+//  ca-file = ...         # default ""
+//  key-file = ...        # default ""
 //
-// http.endpoint:http.listen-port is the address that the proxy listens on for incoming traffic.
+// The proxy listens on for incoming traffic the interface ":{http.listen-port}{http.endpoint}",
+// by default ":8090/".
+//
+// If http.ca-file has a value then http.key-file must also have a value (and vice versa), and
+// the proxy will listen for https traffic only, using that information.
 //
 //	[kafka]
 //	broker-address = ...  # default localhost:9099
@@ -42,7 +46,7 @@
 //	timeout = ...         # default 1800 seconds
 //
 // The kafka.broker-address and kafka.ca-file are exactly as for Sonar: they are the broker endpoint
-// and the cert required to speak TLS to it, if it's set up that way.
+// and the cert required to speak TLS to the broker, if the broker is set up that way.
 //
 // If kafka.sasl is true but the sasl-user/sasl-password are not present in the control object (see
 // below) then the message is rejected.
@@ -152,6 +156,8 @@ var (
 	kafkaCaFile        = ""
 	httpEndpoint       = "/"
 	httpListenPort     = 8090
+	httpCaFile         = ""
+	httpKeyFile        = ""
 	dumpFile           = ""
 	debugUser          = ""
 	debugPassword      = ""
@@ -213,6 +219,8 @@ func main() {
 		httpSect := iniParser.AddSection("http")
 		hEndpoint := httpSect.AddString("endpoint")
 		hListenPort := httpSect.AddUint64("listen-port")
+		hCaFile := httpSect.AddString("ca-file")
+		hKeyFile := httpSect.AddString("key-file")
 		debugSect := iniParser.AddSection("debug")
 		dDump := debugSect.AddString("dump")
 		dUser := debugSect.AddString("user")
@@ -243,6 +251,13 @@ func main() {
 		if hListenPort.Present(store) {
 			httpListenPort = int(hListenPort.Uint64Val(store))
 		}
+		if hCaFile.Present(store) != hKeyFile.Present(store) {
+			log.Fatalf("Neither or both the http ca-file and key-file must be provided")
+		}
+		if hCaFile.Present(store) {
+			httpCaFile = hCaFile.StringVal(store)
+			httpKeyFile = hKeyFile.StringVal(store)
+		}
 		if *debugMode {
 			dumpFile = dDump.StringVal(store)
 			debugUser = dUser.StringVal(store)
@@ -264,7 +279,13 @@ func main() {
 		runKafkaSender(ch)
 	}
 	runHttpListener(ch)
-	report(true, "Kafka HTTP proxy exit: %v", http.ListenAndServe(fmt.Sprintf(":%d", httpListenPort), nil))
+	var result error
+	if httpCaFile != "" {
+		result = http.ListenAndServeTLS(fmt.Sprintf(":%d", httpListenPort), httpCaFile, httpKeyFile, nil)
+	} else {
+		result = http.ListenAndServe(fmt.Sprintf(":%d", httpListenPort), nil)
+	}
+	report(true, "Kafka HTTP proxy exit: %v", result)
 	close(ch)
 }
 
