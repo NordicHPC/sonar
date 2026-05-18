@@ -6,7 +6,7 @@ ARCH=$(shell uname -m)
 
 default: target/release/sonar
 
-target/release/sonar: src/*.rs src/*/*.rs gpuapi/$(ARCH)/*.a
+target/release/sonar: src/*.rs src/*/*.rs gpuapi/$(ARCH)/*.a Cargo.toml Cargo.lock
 	cargo build --release
 
 src/json_tags.rs: util/formats/newfmt/types.go
