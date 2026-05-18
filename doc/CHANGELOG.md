@@ -11,8 +11,11 @@ output format can most easily be be seen by diffing this file against a desired 
 
 ## Changes in v0.19.0 (on `main`)
 
+* Bug 556 - **IMPORTANT FUNCTIONALITY.** The Kafka proxy can also to HTTPS, it does not need to be
+  behind a web server.  This allows it to easily use self-signed certificates.
 * Bug 549 - **IMPORTANT FUNCTIONALITY.** If ca-file is added to the sonar config for HTTP POST or the
-  Kafka REST API then it will be used to check / encrypt an HTTPS channel.
+  Kafka REST API then it will be used to check / encrypt an HTTPS channel.  This allows it to easily use
+  self-signed certificates.
 * Bug 540 - **IMPORTANT FUNCTIONALITY.** Added the ability to exfiltrate data by HTTP POST to a REST API
   endpoint (subject to some further tweaks).
 * Bug 516 - **IMPORTANT FUNCTIONALITY.** Introduce `global.hostname-only` as a better way of managing
