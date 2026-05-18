@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: MIT
 
+// Copyright (c) 2023-2026 Norwegian Ai Cloud
+
 // This is a machine-processable and partly executable specification for the new JSON format for
 // Sonar output.  It is processable into Rust code and Markdown docs by code in ../../process-doc.
 //
@@ -377,11 +379,12 @@ type SysinfoAttributes struct {
 // NOTE: Though the power limit can change, it is reported here (as well as in sample data) because
 // it usually does not.
 type SysinfoGpuCard struct {
-	// Node-local card index.  See notes in preamble
+	// Node-local card index.  See notes in preamble.  This isn't marked "omitempty" because an
+	// index can be 0 and it's confusing to omit the field in that case
 	Index uint64 `json:"index"`
 
 	// UUID as reported by card.  See notes in preamble
-	UUID string `json:"uuid"`
+	UUID string `json:"uuid,omitempty"`
 
 	// Indicates an intra-system card address, eg PCI address
 	Address string `json:"address,omitempty"`

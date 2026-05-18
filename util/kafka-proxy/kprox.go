@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: MIT
 
+// Copyright (c) 2023-2026 Norwegian Ai Cloud
+
 // Kprox is a very simple Kafka REST proxy, written for Sonar but probably generally useful.
 //
 // Usage: kprox [options] [inifile-name]

@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: MIT
 
+// Copyright (c) 2023-2026 Norwegian Ai Cloud
+
 package newfmt
 
 import (

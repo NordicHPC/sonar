@@ -382,7 +382,8 @@ it usually does not.
 
 #### **`index`** uint64
 
-Node-local card index.  See notes in preamble
+Node-local card index.  See notes in preamble.  This isn't marked "omitempty" because an
+index can be 0 and it's confusing to omit the field in that case
 
 #### **`uuid`** string
 

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+
 // Origin of this code: https://github.com/svartalf/hostname.
 
 /*
