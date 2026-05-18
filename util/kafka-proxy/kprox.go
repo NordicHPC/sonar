@@ -14,7 +14,7 @@
 //
 // Sonar posts data via http/https to this proxy.  This proxy decodes the traffic and then speaks
 // the normal Kafka protocol to the broker, forwarding individual messages to it.  It is not
-// necessary for the broker to trust this proxy: the proxy will forward the SASL credentials
+// necessary for the broker to trust this proxy: the proxy will forward any SASL credentials
 // included in the messages with the messages to the broker.
 //
 // Logging is to the syslog by default (without options only critical errors, with -v also
@@ -61,9 +61,9 @@
 // The [debug] section is honored if -D is present on the command line:
 //
 //	[debug]
-//	dump = filename
-//	user = username
-//	password = password
+//	dump = filename       # default "" - data not dumped, but dropped
+//	user = username       # default "" - username ignored
+//	password = password   # default "" - password ignored
 //
 // If there is a debug.dump, all validated incoming data are appended to that file.  If there are
 // debug.user and/or debug.password properties then the sasl-user / sasl-password fields must be set
@@ -330,7 +330,11 @@ func runDebugDumper(ch <-chan Msg) {
 					"Message #%d received: %s %s %s %s %s %d",
 					msgId, msg.Topic, msg.Key, msg.Client, msg.SaslUser, msg.SaslPassword, msg.DataSize,
 				)
-				log.Printf("Dumping message to %s, not sending to Kafka", dumpFile)
+				if dump != nil {
+					log.Printf("Dumping message to %s, not sending to Kafka", dumpFile)
+				} else {
+					log.Printf("Dropping message, not sending to Kafka")
+				}
 			}
 			if dump != nil {
 				bs, _ := json.Marshal(msg.Control)
