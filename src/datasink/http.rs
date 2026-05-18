@@ -89,9 +89,15 @@ fn http_producer(
     incoming_message_queue: channel::Receiver<Message<HttpMsg>>,
     control_and_errors: channel::Sender<Operation>,
 ) {
+    let ca_file = if let Some(ref f) = settings.ca_file {
+        f
+    } else {
+        ""
+    };
     let uploader = http_upload::HttpUploader::new(
         &curl_cmd,
         &settings.http_proxy,
+        ca_file,
         settings.timeout.to_seconds(),
     );
     let op = HttpBackgroundProducer {

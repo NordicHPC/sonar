@@ -108,6 +108,7 @@ impl KafkaSink {
                 let cutoff = kafka.http_payload_limit;
                 let rest_endpoint = kafka.rest_endpoint.clone();
                 let http_proxy = kafka.http_proxy.clone();
+                let ca_file = kafka.ca_file.clone();
                 let curl_cmd = if let Some(ref curl) = ini.programs.curl_cmd {
                     curl.clone()
                 } else {
@@ -119,6 +120,7 @@ impl KafkaSink {
                         &curl_cmd,
                         &rest_endpoint,
                         &http_proxy,
+                        ca_file,
                         &client_id,
                         sasl_identity,
                         sending_window,
@@ -407,6 +409,7 @@ fn kafka_http_producer(
     curl_cmd: &str,
     api_endpoint: &str,
     http_proxy: &str,
+    ca_file: Option<String>,
     client_id: &str,
     sasl_identity: Option<(String, String)>,
     sending_window: u64,
@@ -414,7 +417,8 @@ fn kafka_http_producer(
     incoming_message_queue: channel::Receiver<Message<KafkaMsg>>,
     control_and_errors: channel::Sender<Operation>,
 ) {
-    let uploader = http_upload::HttpUploader::new(curl_cmd, http_proxy, timeout);
+    let ca_file = if let Some(ref f) = ca_file { &f } else { "" };
+    let uploader = http_upload::HttpUploader::new(curl_cmd, http_proxy, ca_file, timeout);
     let op = KafkaHttpBackgroundProducer {
         uploader,
         cutoff,

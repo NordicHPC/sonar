@@ -1,0 +1,18 @@
+# This is a valid test configuration, but only tests things that could
+# not be tested by daemon-stdio-config.txt.  See that file for more
+# information.
+
+[global]
+cluster = mlx.hpc.uio.no
+role=master
+
+[http]
+api-root = https://axis-of-eval.org:666
+http-proxy = hell.local:777
+http-payload-limit = 100M
+sending-window = 3m
+timeout = 5h
+ca-file = zappa.pem
+upload-password-file = myauth.txt
+
+

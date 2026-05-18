@@ -79,6 +79,7 @@ impl Credential {
 pub struct HttpUploader<'a> {
     curl_cmd: &'a str,
     http_proxy: &'a str,
+    ca_file: &'a str,
     retry_count: i32,
 }
 
@@ -91,7 +92,15 @@ impl<'a> HttpUploader<'a> {
     // possible to call start() repeatedly on the same uploader with different URLs, it will create
     // independent subprocesses and threads to handle the additional uploads, all of which will be
     // performed concurrently.
-    pub fn new(curl_cmd: &'a str, http_proxy: &'a str, mut timeout: u64) -> HttpUploader<'a> {
+    //
+    // If ca_file is not "" then it names a file that holds an SSL certificate to use for the
+    // connection, it will be passed to curl with --cacert.
+    pub fn new(
+        curl_cmd: &'a str,
+        http_proxy: &'a str,
+        ca_file: &'a str,
+        mut timeout: u64,
+    ) -> HttpUploader<'a> {
         // Curl will retry for 1s, 2s, 4s, ..., 10m and then stick to 10m
         let mut retry_count = 0;
         let mut next = 1;
@@ -103,6 +112,7 @@ impl<'a> HttpUploader<'a> {
         HttpUploader {
             curl_cmd,
             http_proxy,
+            ca_file,
             retry_count,
         }
     }
@@ -130,6 +140,10 @@ impl<'a> HttpUploader<'a> {
             args.push("--retry".to_string());
             args.push(format!("{}", self.retry_count));
             args.push("--retry-connrefused".to_string());
+        }
+        if self.ca_file != "" {
+            args.push("--cacert".to_string());
+            args.push(self.ca_file.to_string());
         }
         let tempfile = match cred {
             None => None,

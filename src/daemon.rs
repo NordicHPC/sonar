@@ -73,6 +73,7 @@ pub struct HttpIni {
     pub http_payload_limit: Option<usize>,
     pub sending_window: Dur,
     pub timeout: Dur,
+    pub ca_file: Option<String>,
     pub upload_password: Option<String>,
     pub upload_password_file: Option<String>,
 }
@@ -768,6 +769,7 @@ fn parse_config(config_file: &str) -> Result<Ini, String> {
             http_payload_limit: None,
             sending_window: Dur::Minutes(5),
             timeout: Dur::Minutes(30),
+            ca_file: None,
             upload_password: None,
             upload_password_file: None,
         },
@@ -990,6 +992,9 @@ fn parse_config(config_file: &str) -> Result<Ini, String> {
                 }
                 "timeout" => {
                     ini.http.timeout = parse_duration("http.timeout", &value, true)?;
+                }
+                "ca-file" => {
+                    ini.http.ca_file = Some(value);
                 }
                 "upload-password" => {
                     ini.http.upload_password = Some(value);
@@ -1475,4 +1480,18 @@ pub fn test_parser() {
     assert!(ini.global.role == "master");
 
     assert!(ini.directory.data_dir == Some("/dev/null/your/data/here".to_string()));
+
+    let ini = parse_config("src/testdata/daemon-stdio-config4.txt").unwrap();
+
+    assert!(ini.http.api_root == "https://axis-of-eval.org:666".to_string());
+    assert!(ini.http.http_proxy == "hell.local:777".to_string());
+    assert!(ini.http.http_payload_limit == Some(100 * 1024 * 1024));
+    assert!(ini.http.sending_window == Dur::Minutes(3));
+    assert!(ini.http.timeout == Dur::Hours(5));
+    assert!(ini.http.ca_file == Some("zappa.pem".to_string()));
+    assert!(ini.http.upload_password == Some("SPECTRE".to_string()));
+
+    let ini = parse_config("src/testdata/daemon-stdio-config5.txt").unwrap();
+
+    assert!(ini.http.upload_password_file == Some("myauth.txt".to_string()));
 }
