@@ -35,11 +35,14 @@ sent from the back-end to the clients in the cluster:
 
 Test notes with standard Kafka server, see https://kafka.apache.org/quickstart.
 
+**NOTE** The following notes are for Kafka 3.9.0, but we have tested with Kafka 4.2 and it is known
+to work.  Management is a little different for 4.2, as Zookeeper is gone.  See
+https://kafka.apache.org/42/getting-started/quickstart/ for pointers.
+
 #### Setup
 
-Download the [Kafka Binary Release](https://kafka.apache.org/downloads) (.tgz).
-You should download the release for scala version 2.13 and kafka version 3.9.0, since that is the only release tested with sonar.
-Unpack it, once downloaded:
+Download the [Kafka Binary Release](https://kafka.apache.org/downloads) (.tgz).  These instructions
+are for scala version 2.13 and kafka version 3.9.0.  Unpack it, once downloaded:
 
 ```
     tar xvf kafka_2.13-3.9.0.tgz
@@ -50,8 +53,8 @@ You're going to be running several shells, let's call them Zookeeper, Server, Co
 The working directory for the following is the root directory of the unpacked Kafka distribution, e.g.,
 `kafka_2.13-3.9.0/`.
 
-NOTE!  Currently Sonar has only been tested with Kafka 3.9.0.  Kafka 4.0.0 may or may not work, it removed
-support for some older protocol versions.
+NOTE!  Sonar has been tested with Kafka 3.9.0, and 4.2.0; both work.  Kafka 4 removed support for
+some older protocol versions.
 
 #### 2.13-3.9.0
 
