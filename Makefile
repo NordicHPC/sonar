@@ -43,10 +43,13 @@ format:
 	( cd gpuapi ; $(MAKE) format )
 
 # (Re)generate all files that are generated
-generate:
+generate: CITATION.cff
 	( cd build-dist ; $(MAKE) generate )
 	( cd util ; $(MAKE) generate )
 	( cd tests ; $(MAKE) generate )
+
+CITATION.cff: Cargo.toml
+	python3 citation-version.py Cargo.toml CITATION.cff
 
 # https://github.com/lars-t-hansen/gotags, you can also use etags here for less interesting info
 RSSRC=$(shell find src -name '*.rs')
