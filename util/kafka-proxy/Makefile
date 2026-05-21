@@ -13,7 +13,7 @@ all:
 
 release: kprox
 
-kprox: kprox.go version.go Makefile
+kprox: kprox.go version.go auth.go Makefile
 	CGO_ENABLED=0 go build -a
 
 generate: version.go

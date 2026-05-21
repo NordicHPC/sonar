@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 //
-// Copyright (c) 2023-2026 Norwegian Ai Cloud
+// Copyright (c) 2026 Sonar developers
 
 // Kprox is a very simple Kafka REST proxy, written for Sonar but probably generally useful.
 //
@@ -31,16 +31,21 @@
 // The http section configures the connection between the remote Sonar and the proxy:
 //
 //	[http]
-//	endpoint = ...        # default /
-//	listen-port = ...     # default 8090
-//	ca-file = ...         # default ""
-//	key-file = ...        # default ""
+//	endpoint = ...         # default /
+//	listen-port = ...      # default 8090
+//	ca-file = ...          # default ""
+//	key-file = ...         # default ""
+//	upload-auth-file = ... # default ""
 //
 // The proxy listens on for incoming traffic the interface ":{http.listen-port}{http.endpoint}",
 // by default ":8090/".
 //
 // If http.ca-file has a value then http.key-file must also have a value (and vice versa), and
 // the proxy will listen for https traffic only, using that information.
+//
+// If http.upload-auth-file has a value then that file must have cluster-name:upload-password pairs,
+// and the sasl-user / sasl-password fields must be set in the control object, and must match a pair
+// in the file.  If not, the message is rejected.
 //
 // The kafka section configures the connection between the proxy and the Kafka broker:
 //
@@ -54,7 +59,8 @@
 // and the cert required to speak TLS to the broker, if the broker is set up that way.
 //
 // If kafka.sasl is true but the sasl-user/sasl-password are not present in the control object (see
-// below) then the message is rejected.
+// below) then the message is rejected.  Note that if an http.upload-auth-file is configured, the
+// SASL credentials will be required for checking in kprox, so this property should be set.
 //
 // kafka.timeout is how long to hold messages without broker contact before discarding them.
 //
@@ -68,6 +74,9 @@
 // If there is a debug.dump, all validated incoming data are appended to that file.  If there are
 // debug.user and/or debug.password properties then the sasl-user / sasl-password fields must be set
 // in the control object and must match the user / password or the message is rejected, not dumped.
+// Note any http.upload-auth-file takes precedence over the user/password settings here: if an
+// upload does not authenticate to that file, it is rejected and the debug credentials are never
+// checked.
 //
 // # Protocol
 //
@@ -93,6 +102,10 @@
 // connection will be created specially for that pair.  The client ID is forwarded to Kafka as a
 // header on the message.
 //
+// If upload authorization is performed by the proxy (when http.upload-auth-file is set) then the
+// SASL credentials are not forwarded to Kafka as there's no need for Kafka to perform authorization
+// too.
+//
 // # Limits
 //
 // It is inevitable that there will be some restrictions in the proxy on the size and volume of
@@ -107,6 +120,14 @@
 // rejected silently.
 //
 // Probably Kafka messages larger than 1MB will be problematic.
+//
+// # NOTES
+//
+// The option of performing authorization in the proxy makes this a bit more than a proxy, but it
+// simplifies a typical back-end: a back-end that runs the proxy, Kafka, and data processors on the
+// same trusted node can run them with unencrypted communication among them and simple
+// configurations.  In particular, Kafka does not need to be configured with authorization
+// information.
 //
 // # TODO
 //
@@ -163,6 +184,7 @@ var (
 	httpListenPort     = 8090
 	httpCaFile         = ""
 	httpKeyFile        = ""
+	httpUploadAuthFile = ""
 	dumpFile           = ""
 	debugUser          = ""
 	debugPassword      = ""
@@ -172,8 +194,9 @@ var (
 )
 
 var (
-	kafkaCaCert []byte
-	syslogger   *syslog.Writer
+	kafkaCaCert   []byte
+	syslogger     *syslog.Writer
+	authenticator *Authenticator
 )
 
 type Control struct {
@@ -216,16 +239,20 @@ func main() {
 	if len(rest) > 0 {
 		iniName := rest[0]
 		iniParser := ini.NewParser()
+
 		kafkaSect := iniParser.AddSection("kafka")
 		kBrokerAddr := kafkaSect.AddString("broker-address")
 		kRequireSasl := kafkaSect.AddBool("sasl")
 		kTimeoutSec := kafkaSect.AddUint64("timeout")
 		kCaFile := kafkaSect.AddString("ca-file")
+
 		httpSect := iniParser.AddSection("http")
 		hEndpoint := httpSect.AddString("endpoint")
 		hListenPort := httpSect.AddUint64("listen-port")
 		hCaFile := httpSect.AddString("ca-file")
 		hKeyFile := httpSect.AddString("key-file")
+		hUploadAuthFile := httpSect.AddString("upload-auth-file")
+
 		debugSect := iniParser.AddSection("debug")
 		dDump := debugSect.AddString("dump")
 		dUser := debugSect.AddString("user")
@@ -263,6 +290,9 @@ func main() {
 			httpCaFile = hCaFile.StringVal(store)
 			httpKeyFile = hKeyFile.StringVal(store)
 		}
+		if hUploadAuthFile.Present(store) {
+			httpUploadAuthFile = hUploadAuthFile.StringVal(store)
+		}
 		if *debugMode {
 			dumpFile = dDump.StringVal(store)
 			debugUser = dUser.StringVal(store)
@@ -270,6 +300,17 @@ func main() {
 		}
 	}
 
+	if httpUploadAuthFile != "" {
+		f, err := os.Open(httpUploadAuthFile)
+		if err != nil {
+			log.Fatalf("Could not read upload auth file %s", httpUploadAuthFile)
+		}
+		authenticator, err = NewAuthenticator(f)
+		f.Close()
+		if err != nil {
+			log.Fatalf("Could not parse upload auth file %s", httpUploadAuthFile)
+		}
+	}
 	if kafkaCaFile != "" {
 		var err error
 		kafkaCaCert, err = os.ReadFile(kafkaCaFile)
@@ -348,13 +389,23 @@ func runDebugDumper(ch <-chan Msg) {
 }
 
 func checkCredentials(c Control) bool {
-	// If no -U then accept every user
-	if debugUser != "" && c.SaslUser != debugUser {
-		return false
+	// If there is a password file, always use it and fail if we can't authenticate to it
+	if authenticator != nil {
+		// We disallow empty user or password in the control object, and the authenticator checks
+		// this implicitly as it does not allow empty user or password in the password file.
+		if !authenticator.Authenticate(c.SaslUser, c.SaslPassword) {
+			return false
+		}
 	}
-	// If no -P then accept every password
-	if debugPassword != "" && c.SaslPassword != debugPassword {
-		return false
+	if *debugMode {
+		// If no debug.user then accept every user
+		if debugUser != "" && c.SaslUser != debugUser {
+			return false
+		}
+		// If no debug.password then accept every password
+		if debugPassword != "" && c.SaslPassword != debugPassword {
+			return false
+		}
 	}
 	return true
 }
@@ -409,7 +460,8 @@ func runKafkaSender(ch <-chan Msg) {
 					kgo.SeedBrokers(kafkaBrokerAddress),
 					kgo.AllowAutoTopicCreation(),
 				}
-				if msg.SaslUser != "" || msg.SaslPassword != "" {
+				// If we authenticate in kprox, do not forward credentials to Kafka
+				if authenticator == nil && (msg.SaslUser != "" || msg.SaslPassword != "") {
 					opts = append(opts, kgo.SASL(plain.Auth{
 						User: msg.SaslUser,
 						Pass: msg.SaslPassword,
@@ -548,14 +600,11 @@ func parsePayload(ch chan<- Msg, payload []byte) (int, string) {
 		c.Key = strings.TrimSpace(c.Key)
 		c.Client = strings.TrimSpace(c.Client)
 
-		// In -D mode, check credentials.  Logically this test belongs in runDebugDumper, but by
-		// having it here we can return a sensible response code and thus the client can test the
-		// transmission of the credentials.
-		if *debugMode {
-			if !checkCredentials(c) {
-				report(false, "Bad credentials")
-				return 401, "Bad credentials"
-			}
+		// Check credentials.  It's good to do it here because then we can return a sensible error
+		// if the check fails.
+		if !checkCredentials(c) {
+			report(false, "Bad credentials")
+			return 401, "Bad credentials"
 		}
 
 		// Produce it.

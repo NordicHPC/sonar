@@ -253,9 +253,19 @@ that file, along with a `kafka.rest-endpoint` using HTTPS (as above).  On the pr
 `http.ca-file` points to the server certificate and `http.key-file` points to the secret key.  This
 is sufficient for Sonar and the proxy to be communicating over HTTPS.
 
+### Authorizing the upload
+
+The upload can be authorized either by the the kafka-proxy forwarding the SASL credentials that are
+in the message to Kafka, and Kafka carrying authorization information, or by the kafka-proxy itself
+performing the authorization and not forwarding those fields to Kafka.  The advantage of the latter
+is a simpler Kafka configuration.
+
+In the latter case, create an upload identity file with `cluster-name:upload-password` lines and set
+the `http.upload-auth-file` to point to that file.
+
 ### Proxy-to-Kafka communication
 
-Then the ini file for the proxy is usually pretty simple, these values are exactly those that were
+Then the ini file for the kafka-proxy is usually pretty simple, these values are exactly those that were
 used in the Sonar config file when it was speaking directly to the Kafka broker:
 
 ```
@@ -265,4 +275,4 @@ ca-file = my-kafka-ca.crt
 ```
 
 See the doc block at the head of `../util/kafka-proxy/kprox.go` for more information about the
-proxy configuration.
+kafka-proxy configuration.
