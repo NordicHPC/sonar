@@ -15,7 +15,7 @@ Version:        0.18.0
 Release:        %autorelease
 Summary:        Continuous profiling daemon
 
-License:        GPL-3.0 + MIT
+License:        MIT
 URL:            https://github.com/NordicHPC/sonar
 Source0:        https://github.com/NordicHPC/sonar/archive/refs/tags/v0.18.0.tar.gz
 

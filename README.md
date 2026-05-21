@@ -1,5 +1,5 @@
 [![image](https://github.com/NordicHPC/sonar/workflows/Test/badge.svg)](https://github.com/NordicHPC/sonar/actions)
-[![image](https://img.shields.io/badge/license-%20GPL--v3.0-blue.svg)](LICENSE)
+[![image](https://img.shields.io/badge/license-%20MIT-blue.svg)](LICENSE)
 
 # Sonar
 
@@ -9,9 +9,6 @@ nodes, queues, and clusters.
 Sonar examines `/proc` and `/sys` and/or runs diagnostic programs, filters and groups the
 information, and prints it to stdout, stores it in a local directory tree, or sends it to a remote
 collector.
-
-Sonar proper is GPL-3 but some side components that are crucial for the interaction with other tools
-that might not be GPL carry the MIT license.
 
 ![image of a fish swarm](img/sonar-small.png)
 
