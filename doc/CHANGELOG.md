@@ -11,8 +11,9 @@ output format can most easily be be seen by diffing this file against a desired 
 
 ## Changes in v0.19.0 (on `main`)
 
-* Bug 556 - **IMPORTANT FUNCTIONALITY.** The Kafka proxy can also to HTTPS, it does not need to be
+* Bug 556 - **IMPORTANT FUNCTIONALITY.** The Kafka proxy can also do HTTPS, it does not need to be
   behind a web server.  This allows it to easily use self-signed certificates.
+* Bug 551 - Relicense from GPL3 to MIT.
 * Bug 549 - **IMPORTANT FUNCTIONALITY.** If ca-file is added to the sonar config for HTTP POST or the
   Kafka REST API then it will be used to check / encrypt an HTTPS channel.  This allows it to easily use
   self-signed certificates.
@@ -22,7 +23,7 @@ output format can most easily be be seen by diffing this file against a desired 
   how node names are reported, default true (differs from v0.18)
 * Bug 459 - **REMOVED FUNCTIONALITY.** Remove the half-implemented (and poorly-implemented) `cluster.domain`
   setting.
-* Sundry bug fixes.
+* Sundry bug fixes and tweaks.
 
 ## Changes in v0.18.4 (on `release_0_18`)
 
