@@ -11,6 +11,8 @@ output format can most easily be be seen by diffing this file against a desired 
 
 ## Changes in v0.19.0 (on `main`)
 
+* Bug 559 - Allow the Kafka proxy to perform authorization, removing the need for configuring
+  Kafka with that information.
 * Bug 556 - **IMPORTANT FUNCTIONALITY.** The Kafka proxy can also do HTTPS, it does not need to be
   behind a web server.  This allows it to easily use self-signed certificates.
 * Bug 551 - Relicense from GPL3 to MIT.
