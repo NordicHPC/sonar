@@ -16,7 +16,7 @@ use crate::util::cstrdup::cstrdup;
 // TODO: We should use bindgen for this but not important at the moment.
 
 #[link(name = "sonar-amd", kind = "static")]
-extern "C" {
+unsafe extern "C" {
     pub fn amdml_device_get_count(count: *mut cty::uint32_t) -> cty::c_int;
 }
 
@@ -58,9 +58,9 @@ impl Default for AmdmlCardInfo {
 }
 
 #[link(name = "sonar-amd", kind = "static")]
-extern "C" {
+unsafe extern "C" {
     pub fn amdml_device_get_card_info(device: cty::uint32_t, buf: *mut AmdmlCardInfo)
-        -> cty::c_int;
+    -> cty::c_int;
 }
 
 #[repr(C)]
@@ -79,7 +79,7 @@ pub struct AmdmlCardState {
 }
 
 #[link(name = "sonar-amd", kind = "static")]
-extern "C" {
+unsafe extern "C" {
     pub fn amdml_device_get_card_state(
         device: cty::uint32_t,
         buf: *mut AmdmlCardState,
@@ -97,7 +97,7 @@ pub struct AmdmlGpuProcess {
 }
 
 #[link(name = "sonar-amd", kind = "static")]
-extern "C" {
+unsafe extern "C" {
     pub fn amdml_device_probe_processes(count: *mut cty::uint32_t) -> cty::c_int;
     pub fn amdml_get_process(index: cty::uint32_t, buf: *mut AmdmlGpuProcess) -> cty::c_int;
     pub fn amdml_free_processes();

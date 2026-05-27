@@ -11,6 +11,7 @@ output format can most easily be be seen by diffing this file against a desired 
 
 ## Changes in v0.19.0 (on `main`)
 
+* Bug 562 - Update to Rust 2024 Edition.
 * Bug 559 - Allow the Kafka proxy to perform authorization, removing the need for configuring
   Kafka with that information.
 * Bug 556 - **IMPORTANT FUNCTIONALITY.** The Kafka proxy can also do HTTPS, it does not need to be

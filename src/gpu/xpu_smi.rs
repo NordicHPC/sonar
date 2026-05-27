@@ -18,7 +18,7 @@ use std::path::Path;
 // TODO: We should use bindgen for this but not important at the moment.
 
 #[link(name = "sonar-xpu", kind = "static")]
-extern "C" {
+unsafe extern "C" {
     pub fn xpu_device_get_count(count: *mut cty::uint32_t) -> cty::c_int;
 }
 
@@ -50,7 +50,7 @@ impl Default for XpuCardInfo {
 }
 
 #[link(name = "sonar-xpu", kind = "static")]
-extern "C" {
+unsafe extern "C" {
     pub fn xpu_device_get_card_info(device: cty::uint32_t, buf: *mut XpuCardInfo) -> cty::c_int;
 }
 
@@ -68,7 +68,7 @@ pub struct XpuCardState {
 }
 
 #[link(name = "sonar-xpu", kind = "static")]
-extern "C" {
+unsafe extern "C" {
     pub fn xpu_device_get_card_state(device: cty::uint32_t, buf: *mut XpuCardState) -> cty::c_int;
 }
 
@@ -82,7 +82,7 @@ pub struct XpuGpuProcess {
 }
 
 #[link(name = "sonar-xpu", kind = "static")]
-extern "C" {
+unsafe extern "C" {
     pub fn xpu_device_probe_processes(
         device: cty::uint32_t,
         count: *mut cty::uint32_t,

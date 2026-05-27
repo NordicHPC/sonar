@@ -233,12 +233,12 @@ fn main() {
             topo_text_cmd,
         } => {
             let system = attach_common(system, cluster, *hostname_only);
-            let system = if let Some(ref c) = topo_svg_cmd {
+            let system = if let Some(c) = topo_svg_cmd {
                 system.with_topo_svg_cmd(c)
             } else {
                 system
             };
-            let system = if let Some(ref c) = topo_text_cmd {
+            let system = if let Some(c) = topo_text_cmd {
                 system.with_topo_text_cmd(c)
             } else {
                 system
@@ -578,11 +578,7 @@ fn command_line(args: Vec<String>) -> Commands {
 }
 
 fn bool_arg(arg: &str, _args: &[String], next: usize, opt_name: &str) -> Option<usize> {
-    if arg == opt_name {
-        Some(next)
-    } else {
-        None
-    }
+    if arg == opt_name { Some(next) } else { None }
 }
 
 fn string_arg(arg: &str, args: &[String], next: usize, opt_name: &str) -> Option<(usize, String)> {

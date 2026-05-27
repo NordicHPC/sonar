@@ -10,9 +10,9 @@
 // reality, for most nodes, traffic will be low and non-batching is not an issue.
 
 use crate::daemon::{HttpIni, Ini, Operation};
-use crate::datasink::background::{background_producer, BackgroundSender, Message, Size};
-use crate::datasink::http_upload;
 use crate::datasink::DataSink;
+use crate::datasink::background::{BackgroundSender, Message, Size, background_producer};
+use crate::datasink::http_upload;
 use crate::systemapi::SystemAPI;
 use crossbeam::channel;
 use std::thread;

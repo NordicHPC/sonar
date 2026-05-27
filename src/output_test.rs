@@ -1,7 +1,7 @@
 // These are separated so as not to confuse some test code that greps output.rs for strings that
 // look like field names.
 
-use crate::output::{write_json, Array, Object, Value};
+use crate::output::{Array, Object, Value, write_json};
 
 #[test]
 pub fn test_json() {

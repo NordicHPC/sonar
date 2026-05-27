@@ -12,7 +12,7 @@ use crate::util::cstrdup::cstrdup;
 // TODO: We should use bindgen for this but not important at the moment.
 
 #[link(name = "sonar-habana", kind = "static")]
-extern "C" {
+unsafe extern "C" {
     pub fn habana_device_get_count(count: *mut cty::uint32_t) -> cty::c_int;
 }
 
@@ -44,7 +44,7 @@ impl Default for HabanaCardInfo {
 }
 
 #[link(name = "sonar-habana", kind = "static")]
-extern "C" {
+unsafe extern "C" {
     pub fn habana_device_get_card_info(
         device: cty::uint32_t,
         buf: *mut HabanaCardInfo,
@@ -66,7 +66,7 @@ pub struct HabanaCardState {
 }
 
 #[link(name = "sonar-habana", kind = "static")]
-extern "C" {
+unsafe extern "C" {
     pub fn habana_device_get_card_state(
         device: cty::uint32_t,
         buf: *mut HabanaCardState,

@@ -5,7 +5,7 @@
 use crate::gpu::{self, fakegpu::FakegpuGPU};
 use crate::ps;
 use crate::types::{Pid, Uid};
-use crate::util::cstrdup;
+use crate::util::cstrdup::cstrdup;
 
 ////// C library API //////////////////////////////////////////////////////////////////////////////
 
@@ -16,7 +16,7 @@ use crate::util::cstrdup;
 // TODO: We should use bindgen for this but not important at the moment.
 
 #[link(name = "sonar-fakegpu", kind = "static")]
-extern "C" {
+unsafe extern "C" {
     pub fn fakegpu_device_get_count(count: *mut cty::uint32_t) -> cty::c_int;
 }
 
@@ -48,7 +48,7 @@ impl Default for FakegpuCardInfo {
 }
 
 #[link(name = "sonar-fakegpu", kind = "static")]
-extern "C" {
+unsafe extern "C" {
     pub fn fakegpu_device_get_card_info(
         device: cty::uint32_t,
         buf: *mut FakegpuCardInfo,
@@ -69,7 +69,7 @@ pub struct FakegpuCardState {
 }
 
 #[link(name = "sonar-fakegpu", kind = "static")]
-extern "C" {
+unsafe extern "C" {
     pub fn fakegpu_device_get_card_state(
         device: cty::uint32_t,
         buf: *mut FakegpuCardState,
@@ -86,7 +86,7 @@ pub struct FakegpuGpuProcess {
 }
 
 #[link(name = "sonar-fakegpu", kind = "static")]
-extern "C" {
+unsafe extern "C" {
     pub fn fakegpu_device_probe_processes(
         device: cty::uint32_t,
         count: *mut cty::uint32_t,

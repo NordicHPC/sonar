@@ -18,6 +18,7 @@
 // Signal handlers place signals in the daemon's channel as events.
 
 use crate::cluster;
+use crate::datasink::DataSink;
 use crate::datasink::delay::DelaySink;
 use crate::datasink::directory::DirectorySink;
 #[cfg(feature = "http")]
@@ -25,7 +26,6 @@ use crate::datasink::http::HttpSink;
 #[cfg(feature = "kafka")]
 use crate::datasink::kafka::KafkaSink;
 use crate::datasink::stdio::StdioSink;
-use crate::datasink::DataSink;
 use crate::install_logger;
 use crate::jobsapi;
 use crate::json_tags;
@@ -924,7 +924,7 @@ fn parse_config(config_file: &str) -> Result<Ini, String> {
                     _ => {
                         return Err(format!(
                             "Invalid global.role value `{value}` - node or master required"
-                        ))
+                        ));
                     }
                 },
                 "lockdir" | "lock-directory" => {

@@ -32,7 +32,7 @@
 // on very large and busy nodes, and typically much less than that.
 
 use crate::systemapi;
-use crate::types::{JobID, Pid, PID_MAX};
+use crate::types::{JobID, PID_MAX, Pid};
 use std::collections::HashMap;
 
 // PID_LIMIT and MIN_RANGE_SIZE are sensible for a "large enough" pid range, but can be set to
