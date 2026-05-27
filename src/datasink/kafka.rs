@@ -27,9 +27,9 @@
 #![allow(dead_code)]
 
 use crate::daemon::{Dur, Ini, Operation};
+use crate::datasink::DataSink;
 use crate::datasink::background::*;
 use crate::datasink::http_upload;
-use crate::datasink::DataSink;
 #[cfg(debug_assertions)]
 use crate::posix::time::unix_now;
 use crate::systemapi::SystemAPI;
@@ -152,7 +152,7 @@ impl DataSink for KafkaSink {
         // that will only happen if stop() has been called, and post() should never be called after
         // stop(), so in that case ignore the error here.
         let mut topic = cluster.to_string() + "." + data_tag;
-        if let Some(ref prefix) = topic_prefix {
+        if let Some(prefix) = topic_prefix {
             topic = prefix.clone() + "." + &topic;
         }
         let key = hostname.to_string();

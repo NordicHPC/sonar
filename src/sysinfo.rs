@@ -6,7 +6,7 @@ use crate::json_tags::*;
 use crate::output;
 use crate::systemapi;
 
-use base64::{engine::general_purpose::STANDARD, Engine as _};
+use base64::{Engine as _, engine::general_purpose::STANDARD};
 
 use std::io;
 

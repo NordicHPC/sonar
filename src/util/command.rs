@@ -69,7 +69,7 @@ pub fn safe_command(
                     "Unknown internal failure",
                     &stdout_result,
                     &stderr_result,
-                )))
+                )));
             }
             Err(e) => {
                 if e.error.kind() == io::ErrorKind::TimedOut {
@@ -80,7 +80,7 @@ pub fn safe_command(
                                 "Timed out and had to be killed",
                                 &stdout_result,
                                 &stderr_result,
-                            )))
+                            )));
                         }
                         Err(e) => {
                             break Some(CmdError::InternalError(format_failure(
@@ -88,7 +88,7 @@ pub fn safe_command(
                                 format!("Unknown internal error {:?}", e).as_str(),
                                 &stdout_result,
                                 &stderr_result,
-                            )))
+                            )));
                         }
                     }
                 }
@@ -146,7 +146,9 @@ pub fn safe_command(
 fn format_failure(command: &str, root_cause: &str, stdout: &str, stderr: &str) -> String {
     if !stdout.is_empty() {
         if !stderr.is_empty() {
-            format!("COMMAND:\n{command}\nROOT CAUSE:\n{root_cause}\nSTDOUT:\n{stdout}\nSTDERR:\n{stderr}")
+            format!(
+                "COMMAND:\n{command}\nROOT CAUSE:\n{root_cause}\nSTDOUT:\n{stdout}\nSTDERR:\n{stderr}"
+            )
         } else {
             format!("COMMAND:\n{command}\nROOT CAUSE:\n{root_cause}\nSTDOUT:\n{stdout}")
         }

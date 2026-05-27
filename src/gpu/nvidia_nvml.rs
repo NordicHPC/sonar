@@ -14,7 +14,7 @@ use crate::util::cstrdup::cstrdup;
 // TODO: We should use bindgen for this but not important at the moment.
 
 #[link(name = "sonar-nvidia", kind = "static")]
-extern "C" {
+unsafe extern "C" {
     pub fn nvml_device_get_count(count: *mut cty::uint32_t) -> cty::c_int;
 }
 
@@ -54,7 +54,7 @@ impl Default for NvmlCardInfo {
 }
 
 #[link(name = "sonar-nvidia", kind = "static")]
-extern "C" {
+unsafe extern "C" {
     pub fn nvml_device_get_card_info(device: cty::uint32_t, buf: *mut NvmlCardInfo) -> cty::c_int;
 }
 
@@ -83,9 +83,9 @@ pub struct NvmlCardState {
 }
 
 #[link(name = "sonar-nvidia", kind = "static")]
-extern "C" {
+unsafe extern "C" {
     pub fn nvml_device_get_card_state(device: cty::uint32_t, buf: *mut NvmlCardState)
-        -> cty::c_int;
+    -> cty::c_int;
 }
 
 #[repr(C)]
@@ -98,7 +98,7 @@ pub struct NvmlGpuProcess {
 }
 
 #[link(name = "sonar-nvidia", kind = "static")]
-extern "C" {
+unsafe extern "C" {
     pub fn nvml_device_probe_processes(
         device: cty::uint32_t,
         count: *mut cty::uint32_t,

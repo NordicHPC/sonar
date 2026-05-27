@@ -23,10 +23,10 @@ use std::io;
 use std::io::{Read, Write};
 use std::os::linux::fs::MetadataExt;
 use std::path;
+use std::sync::Arc;
 #[cfg(debug_assertions)]
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
 
 use signal_hook::consts::signal;
 use signal_hook::flag;
