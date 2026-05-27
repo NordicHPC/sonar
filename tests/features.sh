@@ -12,10 +12,12 @@ for amd in "" "amd"; do
     for nvidia in "" "nvidia"; do
         for xpu in "" "xpu"; do
             for habana in "" "habana"; do
-                for daemon in "" "daemon"; do
-                    features=$(join $amd $nvidia $xpu $habana $daemon)
-                    echo "no-defaults with features: $features"
-                    cargo run --no-default-features --features="$features" -- sysinfo | jq . > /dev/null
+                for fakegpu in "" "fakegpu"; do
+                    for daemon in "" "daemon"; do
+                        features=$(join $amd $nvidia $xpu $habana $daemon $fakegpu)
+                        echo "no-defaults with features: $features"
+                        cargo run --no-default-features --features="$features" -- sysinfo | jq . > /dev/null
+                    done
                 done
             done
         done
