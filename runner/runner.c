@@ -2,20 +2,27 @@
    partner that will respond to very limited requests for information that is only available to
    root.  Communication is over a pipe: Sonar may send questions and this program will respond
    with an answer.
+
+   Usage (as root):
+     sonar-daemon-runner path-to-sonar path-to-daemon-config-file user group
+
+   This will create a bidirectional pipe, fork & drop provileges to user/group & run sonar
+   with the arguments (and passing the pipe info on the command line), then wait for commands.
 */
 
-#include <inttype.h>
+#define _GNU_SOURCE
+#include <fcntl.h>
+#include <inttypes.h>
+#include <string.h>
 #include <unistd.h>
+#include <stdio.h>
+#include <errno.h>
+#include <signal.h>
+
+#include "proto.h"
 
 /* An outgoing String is a (say) uint16_t length followed by raw bytes, with no terminator. */
 /* Batching would be nice but makes the protocol a little harder? */
-
-enum {
-    REQ_INVALID = 0,            /* No payload or response */
-    REQ_EXIT = 1,               /* No payload or response */
-    REQ_EXE_FOR_PID = 2,        /* Incoming: uint32_t pid; outgoing: String */
-    REQ_LAST
-};
 
 /* Arguments:
    -user   sonar-user-name
@@ -34,45 +41,93 @@ enum {
    be OK and that the FDs can be communicated by env vars, in the worst case.
 */
 
-int main(int argc, char** argv) {
-    /* TODO: Check that we're running as root, since otherwise it won't be possible to lower privileges */
+void msg(const char* s) {
+    write(2, s, strlen(s));
+}
 
-    int p[2];
-    /* I don't think we need O_DIRECT here */
-    if (pipe2(&p, 0) == -1) {
-        return 1;
-    }
-    int input = p[1], output = p[2];
+void sonar(const char* path, const char* config, const char* user, const char* group, int input, int output) {
+    printf("Sonar: %d %d\n", input, output);
+    char ins[20], outs[20];
+    sprintf(ins, "%d", input);
+    sprintf(outs, "%d", output);
+    /* TODO: Could close some things that are not needed */
+    int r = execl(path, path, "-pin", ins, "-pout", outs, "daemon", config, (char*)NULL);
+    perror("exec");
+}
 
+int server(int input, int output) {
     for (;;) {
-        char inbuf[sizeof(uint64)];
-        int n = read(input, &inbuf, 1);
+        uint8_t op;
+        errno = 0;
+        int n = read(input, (char*)&op, 1);
         if (n == 0) {
-            /* EOF */
+            msg("Unexpected EOF\n");
             return 1;
         }
         if (n < 0) {
-            /* ERROR */
+            if (errno == EAGAIN) {
+                continue;
+            }
+            perror("server read");
             return 1;
         }
-        uint8_t t = (uint8_t)inbuf[0];
-        if (t >= REQ_LAST) {
-            /* BOGUS */
-            continue;
-        }
-        switch (t) {
-        case REQ_INVALID:
-            continue;
+        printf("Server: got msg %d\n", op);
+        switch (op) {
         case REQ_EXIT:
             return 0;
         case REQ_EXE_FOR_PID:
-            /* read pid */
-            /* read /proc/pid/exe into big enough buffer */
-            /* send length */
-            /* send chars, probably sanitized somehow */
+            msg("Server: sending reply\n");
+            /* TODO: Here the message would have a PID payload */
+            if (write(output, "\x05\x00hello", 7) != 7) {
+                perror("server write");
+            }
             break;
         default:
+            msg("Unknown message\n");
             continue;
         }
+    }
+}
+
+int main(int argc, char** argv) {
+    if (argc != 5) {
+        msg("Wrong number of arguments\n");
+        return 1;
+    }
+#if 0
+    if (getuid() != 0) {
+        /* ERROR */
+        return 1;
+    }
+#endif
+
+    /* I don't think we need O_DIRECT here */
+
+    int down[2];
+    if (pipe2(down, 0) == -1) {
+        perror("pipe2");
+        return 1;
+    }
+    int up[2];
+    if (pipe2(up, 0) == -1) {
+        perror("pipe2");
+        return 1;
+    }
+
+    if (signal(SIGCHLD, SIG_IGN) == SIG_ERR) {
+        perror("signal");
+        return 1;
+    }
+
+    pid_t pid = fork();
+    switch (pid) {
+    case -1:
+        perror("fork");
+        return 1;
+    case 0:
+        return server(up[0], down[1]);
+    default:
+        sonar(argv[1], argv[2], argv[3], argv[4], down[0], up[1]);
+        return 1;
     }
 }
