@@ -1,13 +1,18 @@
-/* This is meant to run as root.  It forks off a non-privileged Sonar and sets itself up as a
-   partner that will respond to very limited requests for information that is only available to
-   root.  Communication is over a pipe: Sonar may send questions and this program will respond
-   with an answer.
+/* This program is meant to run as root.  It forks off a non-privileged `sonar daemon` and sets
+   itself up as a server that will respond to very limited requests for information that is only
+   available to root.  Communication is over a pipe: Sonar may send questions and this program will
+   respond with an answer.  The protocol is documented in proto.h.
 
    Usage (as root):
+
      sonar-daemon-runner path-to-sonar path-to-daemon-config-file user group
 
-   This will create a bidirectional pipe, fork & drop provileges to user/group & run sonar
-   with the arguments (and passing the pipe info on the command line), then wait for commands.
+   If the child terminates, the server will also terminate (with the same exit code ideally).
+
+   If the child asks for the server to terminate, it will terminate with the passed exit code.
+
+   In principle, the server can time out waiting for payload data, and if so, should terminate with
+   an error.
 */
 
 #define _GNU_SOURCE
@@ -21,26 +26,6 @@
 
 #include "proto.h"
 
-/* An outgoing String is a (say) uint16_t length followed by raw bytes, with no terminator. */
-/* Batching would be nice but makes the protocol a little harder? */
-
-/* Arguments:
-   -user   sonar-user-name
-   -group  sonar-group-name
-   -sonar  path-to-sonar-executable
-   -config path-to-sonar-config-file
-
-   Chief problem:
-
-   We're going to lower privileges and then run `sonar daemon config-file` but we need to coordinate
-   the name of the communication channel and we ideally want this channel to be invisible to anyone
-   outside the two processes.
-
-   A pipe would be best but then the Sonar subprocess must be able to know the proper FDs and we
-   need to guarantee that those FDs are not being used by the Rust runtime.  I'm guessing this will
-   be OK and that the FDs can be communicated by env vars, in the worst case.
-*/
-
 void msg(const char* s) {
     write(2, s, strlen(s));
 }
@@ -50,7 +35,7 @@ void sonar(const char* path, const char* config, const char* user, const char* g
     char ins[20], outs[20];
     sprintf(ins, "%d", input);
     sprintf(outs, "%d", output);
-    int r = execl(path, path, "-pin", ins, "-pout", outs, "daemon", config, (char*)NULL);
+    int r = execl(path, path, "-i", ins, "-o", outs, "daemon", config, (char*)NULL);
     perror("exec");
 }
 
@@ -78,7 +63,12 @@ int server(int input, int output) {
             msg("Server: sending reply\n");
             /* TODO: Here the message would have a PID payload */
             /* TODO: This is a little scary because we can hang here if the child is not reading */
-            if (write(output, "\x05\x00hello", 7) != 7) {
+            sr_len_t len;
+            encode_length(5, len);
+            if (write(output, len, 2) != 2) {
+                perror("server write");
+            }
+            if (write(output, "hello", 5) != 5) {
                 perror("server write");
             }
             break;

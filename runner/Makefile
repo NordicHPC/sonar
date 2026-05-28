@@ -3,5 +3,5 @@ TARGETS=runner subproc
 
 all: $(TARGETS)
 
-TARGETS: *.h
+runner.o subproc.o: *.h
 

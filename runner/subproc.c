@@ -1,9 +1,9 @@
-/* This stands in for sonar.  The arguments -pin and -pout carry the descriptors to use for the
- * pipe.  Sonar will want to batch messages and will want to get error returns for arguments that
- * can't be handled (eg processes that have exited).  There needs to be a timeout on reading from
- * the service, not more than a few seconds probably.  If the service times out it should be assumed
- * to be suspec, and if twice it should be assumed to be dead, and an error should be propagated
- * accordingly.
+/* This is a test client that stands in for sonar.  The arguments -i and -o carry the descriptors to
+ * use for the pipe (input and output fds).
+ *
+ * There needs to be a timeout on reading from the service, not more than a few seconds probably.
+ * If the service times out it should be assumed to be suspec, and if twice it should be assumed to
+ * be dead, and an error should be propagated accordingly.
  */
 
 #include <stdio.h>
@@ -21,7 +21,7 @@ void msg(const char* s) {
 int main(int argc, char** argv) {
     int input = -1, output = -1;
     while (*argv) {
-        if (strcmp(*argv, "-pin") == 0) {
+        if (strcmp(*argv, "-i") == 0) {
             argv++;
             if (*argv == 0) {
                 msg("Bad args\n");
@@ -31,7 +31,7 @@ int main(int argc, char** argv) {
             argv++;
             continue;
         }
-        if (strcmp(*argv, "-pout") == 0) {
+        if (strcmp(*argv, "-o") == 0) {
             argv++;
             if (*argv == 0) {
                 msg("Bad args\n");
@@ -53,12 +53,12 @@ int main(int argc, char** argv) {
             perror("client write");
             return 1;
         }
-        uint8_t len[2];
+        sr_len_t len;
         if (read(input, &len, sizeof(len)) != 2) {
             perror("client read");
             return 1;
         }
-        size_t slen = ((size_t)len[1] << 8) + (size_t)len[0];
+        unsigned slen = decode_length(len);
         printf("will read %d bytes\n", slen);
         char *buf = malloc(slen);
         if (buf == NULL) {
