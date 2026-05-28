@@ -50,7 +50,6 @@ void sonar(const char* path, const char* config, const char* user, const char* g
     char ins[20], outs[20];
     sprintf(ins, "%d", input);
     sprintf(outs, "%d", output);
-    /* TODO: Could close some things that are not needed */
     int r = execl(path, path, "-pin", ins, "-pout", outs, "daemon", config, (char*)NULL);
     perror("exec");
 }
@@ -78,6 +77,7 @@ int server(int input, int output) {
         case REQ_EXE_FOR_PID:
             msg("Server: sending reply\n");
             /* TODO: Here the message would have a PID payload */
+            /* TODO: This is a little scary because we can hang here if the child is not reading */
             if (write(output, "\x05\x00hello", 7) != 7) {
                 perror("server write");
             }
@@ -101,7 +101,7 @@ int main(int argc, char** argv) {
     }
 #endif
 
-    /* I don't think we need O_DIRECT here */
+    /* I don't think we need O_DIRECT here so just pipe() is enough? */
 
     int down[2];
     if (pipe2(down, 0) == -1) {
@@ -114,6 +114,10 @@ int main(int argc, char** argv) {
         return 1;
     }
 
+    /* This is wrong.  If the child exits, we should wait() and exit(), and indeed
+     * any reading should be aborted.  So if server() gets a read failure it must
+     * consider the possibility that the child has exited.
+     */
     if (signal(SIGCHLD, SIG_IGN) == SIG_ERR) {
         perror("signal");
         return 1;
@@ -125,8 +129,12 @@ int main(int argc, char** argv) {
         perror("fork");
         return 1;
     case 0:
+        close(down[0]);
+        close(up[1]);
         return server(up[0], down[1]);
     default:
+        close(down[1]);
+        close(up[0]);
         sonar(argv[1], argv[2], argv[3], argv[4], down[0], up[1]);
         return 1;
     }
