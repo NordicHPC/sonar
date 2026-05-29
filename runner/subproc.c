@@ -47,30 +47,43 @@ int main(int argc, char** argv) {
     printf("Client: %d %d\n", input, output);
     for (int i=0 ; i< 10; i++) {
         sleep(1);
-        uint8_t op = REQ_EXE_FOR_PID;
-        /* TODO: Need to send a payload here */
-        if (write(output, &op, 1) != 1) {
-            perror("client write");
-            return 1;
+        outbound_t outbound;
+        init_outbound(&outbound);
+        encode_byte(&outbound, REQ_EXE_FOR_PIDS);
+        encode_int(&outbound, 2);
+        encode_int(&outbound, 12345);
+        encode_int(&outbound, 24680);
+        int r = send_message(output, &outbound);
+        destroy_outbound(&outbound);
+        if (r) {
+            break;
         }
-        sr_len_t len;
-        if (read(input, &len, sizeof(len)) != 2) {
-            perror("client read");
-            return 1;
+        inbound_t inbound;
+        init_inbound(&inbound);
+        if (recv_message(input, &inbound)) {
+            break;
         }
-        unsigned slen = decode_length(len);
-        printf("will read %d bytes\n", slen);
-        char *buf = malloc(slen);
-        if (buf == NULL) {
-            perror("malloc");
-            return 1;
+        uint8_t op;
+        if (decode_byte(&inbound, &op)) {
+            break;
         }
-        if (read(input, buf, slen) != slen) {
-            perror("client read 2");
-            return 1;
+        assert(op == REQ_EXE_FOR_PIDS);
+        uint32_t nelem;
+        if (decode_int(&inbound, &nelem)) {
+            break;
         }
-        buf[slen] = 0;
-        printf("%s\n", buf);
-        free(buf);
+        assert(nelem == 2);
+        for ( int i= 0; i < nelem; i++ ){
+            uint32_t pid;
+            uint8_t* s = NULL;
+            if (decode_int(&inbound, &pid)) {
+                break;
+            }
+            if (decode_string(&inbound, &s)) {
+                break;
+            }
+            printf("%d: %s\n", pid, s);
+            free(s);
+        }
     }
 }
