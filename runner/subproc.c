@@ -51,18 +51,23 @@ int main(int argc, char** argv) {
         init_outbound(&outbound);
         encode_byte(&outbound, REQ_EXE_FOR_PIDS);
         encode_int(&outbound, 2);
-        encode_int(&outbound, 12345);
-        encode_int(&outbound, 24680);
+        encode_int(&outbound, 110);
+        encode_int(&outbound, 16);
+        printf("Subproc: sending\n");
         int r = send_message(output, &outbound);
+        printf("Subproc: sent, sleeping a bit\n");
+        sleep(2);
         destroy_outbound(&outbound);
         if (r) {
             break;
         }
         inbound_t inbound;
         init_inbound(&inbound);
+        printf("Subproc: receiving\n");
         if (recv_message(input, &inbound)) {
             break;
         }
+        printf("Subproc: received\n");
         uint8_t op;
         if (decode_byte(&inbound, &op)) {
             break;

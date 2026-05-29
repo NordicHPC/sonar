@@ -111,18 +111,22 @@ int server(int input, int output) {
     for (;;) {
         destroy_inbound(&inbound);
         destroy_outbound(&outbound);
+        printf("Runner receiving\n");
         if (!recv_message(input, &inbound)) {
             goto Done;
         }
+        printf("Runner received\n");
         uint8_t op;
         if (!decode_byte(&inbound, &op)) {
             goto Done;
         }
         switch (op) {
         case REQ_EXIT:
+            printf("Runner exiting\n");
             r = 0;
             goto Done;
         case REQ_EXE_FOR_PIDS: {
+            printf("Runner gets pids\n");
             uint32_t nelem;
             if (!decode_int(&inbound, &nelem)) {
                 goto Done;
