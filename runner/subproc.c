@@ -85,5 +85,6 @@ int main(int argc, char** argv) {
             printf("%d: %s\n", pid, s);
             free(s);
         }
+        destroy_inbound(&inbound);
     }
 }
