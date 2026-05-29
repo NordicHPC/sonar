@@ -41,21 +41,29 @@ int main(int argc, char** argv) {
             argv++;
             continue;
         }
+#ifdef LOGGING
         printf("%s\n", *argv);
+#endif
         argv++;
     }
+#ifdef LOGGING
     printf("Client: %d %d\n", input, output);
-    for (int i=0 ; i< 10; i++) {
+#endif
+    for (int i=0 ; i< 1; i++) {
         sleep(1);
         outbound_t outbound;
         init_outbound(&outbound);
         encode_byte(&outbound, REQ_EXE_FOR_PIDS);
         encode_int(&outbound, 2);
-        encode_int(&outbound, 110);
-        encode_int(&outbound, 16);
+        encode_int(&outbound, 2038);
+        encode_int(&outbound, 156935);
+#ifdef LOGGING
         printf("Subproc: sending\n");
+#endif
         int r = send_message(output, &outbound);
+#ifdef LOGGING
         printf("Subproc: sent, sleeping a bit\n");
+#endif
         sleep(2);
         destroy_outbound(&outbound);
         if (r) {
@@ -63,11 +71,15 @@ int main(int argc, char** argv) {
         }
         inbound_t inbound;
         init_inbound(&inbound);
+#ifdef LOGGING
         printf("Subproc: receiving\n");
+#endif
         if (recv_message(input, &inbound)) {
             break;
         }
-        printf("Subproc: received\n");
+//#ifdef LOGGING
+        printf("Subproc: received %d\n", inbound.len);
+//#endif
         uint8_t op;
         if (decode_byte(&inbound, &op)) {
             break;
@@ -78,18 +90,25 @@ int main(int argc, char** argv) {
             break;
         }
         assert(nelem == 2);
+        printf("Subproc: %d elements\n", nelem);
         for ( int i= 0; i < nelem; i++ ){
             uint32_t pid;
             uint8_t* s = NULL;
             if (decode_int(&inbound, &pid)) {
+                printf("Subproc: no pid\n");
                 break;
             }
             if (decode_string(&inbound, &s)) {
+                printf("Subproc: no path\n");
                 break;
             }
-            printf("%d: %s\n", pid, s);
+//#ifdef LOGGING
+            printf("Subproc: pid=%d path=%s\n", pid, s);
+//#endif
             free(s);
         }
         destroy_inbound(&inbound);
     }
+    close(output);
+    close(input);
 }

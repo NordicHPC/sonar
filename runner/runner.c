@@ -80,12 +80,12 @@ int main(int argc, char** argv) {
         perror("fork");
         return 1;
     case 0:
-        close(down[0]);
-        close(up[1]);
+        //close(down[0]);
+        //close(up[1]);
         return server(up[0], down[1]);
     default:
-        close(down[1]);
-        close(up[0]);
+        //close(down[1]);
+        //close(up[0]);
         sonar(argv[1], argv[2], argv[3], argv[4], down[0], up[1]);
         return 1;
     }
@@ -111,51 +111,89 @@ int server(int input, int output) {
     for (;;) {
         destroy_inbound(&inbound);
         destroy_outbound(&outbound);
+#ifdef LOGGING
         printf("Runner receiving\n");
-        if (!recv_message(input, &inbound)) {
+#endif
+        if (recv_message(input, &inbound)) {
+#ifdef LOGGING
+            printf("runner recv failed!\n");
+#endif
             goto Done;
         }
+#ifdef LOGGING
         printf("Runner received\n");
+#endif
         uint8_t op;
-        if (!decode_byte(&inbound, &op)) {
+        if (decode_byte(&inbound, &op)) {
             goto Done;
         }
         switch (op) {
         case REQ_EXIT:
+#ifdef LOGGING
             printf("Runner exiting\n");
+#endif
             r = 0;
             goto Done;
         case REQ_EXE_FOR_PIDS: {
+#ifdef LOGGING
             printf("Runner gets pids\n");
+#endif
             uint32_t nelem;
-            if (!decode_int(&inbound, &nelem)) {
+            if (decode_int(&inbound, &nelem)) {
                 goto Done;
             }
-            if (!encode_byte(&outbound, op)) {
+#ifdef LOGGING
+            printf("Numpids: %d\n", nelem);
+#endif
+            if (encode_byte(&outbound, op)) {
                 goto Done;
             }
-            if (!encode_int(&outbound, nelem)) {
+#ifdef LOGGING
+            printf("encode_byte ok\n");
+#endif
+            if (encode_int(&outbound, nelem)) {
                 goto Done;
             }
+#ifdef LOGGING
+            printf("Entering loop\n");
+#endif
             for ( uint32_t i=0 ; i < nelem ; i++ ) {
                 uint32_t pid;
                 static char exebuf[PATH_MAX];
-                if (!decode_int(&inbound, &pid)) {
+                if (decode_int(&inbound, &pid)) {
                     goto Done;
                 }
-                if (!get_exe(pid, exebuf)) {
+#ifdef LOGGING
+                printf("Runner: encoding %d\n", pid);
+#endif
+                if (get_exe(pid, exebuf)) {
                     *exebuf = 0;
                 }
-                if (!encode_int(&outbound, pid)) {
+#ifdef LOGGING
+                printf("Runner: get_exe returned %s\n", exebuf);
+#endif
+                if (encode_int(&outbound, pid)) {
                     goto Done;
                 }
-                if (!encode_string(&outbound, exebuf)) {
+#ifdef LOGGING
+                printf("Runner: encode_int returned\n");
+#endif
+                if (encode_string(&outbound, exebuf)) {
                     goto Done;
                 }
+#ifdef LOGGING
+                printf("Runner: encode_string returned\n");
+#endif
             }
-            if (!send_message(output, &outbound)) {
+#ifdef LOGGING
+            printf("Runner: sending\n");
+#endif
+            if (send_message(output, &outbound)) {
                 goto Done;
             }
+#ifdef LOGGING
+            printf("Runner: sent\n");
+#endif
             continue;
         }
         default:
@@ -170,10 +208,12 @@ Done:
 }
 
 int get_exe(uint32_t pid, char buf[PATH_MAX]) {
+    printf("get_exe %d\n", pid);
     static char path[128];
     snprintf(path, sizeof(path), "/proc/%d/exe", pid);
     ssize_t n;
     if ((n = readlink(path, buf, PATH_MAX)) == -1) {
+        fprintf(stderr, "Readlink failed for %s\n", path);
         return 1;
     }
     if (n >= PATH_MAX) {

@@ -1,11 +1,10 @@
 .PHONY: all
 TARGETS=runner subproc
 
-all: $(TARGETS)
+default:
 
-runner: runner.o proto.o
+runner: runner.c proto.c proto.h Makefile
+	$(CC) -g -O0 -DLOGGING -o runner runner.c proto.c
 
-subproc: subproc.o proto.o
-
-runner.o subproc.o: *.h
-
+subproc: subproc.c proto.c proto.h Makefile
+	$(CC) -g -O0 -o subproc subproc.c proto.c

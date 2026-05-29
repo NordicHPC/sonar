@@ -20,7 +20,7 @@ void destroy_inbound(inbound_t *m) {
 }
 
 static int ensure_available(inbound_t *m, uint32_t n) {
-    if (m->p - m->buf < n) {
+    if ((m->buf + m->len) - m->p < n) {
         fprintf(stderr, "Input buffer could not supply %d bytes\n", n);
         return 1;
     }
@@ -72,22 +72,29 @@ int decode_string(inbound_t *m, uint8_t** s) {
     memcpy(buf, m->p, len);
     buf[len] = 0;
     *s = buf;
+    m->p += len;
     return 0;
 }
 
 /* This reads exactly n bytes and returns 0 if it could.  It returns 1 on error including EOF. */
 static int read_bytes(int input, uint8_t* p, int n) {
     int any = 0;
+#ifdef LOGGING
     printf("Read entering\n");
+#endif
     while (n > 0) {
+#ifdef LOGGING
         printf("Read: want %d\n", n);
+#endif
         ssize_t m = read(input, p, n);
         printf("Read: %d\n", m);
         if (m == 0) {
             if (any) {
                 fprintf(stderr, "Partial message read\n");
             }
+#ifdef LOGGING
             printf("EOF\n");
+#endif
             return 1;
         }
         if (m == -1) {
@@ -100,9 +107,13 @@ static int read_bytes(int input, uint8_t* p, int n) {
         any = 1;
         p += m;
         n -= m;
+#ifdef LOGGING
         printf("Here: %d %d\n", n, m);
+#endif
     }
+#ifdef LOGGING
     printf("Read returning\n");
+#endif
     return 0;
 }
 
@@ -112,19 +123,30 @@ int recv_message(int input, inbound_t* m) {
      */
     uint8_t hdr[4];
     if (read_bytes(input, hdr, sizeof(hdr))) {
+#ifdef LOGGING
+        printf("Reading header failed!!\n");
+#endif
         return 1;
     }
     uint32_t nbytes = decode_u32(hdr);
+#ifdef LOGGING
     printf("Header: %d\n", nbytes);
+#endif
     uint8_t* payload = malloc(nbytes);
     if (payload == 0) {
         perror("malloc");
         return 1;
     }
     if (read_bytes(input, payload, nbytes)) {
+#ifdef LOGGING
+        printf("Reading payload failed!!\n");
+#endif
         free(payload);
         return 1;
     }
+#ifdef LOGGING
+    printf("Received payload\n");
+#endif
     m->len = nbytes;
     m->buf = payload;
     m->p = payload;
@@ -144,16 +166,28 @@ void destroy_outbound(outbound_t *m) {
 
 static int ensure_free(outbound_t *m, uint32_t n) {
     if (m->cap - m->len >= n) {
+#ifdef LOGGING
+        printf("enough space for %d\n", n);
+#endif
         return 0;
     }
+#ifdef LOGGING
+    printf("must grow for %d\n", n);
+#endif
     uint32_t new_cap = m->cap == 0 ? 128 : m->cap;
     while (new_cap - m->len < n && new_cap <= 0x7FFFFFFF) {
+#ifdef LOGGING
+        printf("new_cap %d\n", new_cap);
+#endif
         new_cap *= 2;
     }
     if (new_cap - m->len < n) {
         fprintf(stderr, "Allocation size could not be created for request of %d bytes\n", n);
         return 1;
     }
+#ifdef LOGGING
+    printf("new_cap = %d\n", new_cap);
+#endif
     void *new_buf = realloc(m->buf, new_cap);
     if (new_buf == NULL) {
         perror("realloc");
@@ -189,18 +223,17 @@ int encode_int(outbound_t *m, uint32_t n) {
     }
     encode_u32(m->buf + m->len, n);
     m->len += 4;
-    return 1;
+    return 0;
 }
 
 int encode_string(outbound_t *m, const char* s) {
-    uint32_t slen = strlen(s);
-    uint32_t len = slen + 4;
-    if (ensure_free(m, len)) {
+    uint32_t len = strlen(s);
+    if (ensure_free(m, len + 4)) {
         return 1;
     }
     encode_int(m, len);
-    strcpy(m->buf + m->len, s);
-    m->len += slen;
+    memcpy(m->buf + m->len, s, len);
+    m->len += len;
     return 0;
 }
 
@@ -224,7 +257,9 @@ int send_message(int output, outbound_t *m) {
     }
     uint8_t hdr[4];
     encode_u32(hdr, m->len);
+#ifdef LOGGING
     printf("Sending hdr=%d\n", m->len);
+#endif
     if (write_bytes(output, hdr, sizeof(hdr))) {
         return 1;
     }
