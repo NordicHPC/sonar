@@ -4,6 +4,31 @@
 #include <assert.h>
 #include <inttypes.h>
 
+#ifdef NDEBUG
+
+typedef int result_t;
+#  define OK 0
+#  define ERR_EXHAUSTED 1
+#  define ERR_TOOBIG 1
+#  define ERR_ALLOC 1
+#  define ERR_IO 1
+#  define ERR_EOF 1
+
+#else
+
+struct result_repr_t {
+    int n;
+};
+typedef struct result_repr_t* result_t;
+extern result_t OK;
+extern result_t ERR_EXHAUSTED;
+extern result_t ERR_TOOBIG;
+extern result_t ERR_ALLOC;
+extern result_t ERR_IO;
+extern result_t ERR_EOF;
+
+#endif
+
 /* Operations that Sonar will send to the server, payload formats etc.
  *
  * Data types:
@@ -24,35 +49,35 @@
 
 typedef struct {
     uint32_t len;
-    uint8_t  *buf;
-    uint8_t  *p;
+    uint8_t* buf;
+    uint8_t* p;
 } inbound_t;
 
-void init_inbound(inbound_t *m);
-void destroy_inbound(inbound_t *m);
-int decode_byte(inbound_t *m, uint8_t* b);
-int decode_int(inbound_t *m, uint32_t *len);
+void init_inbound(inbound_t* m);
+void destroy_inbound(inbound_t* m);
+result_t decode_byte(inbound_t* m, uint8_t* b);
+result_t decode_int(inbound_t* m, uint32_t* len);
 
 /* On success, *s is a malloc'd NUL-terminated buffer that must be freed */
-int decode_string(inbound_t *m, uint8_t** s);
+result_t decode_string(inbound_t* m, uint8_t** s);
 
 /* The message *m should be in the initialized state. */
-int recv_message(int input, inbound_t *m);
+result_t recv_message(int input, inbound_t* m);
 
 typedef struct {
     uint32_t len;
     uint32_t cap;
-    uint8_t *buf;
+    uint8_t* buf;
 } outbound_t;
 
-void init_outbound(outbound_t *m);
-void destroy_outbound(outbound_t *m);
-int encode_byte(outbound_t *m, uint8_t b);
-int encode_int(outbound_t *m, uint32_t len);
-int encode_string(outbound_t *m, const char* s);
+void init_outbound(outbound_t* m);
+void destroy_outbound(outbound_t* m);
+result_t encode_byte(outbound_t* m, uint8_t b);
+result_t encode_int(outbound_t* m, uint32_t len);
+result_t encode_string(outbound_t* m, const char* s);
 
 /* This will not destroy the message */
-int send_message(int output, outbound_t *m);
+result_t send_message(int output, outbound_t* m);
 
 /* server should exit without waiting for the child.
  *
@@ -68,7 +93,7 @@ int send_message(int output, outbound_t *m);
  *
  * Response: Array of PID/string pairs, all PIDs in the request should be represented in this array.
  * Zero-length strings mean "no information for this PID" (eg process exited).
-*/
+ */
 #define REQ_EXE_FOR_PIDS 1
 
 #endif /* proto_h_included */

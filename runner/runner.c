@@ -1,32 +1,46 @@
-/* This program is meant to run as root.  It forks off a non-privileged `sonar daemon` and sets
-   itself up as a server that will respond to very limited requests for information that is only
-   available to root.  Communication is over a pipe: Sonar may send questions and this program will
-   respond with an answer.  The protocol is documented in proto.h.
+/* sonar-daemon-runner runs as root, forks off a non-privileged `sonar daemon`, and sets itself up
+ * as a server that will respond to very limited requests from the sonar daemon for information that
+ * is only available to root.
+ *
+ * Usage (as root):
+ *
+ *	sonar-daemon-runner sonar-path config-path user-name group-name
+ *
+ * where sonar-path is the full path to the Sonar executable, config-path is the full path to the
+ * Sonar daemon's config file, and user-name and group-name names the user and group under which
+ * Sonar should be running.
+ *
+ * Communication is over a pipe: The subprocess will send requests and this program will respond
+ * with an answer.  The protocol is simple question-answer and is documented in proto.h.  The
+ * protocol may change; do not upgrade this server independently of the Sonar subprocess (or the
+ * test process in subproc.c).
+ *
+ * If the child terminates, the server will also terminate (with the same exit code as the child).
+ *
+ * The child can optionally send a message asking the server to terminate with a specific exit code.
+ *
+ * All logging is currently to stderr and is done as close to the error site as possible.  Code that
+ * just propagates an error may assume that the error has been logged at the originating site.
+ * Under normal circumstances, the runner is run under systemd and systemd will surface the errors
+ * via systemctl status.
+ *
+ * Notes:
+ *
+ * This needs to be as trustworthy as possible, so it is simple and uses straightforward
+ * abstractions to maintain that simplicity.
+ *
+ * Error propagation: all functions return OK for success and ERR_SOMETHING on error.  The error
+ * code should be propagated whenever possible.
+ */
 
-   Usage (as root):
-
-     sonar-daemon-runner path-to-sonar path-to-daemon-config-file user group
-
-   If the child terminates, the server will also terminate (with the same exit code ideally).
-
-   If the child asks for the server to terminate, it will terminate with the passed exit code.
-
-   In principle, the server can time out waiting for payload data, and if so, should terminate with
-   an error.
-
-   Notes:
-
-   This needs to be trustworthy, so it is simple and uses solid, believable abstractions to maintain
-   that simplicity.
-*/
-
+#include <errno.h>
 #include <inttypes.h>
+#include <linux/limits.h>
+#include <signal.h>
+#include <stdio.h>
 #include <string.h>
 #include <unistd.h>
-#include <stdio.h>
-#include <errno.h>
-#include <signal.h>
-#include <linux/limits.h>
+#undef NULL
 
 #include "proto.h"
 
@@ -34,13 +48,14 @@
 #  define PATH_MAX 4096
 #endif
 
-void sonar(const char* path, const char* config, const char* user, const char* group, int input, int output);
-int server(int input, int output);
-int get_exe(uint32_t pid, char buf[PATH_MAX]);
+void sonar(const char* path, const char* config, const char* user, const char* group, int input,
+    int output);
+result_t server(int input, int output);
+result_t get_exe(uint32_t pid, char buf[PATH_MAX]);
 
 int main(int argc, char** argv) {
     if (argc != 5) {
-        fprintf(stderr, "Usage: %s path-to-sonar path-to-config user-name group-name\n", argv[0]);
+        fprintf(stderr, "Usage: %s sonar-path config-path user-name group-name\n", argv[0]);
         return 1;
     }
 #if 0
@@ -80,30 +95,19 @@ int main(int argc, char** argv) {
         perror("fork");
         return 1;
     case 0:
-        //close(down[0]);
-        //close(up[1]);
-        return server(up[0], down[1]);
+        // close(down[0]);
+        // close(up[1]);
+        return server(up[0], down[1]) != OK;
     default:
-        //close(down[1]);
-        //close(up[0]);
+        // close(down[1]);
+        // close(up[0]);
         sonar(argv[1], argv[2], argv[3], argv[4], down[0], up[1]);
         return 1;
     }
 }
 
-void sonar(const char* path, const char* config, const char* user, const char* group, int input, int output) {
-    /* TODO: Drop privileges to user/group */
-    /* For this, use setuid(), which is safe.  setgid() also looks like the right thing. */
-    printf("Sonar: %d %d\n", input, output);
-    char ins[20], outs[20];
-    sprintf(ins, "%d", input);
-    sprintf(outs, "%d", output);
-    int r = execl(path, path, "-i", ins, "-o", outs, "daemon", config, (char*)NULL);
-    perror("exec");
-}
-
-int server(int input, int output) {
-    int r = 1;
+result_t server(int input, int output) {
+    result_t r;
     inbound_t inbound;
     outbound_t outbound;
     init_inbound(&inbound);
@@ -111,93 +115,53 @@ int server(int input, int output) {
     for (;;) {
         destroy_inbound(&inbound);
         destroy_outbound(&outbound);
-#ifdef LOGGING
-        printf("Runner receiving\n");
-#endif
-        if (recv_message(input, &inbound)) {
-#ifdef LOGGING
-            printf("runner recv failed!\n");
-#endif
+        if ((r = recv_message(input, &inbound)) != OK) {
             goto Done;
         }
-#ifdef LOGGING
-        printf("Runner received\n");
-#endif
         uint8_t op;
-        if (decode_byte(&inbound, &op)) {
+        if ((r = decode_byte(&inbound, &op)) != OK) {
             goto Done;
         }
         switch (op) {
         case REQ_EXIT:
-#ifdef LOGGING
-            printf("Runner exiting\n");
-#endif
-            r = 0;
+            fprintf(stderr, "Sonar-runner exiting by child request\n");
+            r = OK;
             goto Done;
         case REQ_EXE_FOR_PIDS: {
-#ifdef LOGGING
-            printf("Runner gets pids\n");
-#endif
             uint32_t nelem;
-            if (decode_int(&inbound, &nelem)) {
+            if ((r = decode_int(&inbound, &nelem)) != OK) {
                 goto Done;
             }
-#ifdef LOGGING
-            printf("Numpids: %d\n", nelem);
-#endif
-            if (encode_byte(&outbound, op)) {
+            if ((r = encode_byte(&outbound, op)) != OK) {
                 goto Done;
             }
-#ifdef LOGGING
-            printf("encode_byte ok\n");
-#endif
-            if (encode_int(&outbound, nelem)) {
+            if ((r = encode_int(&outbound, nelem)) != OK) {
                 goto Done;
             }
-#ifdef LOGGING
-            printf("Entering loop\n");
-#endif
-            for ( uint32_t i=0 ; i < nelem ; i++ ) {
+            for (uint32_t i = 0; i < nelem; i++) {
                 uint32_t pid;
                 static char exebuf[PATH_MAX];
-                if (decode_int(&inbound, &pid)) {
+                if ((r = decode_int(&inbound, &pid)) != OK) {
                     goto Done;
                 }
-#ifdef LOGGING
-                printf("Runner: encoding %d\n", pid);
-#endif
-                if (get_exe(pid, exebuf)) {
+                if (get_exe(pid, exebuf) != OK) {
+                    /* Soft error: just send empty string */
                     *exebuf = 0;
                 }
-#ifdef LOGGING
-                printf("Runner: get_exe returned %s\n", exebuf);
-#endif
-                if (encode_int(&outbound, pid)) {
+                if ((r = encode_int(&outbound, pid)) != OK) {
                     goto Done;
                 }
-#ifdef LOGGING
-                printf("Runner: encode_int returned\n");
-#endif
-                if (encode_string(&outbound, exebuf)) {
+                if ((r = encode_string(&outbound, exebuf)) != OK) {
                     goto Done;
                 }
-#ifdef LOGGING
-                printf("Runner: encode_string returned\n");
-#endif
             }
-#ifdef LOGGING
-            printf("Runner: sending\n");
-#endif
-            if (send_message(output, &outbound)) {
+            if ((r = send_message(output, &outbound)) != OK) {
                 goto Done;
             }
-#ifdef LOGGING
-            printf("Runner: sent\n");
-#endif
             continue;
         }
         default:
-            fprintf(stderr, "Unknown message: %d\n", op);
+            fprintf(stderr, "Unknown operation from child: %d\n", op);
             continue;
         }
     }
@@ -207,18 +171,31 @@ Done:
     return r;
 }
 
-int get_exe(uint32_t pid, char buf[PATH_MAX]) {
+/* Given a pid, try to get /proc/pid/exe. */
+result_t get_exe(uint32_t pid, char buf[PATH_MAX]) {
     printf("get_exe %d\n", pid);
     static char path[128];
     snprintf(path, sizeof(path), "/proc/%d/exe", pid);
     ssize_t n;
     if ((n = readlink(path, buf, PATH_MAX)) == -1) {
         fprintf(stderr, "Readlink failed for %s\n", path);
-        return 1;
+        return ERR_IO;
     }
     if (n >= PATH_MAX) {
-        n = PATH_MAX-1;
+        n = PATH_MAX - 1;
     }
     buf[n] = 0;
-    return 0;
+    return OK;
+}
+
+void sonar(const char* path, const char* config, const char* user, const char* group, int input,
+    int output) {
+    /* TODO: Drop privileges to user/group */
+    /* For this, use setuid(), which is safe.  setgid() also looks like the right thing. */
+    printf("Sonar: %d %d\n", input, output);
+    char ins[20], outs[20];
+    sprintf(ins, "%d", input);
+    sprintf(outs, "%d", output);
+    execl(path, path, "-i", ins, "-o", outs, "daemon", config, (char*)nullptr);
+    perror("exec");
 }

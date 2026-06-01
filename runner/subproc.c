@@ -6,17 +6,15 @@
  * be dead, and an error should be propagated accordingly.
  */
 
+#include <inttypes.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-#include <inttypes.h>
-#include <stdlib.h>
 
 #include "proto.h"
 
-void msg(const char* s) {
-    write(2, s, strlen(s));
-}
+void msg(const char* s) { write(2, s, strlen(s)); }
 
 int main(int argc, char** argv) {
     int input = -1, output = -1;
@@ -49,7 +47,7 @@ int main(int argc, char** argv) {
 #ifdef LOGGING
     printf("Client: %d %d\n", input, output);
 #endif
-    for (int i=0 ; i< 1; i++) {
+    for (int i = 0; i < 1; i++) {
         sleep(1);
         outbound_t outbound;
         init_outbound(&outbound);
@@ -60,13 +58,13 @@ int main(int argc, char** argv) {
 #ifdef LOGGING
         printf("Subproc: sending\n");
 #endif
-        int r = send_message(output, &outbound);
+        result_t r = send_message(output, &outbound);
 #ifdef LOGGING
         printf("Subproc: sent, sleeping a bit\n");
 #endif
         sleep(2);
         destroy_outbound(&outbound);
-        if (r) {
+        if (r != OK) {
             break;
         }
         inbound_t inbound;
@@ -77,9 +75,9 @@ int main(int argc, char** argv) {
         if (recv_message(input, &inbound)) {
             break;
         }
-//#ifdef LOGGING
+        // #ifdef LOGGING
         printf("Subproc: received %d\n", inbound.len);
-//#endif
+        // #endif
         uint8_t op;
         if (decode_byte(&inbound, &op)) {
             break;
@@ -91,7 +89,7 @@ int main(int argc, char** argv) {
         }
         assert(nelem == 2);
         printf("Subproc: %d elements\n", nelem);
-        for ( int i= 0; i < nelem; i++ ){
+        for (int i = 0; i < nelem; i++) {
             uint32_t pid;
             uint8_t* s = NULL;
             if (decode_int(&inbound, &pid)) {
@@ -102,9 +100,9 @@ int main(int argc, char** argv) {
                 printf("Subproc: no path\n");
                 break;
             }
-//#ifdef LOGGING
+            // #ifdef LOGGING
             printf("Subproc: pid=%d path=%s\n", pid, s);
-//#endif
+            // #endif
             free(s);
         }
         destroy_inbound(&inbound);
