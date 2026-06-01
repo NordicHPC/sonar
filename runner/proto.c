@@ -110,6 +110,7 @@ static result_t read_bytes(int input, uint8_t* p, int n) {
         if (m == 0) {
             if (any) {
                 fprintf(stderr, "Partial message read\n");
+                return ERR_IO;
             }
             return ERR_EOF;
         }
