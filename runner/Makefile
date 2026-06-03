@@ -4,11 +4,11 @@ FLAGS=-g -O0 -Wall -Werror -Wno-format-truncation
 
 default:
 
-runner: runner.c proto.c proto.h Makefile
-	$(CC) $(FLAGS) -DLOGGING -o runner runner.c proto.c
+sonar-daemon-runner: sonar-daemon-runner.c proto.c proto.h Makefile
+	$(CC) $(FLAGS) -DLOGGING -o sonar-daemon-runner sonar-daemon-runner.c proto.c
 
-subproc: subproc.c proto.c proto.h Makefile
-	$(CC) $(FLAGS) -o subproc subproc.c proto.c
+sonar-mock: sonar-mock.c proto.c proto.h Makefile
+	$(CC) $(FLAGS) -o sonar-mock sonar-mock.c proto.c
 
 format:
 	if [[ -n $$(command -v clang-format) ]]; then \
