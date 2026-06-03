@@ -40,6 +40,17 @@ extern result_t ERR_EOF;
  * Message:
  *  integer length of payload, never zero, followed by payload
  *  payload always starts with 1-byte operation code (from set below).
+ *
+ * The protocol is that the client sends a message and then the server responds with another
+ * message, that is, the opcode is included also in the response though the payload data after
+ * the opcode may be different (as documented below).
+ *
+ * Multiple messages can be sent back-to-back on the client->server pipe, the client need not
+ * wait for the server to respond.
+ *
+ * The order of responses is *always* in the order of requests.  Every request has exactly one
+ * response, with the same operation code.  If errors are possible then they are encoded in the
+ * response, as detailed below.
  */
 
 /* In all functions below, a nonzero return means error (and an error message will have been printed
@@ -91,7 +102,7 @@ result_t send_message(int output, outbound_t* m);
  *
  * Request: Array of PIDs.
  *
- * Response: Array of PID/string pairs, all PIDs in the request should be represented in this array.
+ * Response: Array of PID/string pairs, all PIDs in the request will be represented in this array.
  * Zero-length strings mean "no information for this PID" (eg process exited).
  */
 #define REQ_EXE_FOR_PIDS 1
