@@ -64,21 +64,6 @@ though, as access to the Slurm data store will not impact compute nodes and plac
 on administrative systems.  Even so, we may not assume that sampling can run very often, as the
 data volumes can be quite large.  (`squeue | wc` on fox just now yields 100KB of formatted data.)
 
-In principle, Sonar shall send data about a job at least three times: when the job is created
-and enters the PENDING state, when it enters the RUNNING state, and when it has completed (in
-any of a number of different states).  At each of those steps, it shall send data that are
-available at that time that have not been sent before; this includes data that may have changed
-(for example, the Priority may be sent with a PENDING record but if the priority changes later,
-it should be sent again the next time a data sample is sent).  In practice, there are two main
-complications: Sonar runs as a sampler and may not observe a job in all of those states, and it
-may run in a stateless mode in which it will be unable to know whether it has already sent some
-information about a job and can avoid sending it again.  (There is a discussion to be had about
-other events: priority changes, job suspension, job resize.)
-
-Therefore, the Slurm data that are transmitted must be assumed by the consumer to be both
-partial and potentially redundant.  Data in records with later timestamps generally override
-data from earlier records.
-
 ## Data format overall notes
 
 The output is a tree structure that is constrained enough to be serialized as
@@ -87,12 +72,14 @@ bson, cbor, a custom format, whatever).  It shall follow the [json:api
 specification](https://jsonapi.org/format/#document-structure).  It generally does not
 incorporate many size optimizations.
 
-It's not a goal to have completely normalized data; redundancies are desirable in some cases to
-make data self-describing.
+It is not a goal to have completely normalized data; redundancies are desirable in some cases to
+make data self-describing.  Redundancies within a data packet must always be consistent, for
+example, if the time of a sample is represented multiple times in the packet, the value must be
+the same in all cases.
 
-In a serialization format that allows fields to be omitted, all fields except union fields will
-have default values, which are zero, empty string, false, the empty object, or the empty array.
-A union field must have exactly one member present.
+In a serialization format (such as JSON) that allows fields to be omitted, all fields except
+union fields will have default values, which are zero, empty string, false, the empty object, or
+the empty array.  A non-omitted union field must have exactly one member present.
 
 Field values are constrained by data types described below, and sometimes by additional
 constraints described in prose.  Primitive types are as they are in Go: 64-bit integers and
@@ -113,11 +100,11 @@ The top-level object for each output data type is the "...Envelope" object.
 
 Within each envelope, `Data` and `Errors` are exclusive of each other.
 
-Within each data object, no json:api `id` field is needed since the monitoring component is a
-client in spec terms.
+Within each Data object, no json:api `id` field is needed since the monitoring component is a
+client in json:api spec terms.
 
 The errors field in an envelope is populated only for hard errors that prevent output from being
-produced at all. Soft/recoverable errors are represented in the primary data objects.
+produced at all.  Soft/recoverable errors are represented in the primary data objects.
 
 MetadataObject and ErrorObject are shared between the various data types, everything else is
 specific to the data type and has a name that clearly indicates that.
@@ -126,10 +113,10 @@ Some fields present in the older Sonar data are no longer here, having been deem
 obsolete.  Some are here in a different form.  Therefore, while old and new data are broadly
 compatible, there may be some minor problems translating between them.
 
-If a device does not expose a UUID, one will be constructed for it by the monitoring component.
-A UUID will never be confusable with another device within the same cluster but a synthesized
-UUID may change, eg at reboot, creating a larger population of devices than there is in
-actuality.
+If a GPU device does not expose a UUID, one will be constructed for it by Sonar.  A UUID will
+never be confusable with another device within the same cluster at any point in time, but a
+synthesized UUID may change, eg at reboot, creating an apparently larger population of devices
+than there is in actuality.
 
 Device indices are hard to use well.  Sonar will report the indices as seen from the node,
 independent of any mappings created for jobs.  There are several problems.  Indices may change at
@@ -138,12 +125,126 @@ may be both an AMD at index 0 and an NVIDIA at index 0.  And seen from within a 
 indices may reflect a mapping created for the job, so the job's "index 0" may differ from the
 node's "index 0".  Tracking cards by UUIDs is going to be simpler.
 
+Disk IDs (names) are always relative to the node that they are on, and disks may be moved and
+renamed without warning, and there's generally no way at present to discover this.
+
+In Linux, when a child process exits its resource consumption is added to the consumption of the
+parent, if still alive.  It is important to not be misled by this but tricky to deal with it
+sometimes.  It can be fixed in part by building process trees from sample data and adjusting the
+values in the data streams by subtracting time accrued to children, but this is complex.
+Sampling also means that some children (or parents) are never seen.
+
 ## Data format versions
 
 This document describes data format version "0".  Adding fields or removing fields where default
 values indicate missing values in the data format do not change the version number: the version
 number only needs change if semantics of existing fields change in some incompatible way.  We
 intend that the version will "never" change.
+
+## Data stream semantics
+
+The data packets induce the following time-varying primitive data streams (always on a single
+cluster):
+
+ - per-process sampled state for a given process on a given node, see below about process identity
+ - card state data for a given card UUID
+ - card configuration data for a given card UUID
+ - node state data for a given node name as seen from the node
+ - node state data for a given node name as seen from the slurm master
+ - node configuration data for a given node name
+ - disk state data for a given node name and disk ID
+ - job state data for a given slurm job id
+ - cluster partition configuration data for a given partition name
+
+### Redundant time stamps (all streams)
+
+Every primitive data stream can be sorted by ascending time.  If two records in such a stream
+have the same time stamp then one of them can be discarded, it is arbitrary which one.
+
+### Varying names and indices
+
+GPU card indices are hard to trust as they may be relative to a job allocation, may change at
+reboot or during other remapping.  They should be treated as advisory / informational.
+
+Disk names are always node-relative, and disks may be given new names and new disks may assume
+the names of older disks, all without warning.  Disk names should be treated as advisory /
+informational.
+
+### Partitioning sample data by process and assigning process identity
+
+A process on a node is not identified solely by its process ID (Pid), as pids will be reused.  On
+a node, process samples can be partitioned by pid and each partition can be sorted ascending by
+time (and duplicate time stamps then discarded, see above).  Two process samples A and B that are
+adjacent in such a sorted partition belong to the same process iff their (Job,Epoch) pairs are
+the same and the timestamp of B is not greater than the timestamp of A by some value
+PidReuseWindow, defined in the section "The meaning of a Job ID", below.  If A and B do not
+belong to the same process then that partition to which they both belong is split between them.
+One might say that for each (Node,Job,Epoch,Pid) quadruple there additionally exists a counter
+that is used to distinguish processes that would otherwise be indistinguishable: A would belong
+to a partition of sample values with a lower counter value than the partition to which B belongs.
+Also see the descriptions of the Pid field in SampleProcess and the Epoch and User fields in
+SampleJob, and the overall documentation for SampleJob.
+
+### Computing more precise cpu utilization from the data stream
+
+In each process sample, the CpuUtil is the current CPU utilization sampled over a short interval
+(typically 100ms).  An alternative way to obtain the same data (call it CpuComputedUtil) is to
+compute the difference of the CpuTime fields of two adjacent samples, and divide by the interval
+of the samples.  Generally CpuUtil and CpuComputedUtil should be close, but the latter may be
+more accurate as it is not a sample but based on true accounting data - it will capture shorter
+spikes that occur within the sampling interval, for example.
+
+### Merging processes into jobs
+
+Processes that have the same non-zero Job value belong to the same job (which is a Slurm job if
+its Epoch is zero and a non-Slurm job otherwise, see the SampleJob documentation below).  The
+process sample data for the processes in the job can be merged into a job-wide view of resource
+consumption across time.  However, for multi-node jobs this is complicated because the sample
+times are not synchronized.  The simplest and most predictable way to merge the process streams
+is to establish a logical clock (that runs at a higher frequency than sampling) and then at each
+tick of this clock sum the linearly interpolated values of the data items from the samples in
+each process that were taken at the times no later than the tick and no earlier than the tick.
+(So if the latest sample in a process at some time t before the tick at time w has a reading X
+for the value and the earliest sample at time u after the tick has value Y, the sample V at w is
+V = X + (w-t)/(u-t) * (Y - X), if I've gotten it right.)  One could consider summing clusters of
+actual data within some moving window to construct a non-uniform merged timeline that contains no
+synthesized data (as Sonalyze actually does) but this is complex and it's not obvious that it's
+any better.
+
+### Redundancies and lacunae in Slurm data
+
+Over the lifetime of a job the Slurm data for a job will change in various ways.  Partial and
+redundant records may be sent, as follows.
+
+In principle, Sonar will send Slurm data about a job at least three times: when the job is
+created and enters the PENDING state, when it enters the RUNNING state, and when it has completed
+(in any of a number of different states).  In practice, Sonar runs as a sampler and may not
+observe a job in all of those states, and will only be able to send what it observes.  Thus it is
+possible that only the completed state of some jobs are recorded.  The back-end cannot assume
+that a full view of all states will be available.
+
+In principle, Sonar need only send data that have changed since the last time it send some data
+about the same job.  In practice, there are a lot of advantages to running Sonar essentially
+stateless, so data are currently transmitted redundantly.  Every record sent for a job will
+typically have the same Priority field, for example.  The back-end can usefully filter redundant
+or nearly-redundant records.
+
+### Computing the capability of nodes
+
+Frequently it is useful to report on a job's resource use relative to the capability of the
+system it is running on.  A node's capacity at time t (for a sample taken at t) is the capacity
+reported in sysinfo data for the node at a time no later than t.
+
+The sum of a set of nodes' capacities at time t should be taken to be the sum across the
+individual capacities at t as defined in the previous paragraph.
+
+### Joining process and Slurm data
+
+As process data and Slurm data are sampled at different intervals and points in time, joining
+them means adjusting one to the other.  The most sensible way is to grab the latest Slurm data
+for a job that is no newer than the sample timestamp.  This will occasionally yield absurd
+results, eg, the job will appear to be PENDING but will have some CPU usage according to sample
+data.
 
 ## Data types
 
@@ -676,7 +777,7 @@ NOTE: The (job,epoch) pair must always be used together. If epoch is 0 then job 
 other (job,0) records coming from the same or other nodes in the same cluster at the same or
 different time denote other aspects of the same job. Slurm jobs will have epoch=0, allowing us
 to merge event streams from the job both intra- and inter-node, while non-mergeable jobs will
-have epoch not zero. See extensive discussion in the "Rectification" section below.
+have epoch not zero.  Also see "Data stream semantics" above and "The meaning of a Job ID" below.
 
 NOTE: Other job-wide / cross-process / per-slurm-job fields can be added, e.g. for I/O and
 energy, but only those that can only be monitored from within the node itself. Job data that can
@@ -731,13 +832,8 @@ provides cpu_util but not cpu_avg or cpu_time, and a memory utilization figure f
 resident_memory must be back-computed.
 
 NOTE: The fields cpu_time, cpu_avg, and cpu_util are different views on the same quantities and
-are used variously by Jobanalyzer and the slurm-monitor dashboard. The Jobanalyzer back-end
-computes its own cpu_util from a time series of cpu_time values and using the cpu_avg as the
-first value in the computed series. The slurm-monitor dashboard in contrast uses cpu_util
-directly, but as it will require some time to perform the sampling it slows down the monitoring
-process (a little) and makes it more expensive (a little), and the result is less accurate (it's
-a sample, not an averaging over the entire interval). Possibly having either cpu_avg and cpu_time
-together or cpu_util on its own would be sufficient.
+are used variously by Jobanalyzer and the slurm-monitor dashboard.  See Data stream semantics,
+above.
 
 #### **`resident_memory`** uint64
 
@@ -1428,13 +1524,13 @@ The monitoring data expose job, epoch, node, and time.  The epoch is a represent
 node's boot time.  These fields work together as follows (for non-Slurm jobs).  Consider two
 records A and B. If A.job != B.job or A.node != B.node or A.epoch != B.epoch then they belong to
 different jobs.  Otherwise, we collect all records in which those three fields are the same and
-sort them by time.  If B follows A in the timeline and B.time - A.time > t then A and B are in
-different jobs (one ends with A and the next starts with B).
+sort them by time.  If B follows A in the timeline and B.time - A.time > PidReuseWindow then A
+and B are in different jobs (one ends with A and the next starts with B).
 
-A suitable value for t is probably on the order of a few hours, TBD.  Linux has a process ID
-space typically around 4e6. Some systems running very many jobs (though not usually HPC systems)
-can wrap around pids in a matter of days.  We want t to be shorter than the shortest plausible
-wraparound time.
+A suitable value for PidReuseWindow is probably on the order of a few hours, TBD.  Linux has a
+process ID space typically around 4e6. Some systems running very many jobs (though not usually
+HPC systems) can wrap around pids in a matter of days.  We want PidReuseWindow to be shorter than
+the shortest plausible wraparound time.
 
 ## Rolled-up samples
 
