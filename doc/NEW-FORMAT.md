@@ -146,15 +146,15 @@ intend that the version will "never" change.
 The data packets induce the following time-varying primitive data streams (always on a single
 cluster):
 
- - per-process sampled state for a given process on a given node, see below about process identity
- - card state data for a given card UUID
- - card configuration data for a given card UUID
- - node state data for a given node name as seen from the node
- - node state data for a given node name as seen from the slurm master
- - node configuration data for a given node name
- - disk state data for a given node name and disk ID
- - job state data for a given slurm job id
- - cluster partition configuration data for a given partition name
+  - per-process sampled state for a given process on a given node, see below about process identity
+  - card state data for a given card UUID
+  - card configuration data for a given card UUID
+  - node state data for a given node name as seen from the node
+  - node state data for a given node name as seen from the slurm master
+  - node configuration data for a given node name
+  - disk state data for a given node name and disk ID
+  - job state data for a given slurm job id
+  - cluster partition configuration data for a given partition name
 
 ### Redundant time stamps (all streams)
 
