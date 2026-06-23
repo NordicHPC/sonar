@@ -70,22 +70,23 @@ The output is a tree structure that is constrained enough to be serialized as
 [JSON](https://www.rfc-editor.org/rfc/rfc8259) and other likely serialization formats (protobuf,
 bson, cbor, a custom format, whatever).  It shall follow the [json:api
 specification](https://jsonapi.org/format/#document-structure).  It generally does not
-incorporate many size optimizations.
+incorporate many size optimizations apart from the tree structure itself, which simply lifts
+redundancies up in the tree.
 
 It is not a goal to have completely normalized data; redundancies are desirable in some cases to
 make data self-describing.  Redundancies within a data packet must always be consistent, for
 example, if the time of a sample is represented multiple times in the packet, the value must be
 the same in all cases.
 
-In a serialization format (such as JSON) that allows fields to be omitted, all fields except
-union fields will have default values, which are zero, empty string, false, the empty object, or
-the empty array.  A non-omitted union field must have exactly one member present.
-
 Field values are constrained by data types described below, and sometimes by additional
 constraints described in prose.  Primitive types are as they are in Go: 64-bit integers and
 floating point, and Unicode strings.  Numeric values outside the given ranges, non-Unicode
 string encodings, malformed timestamps, malformed node-ranges or type-incorrect data in any
 field can cause the entire top-level object containing them to be rejected by the back-end.
+
+In a serialization format (such as JSON) that allows fields to be omitted, all fields except
+those of a type derived from NonemptyString have default values, which are zero, empty string,
+false, the empty object, or the empty array.  Notably ExtendedUint defaults to zero, "unset".
 
 The word "current" in the semantics of a field denotes an instantaneous reading or a
 short-interval statistical measure; contrast "cumulative", which is since start of process/job
@@ -155,6 +156,10 @@ cluster):
   - disk state data for a given node name and disk ID
   - job state data for a given slurm job id
   - cluster partition configuration data for a given partition name
+
+### Bad time stamps (all streams)
+
+Malformatted timestamps render the entire data packet invalid.
 
 ### Redundant time stamps (all streams)
 
@@ -228,6 +233,15 @@ about the same job.  In practice, there are a lot of advantages to running Sonar
 stateless, so data are currently transmitted redundantly.  Every record sent for a job will
 typically have the same Priority field, for example.  The back-end can usefully filter redundant
 or nearly-redundant records.
+
+### Slurm job step streams
+
+Most Slurm data objects belongs to a specific job step; thus for a given JobID, there can be
+multiple data streams, one for each step in the job, including some housekeeping steps.  The
+(JobID, JobStep) pair identifies the stream.  In a given Slurm data packet, there will be a
+"main" line for the job that is identified by its UserName field being not blank; this will have
+overall information about the job.  The data objects for the individual steps will follow this
+main line.
 
 ### Computing the capability of nodes
 
@@ -752,7 +766,7 @@ Disk's local minor device number.
 Disk stats values in the order present in /proc/diskstats.  Documentation: Linux 6.x has
 Documentation/admin-guide/iostats.rst [1].  Older kernels have Documentation/iostats.txt [2].
 
-Note:
+NOTE:
 - The layout of this array changes between kernel versions and may require knowledge of
   the kernel version to interpret.  See the OsRelease field in SysinfoAttributes.
 - In particular, the length of the array is not constant across kernel versions, though it
@@ -1183,6 +1197,13 @@ slurm: `JOB_INFO.steps[i].task.distribution`
 Requested resources. If present, this comes from scontrol's ReqTRES field.  See
 DecodeSlurmTRES() in decode_jobs.go in this directory for encoding details.
 
+We are most often interested in GPU resources, as other resources are represented in other
+ways.  GPU resources are subfields tagged as "gres/gpu=*" for "any gpu" and
+"gres/gpu:model=n" for specific GPU model names.
+
+Memory sizes in the TRES may be encoded with a suffix K, M, G, T, or P representing (as far
+as is known) 2^10, 20^20, 2^30, 2^40, and 2^50 bytes.
+
 scontrol: `ReqTRES`
 
 Note that it's been observed that scontrol produces the items in this field in a surprising
@@ -1192,8 +1213,8 @@ always so (yet AllocTRES seems to have the expected order).
 
 #### **`allocated_resources`** string
 
-Allocated resources. If present, this comes from sacct's AllocTRES field.  See
-DecodeSlurmTRES() in decode_jobs.go in this directory for encoding details.
+Allocated resources. If present, this comes from sacct's AllocTRES field.  See ReqTRES
+documentation for encoding details.
 
 sacct: `AllocTRES`
 
