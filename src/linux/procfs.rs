@@ -49,7 +49,7 @@ pub fn get_memory_in_kib(fs: &dyn ProcfsAPI) -> Result<systemapi::Memory, String
             if fields.len() != 3 || fields[2] != "kB" {
                 return Err(format!("Unexpected {} in /proc/meminfo: {l}", fields[0]));
             }
-            *ptr = parse_u64_field(&fields, 1, l, "meminfo", 0, fields[0])?;
+            *ptr = parse_u64_field(&fields, 1, l, "meminfo", None, fields[0])?;
         }
     }
     if memory.total == 0 {
@@ -184,7 +184,7 @@ pub fn get_boot_time_in_secs_since_epoch(fs: &dyn ProcfsAPI) -> Result<u64, Stri
     for l in stat_s.split('\n') {
         if l.starts_with("btime ") {
             let fields = l.split_ascii_whitespace().collect::<Vec<&str>>();
-            return parse_u64_field(&fields, 1, l, "stat", 0, "btime");
+            return parse_u64_field(&fields, 1, l, "stat", None, "btime");
         }
     }
     Err(format!("Could not find btime in /proc/stat: {stat_s}"))
@@ -219,7 +219,7 @@ pub fn compute_node_information(
             let fields = l.split_ascii_whitespace().collect::<Vec<&str>>();
             let mut sum = 0;
             for i in STAT_FIELDS {
-                sum += parse_u64_field(&fields, i, l, "stat", 0, "cpu")?;
+                sum += parse_u64_field(&fields, i, l, "stat", None, "cpu")?;
             }
             if l.starts_with("cpu ") {
                 cpu_total_secs = sum / ticks_per_sec;
@@ -410,8 +410,8 @@ pub fn compute_process_information(
                 comm += " <defunct>";
             }
 
-            ppid = parse_u64_field(&fields, 1, &line, "stat", pid, "ppid")? as Pid;
-            pgrp = parse_u64_field(&fields, 2, &line, "stat", pid, "pgrp")? as Pid;
+            ppid = parse_u64_field(&fields, 1, &line, "stat", Some(pid), "ppid")? as Pid;
+            pgrp = parse_u64_field(&fields, 2, &line, "stat", Some(pid), "pgrp")? as Pid;
 
             // Generally we want to record cumulative self+child time.  The child time we read will
             // be for children that have terminated and have been wait()ed for.  The logic is that
@@ -432,12 +432,12 @@ pub fn compute_process_information(
             // has no history, and has no notion of a job or process being "gone".  Instead, enough
             // data must be emitted by Sonar for a postprocessor of the data to reconstruct the job
             // tree and correct the data, if necessary.
-            utime_ticks = parse_u64_field(&fields, 11, &line, "stat", pid, "utime")?;
-            stime_ticks = parse_u64_field(&fields, 12, &line, "stat", pid, "stime")?;
-            let cutime_ticks = parse_u64_field(&fields, 13, &line, "stat", pid, "cutime")?;
-            let cstime_ticks = parse_u64_field(&fields, 14, &line, "stat", pid, "cstime")?;
+            utime_ticks = parse_u64_field(&fields, 11, &line, "stat", Some(pid), "utime")?;
+            stime_ticks = parse_u64_field(&fields, 12, &line, "stat", Some(pid), "stime")?;
+            let cutime_ticks = parse_u64_field(&fields, 13, &line, "stat", Some(pid), "cutime")?;
+            let cstime_ticks = parse_u64_field(&fields, 14, &line, "stat", Some(pid), "cstime")?;
             bsdtime_ticks = utime_ticks + stime_ticks + cutime_ticks + cstime_ticks;
-            let start_time_ticks = parse_u64_field(&fields, 19, &line, "stat", pid, "starttime")?;
+            let start_time_ticks = parse_u64_field(&fields, 19, &line, "stat", Some(pid), "starttime")?;
 
             // boot_time and the current time are both time_t, ie, a 31-bit quantity in 2023 and a
             // 32-bit quantity before 2038.  clock_ticks_per_sec is on the order of 100.  Ergo
@@ -475,8 +475,8 @@ pub fn compute_process_information(
         if let Ok(s) = fs.read_to_string(&format!("{pid}/statm")) {
             let fields = s.split_ascii_whitespace().collect::<Vec<&str>>();
             rss_kib =
-                parse_u64_field(&fields, 1, &s, "statm", pid, "resident set size")? * kib_per_page;
-            size_kib = parse_u64_field(&fields, 5, &s, "statm", pid, "data size")? * kib_per_page;
+                parse_u64_field(&fields, 1, &s, "statm", Some(pid), "resident set size")? * kib_per_page;
+            size_kib = parse_u64_field(&fields, 5, &s, "statm", Some(pid), "data size")? * kib_per_page;
         } else {
             // This is *usually* benign - see above.
             continue;
@@ -510,7 +510,7 @@ pub fn compute_process_information(
                         return Err(format!("Unexpected RssAnon in /proc/{pid}/status: {l}"));
                     }
                     rssanon_kib =
-                        parse_u64_field(&fields, 1, l, "status", pid, "private resident set size")?;
+                        parse_u64_field(&fields, 1, l, "status", Some(pid), "private resident set size")?;
                     break;
                 }
             }
@@ -534,17 +534,17 @@ pub fn compute_process_information(
                 if !fields.is_empty() {
                     match fields[0] {
                         "read_bytes:" => {
-                            data_read_kib = parse_u64_field(&fields, 1, l, "io", pid, "data read")?
+                            data_read_kib = parse_u64_field(&fields, 1, l, "io", Some(pid), "data read")?
                                 .div_ceil(1024);
                         }
                         "write_bytes:" => {
                             data_written_kib =
-                                parse_u64_field(&fields, 1, l, "io", pid, "data written")?
+                                parse_u64_field(&fields, 1, l, "io", Some(pid), "data written")?
                                     .div_ceil(1024);
                         }
                         "cancelled_write_bytes:" => {
                             data_cancelled_kib =
-                                parse_u64_field(&fields, 1, l, "io", pid, "data cancelled")?
+                                parse_u64_field(&fields, 1, l, "io", Some(pid), "data cancelled")?
                                     .div_ceil(1024);
                         }
                         _ => {}
@@ -667,10 +667,10 @@ fn compute_process_ticks(fs: &dyn ProcfsAPI, pid: Pid) -> Result<(bool, u64), St
                         .collect::<Vec<&str>>();
                 }
             }
-            let utime_ticks = parse_u64_field(&fields, 11, &line, "stat", pid, "utime")?;
-            let stime_ticks = parse_u64_field(&fields, 12, &line, "stat", pid, "stime")?;
-            let cutime_ticks = parse_u64_field(&fields, 13, &line, "stat", pid, "cutime")?;
-            let cstime_ticks = parse_u64_field(&fields, 14, &line, "stat", pid, "cstime")?;
+            let utime_ticks = parse_u64_field(&fields, 11, &line, "stat", Some(pid), "utime")?;
+            let stime_ticks = parse_u64_field(&fields, 12, &line, "stat", Some(pid), "stime")?;
+            let cutime_ticks = parse_u64_field(&fields, 13, &line, "stat", Some(pid), "cutime")?;
+            let cstime_ticks = parse_u64_field(&fields, 14, &line, "stat", Some(pid), "cstime")?;
             let bsdtime_ticks = utime_ticks + stime_ticks + cutime_ticks + cstime_ticks;
             Ok((true, bsdtime_ticks))
         }
@@ -709,16 +709,16 @@ fn parse_u64_field(
     ix: usize,
     line: &str,
     file: &str,
-    pid: Pid,
+    pid: Option<Pid>,
     fieldname: &str,
 ) -> Result<u64, String> {
     if ix >= fields.len() {
-        if pid == 0 {
-            return Err(format!("Index out of range for /proc/{file}: {ix}: {line}"));
-        } else {
+        if let Some(pid) = pid {
             return Err(format!(
                 "Index out of range for /proc/{pid}/{file}: {ix}: {line}"
             ));
+        } else {
+            return Err(format!("Index out of range for /proc/{file}: {ix}: {line}"));
         }
     }
     if let Ok(n) = fields[ix].parse::<u64>() {

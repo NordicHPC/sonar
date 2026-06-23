@@ -199,17 +199,17 @@ fn format_newfmt_sample(proc_info: &ProcInfo) -> output::Object {
         fields.push_u(SAMPLE_PROCESS_CANCELLED, proc_info.data_cancelled_kib);
     }
     fields.push_s(SAMPLE_PROCESS_CMD, proc_info.command.clone());
-    if proc_info.pid != 0 {
+    if let Some(pid) = proc_info.pid {
         // Rolled-up processes have a synthesized non-zero pid in daemon mode, and a zero pid in
         // one-shot mode.
         // pid may be u32 during testing
         #[allow(clippy::unnecessary_cast)]
-        fields.push_u(SAMPLE_PROCESS_PID, proc_info.pid as u64);
+        fields.push_u(SAMPLE_PROCESS_PID, pid.get());
     }
-    if proc_info.ppid != 0 {
+    if let Some(ppid) = proc_info.ppid {
         // ppid may be u32 during testing
         #[allow(clippy::unnecessary_cast)]
-        fields.push_u(SAMPLE_PROCESS_PARENT_PID, proc_info.ppid as u64);
+        fields.push_u(SAMPLE_PROCESS_PARENT_PID, ppid.get());
     }
     if proc_info.container_state == CState::Child {
         fields.push_b(SAMPLE_PROCESS_IN_CONTAINER, true);

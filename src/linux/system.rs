@@ -304,10 +304,12 @@ impl systemapi::SystemAPI for System {
     fn get_pid_max(&self) -> Pid {
         if let Ok(s) = fs::read_to_string("/proc/sys/kernel/pid_max") {
             if let Ok(n) = s.parse::<u64>() {
-                return n as Pid;
+                if n != 0 {
+                    return Pid::new(n);
+                }
             }
         }
-        4194304
+        Pid::new(4194304)
     }
 
     fn compute_node_information(&self) -> Result<(u64, Vec<u64>), String> {
