@@ -728,13 +728,13 @@ fn parse_u64_field(
         // Special "no data" value, we just fold it to zero
         return Ok(0);
     }
-    if pid == 0 {
+    if let Some(pid) = pid {
         Err(format!(
-            "Could not parse {fieldname} in /proc/{file}: {line}"
+            "Could not parse {fieldname} from /proc/{pid}/{file}: {line}"
         ))
     } else {
         Err(format!(
-            "Could not parse {fieldname} from /proc/{pid}/{file}: {line}"
+            "Could not parse {fieldname} in /proc/{file}: {line}"
         ))
     }
 }
