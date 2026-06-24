@@ -417,7 +417,7 @@ fn kafka_http_producer(
     incoming_message_queue: channel::Receiver<Message<KafkaMsg>>,
     control_and_errors: channel::Sender<Operation>,
 ) {
-    let ca_file = if let Some(ref f) = ca_file { &f } else { "" };
+    let ca_file = if let Some(ref f) = ca_file { f } else { "" };
     let uploader = http_upload::HttpUploader::new(curl_cmd, http_proxy, ca_file, timeout);
     let op = KafkaHttpBackgroundProducer {
         uploader,

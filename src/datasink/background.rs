@@ -87,7 +87,7 @@ pub fn background_producer<Msg: Size>(
     }
 
     // Best effort: give the sending thread an opportunity to send what it has.
-    thread::sleep(Duration::from_millis(sender.shutdown_delay_ms() as u64));
+    thread::sleep(Duration::from_millis(sender.shutdown_delay_ms()));
 }
 
 // Send all messages in the backlog, but apply batching if appropriate.
