@@ -47,6 +47,7 @@ generate: CITATION.cff
 	( cd build-dist ; $(MAKE) generate )
 	( cd util ; $(MAKE) generate )
 	( cd tests ; $(MAKE) generate )
+	( cd src/gpu ; $(MAKE) generate )
 
 CITATION.cff: Cargo.toml
 	python3 citation-version.py Cargo.toml CITATION.cff
