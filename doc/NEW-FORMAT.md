@@ -1202,7 +1202,7 @@ ways.  GPU resources are subfields tagged as "gres/gpu=*" for "any gpu" and
 "gres/gpu:model=n" for specific GPU model names.
 
 Memory sizes in the TRES may be encoded with a suffix K, M, G, T, or P representing (as far
-as is known) 2^10, 20^20, 2^30, 2^40, and 2^50 bytes.
+as is known) 2^10, 2^20, 2^30, 2^40, and 2^50 bytes.
 
 scontrol: `ReqTRES`
 
