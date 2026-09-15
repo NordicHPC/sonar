@@ -130,7 +130,7 @@ fn format_newfmt_gpu_sample(c: gpu::CardState) -> output::Object {
         s.push_u(SAMPLE_GPU_MEMORY, c.mem_used_kib);
     }
     if c.gpu_utilization_pct != 0.0 {
-        s.push_i(SAMPLE_GPU_CEUTIL, c.gpu_utilization_pct.round() as i64);
+        s.push_i(SAMPLE_GPU_CE_UTIL, c.gpu_utilization_pct.round() as i64);
     }
     if c.mem_utilization_pct != 0.0 {
         s.push_i(SAMPLE_GPU_MEMORY_UTIL, c.mem_utilization_pct.round() as i64);
@@ -145,7 +145,7 @@ fn format_newfmt_gpu_sample(c: gpu::CardState) -> output::Object {
         s.push_i(SAMPLE_GPU_POWER_LIMIT, c.power_limit_watt as i64);
     }
     if c.ce_clock_mhz != 0 {
-        s.push_i(SAMPLE_GPU_CECLOCK, c.ce_clock_mhz as i64);
+        s.push_i(SAMPLE_GPU_CE_CLOCK, c.ce_clock_mhz as i64);
     }
     if c.mem_clock_mhz != 0 {
         s.push_i(SAMPLE_GPU_MEMORY_CLOCK, c.mem_clock_mhz as i64);

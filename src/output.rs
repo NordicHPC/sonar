@@ -253,8 +253,8 @@ pub fn newfmt_envelope(
         let mut attrvals = Array::new();
         for AttrVal { key, value } in attrs {
             let mut pair = Object::new();
-            pair.push_s(KVPAIR_KEY, key.clone());
-            pair.push_s(KVPAIR_VALUE, value.clone());
+            pair.push_s(KV_PAIR_KEY, key.clone());
+            pair.push_s(KV_PAIR_VALUE, value.clone());
             attrvals.push_o(pair);
         }
         meta.push_a(METADATA_OBJECT_ATTRS, attrvals);
