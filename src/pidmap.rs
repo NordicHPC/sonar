@@ -32,7 +32,7 @@
 // on very large and busy nodes, and typically much less than that.
 
 use crate::systemapi;
-use crate::types::{JobID, PID_MAX, Pid};
+use crate::types::{JobID, Pid};
 use std::collections::HashMap;
 
 // PID_LIMIT and MIN_RANGE_SIZE are sensible for a "large enough" pid range, but can be set to
@@ -45,7 +45,7 @@ use std::collections::HashMap;
 const MIN_RANGE_SIZE: usize = 100;
 
 // The upper limit on the pid range, exclusive.
-const PID_LIMIT: Pid = PID_MAX;
+const PID_LIMIT: Pid = Pid::max();
 
 pub struct PidMap {
     map: HashMap<ProcessKey, ProcessValue>,

@@ -172,7 +172,8 @@ fn get_process_utilization(amd: &AmdGPU, ptable: &ps::ProcessTable) -> Option<Ve
             continue;
         }
 
-        let (username, uid) = ptable.lookup(infobuf.pid as Pid);
+        let pid = Pid::maybe(infobuf.pid as u64);
+        let (username, uid) = ptable.lookup(pid);
         let mut indices = infobuf.cards as usize;
         let mut k = 0u32;
         let mut devices = vec![];
@@ -188,7 +189,7 @@ fn get_process_utilization(amd: &AmdGPU, ptable: &ps::ProcessTable) -> Option<Ve
         }
         result.push(gpu::Process {
             devices,
-            pid: infobuf.pid as Pid,
+            pid: Pid::maybe(infobuf.pid as u64),
             user: username,
             uid,
             mem_pct: infobuf.mem_util as f32,

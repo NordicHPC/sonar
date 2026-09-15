@@ -19,8 +19,8 @@ pub trait ProcfsAPI {
     fn read_to_string(&self, path: &str) -> Result<String, String>;
 
     // Return (name,owner-uid) for every file /proc/<path>/{name} where path can be empty and the
-    // name is a number.  Return a sensible error message in case something goes really, really
-    // wrong, but otherwise try to make the best of it.
+    // name is a non-zero number.  Return a sensible error message in case something goes really,
+    // really wrong, but otherwise try to make the best of it.
     fn read_numeric_file_names(&self, path: &str) -> Result<Vec<(u64, Uid)>, String>;
 }
 
@@ -294,7 +294,7 @@ pub fn compute_loadavg(fs: &dyn ProcfsAPI) -> Result<(f64, f64, f64, u64, u64), 
 }
 
 pub fn get_thread_count(fs: &dyn ProcfsAPI, pid: Pid) -> Result<u64, String> {
-    Ok(fs.read_numeric_file_names(&format!("{pid}/task"))?.len() as u64)
+    Ok(fs.read_numeric_file_names(&format!("{}/task", pid.p))?.len() as u64)
 }
 
 // Obtain process information via /proc and return a hashmap of structures with all the information
@@ -340,7 +340,7 @@ pub fn compute_process_information(
     let mut user_table = UserTable::new();
 
     for (numeric_filename, uid) in pids {
-        let pid = numeric_filename as Pid;
+        let pid = Pid::new(numeric_filename);
         // Basic system variables.  Intermediate time values are represented in ticks to prevent
         // various roundoff artifacts resulting in NaN or Infinity.
 
@@ -351,7 +351,7 @@ pub fn compute_process_information(
         let mut comm;
         let utime_ticks;
         let stime_ticks;
-        if let Ok(line) = fs.read_to_string(&format!("{pid}/stat")) {
+        if let Ok(line) = fs.read_to_string(&format!("{}/stat", pid.p)) {
             // The comm field is a little tricky, it must be extracted first as the contents between
             // the first '(' and the last ')' in the line.
             let commstart = line.find('(');
@@ -361,7 +361,8 @@ pub fn compute_process_information(
             match (commstart, commend) {
                 (None, _) | (_, None) => {
                     return Err(format!(
-                        "Could not parse command from /proc/{pid}/stat: {line}"
+                        "Could not parse command from /proc/{}/stat: {line}",
+                        pid.p,
                     ));
                 }
                 (Some(commstart), Some(commend)) => {
@@ -472,7 +473,7 @@ pub fn compute_process_information(
 
         let size_kib;
         let rss_kib;
-        if let Ok(s) = fs.read_to_string(&format!("{pid}/statm")) {
+        if let Ok(s) = fs.read_to_string(&format!("{}/statm", pid.p)) {
             let fields = s.split_ascii_whitespace().collect::<Vec<&str>>();
             rss_kib =
                 parse_u64_field(&fields, 1, &s, "statm", pid, "resident set size")? * kib_per_page;

@@ -172,13 +172,14 @@ fn get_process_utilization(ptable: &ps::ProcessTable) -> Option<Vec<gpu::Process
                 continue;
             }
 
-            let (username, uid) = ptable.lookup(infobuf.pid as Pid);
+            let pid = Pid::maybe(infobuf.pid as u64);
+            let (username, uid) = ptable.lookup(pid);
             result.push(gpu::Process {
                 devices: vec![gpu::Name {
                     index: dev,
                     uuid: get_card_uuid(dev),
                 }],
-                pid: infobuf.pid as Pid,
+                pid,
                 user: username.clone(),
                 uid: uid as Uid,
                 mem_pct: infobuf.mem_util as f32,

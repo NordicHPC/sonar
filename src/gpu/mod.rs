@@ -60,7 +60,7 @@ pub struct Name {
 #[derive(PartialEq, Default, Clone, Debug)]
 pub struct Process {
     pub devices: Vec<Name>,      // Names are distinct
-    pub pid: Pid,                // Process ID
+    pub pid: Option<Pid>,        // Process ID
     pub user: String,            // User name
     pub uid: Uid,                // User ID
     pub gpu_pct: f32,            // Percent of GPU /for this sample/

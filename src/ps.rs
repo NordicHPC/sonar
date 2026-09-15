@@ -280,8 +280,8 @@ pub enum CState {
 pub struct TheProcInfo {
     pub user: String,
     pub command: String,
-    pub pid: Pid,
-    pub ppid: Pid,
+    pub pid: Option<Pid>,
+    pub ppid: Option<Pid>,
     pub rolledup: usize,
     pub num_threads: u64,
     pub is_system_job: bool,
@@ -725,7 +725,7 @@ fn rollup_processes(procinfo_by_pid: ProcInfoTable) -> Vec<ProcInfo> {
                 // We do not increment the `rolledup` counter here because that counter counts how
                 // many *other* records have been rolled into the canonical one, 0 means "no
                 // interesting information" and need not be printed.
-                proc_info.pid = 0;
+                proc_info.pid = None;
                 rolledup.push(proc_info);
             }
         }
