@@ -1,14 +1,32 @@
-// This reads a valid Go package from stdin and extracts some documentation that's written in
-// standard godoc format, and generates various output on stdout, depending on options.  A typical
-// input file is ../formats/newfmt/types.go.  Typical output is markdown documentation, or field
-// name definitions to be used by Rust code.  Try -h.
+// Process-doc reads a valid Go package from stdin and extracts some documentation that's written in
+// standard godoc format, and generates various output on stdout, depending on options.
 //
+// Usage:
+//
+//	process-doc [options] < input-file > output-file
+//
+// A typical input file is ../formats/newfmt/types.go (and in fact some of the emitted text assumes
+// this).  Output is markdown documentation, or field name definitions to be used by Rust code.
+//
+// Options:
+//
+//	-doc
+//	  Extract all documentation and emit markdown for format and fields
+//
+//	-yaml
+//	  Extract all documentation and emit yaml for for format and fields
+//
+//	-tag
+//	  Extract field names and emit Rust constant definitions for field tags (strings)
+//
+//	-w
+//	  Print warnings for likely problems.
+package main
+
 // TODO:
 // - obviously it would be fun to hyperlink automatically from uses of types to their definitions
 // - consider emitting not string but enums or other type-safer things (see TODO below)
-// - proper underline insertion in words like MyCPUAvg which should be MY_CPU_AVG (see TODO below)
-
-package main
+// - it's annoying that an assumption about the input file name is encoded in the output
 
 //go:generate ./version.bash
 
@@ -27,7 +45,7 @@ import (
 var (
 	makeDoc  = flag.Bool("doc", false, "Produce markdown documentation")
 	makeRust = flag.Bool("tag", false, "Produce Rust constant JSON field tags")
-	makeYaml = flag.Bool("yaml", false, "Produce Yaml Specfile")
+	makeYaml = flag.Bool("yaml", false, "Produce Yaml spec file")
 	warnings = flag.Bool("w", false, "Print warnings")
 	fset     = token.NewFileSet()
 )
@@ -243,18 +261,23 @@ func fail(x ast.Node, msg string) {
 	log.Fatalf("%s:%d: %s", file.Name(), file.Line(p), msg)
 }
 
-// Rust naming conventions: In a given name, the first capital letter X after a lower case
-// letter is transformed to _X.
-//
-// TODO: _ should be inserted between the last two capitals of a run of capitals immediately
-// followed by a lower case letter, so that 'CEClock' becomes '_CE_CLOCK_' no '_CECLOCK_'.
-
+// Transform a name to Rust constant naming conventions:
+//   - insert _ before the first capital letter X after a lower case letter
+//   - insert _ before the last capital letter X in a run of capitals before
+//     a lower case letter
+//   - fold all letters to upper case
 func transformName(n string) string {
 	bs := []byte(n)
 	name := ""
 	for i := range bs {
-		if i > 0 && isUpper(bs[i]) && !isUpper(bs[i-1]) {
-			name += "_"
+		if i > 0 && isUpper(bs[i]) {
+			if !isUpper(bs[i-1]) {
+				// Insert _ before upper case following lower case
+				name += "_"
+				// Insert _ before upper case following upper case if the next is lower case
+			} else if isUpper(bs[i-1]) && i+1 < len(bs) && isLower(bs[i+1]) {
+				name += "_"
+			}
 		}
 		name += toUpper(bs[i])
 	}

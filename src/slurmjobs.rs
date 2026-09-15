@@ -600,12 +600,12 @@ fn render_jobs_newfmt(jobs: &[Box<JobAll>]) -> output::Array {
         push_uint(&mut s, SACCT_DATA_AVE_DISK_READ, j.sacct_ave_disk_read);
         push_uint(&mut s, SACCT_DATA_AVE_DISK_WRITE, j.sacct_ave_disk_write);
         push_uint(&mut s, SACCT_DATA_AVE_RSS, j.sacct_ave_rss);
-        push_uint(&mut s, SACCT_DATA_AVE_VMSIZE, j.sacct_ave_vmsize);
+        push_uint(&mut s, SACCT_DATA_AVE_VM_SIZE, j.sacct_ave_vmsize);
         push_uint(&mut s, SACCT_DATA_ELAPSED_RAW, j.sacct_elapsed_raw);
         push_uint(&mut s, SACCT_DATA_SYSTEM_CPU, j.sacct_system_cpu);
         push_uint(&mut s, SACCT_DATA_USER_CPU, j.sacct_user_cpu);
         push_uint(&mut s, SACCT_DATA_MAX_RSS, j.sacct_max_rss);
-        push_uint(&mut s, SACCT_DATA_MAX_VMSIZE, j.sacct_max_vmsize);
+        push_uint(&mut s, SACCT_DATA_MAX_VM_SIZE, j.sacct_max_vmsize);
         if !s.is_empty() {
             o.push_o(SLURM_JOB_SACCT, s)
         }

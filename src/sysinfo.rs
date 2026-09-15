@@ -186,7 +186,7 @@ fn layout_card_info_newfmt(node_info: NodeInfo) -> output::Array {
             );
         }
         if max_ce_clock_mhz != 0 {
-            gpu.push_i(SYSINFO_GPU_CARD_MAX_CECLOCK, max_ce_clock_mhz as i64);
+            gpu.push_i(SYSINFO_GPU_CARD_MAX_CE_CLOCK, max_ce_clock_mhz as i64);
         }
         if max_mem_clock_mhz != 0 {
             gpu.push_i(SYSINFO_GPU_CARD_MAX_MEMORY_CLOCK, max_mem_clock_mhz as i64);
