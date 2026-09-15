@@ -1,6 +1,5 @@
-use std::io;
 use std::time::Duration;
-use subprocess::{Exec, ExitStatus, Redirection};
+use subprocess::{Exec, Redirection};
 
 #[derive(Debug, PartialEq)]
 pub enum CmdError {
@@ -21,125 +20,86 @@ pub enum CmdError {
 // termination of the child.  This is explained at https://github.com/rust-lang/rust/issues/45572,
 // especially at https://github.com/rust-lang/rust/issues/45572#issuecomment-860134955.  See also
 // https://doc.rust-lang.org/std/process/index.html (second code blob under "Handling I/O").
+//
+// The process crate claims that it does all of this, we don't need to implement that ourselves.
 
 pub fn safe_command(
     command: &str,
     args: &[&str],
     timeout_seconds: u64,
 ) -> Result<(String, String), CmdError> {
-    let mut p = match Exec::cmd(command)
+    let job = match Exec::cmd(command)
         .args(args)
         .stdout(Redirection::Pipe)
         .stderr(Redirection::Pipe)
-        .popen()
+        .start()
     {
-        Ok(p) => p,
+        Ok(job) => job,
         Err(_) => {
-            // TODO: Possibly too coarse-grained but the documentation is not
-            // helpful in clarifying what might have happened.
             return Err(CmdError::CouldNotStart(command.to_string()));
         }
     };
-
-    // It's not necessary to use a thread here, we just limit the amount of time we're willing to
-    // wait for output to become available.
-    //
-    // TODO: If the program produces one byte of output every timeout_seconds/2 seconds, say, then
-    // we'll keep reading for as long as it does that, we won't abort the program after
-    // timeout_seconds have passed.  I think this is probably OK even though it violates the letter
-    // of the API.
-    let mut comm = p
-        .communicate_start(None)
-        .limit_time(Duration::new(timeout_seconds, 0));
-    let mut stdout_result = "".to_string();
-    let mut stderr_result = "".to_string();
-    let code = loop {
-        match comm.read_string() {
-            Ok((Some(stdout), Some(stderr))) => {
-                stderr_result += &stderr;
-                stdout_result += &stdout;
-                if stdout.is_empty() && stderr.is_empty() {
-                    // This is always EOF because timeouts are signaled as Err()
-                    break None;
-                }
-            }
-            Ok((_, _)) => {
-                break Some(CmdError::InternalError(format_failure(
+    let cap = match job.capture_timeout(Duration::new(timeout_seconds, 0)) {
+        Ok(cap) => cap,
+        Err(e) => {
+            if e.kind() == std::io::ErrorKind::TimedOut {
+                return Err(CmdError::Hung(format_failure(
                     command,
-                    "Unknown internal failure",
-                    &stdout_result,
-                    &stderr_result,
+                    "Timed out and had to be killed",
+                    "",
+                    "",
                 )));
             }
-            Err(e) => {
-                if e.error.kind() == io::ErrorKind::TimedOut {
-                    match p.terminate() {
-                        Ok(_) => {
-                            break Some(CmdError::Hung(format_failure(
-                                command,
-                                "Timed out and had to be killed",
-                                &stdout_result,
-                                &stderr_result,
-                            )));
-                        }
-                        Err(e) => {
-                            break Some(CmdError::InternalError(format_failure(
-                                command,
-                                format!("Unknown internal error {:?}", e).as_str(),
-                                &stdout_result,
-                                &stderr_result,
-                            )));
-                        }
-                    }
-                }
-                break Some(CmdError::InternalError(format_failure(
-                    command,
-                    format!("Unknown internal failure after error {:?}", e).as_str(),
-                    &stdout_result,
-                    &stderr_result,
-                )));
-            }
+            return Err(CmdError::InternalError(format_failure(
+                command,
+                format!("Unknown internal error {:?}", e).as_str(),
+                "",
+                "",
+            )));
         }
     };
-
-    match p.wait() {
-        Ok(ExitStatus::Exited(0)) => {
-            if let Some(status) = code {
-                Err(status)
-            } else {
-                Ok((stdout_result, stderr_result))
-            }
-        }
-        Ok(ExitStatus::Exited(126)) => Err(CmdError::CouldNotStart(format_failure(
+    let stdout_result = cap.stdout_str();
+    let stderr_result = cap.stderr_str();
+    match cap.exit_status.code() {
+        Some(0) => Ok((stdout_result, stderr_result)),
+        Some(126) => Err(CmdError::CouldNotStart(format_failure(
             command,
             "Command cannot execute",
             &stdout_result,
             &stderr_result,
         ))),
-        Ok(ExitStatus::Exited(127)) => Err(CmdError::CouldNotStart(format_failure(
+        Some(127) => Err(CmdError::CouldNotStart(format_failure(
             command,
             "Command not found",
             &stdout_result,
             &stderr_result,
         ))),
-        Ok(ExitStatus::Signaled(15)) => Err(CmdError::Hung(format_failure(
-            command,
-            "Killed by SIGTERM",
-            &stdout_result,
-            &stderr_result,
-        ))),
-        Ok(x) => Err(CmdError::Failed(format_failure(
+        Some(x) => Err(CmdError::Failed(format_failure(
             command,
             format!("Unspecified other exit status {:?}", x).as_str(),
             &stdout_result,
             &stderr_result,
         ))),
-        Err(e) => Err(CmdError::InternalError(format_failure(
-            command,
-            format!("Internal error {:?}", e).as_str(),
-            &stdout_result,
-            &stderr_result,
-        ))),
+        None => match cap.exit_status.signal() {
+            Some(15) => Err(CmdError::Hung(format_failure(
+                command,
+                "Killed by SIGTERM",
+                &stdout_result,
+                &stderr_result,
+            ))),
+            Some(_) => Err(CmdError::Hung(format_failure(
+                command,
+                "Killed by signal",
+                &stdout_result,
+                &stderr_result,
+            ))),
+            None => Err(CmdError::InternalError(format_failure(
+                command,
+                "Internal error",
+                &stdout_result,
+                &stderr_result,
+            ))),
+        },
     }
 }
 
