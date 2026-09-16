@@ -15,6 +15,7 @@ cat > $inifile <<EOF
 cluster=hpc.axis-of-eval.org
 role=node
 topic-prefix=zappa
+hostname-only=false
 
 [sysinfo]
 cadence=5s
