@@ -10,7 +10,7 @@ datafile=$(tmpfile daemon-hostname-data)
 logfile=$(tmpfile daemon-hostname-log)
 inifile=$(tmpfile daemon-hostname-ini)
 
-for opt in "" hostname-only=true; do
+for opt in "" hostname-only=false; do
     for cmd in sample sysinfo jobs cluster; do
         if [[ ($cmd == "jobs" || $cmd == "cluster") && -z $(command -v sinfo) ]]; then
             continue
@@ -33,14 +33,14 @@ EOF
         cargo run -- daemon $inifile 2>$logfile >$datafile
         case $cmd in
             sample | sysinfo)
-                if [[ -z $opt ]]; then
+                if [[ -n $opt ]]; then
                     expect=$(hostname)
                 else
                     expect=$(hostname | grep -o -E '^[a-zA-Z0-9-]+')
                 fi
                 node=$(jq --raw-output '.value.data.attributes.node' $datafile)
                 if [[ $node != $expect ]]; then
-                    fail "$cmd - Wrong hostname?  Got $node expected $expect"
+                    fail "$cmd opt=$opt - Wrong hostname?  Got $node expected $expect"
                 else
                     echo " $cmd $opt ok"
                 fi
