@@ -26,6 +26,12 @@ In `process-doc/` is a program that parses the data format files in `formats/` (
 data definitions with structured comments) and extracts .md documentation, .yaml documentation (used
 by slurm-monitor), and JSON field tags (used by Sonar itself).
 
+### Data anonymizer
+
+In `anonymize/` is a program that will systematically anonymize Sonar output (rewriting user names,
+account names, and other things) so that output obtained on a live cluster can be published,
+typically for use in testing and documentation.
+
 ### Misc stuff
 
 In `config/` is some older, experimental name resolver code, it is used to debug node and cluster
