@@ -1,5 +1,5 @@
 .PHONY: all test format generate
-SUBDIRS=formats ingest-kafka kafka-proxy process-doc
+SUBDIRS=anonymize formats ingest-kafka kafka-proxy process-doc
 
 all:
 	@echo "Select a specific target"

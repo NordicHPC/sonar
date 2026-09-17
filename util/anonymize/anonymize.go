@@ -57,6 +57,8 @@
 // "zxv123" also.  But Account and Reservation have their own mapping spaces.
 package main
 
+//go:generate ./version.bash
+
 import (
 	"cmp"
 	"encoding/json"
@@ -76,12 +78,17 @@ var (
 	keepGoing = flag.Bool("x", false, "Keep going: do not error out for unhandled files")
 	lucky     = flag.Bool("feeling-lucky", false, "Do not create .bak files")
 	debug     = flag.Bool("d", false, "Debug: dump mappings after a successful run")
+	vers      = flag.Bool("version", false, "Print version and exit")
 )
 
 var notTranslated = errors.New("Not translated")
 
 func main() {
 	flag.Parse()
+	if *vers {
+		fmt.Println("anonymize version " + version)
+		os.Exit(0)
+	}
 	filenames, err := FindFiles(flag.Args(), "*.json")
 	if err != nil {
 		log.Fatal(err)
