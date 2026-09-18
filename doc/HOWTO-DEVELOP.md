@@ -242,8 +242,6 @@ library and leave the HTTP upload support in place, but can't currently do so.
 
 ## Bindgen
 
-We do not currently use [bindgen](https://github.com/rust-lang/rust-bindgen) to generate the Rust/C
-interface to the GPU shims, but we should.  (The interfaces are manually maintained, which was fine
-when there were two GPU types but now there are four plus the "fake" GPU and there's some room for
-error in doing this manually, in addition to the tedium.)  This change will effectively introduce a
-build dependency on `clang-devel`.
+We use [bindgen](https://github.com/rust-lang/rust-bindgen) to generate the Rust/C interface to the
+GPU shims.  This change introduces a build dependency on `clang-devel`.  See the bindgen
+documentation.
