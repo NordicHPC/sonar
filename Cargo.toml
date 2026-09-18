@@ -1,6 +1,6 @@
 [package]
 name = "sonar"
-version = "0.19.0-devel"
+version = "0.19.0-pre2"
 edition = "2024"
 repository = "https://github.com/NordicHPC/sonar"
 
