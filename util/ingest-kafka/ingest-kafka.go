@@ -1,12 +1,32 @@
-// `ingest-kafka` will listen for new-format Sonar traffic from a kafka broker, and "do something"
-// with the data (currently store it in a directory tree).
+// Ingest-kafka will listen for new-format Sonar traffic from a Kafka broker, and "do something"
+// with the data (currently this program stores it in a directory tree).
+//
+// Usage:
+//
+//	ingest-kafka [options]
+//
+// where required options are
+//
+//	-cluster cluster-name
+//	  The cluster whose data we listen for
+//
+//	-data-dir directory
+//	  The data directory under which to store data
+//
+// and optional options are
+//
+//	-broker broker-address
+//	  The host:port on which the broker listens
 //
 // See comments in ../../doc/HOWTO-KAFKA for an example of how to use this.
 //
-// In the present directory there are files sonar-nonslurm-node.cfg, sonar-slurm-node.cfg and
-// sonar-slurm-master.cfg that set up the Sonar daemon on compute nodes and a cluster master
-// respectively.  See comments in those files for how to adapt them to your use.
-
+// BUGS:
+//
+// Currently, ingest-kafka uses a file naming scheme where data for, say, the "sample" type are
+// appended to the file yyyy/mm/dd/sample-<cluster-name>.json, where the cluster name and the
+// yyyy-mm-dd time stamp come from each datum.  This is incompatible with how Sonalyze stores the
+// data and on large clusters it will also lead to very large files where data for many individual
+// hosts are in the same file.
 package main
 
 import (
@@ -26,9 +46,9 @@ import (
 )
 
 var (
-	cluster = flag.String("cluster", "", "Cluster whose data we listen for")
-	dataDir = flag.String("data-dir", "", "Directory under which to store data keyed by date and host")
-	broker  = flag.String("broker", "localhost:9092", "Broker `host:port`")
+	cluster = flag.String("cluster", "", "Listen for data from `cluster-name`")
+	dataDir = flag.String("data-dir", "", "Root of `data-directory` below which we store data keyed by date and host")
+	broker  = flag.String("broker", "localhost:9092", "Kafka `broker-address` on \"host:port\" format")
 	verbose = flag.Bool("v", false, "Verbose")
 )
 
