@@ -165,6 +165,9 @@ import (
 //   - job state data for a given slurm job id
 //   - cluster partition configuration data for a given partition name
 //
+// There are some example scripts in util/extract for extracting these streams from data using the
+// jq utility.
+//
 // ### Bad time stamps (all streams)
 //
 // Malformatted timestamps render the entire data packet invalid.
