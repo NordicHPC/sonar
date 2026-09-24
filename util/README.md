@@ -32,6 +32,13 @@ In `anonymize/` is a program that will systematically anonymize Sonar output (re
 account names, and other things) so that output obtained on a live cluster can be published,
 typically for use in testing and documentation.
 
+### Data extraction
+
+In `extract/` are some scripts to extract primitive data streams from the heavily nested Sonar data,
+using the jq utility.  These probably don't meet all needs but suggest how simpler use cases can
+examine the raw data without a lot of machinery.  For heavier analysis, consider the `sonalyze`
+program that is part of [Jobanalyzer](http://github.com/NAICNO/Jobanalyzer).
+
 ### Misc stuff
 
 In `config/` is some older, experimental name resolver code, it is used to debug node and cluster
