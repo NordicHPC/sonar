@@ -65,12 +65,14 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"github.com/NordicHPC/sonar/util/formats/newfmt"
 	"io"
 	"log"
 	"os"
 	"path"
 	"slices"
+
+	"github.com/NordicHPC/sonar/util/common"
+	"github.com/NordicHPC/sonar/util/formats/newfmt"
 )
 
 var (
@@ -162,7 +164,7 @@ var (
 )
 
 func rewrite(infile, outfile *os.File) error {
-	ty, err := SniffType(infile)
+	ty, err := common.SniffType(infile)
 	if err == io.EOF {
 		// Empty file, we still do the backup + copy but this is trivially true.
 		return nil

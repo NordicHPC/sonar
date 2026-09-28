@@ -1,17 +1,18 @@
-package main
+package common
 
 import (
 	"encoding/json"
 	"errors"
+	"io"
 
 	"github.com/NordicHPC/sonar/util/formats/newfmt"
-	"os"
 )
 
-// Given a file at position 0 that could contain Sonar data, try to find out if it does.  Returns
-// the type tag if so.  Will return io.EOF if the file is empty.  Will attempt to rewind the file
-// before returning but will not catch an error in rewinding.
-func SniffType(f *os.File) (newfmt.DataType, error) {
+// Given an input at position 0 that could contain Sonar data, try to find out if it does.  Returns
+// the type tag if so.  Will return io.EOF if the file is empty, an error if the data could not be
+// decoded.  Will attempt to rewind the file before returning but will not catch an error in
+// rewinding.
+func SniffType(f io.ReadSeeker) (newfmt.DataType, error) {
 	type ToplevelData struct {
 		Type newfmt.DataType `json:"type"`
 	}
