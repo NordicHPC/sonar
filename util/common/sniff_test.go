@@ -1,4 +1,4 @@
-package main
+package common
 
 import (
 	"encoding/json"
@@ -9,7 +9,7 @@ import (
 )
 
 func TestSniff(t *testing.T) {
-	f, _ := os.Open("testdata/p1/nix.json")
+	f, _ := os.Open("testdata/nix.json")
 	defer f.Close()
 	ty, err := SniffType(f)
 	if err != nil {
