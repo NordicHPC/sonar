@@ -71,7 +71,6 @@ import (
 	"path"
 	"slices"
 
-	"github.com/NordicHPC/sonar/util/common"
 	"github.com/NordicHPC/sonar/util/formats/newfmt"
 )
 
@@ -164,7 +163,7 @@ var (
 )
 
 func rewrite(infile, outfile *os.File) error {
-	ty, err := common.SniffType(infile)
+	ty, err := newfmt.SniffType(infile)
 	if err == io.EOF {
 		// Empty file, we still do the backup + copy but this is trivially true.
 		return nil
