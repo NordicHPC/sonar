@@ -1,8 +1,7 @@
-package common
+package newfmt
 
 import (
 	"encoding/json"
-	"github.com/NordicHPC/sonar/util/formats/newfmt"
 	"io"
 	"os"
 	"testing"
@@ -15,11 +14,11 @@ func TestSniff(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if ty != newfmt.DataTagSysinfo {
+	if ty != DataTagSysinfo {
 		t.Fatal("Bad tag: " + ty)
 	}
 	dec := json.NewDecoder(f)
-	var m newfmt.SysinfoEnvelope
+	var m SysinfoEnvelope
 	err = dec.Decode(&m)
 	if err != nil {
 		t.Fatal(err)
