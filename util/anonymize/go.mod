@@ -1,6 +1,6 @@
 module anonymize
 
-go 1.26.8
+go 1.24.10
 
 replace github.com/NordicHPC/sonar/util/formats => ../formats
 
