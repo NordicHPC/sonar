@@ -10,8 +10,8 @@ import (
 	"io"
 )
 
-// The data are not comma-separated or in an array.  So we must decode one at a time.
-
+// ConsumeJSONSysinfo reads Sonar Sysinfo data from a file and calls the consumer on each object.
+// The data in the file are not comma-separated or in an array, just a sequence of them.
 func ConsumeJSONSysinfo(input io.Reader, strict bool, consume func(*SysinfoEnvelope)) error {
 	dec := json.NewDecoder(input)
 	if strict {
