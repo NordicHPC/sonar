@@ -35,7 +35,7 @@ func ConsumeJSONJobs(input io.Reader, strict bool, consume func(*JobsEnvelope)) 
 
 // SlurmTRES encodes a Slurm TRES key/value pair.
 type SlurmTRES struct {
-	Key   string
+	Key string
 	// The Value is int64, float64, or string.
 	Value any
 }
@@ -46,7 +46,7 @@ type SlurmTRES struct {
 // pairs, with the implication that commas do not appear in the field (and that if there are quotes,
 // they are part of the value).  But note that it is an ordered list.  Here's an example:
 //
-//   billing=20,cpu=20,gres/gpu:rtx30=1,gres/gpu=1,mem=50G,node=1
+//	billing=20,cpu=20,gres/gpu:rtx30=1,gres/gpu=1,mem=50G,node=1
 //
 // The value is represented as int64 if it could be parsed as that, otherwise float64 if it could be
 // parsed as that, otherwise string.  That includes values suffixed by "P", "T", "G", "M", or "K":
