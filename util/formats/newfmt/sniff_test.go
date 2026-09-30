@@ -1,3 +1,7 @@
+// SPDX-License-Identifier: MIT
+
+// Copyright (c) 2023-2026 Norwegian Ai Cloud
+
 package newfmt
 
 import (
@@ -10,6 +14,11 @@ import (
 func TestSniff(t *testing.T) {
 	f, _ := os.Open("testdata/nix.json")
 	defer f.Close()
+	// Skip the junk line at the beginning to also test rewinding to current position.
+	_, err := f.Read(make([]byte, 54))
+	if err != nil {
+		t.Fatal(err)
+	}
 	ty, err := SniffType(f)
 	if err != nil {
 		t.Fatal(err)

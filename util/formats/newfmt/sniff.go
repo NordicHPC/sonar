@@ -1,3 +1,7 @@
+// SPDX-License-Identifier: MIT
+
+// Copyright (c) 2023-2026 Norwegian Ai Cloud
+
 package newfmt
 
 import (
@@ -6,10 +10,10 @@ import (
 	"io"
 )
 
-// Given an input at position 0 that could contain Sonar data, try to find out if it does.  Returns
-// the type tag if so.  Will return io.EOF if the file is empty, an error if the data could not be
-// decoded.  Will attempt to rewind the file before returning but will not catch an error in
-// rewinding.
+// SniffType tries to read a JSON object from the input and returns its type tag if it can be read.
+// It will return io.EOF if there is no JSON following the current position, or another type of
+// error if the data at the input position could not be decoded.  It will attempt to rewind the file
+// to the current position before returning but will not catch an error in rewinding.
 func SniffType(f io.ReadSeeker) (DataType, error) {
 	type ToplevelData struct {
 		Type DataType `json:"type"`
@@ -20,10 +24,14 @@ func SniffType(f io.ReadSeeker) (DataType, error) {
 		Data *ToplevelData  `json:"data"`
 	}
 
-	defer f.Seek(0, 0)
+	here, err := f.Seek(0, io.SeekCurrent)
+	if err != nil {
+		return "", err
+	}
+	defer f.Seek(here, io.SeekStart)
 	dec := json.NewDecoder(f)
 	var m Envelope
-	err := dec.Decode(&m)
+	err = dec.Decode(&m)
 	if err != nil {
 		return "", err
 	}
