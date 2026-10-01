@@ -1,5 +1,5 @@
-#ifndef proto_h_included
-#define proto_h_included
+#ifndef protocol_h_included
+#define protocol_h_included
 
 #include <assert.h>
 #include <inttypes.h>
@@ -58,53 +58,57 @@ extern result_t ERR_EOF;
  * if the program chooses to exit.
  */
 
+/* Response from the wrapper root server to the child */
 typedef struct {
     uint32_t len;
     uint8_t* buf;
     uint8_t* p;
-} inbound_t;
+} response_t;
 
-void init_inbound(inbound_t* m);
-void destroy_inbound(inbound_t* m);
-result_t decode_byte(inbound_t* m, uint8_t* b);
-result_t decode_int(inbound_t* m, uint32_t* len);
+void init_response(response_t* m);
+void destroy_response(response_t* m);
+result_t decode_byte(response_t* m, uint8_t* b);
+result_t decode_int(response_t* m, uint32_t* len);
 
 /* On success, *s is a malloc'd NUL-terminated buffer that must be freed */
-result_t decode_string(inbound_t* m, uint8_t** s);
+result_t decode_string(response_t* m, uint8_t** s);
 
 /* The message *m should be in the initialized state. */
-result_t recv_message(int input, inbound_t* m);
+result_t recv_message(int input, response_t* m);
 
+/* Request from the child to the wrapper root server */
 typedef struct {
     uint32_t len;
     uint32_t cap;
     uint8_t* buf;
-} outbound_t;
+} request_t;
 
-void init_outbound(outbound_t* m);
-void destroy_outbound(outbound_t* m);
-result_t encode_byte(outbound_t* m, uint8_t b);
-result_t encode_int(outbound_t* m, uint32_t len);
-result_t encode_string(outbound_t* m, const char* s);
+void init_request(request_t* m);
+void destroy_request(request_t* m);
+result_t encode_byte(request_t* m, uint8_t b);
+result_t encode_int(request_t* m, uint32_t len);
+result_t encode_string(request_t* m, const char* s);
 
 /* This will not destroy the message */
-result_t send_message(int output, outbound_t* m);
+result_t send_message(int output, request_t* m);
 
-/* server should exit without waiting for the child.
- *
- * Request: 1-byte unsigned exit code.
- *
- * Response: Never responds.
- */
-#define REQ_EXIT 0
+enum Command {
+    /* server should exit without waiting for the child.
+     *
+     * Request: 1-byte unsigned exit code.
+     *
+     * Response: Never responds.
+     */
+    REQ_EXIT,
 
-/* Server should report /proc/PID/exe for PIDs.
- *
- * Request: Array of PIDs.
- *
- * Response: Array of PID/string pairs, all PIDs in the request will be represented in this array.
- * Zero-length strings mean "no information for this PID" (eg process exited).
- */
-#define REQ_EXE_FOR_PIDS 1
+    /* Server should report /proc/PID/exe for PIDs.
+     *
+     * Request: Array of PIDs.
+     *
+     * Response: Array of PID/string pairs, all PIDs in the request will be represented in this array.
+     * Zero-length strings mean "no information for this PID" (eg process exited).
+     */
+    REQ_EXE_FOR_PIDS,
+};
 
-#endif /* proto_h_included */
+#endif /* protocol_h_included */

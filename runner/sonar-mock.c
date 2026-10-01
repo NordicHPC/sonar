@@ -22,9 +22,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-#undef NULL
 
-#include "proto.h"
+#include "protocol.h"
 
 result_t test_exe_for_pids(const char* pids, int input, int output);
 
@@ -41,7 +40,7 @@ result_t getint(const char* s, int* n) {
 
 int main(int argc, char** argv) {
     argv++;
-    if (*argv == nullptr || strcmp(*argv, "-i") != 0) {
+    if (*argv == NULL || strcmp(*argv, "-i") != 0) {
         fprintf(stderr, "sonar-mock: Expected -i\n");
         return 1;
     }
@@ -52,7 +51,7 @@ int main(int argc, char** argv) {
         return 1;
     }
     argv++;
-    if (*argv == nullptr || strcmp(*argv, "-o") != 0) {
+    if (*argv == NULL || strcmp(*argv, "-o") != 0) {
         fprintf(stderr, "sonar-mock: Expected -o\n");
         return 1;
     }
@@ -63,11 +62,11 @@ int main(int argc, char** argv) {
         return 1;
     }
     argv++;
-    if (*argv == nullptr || strcmp(*argv, "daemon") != 0) {
+    if (*argv == NULL || strcmp(*argv, "daemon") != 0) {
         fprintf(stderr, "sonar-mock: Expected 'daemon'");
         return 1;
     }
-    if (*argv == nullptr) {
+    if (*argv == NULL) {
         fprintf(stderr, "sonar-mock: Expected config-file\n");
         return 1;
     }
@@ -76,7 +75,7 @@ int main(int argc, char** argv) {
 #endif
     /* TODO: Check that it exists? */
     argv++;
-    if (*argv != nullptr) {
+    if (*argv != NULL) {
         fprintf(stderr, "sonar-mock: Too many arguments\n");
         return 1;
     }
@@ -86,7 +85,7 @@ int main(int argc, char** argv) {
 #endif
 
     char* e;
-    if ((e = getenv("REQ_EXE_FOR_PIDS")) != nullptr) {
+    if ((e = getenv("REQ_EXE_FOR_PIDS")) != NULL) {
         test_exe_for_pids(e, input, output);
     }
     /* This should cause the parent to exit? */
@@ -98,12 +97,12 @@ int main(int argc, char** argv) {
 result_t test_exe_for_pids(const char* pids, int input, int output) {
     printf("sonar-mock: exe_for_pids\n");
 
-    outbound_t outbound;
-    init_outbound(&outbound);
-    if (encode_byte(&outbound, REQ_EXE_FOR_PIDS) != OK) {
+    request_t request;
+    init_request(&request);
+    if (encode_byte(&request, REQ_EXE_FOR_PIDS) != OK) {
         abort();
     }
-    if (encode_int(&outbound, 2) != OK) {
+    if (encode_int(&request, 2) != OK) {
         abort();
     }
     int expect = 0;
@@ -116,29 +115,29 @@ result_t test_exe_for_pids(const char* pids, int input, int output) {
             return ERR_IO;
         }
         expect++;
-        if (encode_int(&outbound, (int)pid) != OK) {
+        if (encode_int(&request, (int)pid) != OK) {
             abort();
         }
         if (*endp != ',') {
             break;
         }
-        pids = endp+1;
+        pids = endp + 1;
     }
-    result_t r = send_message(output, &outbound);
-    destroy_outbound(&outbound);
+    result_t r = send_message(output, &request);
+    destroy_request(&request);
     if (r != OK) {
         fprintf(stderr, "sonar-mock: failed to send\n");
         return ERR_IO;
     }
 
-    inbound_t inbound;
-    init_inbound(&inbound);
-    if (recv_message(input, &inbound)) {
+    response_t response;
+    init_response(&response);
+    if (recv_message(input, &response)) {
         fprintf(stderr, "sonar-mock: failed to receive\n");
         return ERR_IO;
     }
     uint8_t op;
-    if (decode_byte(&inbound, &op) != OK) {
+    if (decode_byte(&response, &op) != OK) {
         fprintf(stderr, "sonar-mock: missing opcode\n");
         return ERR_IO;
     }
@@ -147,7 +146,7 @@ result_t test_exe_for_pids(const char* pids, int input, int output) {
         return ERR_IO;
     }
     uint32_t nelem;
-    if (decode_int(&inbound, &nelem) != OK) {
+    if (decode_int(&response, &nelem) != OK) {
         fprintf(stderr, "sonar-mock: no array length\n");
         return ERR_IO;
     }
@@ -157,18 +156,18 @@ result_t test_exe_for_pids(const char* pids, int input, int output) {
     }
     for (int i = 0; i < nelem; i++) {
         uint32_t pid;
-        uint8_t* s = nullptr;
-        if (decode_int(&inbound, &pid) != OK) {
+        uint8_t* s = NULL;
+        if (decode_int(&response, &pid) != OK) {
             fprintf(stderr, "sonar-mock: no pid in result\n");
             return ERR_IO;
         }
-        if (decode_string(&inbound, &s) != OK) {
+        if (decode_string(&response, &s) != OK) {
             fprintf(stderr, "sonar-mock: no string in result\n");
             return ERR_IO;
         }
         printf("sonar-mock: pid=%d path=%s\n", pid, s);
         free(s);
     }
-    destroy_inbound(&inbound);
+    destroy_response(&response);
     return OK;
 }

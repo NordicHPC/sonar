@@ -11,7 +11,7 @@
  * Sonar should be running.
  *
  * Communication is over a pipe: The subprocess will send requests and this program will respond
- * with an answer.  The protocol is simple question-answer and is documented in proto.h.  The
+ * with an answer.  The protocol is simple question-answer and is documented in protocol.h.  The
  * protocol may change; do not upgrade this server independently of the Sonar subprocess (or the
  * test process in subproc.c).
  *
@@ -39,10 +39,10 @@
 #include <signal.h>
 #include <stdio.h>
 #include <string.h>
+#include <sys/types.h>
 #include <unistd.h>
-#undef NULL
 
-#include "proto.h"
+#include "protocol.h"
 
 #ifndef PATH_MAX
 #  define PATH_MAX 4096
@@ -108,18 +108,18 @@ int main(int argc, char** argv) {
 
 result_t server(int input, int output) {
     result_t r;
-    inbound_t inbound;
-    outbound_t outbound;
-    init_inbound(&inbound);
-    init_outbound(&outbound);
+    response_t response;
+    request_t request;
+    init_response(&response);
+    init_request(&request);
     for (;;) {
-        destroy_inbound(&inbound);
-        destroy_outbound(&outbound);
-        if ((r = recv_message(input, &inbound)) != OK) {
+        destroy_response(&response);
+        destroy_request(&request);
+        if ((r = recv_message(input, &response)) != OK) {
             goto Done;
         }
         uint8_t op;
-        if ((r = decode_byte(&inbound, &op)) != OK) {
+        if ((r = decode_byte(&response, &op)) != OK) {
             goto Done;
         }
         switch (op) {
@@ -129,33 +129,33 @@ result_t server(int input, int output) {
             goto Done;
         case REQ_EXE_FOR_PIDS: {
             uint32_t nelem;
-            if ((r = decode_int(&inbound, &nelem)) != OK) {
+            if ((r = decode_int(&response, &nelem)) != OK) {
                 goto Done;
             }
-            if ((r = encode_byte(&outbound, op)) != OK) {
+            if ((r = encode_byte(&request, op)) != OK) {
                 goto Done;
             }
-            if ((r = encode_int(&outbound, nelem)) != OK) {
+            if ((r = encode_int(&request, nelem)) != OK) {
                 goto Done;
             }
             for (uint32_t i = 0; i < nelem; i++) {
                 uint32_t pid;
                 static char exebuf[PATH_MAX];
-                if ((r = decode_int(&inbound, &pid)) != OK) {
+                if ((r = decode_int(&response, &pid)) != OK) {
                     goto Done;
                 }
                 if (get_exe(pid, exebuf) != OK) {
                     /* Soft error: just send empty string */
                     *exebuf = 0;
                 }
-                if ((r = encode_int(&outbound, pid)) != OK) {
+                if ((r = encode_int(&request, pid)) != OK) {
                     goto Done;
                 }
-                if ((r = encode_string(&outbound, exebuf)) != OK) {
+                if ((r = encode_string(&request, exebuf)) != OK) {
                     goto Done;
                 }
             }
-            if ((r = send_message(output, &outbound)) != OK) {
+            if ((r = send_message(output, &request)) != OK) {
                 goto Done;
             }
             continue;
@@ -166,8 +166,8 @@ result_t server(int input, int output) {
         }
     }
 Done:
-    destroy_inbound(&inbound);
-    destroy_outbound(&outbound);
+    destroy_response(&response);
+    destroy_request(&request);
     return r;
 }
 
@@ -196,6 +196,6 @@ void sonar(const char* path, const char* config, const char* user, const char* g
     char ins[20], outs[20];
     sprintf(ins, "%d", input);
     sprintf(outs, "%d", output);
-    execl(path, path, "-i", ins, "-o", outs, "daemon", config, (char*)nullptr);
+    execl(path, path, "-i", ins, "-o", outs, "daemon", config, NULL);
     perror("exec");
 }
