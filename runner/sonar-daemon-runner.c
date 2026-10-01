@@ -108,18 +108,18 @@ int main(int argc, char** argv) {
 
 result_t server(int input, int output) {
     result_t r;
-    response_t response;
-    request_t request;
-    init_response(&response);
-    init_request(&request);
+    inbound_t inbound;
+    outbound_t outbound;
+    init_inbound(&inbound);
+    init_outbound(&outbound);
     for (;;) {
-        destroy_response(&response);
-        destroy_request(&request);
-        if ((r = recv_message(input, &response)) != OK) {
+        destroy_inbound(&inbound);
+        destroy_outbound(&outbound);
+        if ((r = recv_message(input, &inbound)) != OK) {
             goto Done;
         }
         uint8_t op;
-        if ((r = decode_byte(&response, &op)) != OK) {
+        if ((r = decode_byte(&inbound, &op)) != OK) {
             goto Done;
         }
         switch (op) {
@@ -129,33 +129,33 @@ result_t server(int input, int output) {
             goto Done;
         case REQ_EXE_FOR_PIDS: {
             uint32_t nelem;
-            if ((r = decode_int(&response, &nelem)) != OK) {
+            if ((r = decode_int(&inbound, &nelem)) != OK) {
                 goto Done;
             }
-            if ((r = encode_byte(&request, op)) != OK) {
+            if ((r = encode_byte(&outbound, op)) != OK) {
                 goto Done;
             }
-            if ((r = encode_int(&request, nelem)) != OK) {
+            if ((r = encode_int(&outbound, nelem)) != OK) {
                 goto Done;
             }
             for (uint32_t i = 0; i < nelem; i++) {
                 uint32_t pid;
                 static char exebuf[PATH_MAX];
-                if ((r = decode_int(&response, &pid)) != OK) {
+                if ((r = decode_int(&inbound, &pid)) != OK) {
                     goto Done;
                 }
                 if (get_exe(pid, exebuf) != OK) {
                     /* Soft error: just send empty string */
                     *exebuf = 0;
                 }
-                if ((r = encode_int(&request, pid)) != OK) {
+                if ((r = encode_int(&outbound, pid)) != OK) {
                     goto Done;
                 }
-                if ((r = encode_string(&request, exebuf)) != OK) {
+                if ((r = encode_string(&outbound, exebuf)) != OK) {
                     goto Done;
                 }
             }
-            if ((r = send_message(output, &request)) != OK) {
+            if ((r = send_message(output, &outbound)) != OK) {
                 goto Done;
             }
             continue;
@@ -166,8 +166,8 @@ result_t server(int input, int output) {
         }
     }
 Done:
-    destroy_response(&response);
-    destroy_request(&request);
+    destroy_inbound(&inbound);
+    destroy_outbound(&outbound);
     return r;
 }
 
@@ -196,6 +196,6 @@ void sonar(const char* path, const char* config, const char* user, const char* g
     char ins[20], outs[20];
     sprintf(ins, "%d", input);
     sprintf(outs, "%d", output);
-    execl(path, path, "-i", ins, "-o", outs, "daemon", config, NULL);
+    execl(path, path, "-i", ins, "-o", outs, "daemon", config, (char*)NULL);
     perror("exec");
 }

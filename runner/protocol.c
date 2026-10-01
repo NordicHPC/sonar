@@ -30,18 +30,18 @@ result_t ERR_EOF = &ERR_EOF_;
 
 #endif
 
-void init_response(response_t* m) {
+void init_inbound(inbound_t* m) {
     m->buf = m->p = NULL;
     m->len = 0;
 }
 
-void destroy_response(response_t* m) {
+void destroy_inbound(inbound_t* m) {
     free(m->buf);
     m->buf = m->p = NULL;
     m->len = 0;
 }
 
-static result_t ensure_available(response_t* m, uint32_t n) {
+static result_t ensure_available(inbound_t* m, uint32_t n) {
     if ((m->buf + m->len) - m->p < n) {
         fprintf(stderr, "Input buffer could not supply %d bytes\n", n);
         return ERR_EXHAUSTED;
@@ -49,7 +49,7 @@ static result_t ensure_available(response_t* m, uint32_t n) {
     return OK;
 }
 
-result_t decode_byte(response_t* m, uint8_t* b) {
+result_t decode_byte(inbound_t* m, uint8_t* b) {
     result_t r;
     if ((r = ensure_available(m, 1)) != OK) {
         return r;
@@ -70,7 +70,7 @@ static inline uint32_t decode_u32(uint8_t* p) {
     return k;
 }
 
-result_t decode_int(response_t* m, uint32_t* n) {
+result_t decode_int(inbound_t* m, uint32_t* n) {
     result_t r;
     if ((r = ensure_available(m, 4)) != OK) {
         return r;
@@ -80,7 +80,7 @@ result_t decode_int(response_t* m, uint32_t* n) {
     return OK;
 }
 
-result_t decode_string(response_t* m, uint8_t** s) {
+result_t decode_string(inbound_t* m, uint8_t** s) {
     uint32_t len;
     result_t r;
     if ((r = decode_int(m, &len)) != OK) {
@@ -127,7 +127,7 @@ static result_t read_bytes(int input, uint8_t* p, int n) {
     return 0;
 }
 
-result_t recv_message(int input, response_t* m) {
+result_t recv_message(int input, inbound_t* m) {
     /* TODO: Make space for the header in a plausibly-sized buffer to be able to make only one call
      * to read() in common cases: most messages will be on the smaller side.
      */
@@ -152,18 +152,18 @@ result_t recv_message(int input, response_t* m) {
     return OK;
 }
 
-void init_request(request_t* m) {
+void init_outbound(outbound_t* m) {
     m->len = m->cap = 0;
     m->buf = NULL;
 }
 
-void destroy_request(request_t* m) {
+void destroy_outbound(outbound_t* m) {
     free(m->buf);
     m->len = m->cap = 0;
     m->buf = NULL;
 }
 
-static result_t ensure_free(request_t* m, uint32_t n) {
+static result_t ensure_free(outbound_t* m, uint32_t n) {
     if (m->cap - m->len >= n) {
         return OK;
     }
@@ -185,7 +185,7 @@ static result_t ensure_free(request_t* m, uint32_t n) {
     return OK;
 }
 
-result_t encode_byte(request_t* m, uint8_t b) {
+result_t encode_byte(outbound_t* m, uint8_t b) {
     result_t r;
     if ((r = ensure_free(m, 1)) != OK) {
         return r;
@@ -205,7 +205,7 @@ static inline void encode_u32(uint8_t* p, uint32_t n) {
     p[3] = n & 255;
 }
 
-result_t encode_int(request_t* m, uint32_t n) {
+result_t encode_int(outbound_t* m, uint32_t n) {
     result_t r;
     if ((r = ensure_free(m, 4)) != OK) {
         return r;
@@ -215,7 +215,7 @@ result_t encode_int(request_t* m, uint32_t n) {
     return OK;
 }
 
-result_t encode_string(request_t* m, const char* s) {
+result_t encode_string(outbound_t* m, const char* s) {
     uint32_t len = strlen(s);
     result_t r;
     if ((r = ensure_free(m, len + 4)) != OK) {
@@ -240,7 +240,7 @@ static result_t write_bytes(int output, void* p, size_t n) {
     return OK;
 }
 
-result_t send_message(int output, request_t* m) {
+result_t send_message(int output, outbound_t* m) {
     /* TODO: Make space for the header in the buffer to be able to make only one call to write(). */
     if (m->len == 0) {
         return OK;

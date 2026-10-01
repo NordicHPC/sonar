@@ -1,4 +1,4 @@
-.PHONY: default all
+.PHONY: default all format test
 # Note _FORTIFY_SOURCE requires -O1 or better
 # Note _XOPEN_SOURCE is required for readlink()
 FLAGS=-g -O1 -Wall -Werror -Wno-format-truncation -std=c17 -D_FORTIFY_SOURCE=2 -D_XOPEN_SOURCE=500
@@ -17,3 +17,6 @@ format:
 	if [[ -n $$(command -v clang-format) ]]; then \
 		clang-format -i --style=file:../clang-format.txt *.c *.h; \
 	fi
+
+# FIXME
+test:
