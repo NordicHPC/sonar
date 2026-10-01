@@ -34,6 +34,7 @@ test: debug release
 	cargo test
 	( cd util ; $(MAKE) test )
 	( cd tests; $(MAKE) test )
+	( cd runner; $(MAKE) test )
 
 # Reformat all sources
 format:
@@ -41,6 +42,7 @@ format:
 	( cd util ; $(MAKE) format )
 	( cd tests ; $(MAKE) format )
 	( cd gpuapi ; $(MAKE) format )
+	( cd runner ; $(MAKE) format )
 
 # (Re)generate all files that are generated
 generate: CITATION.cff
