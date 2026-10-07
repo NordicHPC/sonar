@@ -16,6 +16,8 @@ mod output_test;
 #[cfg(feature = "daemon")]
 mod pidmap;
 mod posix;
+#[cfg(feature = "daemon")]
+mod privileged;
 mod ps;
 mod ps_newfmt;
 #[cfg(test)]

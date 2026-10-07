@@ -6,6 +6,7 @@ use crate::json_tags::*;
 use crate::output;
 #[cfg(feature = "daemon")]
 use crate::pidmap::PidMap;
+use crate::privileged;
 use crate::ps_newfmt::format_newfmt;
 use crate::systemapi::{self, DiskInfo};
 use crate::types::{JobID, Pid, Uid};
@@ -473,7 +474,7 @@ fn new_with_cpu_info(
             .get_jobs()
             .job_id_from_pid(system, proc.pid, processes);
         let exe_path = if let Some((req, resp)) = root {
-            get_exe_path(proc.pid, req, resp)
+            privileged::get_exe_path(proc.pid as u32, req, resp)
         } else {
             "".to_string()
         };
@@ -508,99 +509,6 @@ fn new_with_cpu_info(
         );
     }
     procinfo_by_pid
-}
-
-fn push_u32(req: &mut Vec<u8>, mut n: u32) {
-    req.push((n & 255) as u8);
-    n >>= 8;
-    req.push((n & 255) as u8);
-    n >>= 8;
-    req.push((n & 255) as u8);
-    n >>= 8;
-    req.push((n & 255) as u8);
-}
-
-fn pop_u32(buf: &[u8], i: usize) -> u32 {
-    let mut n = buf[i] as u32;
-    n |= (buf[i + 1] as u32) << 8;
-    n |= (buf[i + 2] as u32) << 8;
-    n |= (buf[i + 3] as u32) << 8;
-    n
-}
-
-fn pop_string(buf: &[u8], i: usize, l: usize) -> String {
-    let mut s = "".to_string();
-    for x in i..i + l {
-        s.push(buf[x] as char);
-    }
-    s
-}
-
-fn get_exe_path(pid: Pid, request_fd: u32, response_fd: u32) -> String {
-    // The protocol is defined in C code in ../runner/.  We write the request and read the response.
-    // (What we really want to do here is to send all the requests for all the PIDs at the same
-    // time, less overhead, but can optimize later.)
-    let mut req = Vec::<u8>::new();
-    push_u32(&mut req, 9u32); // Payload size
-    req.push(1u8); // REQ_EXE_FOR_PIDS
-    push_u32(&mut req, 1u32); // 1 pid
-    push_u32(&mut req, pid as u32); // The pid
-    let n = unsafe {
-        libc::write(
-            request_fd as i32,
-            req.as_ptr() as *const libc::c_void,
-            req.len() as libc::size_t,
-        )
-    };
-    if (n as usize) < req.len() {
-        // FIXME
-        panic!("Wrong write");
-    }
-    let szbuf = vec![0, 0, 0, 0];
-    let n = unsafe {
-        libc::read(
-            response_fd as i32,
-            szbuf.as_ptr() as *mut libc::c_void,
-            szbuf.len() as libc::size_t,
-        )
-    };
-    if (n as usize) < szbuf.len() {
-        // FIXME
-        panic!("Wrong read #1 {} {}", n, szbuf.len());
-    }
-    let want = pop_u32(&szbuf, 0);
-    // This is just dumb
-    let mut rdbuf = Vec::<u8>::with_capacity(want as usize);
-    for _ in 0..want {
-        rdbuf.push(0);
-    }
-    let n = unsafe {
-        libc::read(
-            response_fd as i32,
-            rdbuf.as_ptr() as *mut libc::c_void,
-            rdbuf.len() as libc::size_t,
-        )
-    };
-    if (n as usize) < rdbuf.len() {
-        // FIXME
-        panic!("Wrong read #2 {} {}", n, rdbuf.len());
-    }
-    let mut ix = 0;
-    if rdbuf[ix] != 1 {
-        // REQ_EXE_FOR_PIDS
-        panic!("Bad op");
-    }
-    ix += 1;
-    let npids = pop_u32(&rdbuf[0..], ix);
-    ix += 4;
-    if npids != 1 {
-        panic!("Bad num");
-    }
-    let _pid = pop_u32(&rdbuf, ix);
-    ix += 4;
-    let slen = pop_u32(&rdbuf, ix);
-    ix += 4;
-    pop_string(&rdbuf[0..], ix, slen as usize)
 }
 
 fn add_gpu_info(
