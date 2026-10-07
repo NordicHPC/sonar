@@ -9,8 +9,15 @@ const REQ_EXE_FOR_PIDS: u8 = 1u8;
 
 // Given a real PID, read the /proc/PID/exe link.
 //
-// (What we really want to do here is to send all the requests for all the PIDs at the same
-// time, less overhead, but can optimize later.)
+// TODO: What we really want to do here is to send all the requests for all the PIDs at the same
+// time, less overhead, but can optimize later.
+//
+// TODO: Propagate errors so that the caller knows that the server is no longer operating
+// and can take appropriate action.
+//
+// TODO: The main wrinkle here is that if the server is hung then we will hang too.  It may be that
+// a watchdog timer is necessary to fix this: if the timer triggers, the server should be considered
+// dead.
 
 pub fn get_exe_path(pid: u32, request_fd: u32, response_fd: u32) -> String {
     let mut req = [0u8; 16];
@@ -32,11 +39,13 @@ pub fn get_exe_path(pid: u32, request_fd: u32, response_fd: u32) -> String {
     let op;
     (op, ix) = get_u8(rdbuf.as_slice(), ix);
     if op != REQ_EXE_FOR_PIDS {
+        // TODO
         panic!("Bad op");
     }
     let npids;
     (npids, ix) = get_u32(&rdbuf[0..], ix);
     if npids != 1 {
+        // TODO
         panic!("Bad num");
     }
     (_, ix) = get_u32(&rdbuf, ix);
@@ -74,7 +83,7 @@ fn get_u32(buf: &[u8], ix: usize) -> (u32, usize) {
 }
 
 fn get_string(buf: &[u8], ix: usize, l: usize) -> (String, usize) {
-    // FIXME: Needs to deal with UTF8.
+    // TODO: Needs to deal with UTF8.
     let mut s = "".to_string();
     for x in ix..ix + l {
         s.push(buf[x] as char);
@@ -83,7 +92,7 @@ fn get_string(buf: &[u8], ix: usize, l: usize) -> (String, usize) {
 }
 
 fn write(fd: u32, buf: &[u8], len: usize) {
-    // FIXME: Must deal with partial writes
+    // TODO: Must deal with partial writes
     let n = unsafe {
         libc::write(
             fd as i32,
@@ -97,7 +106,7 @@ fn write(fd: u32, buf: &[u8], len: usize) {
 }
 
 fn read(fd: u32, buf: &mut [u8], len: usize) {
-    // FIXME: Must deal with partial reads
+    // TODO: Must deal with partial reads
     let n = unsafe {
         libc::read(
             fd as i32,

@@ -16,12 +16,12 @@ void protocol_selftest() {
     outbound_t outbound;
     init_outbound(&outbound);
 
-    // Whitebox - after init
+    /* Whitebox - after init */
     assert(outbound.len == 0);
     assert(outbound.cap == 0);
     assert(outbound.buf == NULL);
 
-    // Blackbox
+    /* Blackbox */
     assert(encode_byte(&outbound, 10) == OK);
     assert(encode_int(&outbound, 0x12141620) == OK);
     assert(encode_string(&outbound, "hello there") == OK);
@@ -30,15 +30,15 @@ void protocol_selftest() {
     assert(encode_string(&outbound, "goodbye for now") == OK);
     assert(send_message(-1, &outbound) == OK);
 
-    // Whitebox - after filling
-    // This assumes various things about encoding.
+    /* Whitebox - after filling */
+    /* This assumes various things about encoding. */
     assert(outbound.len >= 1 + 4 + 4 + 11 + 1 + 4 + 4 + 15);
     assert(outbound.len <= outbound.cap);
     assert(outbound.buf != NULL);
 
     destroy_outbound(&outbound);
 
-    // Whitebox - after destroy
+    /* Whitebox - after destroy */
     assert(outbound.len == 0);
     assert(outbound.cap == 0);
     assert(outbound.buf == NULL);
@@ -46,12 +46,12 @@ void protocol_selftest() {
     inbound_t inbound;
     init_inbound(&inbound);
 
-    // Whitebox - after init
+    /* Whitebox - after init */
     assert(inbound.len == 0);
     assert(inbound.buf == NULL);
     assert(inbound.p == NULL);
 
-    // Blackbox
+    /* Blackbox */
     assert(recv_message(-1, &inbound) == OK);
     uint8_t by;
     uint32_t in;
@@ -73,10 +73,10 @@ void protocol_selftest() {
     free(str);
     str = NULL;
 
-    // Whitebox - after consuming
+    /* Whitebox - after consuming */
     assert(inbound.buf + inbound.len == inbound.p);
 
-    // Whitebox - after destroy
+    /* Whitebox - after destroy */
     destroy_inbound(&inbound);
     assert(inbound.len == 0);
     assert(inbound.buf == NULL);

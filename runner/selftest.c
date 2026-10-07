@@ -1,3 +1,7 @@
+/* Really you want to run this under valgrind:
+ *     valgrind --leak-check=full ./selftest
+ */
+
 #include <assert.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -8,9 +12,6 @@
 #undef read
 #undef write
 
-/* Really you want to run this under valgrind:
-     valgrind --leak-check=full ./selftest
-*/
 void parse_selftest();
 void protocol_selftest();
 void exe_for_pids_selftest();
@@ -21,7 +22,7 @@ int main(int argc, char** argv) {
     exe_for_pids_selftest();
 }
 
-/* Mocking I/O, used also by sonar-mock selftests */
+/* Mocking I/O */
 #define NCHAN 2
 
 static struct channel_t {
@@ -45,7 +46,7 @@ int selftest_read(int input, uint8_t* p, int n) {
     if (input >= 0) {
         return read(input, p, n);
     }
-    // To improve this: read a max number of bytes per call, say, 5
+    /* To improve this: read a max number of bytes per call, say, 5 */
     assert(-input - 1 < NCHAN);
     struct channel_t* buffer = &channels[-input - 1];
     int avail = buffer->outp - buffer->inp;
@@ -59,7 +60,7 @@ int selftest_write(int output, const uint8_t* p, int n) {
     if (output >= 0) {
         return write(output, p, n);
     }
-    // To improve this: write at most some number of bytes per call, say, 5
+    /* To improve this: write at most some number of bytes per call, say, 5 */
     assert(-output - 1 < NCHAN);
     struct channel_t* buffer = &channels[-output - 1];
     int avail = buffer->cap - buffer->outp;
