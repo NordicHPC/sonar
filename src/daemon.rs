@@ -252,6 +252,7 @@ pub fn daemon_mode(
         }
     }
 
+    #[cfg(feature = "daemon")]
     if let (Some(req_fd), Some(resp_fd)) = (request_fd, response_fd) {
         system = system.with_root_server(req_fd, resp_fd);
     }

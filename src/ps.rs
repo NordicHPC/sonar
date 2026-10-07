@@ -6,6 +6,7 @@ use crate::json_tags::*;
 use crate::output;
 #[cfg(feature = "daemon")]
 use crate::pidmap::PidMap;
+#[cfg(feature = "daemon")]
 use crate::privileged;
 use crate::ps_newfmt::format_newfmt;
 use crate::systemapi::{self, DiskInfo};
@@ -468,16 +469,20 @@ fn new_with_cpu_info(
     processes: &HashMap<Pid, systemapi::Process>,
 ) -> ProcInfoTable {
     let mut procinfo_by_pid = ProcInfoTable::new();
+    #[cfg(feature = "daemon")]
     let root = system.get_root();
     for proc in processes.values() {
         let (job_id, is_slurm) = system
             .get_jobs()
             .job_id_from_pid(system, proc.pid, processes);
+        #[cfg(feature = "daemon")]
         let exe_path = if let Some((req, resp)) = root {
             privileged::get_exe_path(proc.pid as u32, req, resp)
         } else {
             "".to_string()
         };
+        #[cfg(not(feature = "daemon"))]
+        let exe_path = "".to_string();
         procinfo_by_pid.insert(
             proc.pid,
             Box::new(TheProcInfo {

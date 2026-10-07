@@ -42,6 +42,7 @@ const SINFO_TIMEOUT_S: u64 = 10;
 
 pub struct Builder {
     jm: Option<Box<dyn jobsapi::JobManager>>,
+    #[cfg(feature = "daemon")]
     root: Option<(u32, u32)>,
     cluster: String,
     hostname_only: bool,
@@ -56,6 +57,7 @@ impl Builder {
     pub fn new() -> Builder {
         Builder {
             jm: None,
+            #[cfg(feature = "daemon")]
             root: None,
             cluster: "".to_string(),
             hostname_only: false,
@@ -90,6 +92,7 @@ impl Builder {
         }
     }
 
+    #[cfg(feature = "daemon")]
     #[allow(dead_code)]
     pub fn with_root_server(self, request_fd: u32, response_fd: u32) -> Builder {
         Builder {
@@ -162,6 +165,7 @@ impl Builder {
             } else {
                 Box::new(jobsapi::NoJobManager::new())
             },
+            #[cfg(feature = "daemon")]
             root: self.root,
             fs,
             gpus: realgpu::RealGpu::new(hostname, boot_time),
@@ -193,6 +197,7 @@ pub struct System {
     #[allow(unused)]
     hostname_only: bool,
     cluster: String,
+    #[cfg(feature = "daemon")]
     root: Option<(u32, u32)>,
     fs: RealProcFS,
     gpus: realgpu::RealGpu,
@@ -273,6 +278,7 @@ impl systemapi::SystemAPI for System {
         &*self.jm
     }
 
+    #[cfg(feature = "daemon")]
     fn get_root(&self) -> Option<(u32, u32)> {
         self.root
     }

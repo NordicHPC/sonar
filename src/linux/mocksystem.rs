@@ -136,6 +136,7 @@ impl Builder {
         }
     }
 
+    #[cfg(feature = "daemon")]
     #[allow(dead_code)]
     pub fn with_root_server(self, _request_fd: u32, _response_fd: u32) -> Builder {
         Builder { ..self }
@@ -304,6 +305,7 @@ impl systemapi::SystemAPI for MockSystem {
         &*self.jm
     }
 
+    #[cfg(feature = "daemon")]
     fn get_root(&self) -> Option<(u32, u32)> {
         None
     }
