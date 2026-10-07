@@ -510,7 +510,7 @@ fn new_with_cpu_info(
     procinfo_by_pid
 }
 
-fn get_exe_path(pid: Pid, request_fd: u32, response_fd: u32) -> String {
+fn get_exe_path(_pid: Pid, _request_fd: u32, _response_fd: u32) -> String {
     // The protocol is defined in C code in ../runner.  We write the request and read the response.
     // What we really want to do here is to send all the requests at the same time, less overhead,
     // but can optimize later.

@@ -90,6 +90,7 @@ impl Builder {
         }
     }
 
+    #[allow(dead_code)]
     pub fn with_root_server(self, request_fd: u32, response_fd: u32) -> Builder {
         Builder {
             root: Some((request_fd, response_fd)),
