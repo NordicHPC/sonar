@@ -107,7 +107,7 @@ int main(int argc, char** argv) {
     }
 }
 
-void sigchld(int) {
+void sigchld(int s) {
 #ifdef LOGGING
     int n = write(1, "RUNNER: SIGCHLD\n", 16);
     (void)n;
