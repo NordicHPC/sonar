@@ -38,7 +38,14 @@ enum Commands {
     /// Enter daemon mode.
     #[cfg(feature = "daemon")]
     Daemon {
+        /// Daemon configuration
         config_file: String,
+
+        /// Descriptor on which to send privileged requests to server, if not -1
+        request_fd: Option<u32>,
+
+        /// Descriptor on which the server sends responses, if not -1
+        response_fd: Option<u32>,
     },
     /// Take a snapshot of the currently running processes
     PS {
@@ -170,12 +177,16 @@ fn main() {
 
     match &command_line(args) {
         #[cfg(feature = "daemon")]
-        Commands::Daemon { config_file } => {
+        Commands::Daemon {
+            config_file,
+            request_fd,
+            response_fd,
+        } => {
             // This ignores `writer`, as the daemon manages its own I/O.
             //
             // The daemon returns early under specific conditions but once it's running it will only
             // return with an Ok return and only when told to exit by a remote command or a signal.
-            match daemon::daemon_mode(config_file, system, force_slurm) {
+            match daemon::daemon_mode(config_file, *request_fd, *response_fd, system, force_slurm) {
                 Ok(_) => {}
                 Err(e) => {
                     log::error!("Daemon returned with error: {e}");
@@ -372,6 +383,26 @@ fn command_line(args: Vec<String>) -> Commands {
         match command {
             #[cfg(feature = "daemon")]
             "daemon" => {
+                let mut request_fd = None;
+                let mut response_fd = None;
+                while next < args.len() {
+                    let arg = args[next].as_ref();
+                    next += 1;
+                    if let Some((new_next, value)) =
+                        numeric_arg::<u32>(arg, &args, next, "--request-fd")
+                    {
+                        (next, request_fd) = (new_next, Some(value));
+                    } else if let Some((new_next, value)) =
+                        numeric_arg::<u32>(arg, &args, next, "--response-fd")
+                    {
+                        (next, response_fd) = (new_next, Some(value));
+                    } else if arg.starts_with("-") {
+                        usage(true);
+                    } else {
+                        next -= 1;
+                        break;
+                    }
+                }
                 if next >= args.len() {
                     usage(true);
                 }
@@ -380,7 +411,14 @@ fn command_line(args: Vec<String>) -> Commands {
                 if next != args.len() {
                     usage(true);
                 }
-                Commands::Daemon { config_file }
+                if request_fd.is_some() != response_fd.is_some() {
+                    usage(true);
+                }
+                Commands::Daemon {
+                    config_file,
+                    request_fd,
+                    response_fd,
+                }
             }
             "sample" | "ps" => {
                 let mut cluster = None;
@@ -638,8 +676,13 @@ Commands:
   help     Print this message
 
 Options for `daemon`:
+  --request-fd int
+      File descriptor to which to send requests for privileged information.
+  --response-fd int
+      File descriptor from which to read responses to such requests.
   filename
       Configuration file from which to read commands, arguments, cadences.
+      This should be the last argument, following options.
 
 Options for `sample`:
   --cluster name

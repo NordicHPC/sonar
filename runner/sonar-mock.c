@@ -4,9 +4,9 @@
  *
  * Usage:
  *
- *	sonar-mock -i input-fd -o output-fd "daemon" config-file
+ *	sonar-mock "daemon" --request-fd req-fd --response-fd resp-fd config-file
  *
- * -i and -o carry the descriptors to use for the pipe (input and output fds) and are required.
+ * The options carry the descriptors to use for communication and are required.
  *
  * The word "daemon" must be present literally and we'll check that it is.  The contents of the
  * config-file are ignored but we check that it exists.
@@ -41,30 +41,30 @@ int main(int argc, char** argv) {
     printf("sonar-mock: running as %d %d\n", (int)getuid(), (int)getgid());
 #  endif
     argv++;
-    if (*argv == NULL || strcmp(*argv, "-i") != 0) {
-        fprintf(stderr, "sonar-mock: Expected -i\n");
-        return 1;
-    }
-    argv++;
-    int input = -1;
-    if (parse_int(*argv, &input) != 0) {
-        fprintf(stderr, "sonar-mock: Bad -i arg\n");
-        return 1;
-    }
-    argv++;
-    if (*argv == NULL || strcmp(*argv, "-o") != 0) {
-        fprintf(stderr, "sonar-mock: Expected -o\n");
-        return 1;
-    }
-    argv++;
-    int output = -1;
-    if (parse_int(*argv, &output) != 0) {
-        fprintf(stderr, "sonar-mock: Bad -o arg\n");
-        return 1;
-    }
-    argv++;
     if (*argv == NULL || strcmp(*argv, "daemon") != 0) {
         fprintf(stderr, "sonar-mock: Expected 'daemon'");
+        return 1;
+    }
+    argv++;
+    if (*argv == NULL || strcmp(*argv, "--request-fd") != 0) {
+        fprintf(stderr, "sonar-mock: Expected --request-fd\n");
+        return 1;
+    }
+    argv++;
+    int request_fd = -1;
+    if (parse_int(*argv, &request_fd) != 0) {
+        fprintf(stderr, "sonar-mock: Bad --request-fd arg\n");
+        return 1;
+    }
+    argv++;
+    if (*argv == NULL || strcmp(*argv, "--response-fd") != 0) {
+        fprintf(stderr, "sonar-mock: Expected --response-fd\n");
+        return 1;
+    }
+    argv++;
+    int response_fd = -1;
+    if (parse_int(*argv, &response_fd) != 0) {
+        fprintf(stderr, "sonar-mock: Bad --response-fd arg\n");
         return 1;
     }
     argv++;
@@ -83,7 +83,7 @@ int main(int argc, char** argv) {
     }
 
 #  ifdef LOGGING
-    printf("sonar-mock: %d %d %s\n", input, output, config_file);
+    printf("sonar-mock: %d %d %s\n", request_fd, response_fd, config_file);
 #  endif
 
     char* e;
@@ -95,7 +95,7 @@ int main(int argc, char** argv) {
             return 1;
         }
         printf("sonar-mock: exe_for_pids\n");
-        if (test_exe_for_pids(pids, npids, input, output, NULL, exe_for_pid) != OK) {
+        if (test_exe_for_pids(pids, npids, request_fd, response_fd, NULL, exe_for_pid) != OK) {
             /* TODO: Print the exact error */
             fprintf(stderr, "sonar-mock: I/O error");
             return 1;
@@ -113,7 +113,7 @@ int main(int argc, char** argv) {
 }
 #endif
 
-result_t test_exe_for_pids(const long* pids, size_t npids, int input, int output,
+result_t test_exe_for_pids(const long* pids, size_t npids, int request_fd, int response_fd,
     void (*sent_hook)(), void (*pid_callback)(uint32_t, const char*)) {
     result_t r;
 
@@ -130,7 +130,7 @@ result_t test_exe_for_pids(const long* pids, size_t npids, int input, int output
             return r;
         }
     }
-    r = send_message(output, &outbound);
+    r = send_message(request_fd, &outbound);
     destroy_outbound(&outbound);
     if (r != OK) {
         fprintf(stderr, "sonar-mock: failed to send\n");
@@ -143,7 +143,7 @@ result_t test_exe_for_pids(const long* pids, size_t npids, int input, int output
 
     inbound_t inbound;
     init_inbound(&inbound);
-    if ((r = recv_message(input, &inbound)) != OK) {
+    if ((r = recv_message(response_fd, &inbound)) != OK) {
         fprintf(stderr, "sonar-mock: failed to receive\n");
         return r;
     }

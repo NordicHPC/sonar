@@ -32,6 +32,7 @@ pub trait SystemAPI {
     fn get_boot_time_in_secs_since_epoch(&self) -> u64;
     fn get_gpus(&self) -> &dyn gpu::GpuAPI;
     fn get_jobs(&self) -> &dyn jobsapi::JobManager;
+    fn get_root(&self) -> Option<(u32, u32)>;
     fn get_cpu_info(&self) -> Result<CpuInfo, String>;
     fn get_memory_in_kib(&self) -> Result<Memory, String>;
     fn get_numa_distances(&self) -> Result<Vec<Vec<u32>>, String>;

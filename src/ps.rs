@@ -280,6 +280,7 @@ pub enum CState {
 pub struct TheProcInfo {
     pub user: String,
     pub command: String,
+    pub exe_path: String,
     pub pid: Pid,
     pub ppid: Pid,
     pub rolledup: usize,
@@ -466,15 +467,22 @@ fn new_with_cpu_info(
     processes: &HashMap<Pid, systemapi::Process>,
 ) -> ProcInfoTable {
     let mut procinfo_by_pid = ProcInfoTable::new();
+    let root = system.get_root();
     for proc in processes.values() {
         let (job_id, is_slurm) = system
             .get_jobs()
             .job_id_from_pid(system, proc.pid, processes);
+        let exe_path = if let Some((req, resp)) = root {
+            get_exe_path(proc.pid, req, resp)
+        } else {
+            "".to_string()
+        };
         procinfo_by_pid.insert(
             proc.pid,
             Box::new(TheProcInfo {
                 user: proc.user.clone(),
                 command: proc.command.clone(),
+                exe_path,
                 pid: proc.pid,
                 ppid: proc.ppid,
                 is_system_job: proc.uid < 1000,
@@ -500,6 +508,13 @@ fn new_with_cpu_info(
         );
     }
     procinfo_by_pid
+}
+
+fn get_exe_path(pid: Pid, request_fd: u32, response_fd: u32) -> String {
+    // The protocol is defined in C code in ../runner.  We write the request and read the response.
+    // What we really want to do here is to send all the requests at the same time, less overhead,
+    // but can optimize later.
+    "".to_string()
 }
 
 fn add_gpu_info(

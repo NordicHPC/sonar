@@ -34,12 +34,8 @@
  *
  * Robustness:
  *
- * It might be useful for this to be very, very robust and/or to have some well understood ways in
- * which it will kill the child process and quit and cause systemd to restart everyting.  In the
- * former case we could precede every message on the channel by a prefix so that it is possible to
- * sync against the channel.  But in this case we also want a sequence number in each message.  And
- * it's unclear what could be done to recover.  In the latter case I'm not sure, but maybe we define
- * every error as fatal on both sides of the channel.
+ * Pretty every error is considered fatal and will cause it to kill the child and exit.  If the
+ * child exits, this will also exit.
  */
 
 #include <errno.h>
@@ -59,8 +55,8 @@
 #  define PATH_MAX 4096
 #endif
 
-void sonar(const char* path, const char* config, const char* user, const char* group, int input,
-    int output);
+void sonar(const char* path, const char* config, const char* user, const char* group,
+    int request_fd, int response_fd);
 result_t server(int input, int output);
 result_t get_exe(uint32_t pid, char buf[PATH_MAX]);
 void sigchld(int);
@@ -98,7 +94,7 @@ int main(int argc, char** argv) {
         /* child */
         close(down[1]);
         close(up[0]);
-        sonar(argv[1], argv[2], argv[3], argv[4], down[0], up[1]);
+        sonar(argv[1], argv[2], argv[3], argv[4], up[1], down[0]);
         return 1;
     default: {
         /* parent */
@@ -204,8 +200,8 @@ result_t get_exe(uint32_t pid, char buf[PATH_MAX]) {
  * success, this does not return, but if it does return then the child should exit immediately with
  * an error code.
  */
-void sonar(const char* path, const char* config, const char* user, const char* group, int input,
-    int output) {
+void sonar(const char* path, const char* config, const char* user, const char* group,
+    int request_fd, int response_fd) {
     if (getuid() == 0) {
         struct passwd pw, *presult;
         char buf[1024];
@@ -241,11 +237,13 @@ void sonar(const char* path, const char* config, const char* user, const char* g
         fprintf(stderr, "Not running as root, not dropping privileges\n");
     }
 #ifdef LOGGING
-    printf("Running %s -i %d -o %d daemon %s\n", path, input, output, config);
+    // Probably this wants to be "daemon" first...
+    printf("Running %s daemon --request-fd %d --response-fd %d %s\n", path, request_fd, response_fd,
+        config);
 #endif
-    char ins[20], outs[20];
-    sprintf(ins, "%d", input);
-    sprintf(outs, "%d", output);
-    execl(path, path, "-i", ins, "-o", outs, "daemon", config, (char*)NULL);
+    char req[20], resp[20];
+    sprintf(req, "%d", request_fd);
+    sprintf(resp, "%d", response_fd);
+    execl(path, path, "daemon", "--request-fd", req, "--response-fd", resp, config, (char*)NULL);
     perror("exec");
 }

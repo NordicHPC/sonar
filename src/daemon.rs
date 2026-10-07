@@ -211,6 +211,8 @@ impl Dur {
 
 pub fn daemon_mode(
     config_file: &str,
+    request_fd: Option<u32>,
+    response_fd: Option<u32>,
     mut system: linux::system::Builder,
     force_slurm: bool,
 ) -> Result<(), String> {
@@ -248,6 +250,10 @@ pub fn daemon_mode(
             }
             Err(e) => return Err(format!("Failed to read http password file: {e}")),
         }
+    }
+
+    if let (Some(req_fd), Some(resp_fd)) = (request_fd, response_fd) {
+        system = system.with_root_server(req_fd, resp_fd);
     }
 
     if ini.sample.cadence.is_some() {

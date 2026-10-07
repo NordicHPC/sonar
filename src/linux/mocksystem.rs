@@ -136,6 +136,10 @@ impl Builder {
         }
     }
 
+    pub fn with_root_server(self, _request_fd: u32, _response_fd: u32) -> Builder {
+        Builder { ..self }
+    }
+
     pub fn with_version(self, version: &str) -> Builder {
         Builder {
             version: Some(version.to_string()),
@@ -297,6 +301,10 @@ impl systemapi::SystemAPI for MockSystem {
 
     fn get_jobs(&self) -> &dyn jobsapi::JobManager {
         &*self.jm
+    }
+
+    fn get_root(&self) -> Pid {
+        self.root
     }
 
     fn get_pid(&self) -> Pid {

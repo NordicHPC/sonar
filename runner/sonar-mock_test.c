@@ -52,7 +52,7 @@ static void check(uint32_t pid, const char* s) {
 void exe_for_pids_selftest() {
     clear_channel(req_channel);
     clear_channel(resp_channel);
-    assert(test_exe_for_pids(pids, npids, resp_channel, req_channel, sent_hook, check) == OK);
+    assert(test_exe_for_pids(pids, npids, req_channel, resp_channel, sent_hook, check) == OK);
     clear_channel(req_channel);
     clear_channel(resp_channel);
 }
