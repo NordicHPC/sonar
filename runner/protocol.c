@@ -130,9 +130,6 @@ static result_t read_bytes(int input, uint8_t* p, int n) {
 }
 
 result_t recv_message(int input, inbound_t* m) {
-    /* TODO: Make space for the header in a plausibly-sized buffer to be able to make only one call
-     * to read() in common cases: most messages will be on the smaller side.
-     */
     uint8_t hdr[4];
     result_t r;
     if ((r = read_bytes(input, hdr, sizeof(hdr))) != OK) {
