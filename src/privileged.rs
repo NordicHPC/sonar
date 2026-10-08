@@ -92,7 +92,7 @@ fn get_string(buf: &[u8], ix: usize, l: usize) -> (String, usize) {
 }
 
 fn write(fd: u32, buf: &[u8], len: usize) {
-    // TODO: Must deal with partial writes
+    // TODO: Must deal with partial writes and errors
     let n = unsafe {
         libc::write(
             fd as i32,
@@ -106,7 +106,7 @@ fn write(fd: u32, buf: &[u8], len: usize) {
 }
 
 fn read(fd: u32, buf: &mut [u8], len: usize) {
-    // TODO: Must deal with partial reads
+    // TODO: Must deal with partial reads and errors
     let n = unsafe {
         libc::read(
             fd as i32,

@@ -31,8 +31,8 @@
  * - If the child terminates, the server will catch the SIGCHLD and will also terminate (with the
  *   same exit code as the child).
  *
- * - If the server needs to terminate, except by explicit request, it will attempt to terminate
- *   the child by sending it SIGTERM.
+ * - If the server needs to terminate, except by explicit request from the child, it will attempt to
+ *   terminate the child by sending it SIGTERM.
  *
  * - Both sides should consider a malformed message from the other side a fatal error, and should
  *   terminate immediately.  There is no error recovery on the channel.
@@ -51,11 +51,12 @@
 
 #include <errno.h>
 #include <grp.h>
-#include <inttypes.h>
 #include <linux/limits.h>
 #include <pwd.h>
 #include <signal.h>
+#include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <sys/types.h>
 #include <unistd.h>
@@ -116,6 +117,10 @@ int main(int argc, char** argv) {
         close(up[1]);
         result_t r = server(up[0], down[1]);
         if (r != OK) {
+            struct sigaction act;
+            memset(&act, 0, sizeof(act));
+            act.sa_handler = SIG_IGN;
+            sigaction(SIGCHLD, &act, NULL);
             kill(pid, SIGTERM);
         }
         return r != OK;

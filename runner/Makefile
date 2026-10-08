@@ -30,5 +30,5 @@ format:
 	fi
 
 test: selftest
-	valgrind --leak-check=full ./selftest
+	valgrind --leak-check=full --trace-children=yes ./selftest
 

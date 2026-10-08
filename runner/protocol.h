@@ -53,11 +53,6 @@ extern result_t ERR_EOF;
  * response, as detailed below.
  */
 
-/* In all functions below, a nonzero return means error (and an error message will have been printed
- * on stderr), 0 means success.  The error code is normally 1, but is more generally the exit code
- * if the program chooses to exit.
- */
-
 typedef struct {
     uint32_t len;
     uint8_t* buf;
@@ -66,13 +61,19 @@ typedef struct {
 
 void init_inbound(inbound_t* m);
 void destroy_inbound(inbound_t* m);
+
+/* Decode functions can fail to allocate or can exhaust the input in the middle of a datum (a
+ * malformed message).
+ */
 result_t decode_byte(inbound_t* m, uint8_t* b);
 result_t decode_int(inbound_t* m, uint32_t* len);
 
 /* On success, *s is a malloc'd NUL-terminated buffer that must be freed */
 result_t decode_string(inbound_t* m, uint8_t** s);
 
-/* The message *m should be in the initialized state. */
+/* The message *m should be in the initialized state.  It can fail to read from the input, or fail
+ * to allocate memory.
+ */
 result_t recv_message(int input, inbound_t* m);
 
 typedef struct {
@@ -83,11 +84,13 @@ typedef struct {
 
 void init_outbound(outbound_t* m);
 void destroy_outbound(outbound_t* m);
+
+/* Encode functions can fail to allocate or can overflow the max buffer size. */
 result_t encode_byte(outbound_t* m, uint8_t b);
 result_t encode_int(outbound_t* m, uint32_t len);
 result_t encode_string(outbound_t* m, const char* s);
 
-/* This will not destroy the message */
+/* This will not destroy the message.  It can fail to write to the output. */
 result_t send_message(int output, outbound_t* m);
 
 enum {
