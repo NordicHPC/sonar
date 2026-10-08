@@ -79,12 +79,12 @@ int main(int argc, char** argv) {
     }
     int down[2];
     if (pipe(down) != 0) {
-        perror("pipe2");
+        perror("pipe");
         return 1;
     }
     int up[2];
     if (pipe(up) != 0) {
-        perror("pipe2");
+        perror("pipe");
         return 1;
     }
     struct sigaction act;
