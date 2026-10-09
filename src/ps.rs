@@ -477,7 +477,12 @@ fn new_with_cpu_info(
             .job_id_from_pid(system, proc.pid, processes);
         #[cfg(feature = "daemon")]
         let exe_path = if let Some((req, resp)) = root {
-            privileged::get_exe_path(proc.pid as u32, req, resp)
+            if let Ok(s) = privileged::get_exe_path(proc.pid as u32, req, resp) {
+                s
+            } else {
+                // TODO: need to handle this error somehow
+                "".to_string()
+            }
         } else {
             "".to_string()
         };

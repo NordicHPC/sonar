@@ -51,7 +51,6 @@
 
 #include <errno.h>
 #include <grp.h>
-#include <linux/limits.h>
 #include <pwd.h>
 #include <signal.h>
 #include <stdint.h>
@@ -62,22 +61,50 @@
 #include <unistd.h>
 
 #include "protocol.h"
+#include "sonar-daemon-runner.h"
 
-#ifndef PATH_MAX
-#  define PATH_MAX 4096
-#endif
-
-void sonar(const char* path, const char* config, const char* user, const char* group,
+static result_t server(int input, int output);
+static void sonar(const char* path, const char* config, const char* user, const char* group,
     int request_fd, int response_fd);
-result_t server(int input, int output);
-void get_exe(uint32_t pid, char buf[PATH_MAX]);
-void sigchld(int);
+
+#ifndef SELFTEST
+static void sigchld(int);
 
 int main(int argc, char** argv) {
     if (argc != 5) {
         fprintf(stderr, "Usage: %s sonar-path config-path user-name group-name\n", argv[0]);
         return 1;
     }
+    return sonar_daemon_runner(argv[1], argv[2], argv[3], argv[4], sigchld);
+}
+
+static void sigchld(int s) {
+    int n = write(2, "Sonar-runner exiting because child did\n", 40);
+    (void)n;
+    /* TODO: Exit code 1 is not right, we want to wait on the child and then exit with its exit
+     * code.
+     */
+    _exit(1);
+}
+#endif
+
+/* Given a pid, try to get /proc/pid/exe, otherwise return empty string */
+void get_exe(uint32_t pid, char buf[PATH_MAX]) {
+#ifdef LOGGING
+    printf("get_exe %d\n", pid);
+#endif
+    char path[128];
+    snprintf(path, sizeof(path), "/proc/%d/exe", pid);
+    ssize_t n;
+    if ((n = readlink(path, buf, PATH_MAX)) == -1) {
+        /* Failure is common, so just clear out the string */
+        n = 0;
+    }
+    buf[n < PATH_MAX ? n : PATH_MAX - 1] = 0;
+}
+
+int sonar_daemon_runner(const char* sonar_path, const char* config_file, const char* user_name,
+    const char* group_name, void (*sigchld_handler)(int)) {
     int down[2];
     if (pipe(down) != 0) {
         perror("pipe");
@@ -90,7 +117,7 @@ int main(int argc, char** argv) {
     }
     struct sigaction act;
     memset(&act, 0, sizeof(act));
-    act.sa_handler = sigchld;
+    act.sa_handler = sigchld_handler;
     /* TODO: SA_NOCLDWAIT is really wrong b/c we want to wait on the child and then exit with its
      * exit code.
      */
@@ -109,7 +136,7 @@ int main(int argc, char** argv) {
         /* child */
         close(down[1]);
         close(up[0]);
-        sonar(argv[1], argv[2], argv[3], argv[4], up[1], down[0]);
+        sonar(sonar_path, config_file, user_name, group_name, up[1], down[0]);
         return 1;
     default: {
         /* parent */
@@ -128,16 +155,7 @@ int main(int argc, char** argv) {
     }
 }
 
-void sigchld(int s) {
-    int n = write(2, "Sonar-runner exiting because child did\n", 40);
-    (void)n;
-    /* TODO: Exit code 1 is not right, we want to wait on the child and then exit with its exit
-     * code.
-     */
-    _exit(1);
-}
-
-result_t server(int input, int output) {
+static result_t server(int input, int output) {
     result_t r;
     inbound_t inbound;
     outbound_t outbound;
@@ -205,26 +223,11 @@ Done:
     return r;
 }
 
-/* Given a pid, try to get /proc/pid/exe, otherwise return empty string */
-void get_exe(uint32_t pid, char buf[PATH_MAX]) {
-#ifdef LOGGING
-    printf("get_exe %d\n", pid);
-#endif
-    char path[128];
-    snprintf(path, sizeof(path), "/proc/%d/exe", pid);
-    ssize_t n;
-    if ((n = readlink(path, buf, PATH_MAX)) == -1) {
-        /* Failure is common, so just clear out the string */
-        n = 0;
-    }
-    buf[n < PATH_MAX ? n : PATH_MAX - 1] = 0;
-}
-
 /* Drop privileges (if running as root) and run the Sonar subprocess with appropriate arguments.  On
  * success, this does not return, but if it does return then the child should exit immediately with
  * an error code.
  */
-void sonar(const char* path, const char* config, const char* user, const char* group,
+static void sonar(const char* path, const char* config, const char* user, const char* group,
     int request_fd, int response_fd) {
     if (getuid() == 0) {
         struct passwd pw, *presult;
@@ -261,7 +264,6 @@ void sonar(const char* path, const char* config, const char* user, const char* g
         fprintf(stderr, "Not running as root, not dropping privileges\n");
     }
 #ifdef LOGGING
-    /* Probably this wants to be "daemon" first... */
     printf("Running %s daemon --request-fd %d --response-fd %d %s\n", path, request_fd, response_fd,
         config);
 #endif

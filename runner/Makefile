@@ -17,12 +17,14 @@ selftest: selftest.c selftest.h \
 	parse.c parse.h parse_test.c \
 	protocol_test.c protocol.c protocol.h \
 	sonar-mock.c sonar-mock_test.c \
+	sonar-daemon-runner.c sonar-daemon-runner.h sonar-daemon-runner_test.c \
 	Makefile
 	$(CC) $(FLAGS) -o selftest -DSELFTEST \
 		selftest.c \
 		parse.c parse_test.c \
 		protocol.c protocol_test.c \
-		sonar-mock.c sonar-mock_test.c
+		sonar-mock.c sonar-mock_test.c \
+		sonar-daemon-runner.c sonar-daemon-runner.h sonar-daemon-runner_test.c
 
 format:
 	if [[ -n $$(command -v clang-format) ]]; then \

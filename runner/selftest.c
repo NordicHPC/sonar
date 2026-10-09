@@ -15,11 +15,13 @@
 void parse_selftest();
 void protocol_selftest();
 void exe_for_pids_selftest();
+void get_exe_selftest();
 
 int main(int argc, char** argv) {
     parse_selftest();
     protocol_selftest();
     exe_for_pids_selftest();
+    get_exe_selftest();
 }
 
 /* Mocking I/O */
