@@ -865,6 +865,10 @@ Kilobytes of virtual data+stack memory
 The command (not the command line), zombie processes get an extra <defunct> annotation at
 the end, a la ps.
 
+#### **`exe`** string
+
+The executable path, if available (privileged).
+
 #### **`pid`** uint64
 
 Process ID.  Normally Pid is non-zero.  For rolled-up samples in daemon mode (where a set of

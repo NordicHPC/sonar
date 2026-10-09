@@ -103,6 +103,7 @@ pub const SAMPLE_JOB_PROCESSES: &str = "processes"; // []SampleProcess
 pub const SAMPLE_PROCESS_RESIDENT_MEMORY: &str = "resident_memory"; // uint64
 pub const SAMPLE_PROCESS_VIRTUAL_MEMORY: &str = "virtual_memory"; // uint64
 pub const SAMPLE_PROCESS_CMD: &str = "cmd"; // string
+pub const SAMPLE_PROCESS_EXE_PATH: &str = "exe"; // string
 pub const SAMPLE_PROCESS_PID: &str = "pid"; // uint64
 pub const SAMPLE_PROCESS_PARENT_PID: &str = "ppid"; // uint64
 pub const SAMPLE_PROCESS_IN_CONTAINER: &str = "in_container"; // bool

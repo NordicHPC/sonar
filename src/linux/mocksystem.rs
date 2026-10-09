@@ -4,6 +4,7 @@ use crate::jobsapi;
 use crate::json_tags;
 use crate::linux::{procfs, system};
 use crate::posix::time;
+use crate::privileged;
 use crate::systemapi;
 use crate::types::{JobID, Pid, Uid};
 
@@ -134,6 +135,12 @@ impl Builder {
             jm: Some(jm),
             ..self
         }
+    }
+
+    #[cfg(feature = "daemon")]
+    #[allow(dead_code)]
+    pub fn with_root_server(self, _srv: privileged::RootServer) -> Builder {
+        Builder { ..self }
     }
 
     pub fn with_version(self, version: &str) -> Builder {
@@ -297,6 +304,11 @@ impl systemapi::SystemAPI for MockSystem {
 
     fn get_jobs(&self) -> &dyn jobsapi::JobManager {
         &*self.jm
+    }
+
+    #[cfg(feature = "daemon")]
+    fn get_root_server(&self) -> Option<&privileged::RootServer> {
+        None
     }
 
     fn get_pid(&self) -> Pid {

@@ -401,6 +401,10 @@ SampleProcess:
       type: 'string'
       doc: >
         The command (not the command line), zombie processes get an extra <defunct> annotation at the end, a la ps.
+    exe:
+      type: 'string'
+      doc: >
+        The executable path, if available (privileged).
     pid:
       type: 'uint64'
       doc: >
