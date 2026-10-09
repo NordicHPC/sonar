@@ -1,5 +1,7 @@
 use crate::gpu;
 use crate::jobsapi;
+#[cfg(feature = "daemon")]
+use crate::privileged;
 use crate::types::{JobID, Pid, Uid};
 
 use std::boxed::Box;
@@ -33,7 +35,7 @@ pub trait SystemAPI {
     fn get_gpus(&self) -> &dyn gpu::GpuAPI;
     fn get_jobs(&self) -> &dyn jobsapi::JobManager;
     #[cfg(feature = "daemon")]
-    fn get_root(&self) -> Option<(u32, u32)>;
+    fn get_root_server(&self) -> Option<&privileged::RootServer>;
     fn get_cpu_info(&self) -> Result<CpuInfo, String>;
     fn get_memory_in_kib(&self) -> Result<Memory, String>;
     fn get_numa_distances(&self) -> Result<Vec<Vec<u32>>, String>;

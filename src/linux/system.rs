@@ -9,6 +9,8 @@ use crate::linux::slurm;
 use crate::posix::hostname;
 use crate::posix::time;
 use crate::posix::users;
+#[cfg(feature = "daemon")]
+use crate::privileged;
 use crate::systemapi;
 use crate::types::{JobID, Pid, Uid};
 use crate::util::command;
@@ -43,7 +45,7 @@ const SINFO_TIMEOUT_S: u64 = 10;
 pub struct Builder {
     jm: Option<Box<dyn jobsapi::JobManager>>,
     #[cfg(feature = "daemon")]
-    root: Option<(u32, u32)>,
+    root: Option<privileged::RootServer>,
     cluster: String,
     hostname_only: bool,
     sacct: String,
@@ -94,9 +96,9 @@ impl Builder {
 
     #[cfg(feature = "daemon")]
     #[allow(dead_code)]
-    pub fn with_root_server(self, request_fd: u32, response_fd: u32) -> Builder {
+    pub fn with_root_server(self, srv: privileged::RootServer) -> Builder {
         Builder {
-            root: Some((request_fd, response_fd)),
+            root: Some(srv),
             ..self
         }
     }
@@ -198,7 +200,7 @@ pub struct System {
     hostname_only: bool,
     cluster: String,
     #[cfg(feature = "daemon")]
-    root: Option<(u32, u32)>,
+    root: Option<privileged::RootServer>,
     fs: RealProcFS,
     gpus: realgpu::RealGpu,
     jm: Box<dyn jobsapi::JobManager>,
@@ -279,8 +281,11 @@ impl systemapi::SystemAPI for System {
     }
 
     #[cfg(feature = "daemon")]
-    fn get_root(&self) -> Option<(u32, u32)> {
-        self.root
+    fn get_root_server(&self) -> Option<&privileged::RootServer> {
+        match &self.root {
+            None => None,
+            Some(x) => Some(x),
+        }
     }
 
     fn get_pid(&self) -> Pid {

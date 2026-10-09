@@ -31,6 +31,7 @@ use crate::jobsapi;
 use crate::json_tags;
 use crate::linux;
 use crate::posix::time::{unix_now, unix_time_components};
+use crate::privileged;
 use crate::ps;
 use crate::slurmjobs;
 use crate::sysinfo;
@@ -254,7 +255,7 @@ pub fn daemon_mode(
 
     #[cfg(feature = "daemon")]
     if let (Some(req_fd), Some(resp_fd)) = (request_fd, response_fd) {
-        system = system.with_root_server(req_fd, resp_fd);
+        system = system.with_root_server(privileged::RootServer::new(req_fd, resp_fd));
     }
 
     if ini.sample.cadence.is_some() {

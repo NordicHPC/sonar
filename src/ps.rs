@@ -470,14 +470,14 @@ fn new_with_cpu_info(
 ) -> ProcInfoTable {
     let mut procinfo_by_pid = ProcInfoTable::new();
     #[cfg(feature = "daemon")]
-    let root = system.get_root();
+    let root: Option<&privileged::RootServer> = system.get_root_server();
     for proc in processes.values() {
         let (job_id, is_slurm) = system
             .get_jobs()
             .job_id_from_pid(system, proc.pid, processes);
         #[cfg(feature = "daemon")]
-        let exe_path = if let Some((req, resp)) = root {
-            if let Ok(s) = privileged::get_exe_path(proc.pid as u32, req, resp) {
+        let exe_path = if let Some(srv) = root {
+            if let Ok(s) = privileged::get_exe_path(proc.pid as u32, srv) {
                 s
             } else {
                 // TODO: need to handle this error somehow
