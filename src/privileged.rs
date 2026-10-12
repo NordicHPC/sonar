@@ -19,6 +19,8 @@ const REQ_EXE_FOR_PIDS: u8 = 1u8;
 
 // Given a real PID, read the /proc/PID/exe link.
 //
+// If this returns an error, the root agent is broken and the caller should stop using it.
+//
 // OPTIMIZEME: What we really want to do here is to send all the requests for all the PIDs at the
 // same time, less overhead even if it means managing dynamic buffers.
 
@@ -40,7 +42,8 @@ pub fn get_exe_path(pid: u32, srv: &RootServer) -> Result<String, String> {
     Ok(resp.get_string()?)
 }
 
-// Protocol logic implementation.
+// Protocol logic implementation.  Any error return basically amounts to the root agent being broken
+// or having crashed and should lead to its use being disabled.
 
 pub struct Outgoing {
     v: Vec<u8>,
@@ -67,7 +70,7 @@ impl Outgoing {
         self.v.push((n & 255) as u8);
     }
 
-    // Missing because not needed: put_string
+    // Missing because not needed yet: put_string
 }
 
 pub struct Incoming {

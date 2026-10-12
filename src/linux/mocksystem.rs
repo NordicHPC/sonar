@@ -311,6 +311,9 @@ impl systemapi::SystemAPI for MockSystem {
         None
     }
 
+    #[cfg(feature = "daemon")]
+    fn disable_root_server(&self) {}
+
     fn get_pid(&self) -> Pid {
         self.pid
     }

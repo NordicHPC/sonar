@@ -286,18 +286,22 @@ has passed.
 ## RUNNING AS ROOT
 
 Normally you do not want Sonar to run as root.  It's too much code, and it pulls in too many
-libraries we do not control.  You want sonar to run under a regular user account, ideally one
+libraries we do not control.  You want Sonar to run under a regular user account, ideally one
 separate from all actual users on the system.
 
-However, some interesting process data are only obtainable by root.  Therefore, a small and
-auditable program is provided that can be run as root, and it will start Sonar in non-privileged
-mode and will execute privileged system queries on behalf of that Sonar.
+However, some useful process data are only obtainable by root.  Therefore, a small and auditable
+program is provided that can be run as root, and it will start Sonar as a child process in
+non-privileged mode and will execute privileged system queries on behalf of that Sonar.
 
-To compile this program, run `( cd runner ; make sonar-daemon-runner )`.
+To compile this program, run `( cd runner ; make )`.
 
-Then as root run `runner/sonar-daemon-runner path/to/sonar path/to/config username groupname`
-where `username` and `groupname` are the identities under which Sonar should run.  The runner and
-Sonar will communicate over a pipe.  If one exits, the other exits.
+Then as root run `runner/sonar-daemon-runner path/to/sonar path/to/config username groupname` where
+`username` and `groupname` are the identities under which Sonar should run.  The runner and Sonar
+will communicate over a pipe.  If Sonar exits, so does the runner; if the runner exits, Sonar stops
+using it.
+
+In the normal case where systemd is used to run Sonar, the setup amounts to a small change in
+Sonar's systemd config.
 
 ## DATA MESSAGE FORMATS
 

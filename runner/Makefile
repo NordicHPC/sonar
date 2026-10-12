@@ -1,5 +1,5 @@
 .PHONY: default all format test clean
-TARGETS=sonar-daemon-runner sonar-daemon-runner-test sonar-mock selftest godot
+TARGETS=sonar-daemon-runner sonar-daemon-runner-test sonar-mock selftest vladimir
 
 # Note _FORTIFY_SOURCE requires -O1 or better
 # Note _XOPEN_SOURCE is required for readlink()

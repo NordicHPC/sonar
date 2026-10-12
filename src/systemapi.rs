@@ -36,6 +36,8 @@ pub trait SystemAPI {
     fn get_jobs(&self) -> &dyn jobsapi::JobManager;
     #[cfg(feature = "daemon")]
     fn get_root_server(&self) -> Option<&privileged::RootServer>;
+    #[cfg(feature = "daemon")]
+    fn disable_root_server(&self);
     fn get_cpu_info(&self) -> Result<CpuInfo, String>;
     fn get_memory_in_kib(&self) -> Result<Memory, String>;
     fn get_numa_distances(&self) -> Result<Vec<Vec<u32>>, String>;

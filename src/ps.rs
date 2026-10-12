@@ -470,7 +470,7 @@ fn new_with_cpu_info(
 ) -> ProcInfoTable {
     let mut procinfo_by_pid = ProcInfoTable::new();
     #[cfg(feature = "daemon")]
-    let root: Option<&privileged::RootServer> = system.get_root_server();
+    let mut root: Option<&privileged::RootServer> = system.get_root_server();
     for proc in processes.values() {
         let (job_id, is_slurm) = system
             .get_jobs()
@@ -480,7 +480,10 @@ fn new_with_cpu_info(
             if let Ok(s) = privileged::get_exe_path(proc.pid as u32, srv) {
                 s
             } else {
-                // TODO: need to handle this error somehow
+                // The agent is broken.  Disable its further use here.  Then flag it as broken on
+                // the system; get_root_server() will subsequently return none.
+                root = None;
+                system.disable_root_server();
                 "".to_string()
             }
         } else {

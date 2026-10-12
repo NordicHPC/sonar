@@ -2,8 +2,6 @@ sonar-daemon-runner
 sonar-daemon-runner-test
 sonar-mock
 selftest
-godot
+vladimir
 *.o
-test_results.txt
-test_pids.txt
-test_id.txt
+test_*.txt

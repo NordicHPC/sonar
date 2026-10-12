@@ -15,5 +15,6 @@ if [[ ! -f test_pids.txt || ! -f test_id.txt ]]; then
     exit 1
 fi
 ASSUMED_ID=$(cat test_id.txt)
-REQ_EXE_FOR_PIDS=$(cat test_pids.txt) ./sonar-daemon-runner-test ./sonar-mock test.cfg $ASSUMED_ID > test_result.txt
+EXECUTABLE=$(cat test_exe.txt)
+REQ_EXE_FOR_PIDS=$(cat test_pids.txt) ./sonar-daemon-runner-test "$EXECUTABLE" test.cfg $ASSUMED_ID > test_result.txt
 

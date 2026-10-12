@@ -169,6 +169,8 @@ impl Builder {
             },
             #[cfg(feature = "daemon")]
             root: self.root,
+            #[cfg(feature = "daemon")]
+            root_disabled: Cell::new(false),
             fs,
             gpus: realgpu::RealGpu::new(hostname, boot_time),
             timestamp: RefCell::new(time::now_iso8601()),
@@ -201,6 +203,8 @@ pub struct System {
     cluster: String,
     #[cfg(feature = "daemon")]
     root: Option<privileged::RootServer>,
+    #[cfg(feature = "daemon")]
+    root_disabled: Cell<bool>,
     fs: RealProcFS,
     gpus: realgpu::RealGpu,
     jm: Box<dyn jobsapi::JobManager>,
@@ -282,10 +286,19 @@ impl systemapi::SystemAPI for System {
 
     #[cfg(feature = "daemon")]
     fn get_root_server(&self) -> Option<&privileged::RootServer> {
-        match &self.root {
-            None => None,
-            Some(x) => Some(x),
+        if self.root_disabled.get() {
+            None
+        } else {
+            match &self.root {
+                None => None,
+                Some(x) => Some(x),
+            }
         }
+    }
+
+    #[cfg(feature = "daemon")]
+    fn disable_root_server(&self) {
+        self.root_disabled.set(true);
     }
 
     fn get_pid(&self) -> Pid {

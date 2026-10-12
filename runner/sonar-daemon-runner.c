@@ -92,7 +92,7 @@ static void sigchld(int sig, siginfo_t* si, void* data) {
 
 /* Given a pid, try to get /proc/pid/exe, otherwise return empty string */
 void get_exe(uint32_t pid, char buf[PATH_MAX]) {
-#ifdef LOGGING
+#if defined(LOGGING) && defined(SELFTEST)
     printf("get_exe %d\n", pid);
 #endif
     char path[128];
@@ -164,6 +164,10 @@ static result_t server(int input, int output) {
         destroy_inbound(&inbound);
         destroy_outbound(&outbound);
         if ((r = recv_message(input, &inbound)) != OK) {
+#ifdef LOGGING
+            fprintf(stderr, "EOF or error on channel in server, child exited\n");
+            fflush(stderr);
+#endif
             goto Done;
         }
         uint8_t op;
@@ -263,8 +267,9 @@ static void sonar(const char* path, const char* config, const char* user, const 
         fprintf(stderr, "Not running as root, not dropping privileges\n");
     }
 #ifdef LOGGING
-    printf("Running %s daemon --request-fd %d --response-fd %d %s\n", path, request_fd, response_fd,
-        config);
+    fprintf(stderr, "Running %s daemon --request-fd %d --response-fd %d %s\n", path, request_fd,
+        response_fd, config);
+    fflush(stderr);
 #endif
     char req[20], resp[20];
     sprintf(req, "%d", request_fd);
