@@ -13,10 +13,10 @@ all: $(TARGETS)
 clean:
 	rm -f $(TARGETS) *.o test_*.txt *~
 
-sonar-daemon-runner: sonar-daemon-runner.c protocol.c protocol.h Makefile
+sonar-daemon-runner: sonar-daemon-runner.c sonar-daemon-runner.h protocol.c protocol.h Makefile
 	$(CC) $(FLAGS) -o sonar-daemon-runner sonar-daemon-runner.c protocol.c
 
-sonar-daemon-runner-test: sonar-daemon-runner.c protocol.c protocol.h Makefile
+sonar-daemon-runner-test: sonar-daemon-runner.c sonar-daemon-runner.h protocol.c protocol.h Makefile
 	$(CC) $(FLAGS) -DLOGGING -o sonar-daemon-runner-test sonar-daemon-runner.c protocol.c
 
 sonar-mock: sonar-mock.c sonar-mock.h protocol.c protocol.h parse.c parse.h Makefile
@@ -24,8 +24,8 @@ sonar-mock: sonar-mock.c sonar-mock.h protocol.c protocol.h parse.c parse.h Make
 
 selftest: selftest.c selftest.h \
 	parse.c parse.h parse_test.c \
-	protocol_test.c protocol.c protocol.h \
-	sonar-mock.c sonar-mock_test.c \
+	protocol.c protocol.h protocol_test.c \
+	sonar-mock.c sonar-mock.h sonar-mock_test.c \
 	sonar-daemon-runner.c sonar-daemon-runner.h sonar-daemon-runner_test.c \
 	Makefile
 	$(CC) $(FLAGS) -DLOGGING -o selftest -DSELFTEST \

@@ -1,7 +1,6 @@
 #ifndef protocol_h_included
 #define protocol_h_included
 
-#include <assert.h>
 #include <inttypes.h>
 
 #ifdef NDEBUG

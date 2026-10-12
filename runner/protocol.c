@@ -7,7 +7,9 @@
 #include <unistd.h>
 
 #include "protocol.h"
-#include "selftest.h"
+#ifdef SELFTEST
+#  include "selftest.h" /* Override read() and write() */
+#endif
 
 #ifndef NDEBUG
 
