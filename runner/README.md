@@ -20,5 +20,7 @@ Makefile.  Much of the code in this directory is test code that is not included 
 build and need not be audited or trusted.
 
 Generally, "make" will make sonar-daemon-runner for production; "make test" will build and run the
-selftests; and then there is an interactive test, `req_exe_for_pids.bash`, that will test the
-functionality end-to-end with both a mock Sonar and the real Sonar as client.
+selftests.  There are two interactive tests: `req_exe_for_pids.bash` will test the functionality
+end-to-end with both a mock Sonar and the real Sonar as client under an artificial workload and
+check the output, while `smoketest.bash` will run the real Sonar once (on a busy node where you can
+sudo) and let you check the output.
