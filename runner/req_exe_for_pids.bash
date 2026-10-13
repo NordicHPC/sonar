@@ -4,19 +4,15 @@
 # cannot be started as root.
 #
 # Selftest code for the REQ_EXE_FOR_PIDS function of the sonar-runner.  Stage 1.  Run this as a
-# regular user, it will sudo to run stage 2, which will run the sonar-mock after dropping privileges
-# back to this user.
+# regular user, it will sudo to run stage 2, which will run sonar-mock or sonar after dropping
+# privileges back to this user.
 #
 # The expected result here is that this runs for a bit and then exits with the "All OK" message.
-
-# Does not work because exit status of sonar-runner becomes propagated somehow
-# set -e
 
 if [[ $(whoami) == "root" ]]; then
     echo "Do not run as root, it will sudo"
     exit 1
 fi
-
 
 function join() {
     local xs=$1
@@ -59,7 +55,7 @@ echo "Testing with sonar-mock OK"
 echo "Testing with sonar"
 echo ../target/debug/sonar > test_exe.txt
 sudo ./req_exe_for_pids_stage2.bash
-# In this case, test_result.json should be raw JSON output
+# In this case, test_result.txt should be raw JSON output
 jq -c -r '.value.data.attributes.jobs[].processes[] | {"exe":.exe, "pid":.pid}' < test_result.txt | grep vladimir > test_results2.txt
 #cat test_results2.txt
 

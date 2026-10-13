@@ -3,30 +3,14 @@
 
 #include <inttypes.h>
 
-#ifdef NDEBUG
-
-typedef int result_t;
-#  define OK 0
-#  define ERR_EXHAUSTED 1
-#  define ERR_TOOBIG 1
-#  define ERR_ALLOC 1
-#  define ERR_IO 1
-#  define ERR_EOF 1
-
-#else
-
-struct result_repr_t {
-    int n;
-};
-typedef struct result_repr_t* result_t;
-extern result_t OK;
-extern result_t ERR_EXHAUSTED;
-extern result_t ERR_TOOBIG;
-extern result_t ERR_ALLOC;
-extern result_t ERR_IO;
-extern result_t ERR_EOF;
-
-#endif
+typedef enum {
+    OK, /* Must be 0 */
+    ERR_EXHAUSTED,
+    ERR_TOOBIG,
+    ERR_ALLOC,
+    ERR_IO,
+    ERR_EOF,
+} result_t;
 
 /* Operations that Sonar will send to the server, payload formats etc.
  *
@@ -34,6 +18,7 @@ extern result_t ERR_EOF;
  *  integer - 4-byte little-endian
  *  string  - integer length followed by utf8 contents
  *  array   - integer length followed by array elements without padding
+ *  struct  - fields are packed end-to-end
  *  pid     - integer
  *
  * Message:
@@ -44,8 +29,12 @@ extern result_t ERR_EOF;
  * message, that is, the opcode is included also in the response though the payload data after
  * the opcode may be different (as documented below).
  *
- * Multiple messages can be sent back-to-back on the client->server pipe, the client need not
- * wait for the server to respond.
+ * Multiple messages can be sent back-to-back on the client->server pipe, the client need not wait
+ * for the server to respond.  WARNING: A pipe has limited capacity and the system may deadlock if
+ * one side keeps sending messages without interleaving sending activity with reading responses!
+ * The reason for this is that the responding side will be unable to send responses until they are
+ * consumed, and will stop consuming messages; the sending side may then be unable to send, and will
+ * not be able to consume responses.
  *
  * The order of responses is *always* in the order of requests.  Every request has exactly one
  * response, with the same operation code.  If errors are possible then they are encoded in the
@@ -105,7 +94,7 @@ enum {
      *
      * Request: Array of PIDs.
      *
-     * Response: Array of PID/string pairs, all PIDs in the request will be represented in this
+     * Response: Array of PID/string structs, all PIDs in the request will be represented in this
      * array. Zero-length strings mean "no information for this PID" (eg process exited).
      */
     REQ_EXE_FOR_PIDS,

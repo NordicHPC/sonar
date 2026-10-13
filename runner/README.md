@@ -2,7 +2,7 @@
 
 sonar-daemon-runner is a simple program that is to be run as root.  It will fork, drop its
 privileges down to the level of a named user, and then exec the Sonar daemon with the lowered
-privoleges.  The sonar-daemon-runner remains resident and will receive requests from Sonar over a
+privileges.  The sonar-daemon-runner remains resident and will receive requests from Sonar over a
 pipe, and send back results.  The requests are for information that is only available to root.
 
 For information about how to set it up, see the "Running as root" section of
@@ -21,4 +21,4 @@ build and need not be audited or trusted.
 
 Generally, "make" will make sonar-daemon-runner for production; "make test" will build and run the
 selftests; and then there is an interactive test, `req_exe_for_pids.bash`, that will test the
-functionality end-to-end with a mock Sonar as client.
+functionality end-to-end with both a mock Sonar and the real Sonar as client.

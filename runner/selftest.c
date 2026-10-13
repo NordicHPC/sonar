@@ -4,6 +4,7 @@
 
 #include <assert.h>
 #include <stdint.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
@@ -41,14 +42,14 @@ void clear_channel(int c) {
     buffer->outp = 0;
     buffer->cap = 0;
     free(buffer->buf);
-    buffer->buf = 0;
+    buffer->buf = NULL;
 }
 
 int selftest_read(int input, uint8_t* p, int n) {
     if (input >= 0) {
         return read(input, p, n);
     }
-    /* To improve this: read a max number of bytes per call, say, 5 */
+    /* TODO (testing): To improve this: read a max number of bytes per call, say, 5 */
     assert(-input - 1 < NCHAN);
     struct channel_t* buffer = &channels[-input - 1];
     int avail = buffer->outp - buffer->inp;
@@ -62,13 +63,17 @@ int selftest_write(int output, const uint8_t* p, int n) {
     if (output >= 0) {
         return write(output, p, n);
     }
-    /* To improve this: write at most some number of bytes per call, say, 5 */
+    /* TODO (testing): To improve this: write at most some number of bytes per call, say, 5 */
     assert(-output - 1 < NCHAN);
     struct channel_t* buffer = &channels[-output - 1];
     int avail = buffer->cap - buffer->outp;
     if (n > avail) {
         int newcap = buffer->cap + n * 2;
         uint8_t* new = malloc(newcap);
+        if (new == NULL) {
+            perror("malloc");
+            abort();
+        }
         memcpy(new, buffer->buf, buffer->outp);
         free(buffer->buf);
         buffer->buf = new;

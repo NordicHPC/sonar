@@ -29,7 +29,7 @@
 
 #ifndef SELFTEST
 static void exe_for_pid(uint32_t pid, const char* s) {
-    printf("sonar-mock: pid=%u path=%s\n", (unsigned)pid, s);
+    printf("sonar-mock: pid=%" PRIu32 " path=%s\n", (unsigned)pid, s);
 }
 
 int main(int argc, char** argv) {
@@ -38,7 +38,8 @@ int main(int argc, char** argv) {
         return 1;
     }
 #  ifdef LOGGING
-    printf("sonar-mock: running as %d %d\n", (int)getuid(), (int)getgid());
+    fprintf(stderr, "sonar-mock: running as %u %u\n", (unsigned)getuid(), (unsigned)getgid());
+    fflush(stderr);
 #  endif
     argv++;
     if (*argv == NULL || strcmp(*argv, "daemon") != 0) {
@@ -83,7 +84,8 @@ int main(int argc, char** argv) {
     }
 
 #  ifdef LOGGING
-    printf("sonar-mock: %d %d %s\n", request_fd, response_fd, config_file);
+    fprintf(stderr, "sonar-mock: %d %d %s\n", request_fd, response_fd, config_file);
+    fflush(stderr);
 #  endif
 
     char* e;
@@ -106,7 +108,8 @@ int main(int argc, char** argv) {
        time to read all the traffic, and then we exit to force the parent to exit too.
     */
 #  ifdef LOGGING
-    printf("sonar-mock: sleeping for a bit\n");
+    fprintf(stderr, "sonar-mock: sleeping for a bit\n");
+    fflush(stderr);
 #  endif
     sleep(3);
     return 0;

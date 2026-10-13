@@ -11,29 +11,6 @@
 #  include "selftest.h" /* Override read() and write() */
 #endif
 
-#ifndef NDEBUG
-
-/* OK has to be NULL b/c OK=0 in the int rendition of the result codes; this way, !r means the same
-   in both cases: it means r == OK. */
-result_t OK = NULL;
-
-static struct result_repr_t ERR_EXHAUSTED_ = { 2 };
-result_t ERR_EXHAUSTED = &ERR_EXHAUSTED_;
-
-static struct result_repr_t ERR_TOOBIG_ = { 3 };
-result_t ERR_TOOBIG = &ERR_TOOBIG_;
-
-static struct result_repr_t ERR_ALLOC_ = { 4 };
-result_t ERR_ALLOC = &ERR_ALLOC_;
-
-static struct result_repr_t ERR_IO_ = { 5 };
-result_t ERR_IO = &ERR_IO_;
-
-static struct result_repr_t ERR_EOF_ = { 6 };
-result_t ERR_EOF = &ERR_EOF_;
-
-#endif
-
 void init_inbound(inbound_t* m) {
     m->buf = m->p = NULL;
     m->len = 0;
@@ -47,7 +24,7 @@ void destroy_inbound(inbound_t* m) {
 
 static result_t ensure_available(inbound_t* m, uint32_t n) {
     if ((m->buf + m->len) - m->p < n) {
-        fprintf(stderr, "Input buffer could not supply %d bytes\n", n);
+        fprintf(stderr, "Input buffer could not supply %" PRIu32 " bytes\n", n);
         return ERR_EXHAUSTED;
     }
     return OK;
@@ -105,7 +82,7 @@ result_t decode_string(inbound_t* m, uint8_t** s) {
     return OK;
 }
 
-/* This reads exactly n bytes and returns 0 if it could.  It returns 1 on error including EOF. */
+/* This reads exactly n bytes and returns OK if it could.  */
 static result_t read_bytes(int input, uint8_t* p, int n) {
     int any = 0;
     while (n > 0) {
@@ -128,7 +105,7 @@ static result_t read_bytes(int input, uint8_t* p, int n) {
         p += m;
         n -= m;
     }
-    return 0;
+    return OK;
 }
 
 result_t recv_message(int input, inbound_t* m) {
@@ -168,12 +145,18 @@ static result_t ensure_free(outbound_t* m, uint32_t n) {
     if (m->cap - m->len >= n) {
         return OK;
     }
-    uint32_t new_cap = m->cap == 0 ? 128 : m->cap;
+#ifdef SELFTEST
+    const uint32_t initial_cap = 4;
+#else
+    const uint32_t initial_cap = 32;
+#endif
+    uint32_t new_cap = m->cap == 0 ? initial_cap : m->cap;
     while (new_cap - m->len < n && new_cap <= 0x7FFFFFFF) {
         new_cap *= 2;
     }
     if (new_cap - m->len < n) {
-        fprintf(stderr, "Allocation size could not be computed for request of %d bytes\n", n);
+        fprintf(
+            stderr, "Allocation size could not be computed for request of %" PRIu32 " bytes\n", n);
         return ERR_TOOBIG;
     }
     uint8_t* new_buf = realloc(m->buf, new_cap);

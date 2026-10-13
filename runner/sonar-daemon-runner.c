@@ -93,10 +93,11 @@ static void sigchld(int sig, siginfo_t* si, void* data) {
 /* Given a pid, try to get /proc/pid/exe, otherwise return empty string */
 void get_exe(uint32_t pid, char buf[PATH_MAX]) {
 #if defined(LOGGING) && defined(SELFTEST)
-    printf("get_exe %d\n", pid);
+    fprintf(stderr, "get_exe %" PRIu32 "\n", pid);
+    fflush(stderr);
 #endif
     char path[128];
-    snprintf(path, sizeof(path), "/proc/%d/exe", pid);
+    snprintf(path, sizeof(path), "/proc/%" PRIu32 "/exe", pid);
     ssize_t n;
     if ((n = readlink(path, buf, PATH_MAX)) == -1) {
         /* Failure is common, so just clear out the string */

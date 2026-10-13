@@ -2,7 +2,7 @@
 #define sonar_daemon_runner_h_included
 
 #include <linux/limits.h> /* PATH_MAX */
-#include <signal.h>       /* struct siginfo_t */
+#include <signal.h>       /* siginfo_t */
 #include <stdint.h>
 
 #ifndef PATH_MAX

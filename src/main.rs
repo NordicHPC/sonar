@@ -43,10 +43,10 @@ enum Commands {
         /// Daemon configuration
         config_file: String,
 
-        /// Descriptor on which to send privileged requests to server, if not -1
+        /// Descriptor on which to send privileged requests to root server
         request_fd: Option<u32>,
 
-        /// Descriptor on which the server sends responses, if not -1
+        /// Descriptor on which the root server sends responses
         response_fd: Option<u32>,
     },
     /// Take a snapshot of the currently running processes
