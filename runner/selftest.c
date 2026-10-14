@@ -74,8 +74,10 @@ int selftest_write(int output, const uint8_t* p, int n) {
             perror("malloc");
             abort();
         }
-        memcpy(new, buffer->buf, buffer->outp);
-        free(buffer->buf);
+        if (buffer->buf != NULL) {
+            memcpy(new, buffer->buf, buffer->outp);
+            free(buffer->buf);
+        }
         buffer->buf = new;
         buffer->cap = newcap;
     }

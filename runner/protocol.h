@@ -3,6 +3,9 @@
 
 #include <inttypes.h>
 
+/* The coding style in the component is that whoever initially generates a result code that is not
+ * OK or ERR_EOF must also log the error to stderr.  Subsequent propagation of the error should not
+ * normally print additional error messages, unless that is vital for context. */
 typedef enum {
     OK, /* Must be 0 */
     ERR_EXHAUSTED,
@@ -10,6 +13,8 @@ typedef enum {
     ERR_ALLOC,
     ERR_IO,
     ERR_EOF,
+    ERR_EMPTY_MSG,
+    ERR_INVALID_OP,
 } result_t;
 
 /* Operations that Sonar will send to the server, payload formats etc.

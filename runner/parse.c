@@ -26,8 +26,10 @@ int parse_longs(const char* input, long** parsed, size_t* num_parsed) {
             if (new == NULL) {
                 abort();
             }
-            memcpy(new, arr, ix * sizeof(long));
-            free(arr);
+            if (arr != NULL) {
+                memcpy(new, arr, ix * sizeof(long));
+                free(arr);
+            }
             arr = new;
         }
         arr[ix++] = inp;

@@ -177,7 +177,10 @@ static result_t server(int input, int output) {
         }
         switch (op) {
         case REQ_EXIT: {
+#ifdef LOGGING
             fprintf(stderr, "Sonar-runner exiting by child request\n");
+            fflush(stderr);
+#endif
             uint8_t xcode;
             if ((r = decode_byte(&inbound, &xcode)) != OK) {
                 goto Done;
@@ -218,7 +221,8 @@ static result_t server(int input, int output) {
         }
         default:
             fprintf(stderr, "Unknown operation from child: %d\n", op);
-            continue;
+            r = ERR_INVALID_OP;
+            goto Done;
         }
     }
 Done:
@@ -238,7 +242,7 @@ static void sonar(const char* path, const char* config, const char* user, const 
         char buf[1024];
         int e; /* errno */
         if ((e = getpwnam_r(user, &pw, buf, sizeof(buf), &presult)) != 0) {
-            fprintf(stderr, "getpwnam_r failed: %d\n", e);
+            perror("getpwnam_r");
             return;
         }
         if (presult == NULL) {
@@ -248,7 +252,7 @@ static void sonar(const char* path, const char* config, const char* user, const 
         uid_t new_uid = pw.pw_uid;
         struct group gr, *gresult;
         if ((e = getgrnam_r(group, &gr, buf, sizeof(buf), &gresult)) != 0) {
-            fprintf(stderr, "getgrnam_r failed: %d\n", e);
+            perror("getgrnam_r");
             return;
         }
         if (gresult == NULL) {

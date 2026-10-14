@@ -211,7 +211,7 @@ result_t encode_string(outbound_t* m, const char* s) {
     return OK;
 }
 
-static result_t write_bytes(int output, void* p, size_t n) {
+static result_t write_bytes(int output, uint8_t* p, size_t n) {
     while (n > 0) {
         ssize_t m = write(output, p, n);
         if (m == -1) {
@@ -228,7 +228,8 @@ result_t send_message(int output, outbound_t* m) {
     /* TODO (optimization): Make space for the header in the buffer to be able to make only one call
        to write(). */
     if (m->len == 0) {
-        return OK;
+        fprintf(stderr, "Cannot send empty message\n");
+        return ERR_EMPTY_MSG;
     }
     uint8_t hdr[4];
     encode_u32(hdr, m->len);
