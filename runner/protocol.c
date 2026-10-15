@@ -1,3 +1,4 @@
+#include <assert.h>
 #include <errno.h>
 #include <inttypes.h>
 #include <stddef.h>
@@ -83,7 +84,7 @@ result_t decode_string(inbound_t* m, uint8_t** s) {
 }
 
 /* This reads exactly n bytes and returns OK if it could.  */
-static result_t read_bytes(int input, uint8_t* p, int n) {
+static result_t read_bytes(int input, uint8_t* p, size_t n) {
     int any = 0;
     while (n > 0) {
         ssize_t m = read(input, p, n);
@@ -109,6 +110,7 @@ static result_t read_bytes(int input, uint8_t* p, int n) {
 }
 
 result_t recv_message(int input, inbound_t* m) {
+    assert(m->buf == NULL);
     uint8_t hdr[4];
     result_t r;
     if ((r = read_bytes(input, hdr, sizeof(hdr))) != OK) {
@@ -124,6 +126,7 @@ result_t recv_message(int input, inbound_t* m) {
         free(payload);
         return r;
     }
+    /* Commit. */
     m->len = nbytes;
     m->buf = payload;
     m->p = payload;
@@ -215,6 +218,9 @@ static result_t write_bytes(int output, uint8_t* p, size_t n) {
     while (n > 0) {
         ssize_t m = write(output, p, n);
         if (m == -1) {
+            if (errno == EINTR) {
+                continue;
+            }
             perror("write");
             return ERR_IO;
         }
@@ -225,8 +231,9 @@ static result_t write_bytes(int output, uint8_t* p, size_t n) {
 }
 
 result_t send_message(int output, outbound_t* m) {
-    /* TODO (optimization): Make space for the header in the buffer to be able to make only one call
-       to write(). */
+    assert(m->buf != NULL);
+    /* TODO (optimization): Make space for the header in the buffer on initialization to be able to
+     * make only one call to write(). */
     if (m->len == 0) {
         fprintf(stderr, "Cannot send empty message\n");
         return ERR_EMPTY_MSG;
