@@ -824,11 +824,11 @@ type SampleProcess struct {
 	// The running average CPU percentage over the true lifetime of the process as reported
 	// by the operating system. 100.0 corresponds to "one full core's worth of computation".
 	// See notes.
-	CpuAvg float64 `json:"cpu_avg,omitempty"`
+	CpuAvg float64 `json:"cpu_avg,omitempty" minimum:"0"`
 
 	// The current sampled CPU utilization of the process, 100.0 corresponds to "one full core's
 	// worth of computation". See notes.
-	CpuUtil float64 `json:"cpu_util,omitempty"`
+	CpuUtil float64 `json:"cpu_util,omitempty" minimum:"0"`
 
 	// Cumulative CPU time in seconds for the process over its lifetime. See notes.
 	CpuTime uint64 `json:"cpu_time,omitempty"`
