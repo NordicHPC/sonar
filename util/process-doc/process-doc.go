@@ -139,6 +139,7 @@ func handleConst(v *ast.ValueSpec, d *ast.CommentGroup) {
 }
 
 var jsonRe = regexp.MustCompile(`json:"([^,"]*)(?:,.*)?"`)
+var minimumRe = regexp.MustCompile(`minimum:"([^"]+)"`)
 
 func handleStructType(item *ast.GenDecl, td *ast.TypeSpec, st *ast.StructType) {
 	currType := td.Name.Name
@@ -182,12 +183,11 @@ func handleStructType(item *ast.GenDecl, td *ast.TypeSpec, st *ast.StructType) {
 			)
 		case *makeYaml:
 			var docs = extractDocs(f, f.Doc, " ")
-			fmt.Printf(
-				"    %s:\n      type: '%s'\n      doc: >\n        %s\n",
-				fjson,
-				ftype,
-				docs,
-			)
+			fmt.Printf("    %s:\n      type: '%s'\n", fjson, ftype)
+			if minimum := minimumRe.FindStringSubmatch(f.Tag.Value); minimum != nil {
+				fmt.Printf("      minimum: %s\n", minimum[1])
+			}
+			fmt.Printf("      doc: >\n        %s\n", docs)
 		}
 	}
 }

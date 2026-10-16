@@ -419,10 +419,12 @@ SampleProcess:
         The number of threads in the process, minus 1 - we don't count the process's main thread (allowing this fields to be omitted in transmission for most processes).
     cpu_avg:
       type: 'float64'
+      minimum: 0
       doc: >
         The running average CPU percentage over the true lifetime of the process as reported by the operating system. 100.0 corresponds to "one full core's worth of computation". See notes.
     cpu_util:
       type: 'float64'
+      minimum: 0
       doc: >
         The current sampled CPU utilization of the process, 100.0 corresponds to "one full core's worth of computation". See notes.
     cpu_time:
