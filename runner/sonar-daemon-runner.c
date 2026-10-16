@@ -260,6 +260,12 @@ static void sonar(const char* path, const char* config, const char* user, const 
             return;
         }
         gid_t new_gid = gr.gr_gid;
+        if (initgroups(user, new_gid) != 0) {
+            perror("initgroups");
+            return;
+        }
+        /* Unclear to me if the setgid() is really needed with the initgroups() but I suspect it is
+         * and it doesn't hurt. */
         if (setgid(new_gid) != 0) {
             perror("setgid");
             return;

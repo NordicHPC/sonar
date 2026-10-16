@@ -3,8 +3,9 @@ TARGETS=sonar-daemon-runner sonar-daemon-runner-test sonar-mock selftest vladimi
 
 # Note _FORTIFY_SOURCE requires -O1 or better
 # Note _XOPEN_SOURCE is required for readlink()
+# Note _DEFAULT_SOURCE is required for initgroups()
 # Note _POSIX_C_SOURCE=200809L is intended but does not seem necessary
-FLAGS=-g -O1 -Wall -Werror -Wno-format-truncation -Wpedantic -std=c17 -D_FORTIFY_SOURCE=2 -D_XOPEN_SOURCE=500
+FLAGS=-g -O1 -Wall -Werror -Wno-format-truncation -Wpedantic -std=c17 -D_FORTIFY_SOURCE=2 -D_XOPEN_SOURCE=500 -D_DEFAULT_SOURCE
 
 default: sonar-daemon-runner
 
