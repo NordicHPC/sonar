@@ -79,10 +79,32 @@ example, if the time of a sample is represented multiple times in the packet, th
 the same in all cases.
 
 Field values are constrained by data types described below, and sometimes by additional
-constraints described in prose.  Primitive types are as they are in Go: 64-bit integers and
-floating point, and Unicode strings.  Numeric values outside the given ranges, non-Unicode
-string encodings, malformed timestamps, malformed node-ranges or type-incorrect data in any
-field can cause the entire top-level object containing them to be rejected by the back-end.
+constraints described in prose and by annotations.  Primitive types are as they are in Go: 64-bit
+integers and floating point, and Unicode strings.  Numeric values outside the given ranges,
+non-Unicode string encodings, malformed timestamps, malformed node-ranges or type-incorrect data
+in any field can cause the entire top-level object containing them to be rejected by the
+back-end.
+
+We use these structured field annotations on fields that can be surfaced in an OpenAPI rendering
+of the data:
+
+	minimum:"n"    Minimum numeric field value              Example: minimum:"0"
+	maximum:"n"    Maximum numeric field value              Example: maximum:"255"
+	format:"s"     Format constraint                        Example: format:"date-time"
+	minLength:"n"  Minimum length of variable length item   Example: minlength:"1"
+
+Notably, these annotations should always be in place for these types:
+
+	Timestamp       format:"date-time"
+	Hostname        format:"hostname"
+	Clustername     format:"hostname"
+	NonzeroUint     minimum:"1"
+	NonemptyString  minLength:"1"
+
+Additional constraints should be taken from the list for the Huma REST API framework
+(https://huma.rocks/features/request-validation/?h=maxlength#validation-tags).
+
+TODO: How to annotate lists of things with constraints?
 
 In a serialization format (such as JSON) that allows fields to be omitted, all fields except
 those of a type derived from NonemptyString have default values, which are zero, empty string,

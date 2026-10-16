@@ -87,10 +87,32 @@ import (
 // the same in all cases.
 //
 // Field values are constrained by data types described below, and sometimes by additional
-// constraints described in prose.  Primitive types are as they are in Go: 64-bit integers and
-// floating point, and Unicode strings.  Numeric values outside the given ranges, non-Unicode
-// string encodings, malformed timestamps, malformed node-ranges or type-incorrect data in any
-// field can cause the entire top-level object containing them to be rejected by the back-end.
+// constraints described in prose and by annotations.  Primitive types are as they are in Go: 64-bit
+// integers and floating point, and Unicode strings.  Numeric values outside the given ranges,
+// non-Unicode string encodings, malformed timestamps, malformed node-ranges or type-incorrect data
+// in any field can cause the entire top-level object containing them to be rejected by the
+// back-end.
+//
+// We use these structured field annotations on fields that can be surfaced in an OpenAPI rendering
+// of the data:
+//
+//	minimum:"n"    Minimum numeric field value              Example: minimum:"0"
+//	maximum:"n"    Maximum numeric field value              Example: maximum:"255"
+//	format:"s"     Format constraint                        Example: format:"date-time"
+//	minLength:"n"  Minimum length of variable length item   Example: minlength:"1"
+//
+// Notably, these annotations should always be in place for these types:
+//
+//	Timestamp       format:"date-time"
+//	Hostname        format:"hostname"
+//	Clustername     format:"hostname"
+//	NonzeroUint     minimum:"1"
+//	NonemptyString  minLength:"1"
+//
+// Additional constraints should be taken from the list for the Huma REST API framework
+// (https://huma.rocks/features/request-validation/?h=maxlength#validation-tags).
+//
+// TODO: How to annotate lists of things with constraints?
 //
 // In a serialization format (such as JSON) that allows fields to be omitted, all fields except
 // those of a type derived from NonemptyString have default values, which are zero, empty string,
@@ -349,10 +371,10 @@ const (
 // Python version (slurm-monitor does this).
 type MetadataObject struct {
 	// The name of the component that generated the data (eg "sonar", "slurm-monitor")
-	Producer NonemptyString `json:"producer"`
+	Producer NonemptyString `json:"producer" minLength:"1"`
 
 	// The semver of the producer
-	Version NonemptyString `json:"version"`
+	Version NonemptyString `json:"version" minLength:"1"`
 
 	// The data format version
 	Format uint64 `json:"format,omitempty"`
@@ -369,22 +391,22 @@ type MetadataObject struct {
 // Information about a continuable or non-continuable error.
 type ErrorObject struct {
 	// Time when the error was generated
-	Time Timestamp `json:"time"`
+	Time Timestamp `json:"time" format:"date-time"`
 
 	// A sensible English-language error message describing the error
-	Detail NonemptyString `json:"detail"`
+	Detail NonemptyString `json:"detail" minLength:"1"`
 
 	// Canonical cluster name for node generating the error
-	Cluster Clustername `json:"cluster"`
+	Cluster Clustername `json:"cluster" format:"hostname"`
 
 	// name of node generating the error
-	Node Hostname `json:"node"`
+	Node Hostname `json:"node" format:"hostname"`
 }
 
 // Carrier of arbitrary attribute data
 type KVPair struct {
 	// A unique key within the array for the attribute
-	Key NonemptyString `json:"key"`
+	Key NonemptyString `json:"key" minLength:"1"`
 
 	// Some attribute value
 	Value string `json:"value,omitempty"`
@@ -434,41 +456,41 @@ type SysinfoData struct {
 // NOTE: The number of logical cores is sockets * cores_per_socket * threads_per_core.
 type SysinfoAttributes struct {
 	// Time the current data were obtained
-	Time Timestamp `json:"time"`
+	Time Timestamp `json:"time" format:"date-time"`
 
 	// The canonical cluster name
-	Cluster Clustername `json:"cluster"`
+	Cluster Clustername `json:"cluster" format:"hostname"`
 
 	// The name of the host as it is known to itself
-	Node Hostname `json:"node"`
+	Node Hostname `json:"node" format:"hostname"`
 
 	// Operating system name (the `sysname` field of `struct utsname`)
-	OsName NonemptyString `json:"os_name"`
+	OsName NonemptyString `json:"os_name" minLength:"1"`
 
 	// Operating system version (the `release` field of `struct utsname`)
-	OsRelease NonemptyString `json:"os_release"`
+	OsRelease NonemptyString `json:"os_release" minLength:"1"`
 
 	// Architecture name (the `machine` field of `struct utsname`)
-	Architecture NonemptyString `json:"architecture"`
+	Architecture NonemptyString `json:"architecture" minLength:"1"`
 
 	// Number of NUMA nodes (frequently smaller than the number of sockets), zero if we can't
 	// compute it
 	NumaNodes uint64 `json:"numa_nodes"`
 
 	// Number of CPU sockets
-	Sockets NonzeroUint `json:"sockets"`
+	Sockets NonzeroUint `json:"sockets" minimum:"1"`
 
 	// Number of physical cores per socket
-	CoresPerSocket NonzeroUint `json:"cores_per_socket"`
+	CoresPerSocket NonzeroUint `json:"cores_per_socket" minimum:"1"`
 
 	// Number of hyperthreads per physical core
-	ThreadsPerCore NonzeroUint `json:"threads_per_core"`
+	ThreadsPerCore NonzeroUint `json:"threads_per_core" minimum:"1"`
 
 	// Manufacturer's model name
 	CpuModel string `json:"cpu_model"`
 
 	// Primary memory in kilobytes
-	Memory NonzeroUint `json:"memory"`
+	Memory NonzeroUint `json:"memory" minimum:"1"`
 
 	// Base64-encoded text output (SVG source text) of `lstopo` or similar, using the base64
 	// alphabet from RFC4648
@@ -574,13 +596,13 @@ type SampleData struct {
 // node, or a recoverable error situation if errors is not empty.
 type SampleAttributes struct {
 	// Time the current data were obtained
-	Time Timestamp `json:"time"`
+	Time Timestamp `json:"time" format:"date-time"`
 
 	// The canonical cluster name whence the datum originated
-	Cluster Clustername `json:"cluster"`
+	Cluster Clustername `json:"cluster" format:"hostname"`
 
 	// The name of the node as it is known to the node itself
-	Node Hostname `json:"node"`
+	Node Hostname `json:"node" format:"hostname"`
 
 	// State of the node as a whole
 	System SampleSystem `json:"system"`
@@ -601,7 +623,7 @@ type SampleAttributes struct {
 // NOTE: The sysinfo for the node provides the total memory; available memory = total - used.
 type SampleSystem struct {
 	// The node's boot time
-	Boot Timestamp `json:"boot"`
+	Boot Timestamp `json:"boot" format:"date-time"`
 
 	// The state of individual cores.  These are sorted in index order, and the array is always dense and
 	// of length Sockets * CoresPerSocket * ThreadsPerCore (from SysinfoAttributes for the node).
@@ -619,13 +641,13 @@ type SampleSystem struct {
 	UsedMemory uint64 `json:"used_memory,omitempty"`
 
 	// One-minute load average
-	Load1 float64 `json:"load1,omitempty"`
+	Load1 float64 `json:"load1,omitempty" minimum:"0"`
 
 	// Five-minute load average
-	Load5 float64 `json:"load5,omitempty"`
+	Load5 float64 `json:"load5,omitempty" minimum:"0"`
 
 	// Fifteen-minute load average
-	Load15 float64 `json:"load15,omitempty"`
+	Load15 float64 `json:"load15,omitempty" minimum:"0"`
 
 	// Number of currently runnable scheduling entities (processes, threads)
 	RunnableEntities uint64 `json:"runnable_entities,omitempty"`
@@ -652,7 +674,7 @@ type SampleGpu struct {
 	Index uint64 `json:"index"`
 
 	// Card UUID.  See preamble for notes about UUIDs.
-	UUID NonemptyString `json:"uuid"`
+	UUID NonemptyString `json:"uuid" minLength:"1"`
 
 	// If not zero, an error code indicating a card failure state. code=1 is "generic failure".
 	// Other codes TBD.
@@ -750,7 +772,7 @@ type SampleJob struct {
 	// User name on the cluster; `_user_<uid>` if not determined but user ID is available,
 	// `_user_unknown` otherwise.  Notably in the case of container processes (see the "InContainer"
 	// flag in SampleProcess), the user may be nonsensical (unknown or wrong uid) or root.
-	User NonemptyString `json:"user"`
+	User NonemptyString `json:"user" minLength:"1"`
 
 	// Zero for batch jobs, otherwise is a nonzero value that increases (by some amount) when the
 	// system reboots, and never wraps around. You may think of it as a boot counter for the node,
@@ -828,7 +850,7 @@ type SampleProcess struct {
 
 	// The current sampled CPU utilization of the process, 100.0 corresponds to "one full core's
 	// worth of computation". See notes.
-	CpuUtil float64 `json:"cpu_util,omitempty"`
+	CpuUtil float64 `json:"cpu_util,omitempty" minimum:"0"`
 
 	// Cumulative CPU time in seconds for the process over its lifetime. See notes.
 	CpuTime uint64 `json:"cpu_time,omitempty"`
@@ -873,19 +895,19 @@ type SampleProcessGpu struct {
 	Index uint64 `json:"index"`
 
 	// Card UUID.  See preamble for notes about UUIDs.
-	UUID NonemptyString `json:"uuid"`
+	UUID NonemptyString `json:"uuid" minLength:"1"`
 
 	// The current GPU percentage utilization for the process on the card.
 	//
 	// (The "gpu_" prefix here and below is sort of redundant but have been retained since it makes
 	// the fields analogous to the "cpu_" fields.)
-	GpuUtil float64 `json:"gpu_util,omitempty"`
+	GpuUtil float64 `json:"gpu_util,omitempty" minimum:"0"`
 
 	// The current GPU memory used in kilobytes for the process on the card. See notes.
 	GpuMemory uint64 `json:"gpu_memory,omitempty"`
 
 	// The current GPU memory usage percentage for the process on the card. See notes.
-	GpuMemoryUtil float64 `json:"gpu_memory_util,omitempty"`
+	GpuMemoryUtil float64 `json:"gpu_memory_util,omitempty" minimum:"0"`
 }
 
 // Jobs data are extracted from a single always-up master node on the cluster, and describe jobs
@@ -923,10 +945,10 @@ type JobsData struct {
 // the decoder will populate the correct field.  Other fields will be nil.
 type JobsAttributes struct {
 	// Time the current data were obtained
-	Time Timestamp `json:"time"`
+	Time Timestamp `json:"time" format:"date-time"`
 
 	// The canonical cluster name
-	Cluster Clustername `json:"cluster"`
+	Cluster Clustername `json:"cluster" format:"hostname"`
 
 	// Individual job records.  There may be multiple records per job, one per job step.
 	SlurmJobs []SlurmJob `json:"slurm_jobs,omitempty"`
@@ -954,7 +976,7 @@ type SlurmJob struct {
 	// sacct: the part of `JobIDRaw` before the separator (".", "_", "+").
 	//
 	// slurm: `JOB_INFO.job_id`.
-	JobID NonzeroUint `json:"job_id"`
+	JobID NonzeroUint `json:"job_id" minimum:"1"`
 
 	// The step identifier for the job identified by job_id.  For the topmost step/stage of a job
 	// this will be the empty string.  Other values normally have the syntax of unsigned integers,
@@ -983,7 +1005,7 @@ type SlurmJob struct {
 	// discard ("CANCELLED by nnn").
 	//
 	// slurm: `JOB_STATE.current` probably, though that has multiple values.
-	JobState NonemptyString `json:"job_state"`
+	JobState NonemptyString `json:"job_state" minLength:"1"`
 
 	// The overarching ID of an array job, see discussion in the postamble.
 	//
@@ -1034,7 +1056,7 @@ type SlurmJob struct {
 	// sacct: `Submit`
 	//
 	// slurm: `JOB_INFO.submit_time`
-	SubmitTime Timestamp `json:"submit_time"`
+	SubmitTime Timestamp `json:"submit_time" format:"date-time"`
 
 	// The time limit in minutes for the job.
 	//
@@ -1128,7 +1150,7 @@ type SlurmJob struct {
 	// sacct: `Start`
 	//
 	// slurm: `JOB_INFO.start_time`
-	Start Timestamp `json:"start_time"`
+	Start Timestamp `json:"start_time" format:"date-time"`
 
 	// Number of seconds the job was suspended
 	//
@@ -1142,7 +1164,7 @@ type SlurmJob struct {
 	// sacct: `End`
 	//
 	// slurm: `JOB_INFO.end_time`
-	End Timestamp `json:"end_time"`
+	End Timestamp `json:"end_time" format:"date-time"`
 
 	// Job exit code, if ended
 	//
@@ -1246,10 +1268,10 @@ type ClusterData struct {
 // NOTE: All clusters are assumed to have some unmanaged jobs.
 type ClusterAttributes struct {
 	// Time the current data were obtained
-	Time Timestamp `json:"time"`
+	Time Timestamp `json:"time" format:"date-time"`
 
 	// The canonical cluster name
-	Cluster Clustername `json:"cluster"`
+	Cluster Clustername `json:"cluster" format:"hostname"`
 
 	// The `slurm` attribute is true if at least some nodes are under Slurm management.
 	Slurm bool `json:"slurm,omitempty"`
@@ -1264,7 +1286,7 @@ type ClusterAttributes struct {
 // A Partition has a unique name and some nodes.  Nodes may be in multiple partitions.
 type ClusterPartition struct {
 	// Partition name
-	Name NonemptyString `json:"name"`
+	Name NonemptyString `json:"name" minLength:"1"`
 
 	// Nodes in the partition
 	Nodes []HostnameRange `json:"nodes,omitempty"`
