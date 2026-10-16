@@ -199,6 +199,9 @@ fn format_newfmt_sample(proc_info: &ProcInfo) -> output::Object {
         fields.push_u(SAMPLE_PROCESS_CANCELLED, proc_info.data_cancelled_kib);
     }
     fields.push_s(SAMPLE_PROCESS_CMD, proc_info.command.clone());
+    if proc_info.exe_path != "" {
+        fields.push_s(SAMPLE_PROCESS_EXE_PATH, proc_info.exe_path.clone());
+    }
     if proc_info.pid != 0 {
         // Rolled-up processes have a synthesized non-zero pid in daemon mode, and a zero pid in
         // one-shot mode.
