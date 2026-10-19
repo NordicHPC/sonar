@@ -317,7 +317,7 @@ func transformTagForHuma(ty, tag, doc string) string {
 
 func firstSentence(s string) string {
 	for i := 0; i < len(s); i++ {
-		if s[i] == '.' {
+		if s[i] == '.' && (i == len(s)-1 || isSpace(s[i+1])) {
 			return s[0:i]
 		}
 	}
@@ -369,6 +369,10 @@ func isUpper(b uint8) bool {
 
 func isLower(b uint8) bool {
 	return b >= 'a' && b <= 'z'
+}
+
+func isSpace(b uint8) bool {
+	return b == ' ' || b == '\t' || b == '\n'
 }
 
 func toUpper(b uint8) string {

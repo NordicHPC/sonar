@@ -31,7 +31,7 @@ type MetadataObject struct {
 	Version  NonemptyString `json:"version" minLength:"1" doc:"The semver of the producer"`
 	Format   uint64         `json:"format,omitempty" doc:"The data format version"`
 	Attrs    []KVPair       `json:"attrs,omitempty" doc:"An array of generator-dependent attribute values"`
-	Token    string         `json:"token,omitempty" doc:"An API token to be used with Envelope"`
+	Token    string         `json:"token,omitempty" doc:"An API token to be used with Envelope.Data.Attributes.Cluster"`
 }
 type ErrorObject struct {
 	Time    Timestamp      `json:"time" format:"date-time" doc:"Time when the error was generated"`
@@ -153,11 +153,11 @@ type SampleProcess struct {
 	InContainer    bool               `json:"in_container,omitempty" doc:"True if deemed a part of a container"`
 	NumThreads     uint64             `json:"num_threads,omitempty" doc:"The number of threads in the process, minus 1 - we don't count the process's main thread (allowing this fields to be omitted in transmission for most processes)"`
 	CpuAvg         NonnegativeFloat64 `json:"cpu_avg,omitempty" minimum:"0" doc:"The running average CPU percentage over the true lifetime of the process as reported by the operating system"`
-	CpuUtil        NonnegativeFloat64 `json:"cpu_util,omitempty" minimum:"0" doc:"The current sampled CPU utilization of the process, 100"`
+	CpuUtil        NonnegativeFloat64 `json:"cpu_util,omitempty" minimum:"0" doc:"The current sampled CPU utilization of the process, 100.0 corresponds to 'one full core's worth of computation'"`
 	CpuTime        uint64             `json:"cpu_time,omitempty" doc:"Cumulative CPU time in seconds for the process over its lifetime"`
 	Read           uint64             `json:"data_read,omitempty" doc:"Kilobytes read with all sorts of read calls (rounded up)"`
 	Written        uint64             `json:"data_written,omitempty" doc:"Kilobytes written with all sorts of write calls (rounded up)"`
-	Cancelled      uint64             `json:"data_cancelled,omitempty" doc:"Kilobytes written but never flushed to physical media (i"`
+	Cancelled      uint64             `json:"data_cancelled,omitempty" doc:"Kilobytes written but never flushed to physical media (i.e., held in RAM but then made obsolete by overwriting or file deletion or similar) (rounded up)"`
 	Rolledup       int                `json:"rolledup,omitempty" doc:"The number of additional samples for processes that are 'the same' that have been rolled into this one"`
 	Gpus           []SampleProcessGpu `json:"gpus,omitempty" doc:"GPU sample data for all cards used by the process"`
 }
@@ -205,10 +205,10 @@ type SlurmJob struct {
 	ReqCPUS          uint64          `json:"requested_cpus,omitempty" doc:"Number of requested CPUs (assumed to be for the job in total, the documentation is not good)"`
 	ReqMemoryPerNode uint64          `json:"requested_memory_per_node,omitempty" doc:"Amount of requested memory in kilobytes"`
 	ReqNodes         uint64          `json:"requested_node_count,omitempty" doc:"Number of requested nodes"`
-	Start            Timestamp       `json:"start_time" format:"date-time" doc:"Time the job started, if started  sacct: 'Start'  slurm: 'JOB_INFO"`
-	Suspended        uint64          `json:"suspend_time,omitempty" doc:"Number of seconds the job was suspended  sacct: 'Suspended'  slurm: 'JOB_INFO"`
-	End              Timestamp       `json:"end_time" format:"date-time" doc:"Time the job ended (or was cancelled), if ended  sacct: 'End'  slurm: 'JOB_INFO"`
-	ExitCode         uint64          `json:"exit_code,omitempty" doc:"Job exit code, if ended  sacct: 'ExitCode'  slurm: 'JOB_INFO"`
+	Start            Timestamp       `json:"start_time" format:"date-time" doc:"Time the job started, if started  sacct: 'Start'  slurm: 'JOB_INFO.start_time'"`
+	Suspended        uint64          `json:"suspend_time,omitempty" doc:"Number of seconds the job was suspended  sacct: 'Suspended'  slurm: 'JOB_INFO.suspend_time'"`
+	End              Timestamp       `json:"end_time" format:"date-time" doc:"Time the job ended (or was cancelled), if ended  sacct: 'End'  slurm: 'JOB_INFO.end_time'"`
+	ExitCode         uint64          `json:"exit_code,omitempty" doc:"Job exit code, if ended  sacct: 'ExitCode'  slurm: 'JOB_INFO.exit_code.return_code'"`
 	Sacct            *SacctData      `json:"sacct,omitempty" doc:"Data specific to sacct output"`
 }
 type SacctData struct {
