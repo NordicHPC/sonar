@@ -8,7 +8,7 @@ MetadataObject:
     producer:
       type: 'NonemptyString'
       doc: >
-        The name of the component that generated the data (eg "sonar", "slurm-monitor")
+        The name of the component that generated the data. Example: "sonar", "slurm-monitor"
     version:
       type: 'NonemptyString'
       doc: >
@@ -24,7 +24,7 @@ MetadataObject:
     token:
       type: 'string'
       doc: >
-        EXPERIMENTAL / UNDERSPECIFIED.  An API token to be used with Envelope.Data.Attributes.Cluster, it proves that the producer of the datum was authorized to produce data for that cluster name.
+        An API token to be used with Envelope.Data.Attributes.Cluster. It proves that the producer of the datum was authorized to produce data for that cluster name.  EXPERIMENTAL / UNDERSPECIFIED.
 ErrorObject:
   fields:
     time:
@@ -106,7 +106,7 @@ SysinfoAttributes:
     numa_nodes:
       type: 'uint64'
       doc: >
-        Number of NUMA nodes (frequently smaller than the number of sockets), zero if we can't compute it
+        Number of NUMA nodes, zero if we can't compute it.  Frequently smaller than the number of sockets.
     sockets:
       type: 'NonzeroUint'
       doc: >
@@ -260,11 +260,11 @@ SampleSystem:
     cpus:
       type: '[]SampleCpu'
       doc: >
-        The state of individual cores.  These are sorted in index order, and the array is always dense and of length Sockets * CoresPerSocket * ThreadsPerCore (from SysinfoAttributes for the node).
+        The state of individual cores, cores sorted in index order.  The array is always dense and of length Sockets * CoresPerSocket * ThreadsPerCore (from SysinfoAttributes for the node).
     gpus:
       type: '[]SampleGpu'
       doc: >
-        The state of individual GPU devices.  These are sorted in card index order, but the array may be sparse (some indices missing) and may in principle change in length and index set from sample to sample.
+        The state of individual GPU devices, cards sorted in card index order.  The array may be sparse (some indices missing) and may in principle change in length and index set from sample to sample.
     disks:
       type: '[]SampleDisk'
       doc: >
@@ -274,15 +274,15 @@ SampleSystem:
       doc: >
         The amount of primary memory in use in kilobytes
     load1:
-      type: 'float64'
+      type: 'NonnegativeFloat64'
       doc: >
         One-minute load average
     load5:
-      type: 'float64'
+      type: 'NonnegativeFloat64'
       doc: >
         Five-minute load average
     load15:
-      type: 'float64'
+      type: 'NonnegativeFloat64'
       doc: >
         Fifteen-minute load average
     runnable_entities:
@@ -418,11 +418,11 @@ SampleProcess:
       doc: >
         The number of threads in the process, minus 1 - we don't count the process's main thread (allowing this fields to be omitted in transmission for most processes).
     cpu_avg:
-      type: 'float64'
+      type: 'NonnegativeFloat64'
       doc: >
         The running average CPU percentage over the true lifetime of the process as reported by the operating system. 100.0 corresponds to "one full core's worth of computation". See notes.
     cpu_util:
-      type: 'float64'
+      type: 'NonnegativeFloat64'
       doc: >
         The current sampled CPU utilization of the process, 100.0 corresponds to "one full core's worth of computation". See notes.
     cpu_time:
@@ -460,7 +460,7 @@ SampleProcessGpu:
       doc: >
         Card UUID.  See preamble for notes about UUIDs.
     gpu_util:
-      type: 'float64'
+      type: 'NonnegativeFloat64'
       doc: >
         The current GPU percentage utilization for the process on the card.  (The "gpu_" prefix here and below is sort of redundant but have been retained since it makes the fields analogous to the "cpu_" fields.)
     gpu_memory:
@@ -468,7 +468,7 @@ SampleProcessGpu:
       doc: >
         The current GPU memory used in kilobytes for the process on the card. See notes.
     gpu_memory_util:
-      type: 'float64'
+      type: 'NonnegativeFloat64'
       doc: >
         The current GPU memory usage percentage for the process on the card. See notes.
 JobsEnvelope:

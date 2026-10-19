@@ -79,10 +79,12 @@ example, if the time of a sample is represented multiple times in the packet, th
 the same in all cases.
 
 Field values are constrained by data types described below, and sometimes by additional
-constraints described in prose.  Primitive types are as they are in Go: 64-bit integers and
-floating point, and Unicode strings.  Numeric values outside the given ranges, non-Unicode
-string encodings, malformed timestamps, malformed node-ranges or type-incorrect data in any
-field can cause the entire top-level object containing them to be rejected by the back-end.
+constraints described in prose.  Extra-constraining types (NonemptyString, NonnegativeFloat64,
+and so on) are introduced as necessary to add important semantics.  Primitive types are as they
+are in Go: 64-bit integers and floating point, and Unicode strings.  Numeric values outside the
+given ranges, non-Unicode string encodings, malformed timestamps, malformed node-ranges or
+type-incorrect data in any field can cause the entire top-level object containing them to be
+rejected by the back-end.
 
 In a serialization format (such as JSON) that allows fields to be omitted, all fields except
 those of a type derived from NonemptyString have default values, which are zero, empty string,
@@ -96,6 +98,9 @@ Field names generally do not carry unit information.  The units are included in 
 descriptions, but if they are not then they should be kilobytes for memory, megahertz for
 clocks, watts for power, and percentage points for relative utilization measures.  (Here,
 Kilobyte (KB) = 2^10, Megabyte (MB) = 2^20, Gigabyte (GB) = 2^30 bytes, SI notwithstanding.)
+
+The first sentence of a field's documentation may be extracted and attached as an annotation on a
+REST API.  Keep it reasonably brief.
 
 The top-level object for each output data type is the "...Envelope" object.
 
@@ -271,7 +276,11 @@ String value where an empty value is an error, not simply absence of data
 
 ### Type: `NonzeroUint`
 
-Uint64 value where zero is an error, not simply absence of datga
+Uint64 value where zero is an error, not simply absence of data
+
+### Type: `NonnegativeFloat64`
+
+Float64 value where negative, NaN and Infinity are errors
 
 ### Type: `Timestamp`
 
@@ -313,7 +322,7 @@ Python version (slurm-monitor does this).
 
 #### **`producer`** NonemptyString
 
-The name of the component that generated the data (eg "sonar", "slurm-monitor")
+The name of the component that generated the data. Example: "sonar", "slurm-monitor"
 
 #### **`version`** NonemptyString
 
@@ -329,9 +338,9 @@ An array of generator-dependent attribute values
 
 #### **`token`** string
 
-EXPERIMENTAL / UNDERSPECIFIED.  An API token to be used with
-Envelope.Data.Attributes.Cluster, it proves that the producer of the datum was authorized to
-produce data for that cluster name.
+An API token to be used with Envelope.Data.Attributes.Cluster. It proves that the producer of
+the datum was authorized to produce data for that cluster name.  EXPERIMENTAL /
+UNDERSPECIFIED.
 
 ### Type: `ErrorObject`
 
@@ -443,8 +452,8 @@ Architecture name (the `machine` field of `struct utsname`)
 
 #### **`numa_nodes`** uint64
 
-Number of NUMA nodes (frequently smaller than the number of sockets), zero if we can't
-compute it
+Number of NUMA nodes, zero if we can't compute it.  Frequently smaller than the number of
+sockets.
 
 #### **`sockets`** NonzeroUint
 
@@ -636,14 +645,14 @@ The node's boot time
 
 #### **`cpus`** []SampleCpu
 
-The state of individual cores.  These are sorted in index order, and the array is always dense and
-of length Sockets * CoresPerSocket * ThreadsPerCore (from SysinfoAttributes for the node).
+The state of individual cores, cores sorted in index order.  The array is always dense and of
+length Sockets * CoresPerSocket * ThreadsPerCore (from SysinfoAttributes for the node).
 
 #### **`gpus`** []SampleGpu
 
-The state of individual GPU devices.  These are sorted in card index order, but the array may
-be sparse (some indices missing) and may in principle change in length and index set from
-sample to sample.
+The state of individual GPU devices, cards sorted in card index order.  The array may be
+sparse (some indices missing) and may in principle change in length and index set from sample
+to sample.
 
 #### **`disks`** []SampleDisk
 
@@ -653,15 +662,15 @@ The state of individual disks
 
 The amount of primary memory in use in kilobytes
 
-#### **`load1`** float64
+#### **`load1`** NonnegativeFloat64
 
 One-minute load average
 
-#### **`load5`** float64
+#### **`load5`** NonnegativeFloat64
 
 Five-minute load average
 
-#### **`load15`** float64
+#### **`load15`** NonnegativeFloat64
 
 Fifteen-minute load average
 
@@ -895,13 +904,13 @@ fork off a container as part of its work but itself not be running in a containe
 The number of threads in the process, minus 1 - we don't count the process's main thread
 (allowing this fields to be omitted in transmission for most processes).
 
-#### **`cpu_avg`** float64
+#### **`cpu_avg`** NonnegativeFloat64
 
 The running average CPU percentage over the true lifetime of the process as reported
 by the operating system. 100.0 corresponds to "one full core's worth of computation".
 See notes.
 
-#### **`cpu_util`** float64
+#### **`cpu_util`** NonnegativeFloat64
 
 The current sampled CPU utilization of the process, 100.0 corresponds to "one full core's
 worth of computation". See notes.
@@ -960,7 +969,7 @@ Node-local card index.  See notes in preamble
 
 Card UUID.  See preamble for notes about UUIDs.
 
-#### **`gpu_util`** float64
+#### **`gpu_util`** NonnegativeFloat64
 
 The current GPU percentage utilization for the process on the card.
 
@@ -971,7 +980,7 @@ the fields analogous to the "cpu_" fields.)
 
 The current GPU memory used in kilobytes for the process on the card. See notes.
 
-#### **`gpu_memory_util`** float64
+#### **`gpu_memory_util`** NonnegativeFloat64
 
 The current GPU memory usage percentage for the process on the card. See notes.
 
