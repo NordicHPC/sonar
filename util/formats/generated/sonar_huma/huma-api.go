@@ -60,11 +60,11 @@ type SysinfoAttributes struct {
 	OsRelease      NonemptyString   `json:"os_release" minLength:"1" doc:"Operating system version (the 'release' field of 'struct utsname')"`
 	Architecture   NonemptyString   `json:"architecture" minLength:"1" doc:"Architecture name (the 'machine' field of 'struct utsname')"`
 	NumaNodes      uint64           `json:"numa_nodes" doc:"Number of NUMA nodes, zero if we can't compute it"`
-	Sockets        NonzeroUint      `json:"sockets" minimum:"0" doc:"Number of CPU sockets"`
-	CoresPerSocket NonzeroUint      `json:"cores_per_socket" minimum:"0" doc:"Number of physical cores per socket"`
-	ThreadsPerCore NonzeroUint      `json:"threads_per_core" minimum:"0" doc:"Number of hyperthreads per physical core"`
+	Sockets        NonzeroUint      `json:"sockets" minimum:"1" doc:"Number of CPU sockets"`
+	CoresPerSocket NonzeroUint      `json:"cores_per_socket" minimum:"1" doc:"Number of physical cores per socket"`
+	ThreadsPerCore NonzeroUint      `json:"threads_per_core" minimum:"1" doc:"Number of hyperthreads per physical core"`
 	CpuModel       string           `json:"cpu_model" doc:"Manufacturer's model name"`
-	Memory         NonzeroUint      `json:"memory" minimum:"0" doc:"Primary memory in kilobytes"`
+	Memory         NonzeroUint      `json:"memory" minimum:"1" doc:"Primary memory in kilobytes"`
 	TopoSVG        string           `json:"topo_svg,omitempty" doc:"Base64-encoded text output (SVG source text) of 'lstopo' or similar, using the base64 alphabet from RFC4648"`
 	TopoText       string           `json:"topo_text,omitempty" doc:"Base64-encoded text output (human-readable) of 'hwloc-ls' or similar, using the base64 alphabet from RFC4648"`
 	Cards          []SysinfoGpuCard `json:"cards,omitempty" doc:"Per-card information"`
@@ -183,7 +183,7 @@ type JobsAttributes struct {
 	SlurmJobs []SlurmJob  `json:"slurm_jobs,omitempty" doc:"Individual job records"`
 }
 type SlurmJob struct {
-	JobID            NonzeroUint     `json:"job_id" minimum:"0" doc:"The Slurm Job ID that directly controls the task that the record describes, in an array or het job this is the primitive ID of the subjob"`
+	JobID            NonzeroUint     `json:"job_id" minimum:"1" doc:"The Slurm Job ID that directly controls the task that the record describes, in an array or het job this is the primitive ID of the subjob"`
 	JobStep          string          `json:"job_step,omitempty" doc:"The step identifier for the job identified by job_id"`
 	JobName          string          `json:"job_name,omitempty" doc:"The name of the job"`
 	JobState         NonemptyString  `json:"job_state" minLength:"1" doc:"The state of the job described by the record, an all-uppercase word from the set PENDING, RUNNING, CANCELLED, COMPLETED, DEADLINE, FAILED, OUT_OF_MEMORY, TIMEOUT"`

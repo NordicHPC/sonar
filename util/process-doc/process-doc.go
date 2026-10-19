@@ -333,7 +333,7 @@ var humaTags = map[string]string{
 	"NonnegativeFloat64": "minimum:\"0\"",
 	"Timestamp":          "format:\"date-time\"",
 	"Hostname":           "format:\"hostname\"",
-	"NonzeroUint":        "minimum:\"0\"",
+	"NonzeroUint":        "minimum:\"1\"",
 	"HostnameRange":      "minLength:\"1\"", // NonemptyString
 	"ClusterName":        "minLength:\"1\"", // NonemptyString, but not Hostname
 	"OptionalTimestamp":  "minLength:\"1\"", // Timestamp, but omittable
