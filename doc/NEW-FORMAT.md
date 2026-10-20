@@ -79,10 +79,12 @@ example, if the time of a sample is represented multiple times in the packet, th
 the same in all cases.
 
 Field values are constrained by data types described below, and sometimes by additional
-constraints described in prose.  Primitive types are as they are in Go: 64-bit integers and
-floating point, and Unicode strings.  Numeric values outside the given ranges, non-Unicode
-string encodings, malformed timestamps, malformed node-ranges or type-incorrect data in any
-field can cause the entire top-level object containing them to be rejected by the back-end.
+constraints described in prose.  Extra-constraining types (NonemptyString, NonnegativeFloat64,
+and so on) are introduced as necessary to add important semantics.  Primitive types are as they
+are in Go: 64-bit integers and floating point, and Unicode strings.  Numeric values outside the
+given ranges, non-Unicode string encodings, malformed timestamps, malformed node-ranges or
+type-incorrect data in any field can cause the entire top-level object containing them to be
+rejected by the back-end.
 
 In a serialization format (such as JSON) that allows fields to be omitted, all fields except
 those of a type derived from NonemptyString have default values, which are zero, empty string,
@@ -96,6 +98,9 @@ Field names generally do not carry unit information.  The units are included in 
 descriptions, but if they are not then they should be kilobytes for memory, megahertz for
 clocks, watts for power, and percentage points for relative utilization measures.  (Here,
 Kilobyte (KB) = 2^10, Megabyte (MB) = 2^20, Gigabyte (GB) = 2^30 bytes, SI notwithstanding.)
+
+The first sentence of a field's documentation may be extracted and attached as an annotation on a
+REST API.  Keep it reasonably brief.
 
 The top-level object for each output data type is the "...Envelope" object.
 
@@ -271,7 +276,11 @@ String value where an empty value is an error, not simply absence of data
 
 ### Type: `NonzeroUint`
 
-Uint64 value where zero is an error, not simply absence of datga
+Uint64 value where zero is an error, not simply absence of data
+
+### Type: `NonnegativeFloat64`
+
+Float64 value where negative, NaN and Infinity are errors
 
 ### Type: `Timestamp`
 
@@ -313,7 +322,7 @@ Python version (slurm-monitor does this).
 
 #### **`producer`** NonemptyString
 
-The name of the component that generated the data (eg "sonar", "slurm-monitor")
+The name of the component that generated the data. Example: "sonar", "slurm-monitor"
 
 #### **`version`** NonemptyString
 
@@ -329,9 +338,9 @@ An array of generator-dependent attribute values
 
 #### **`token`** string
 
-EXPERIMENTAL / UNDERSPECIFIED.  An API token to be used with
-Envelope.Data.Attributes.Cluster, it proves that the producer of the datum was authorized to
-produce data for that cluster name.
+An API token to be used with Envelope.Data.Attributes.Cluster. It proves that the producer of
+the datum was authorized to produce data for that cluster name.  EXPERIMENTAL /
+UNDERSPECIFIED.
 
 ### Type: `ErrorObject`
 
@@ -431,20 +440,20 @@ The name of the host as it is known to itself
 
 #### **`os_name`** NonemptyString
 
-Operating system name (the `sysname` field of `struct utsname`)
+Operating system name (struct utsname.sysname)
 
 #### **`os_release`** NonemptyString
 
-Operating system version (the `release` field of `struct utsname`)
+Operating system version (struct utsname.release)
 
 #### **`architecture`** NonemptyString
 
-Architecture name (the `machine` field of `struct utsname`)
+Architecture name (struct utsname.machine)
 
 #### **`numa_nodes`** uint64
 
-Number of NUMA nodes (frequently smaller than the number of sockets), zero if we can't
-compute it
+Number of NUMA nodes, zero if we can't compute it.  Frequently smaller than the number of
+sockets.
 
 #### **`sockets`** NonzeroUint
 
@@ -468,13 +477,11 @@ Primary memory in kilobytes
 
 #### **`topo_svg`** string
 
-Base64-encoded text output (SVG source text) of `lstopo` or similar, using the base64
-alphabet from RFC4648
+Text output (SVG source text) of e.g. `lstopo`, base64 per RFC4648
 
 #### **`topo_text`** string
 
-Base64-encoded text output (human-readable) of `hwloc-ls` or similar, using the base64
-alphabet from RFC4648
+Text output (human-readable) of e.g. `hwloc-ls`, base64 per RFC4648
 
 #### **`cards`** []SysinfoGpuCard
 
@@ -482,7 +489,7 @@ Per-card information
 
 #### **`distances`** [][]uint64
 
-Square matrix of standard NUMA node-to-node distances (normalized to 10 for self distance),
+Square matrix of NUMA node-to-node distances, normalized to 10 for self distance,
 empty if we can't compute it
 
 ### Type: `SysinfoGpuCard`
@@ -509,7 +516,7 @@ UUID as reported by card.  See notes in preamble
 
 #### **`address`** string
 
-Indicates an intra-system card address, eg PCI address
+An intra-system card address, eg PCI address
 
 #### **`manufacturer`** string
 
@@ -636,14 +643,15 @@ The node's boot time
 
 #### **`cpus`** []SampleCpu
 
-The state of individual cores.  These are sorted in index order, and the array is always dense and
-of length Sockets * CoresPerSocket * ThreadsPerCore (from SysinfoAttributes for the node).
+The state of individual cores (cpu seconds used since boot), cores sorted in index order.
+The array is always dense and of length Sockets * CoresPerSocket * ThreadsPerCore (from
+SysinfoAttributes for the node).
 
 #### **`gpus`** []SampleGpu
 
-The state of individual GPU devices.  These are sorted in card index order, but the array may
-be sparse (some indices missing) and may in principle change in length and index set from
-sample to sample.
+The state of individual GPU devices, cards sorted in card index order.  The array may be
+sparse (some indices missing) and may in principle change in length and index set from sample
+to sample.
 
 #### **`disks`** []SampleDisk
 
@@ -653,15 +661,15 @@ The state of individual disks
 
 The amount of primary memory in use in kilobytes
 
-#### **`load1`** float64
+#### **`load1`** NonnegativeFloat64
 
 One-minute load average
 
-#### **`load5`** float64
+#### **`load5`** NonnegativeFloat64
 
 Five-minute load average
 
-#### **`load15`** float64
+#### **`load15`** NonnegativeFloat64
 
 Fifteen-minute load average
 
@@ -745,7 +753,7 @@ Compute element current clock
 
 #### **`memory_clock`** uint64
 
-memory current clock
+Memory current clock
 
 ### Type: `SampleDisk`
 
@@ -892,16 +900,16 @@ fork off a container as part of its work but itself not be running in a containe
 
 #### **`num_threads`** uint64
 
-The number of threads in the process, minus 1 - we don't count the process's main thread
-(allowing this fields to be omitted in transmission for most processes).
+The number of threads in the process, minus 1.  We don't count the process's main thread,
+allowing this fields to be omitted in transmission for most processes.
 
-#### **`cpu_avg`** float64
+#### **`cpu_avg`** NonnegativeFloat64
 
 The running average CPU percentage over the true lifetime of the process as reported
 by the operating system. 100.0 corresponds to "one full core's worth of computation".
 See notes.
 
-#### **`cpu_util`** float64
+#### **`cpu_util`** NonnegativeFloat64
 
 The current sampled CPU utilization of the process, 100.0 corresponds to "one full core's
 worth of computation". See notes.
@@ -920,10 +928,10 @@ Kilobytes written with all sorts of write calls (rounded up).
 
 #### **`data_cancelled`** uint64
 
-Kilobytes written but never flushed to physical media (i.e., held in RAM but then made
-obsolete by overwriting or file deletion or similar) (rounded up).
+Kilobytes written but never flushed to physical media (rounded up).  These are data held in
+RAM but then made obsolete by overwriting or file deletion or similar.
 
-#### **`rolledup`** int
+#### **`rolledup`** uint64
 
 The number of additional samples for processes that are "the same" that have been rolled into
 this one. That is, if the value is 1, the record represents the sum of the sample data for
@@ -960,7 +968,7 @@ Node-local card index.  See notes in preamble
 
 Card UUID.  See preamble for notes about UUIDs.
 
-#### **`gpu_util`** float64
+#### **`gpu_util`** NonnegativeFloat64
 
 The current GPU percentage utilization for the process on the card.
 
@@ -971,7 +979,7 @@ the fields analogous to the "cpu_" fields.)
 
 The current GPU memory used in kilobytes for the process on the card. See notes.
 
-#### **`gpu_memory_util`** float64
+#### **`gpu_memory_util`** NonnegativeFloat64
 
 The current GPU memory usage percentage for the process on the card. See notes.
 
@@ -1223,7 +1231,8 @@ sacct: `AllocTRES`
 
 #### **`requested_cpus`** uint64
 
-Number of requested CPUs (assumed to be for the job in total, the documentation is not good).
+Number of requested CPUs for the job in total.  The documentation is not good - it's an
+assumption that this is for the job in total.
 
 sacct: `ReqCPUS`
 
@@ -1247,7 +1256,7 @@ slurm: `JOB_INFO.node_count`
 
 #### **`start_time`** Timestamp
 
-Time the job started, if started
+Time the job started, if started.
 
 sacct: `Start`
 
@@ -1255,7 +1264,7 @@ slurm: `JOB_INFO.start_time`
 
 #### **`suspend_time`** uint64
 
-Number of seconds the job was suspended
+Number of seconds the job was suspended.
 
 sacct: `Suspended`
 
@@ -1263,7 +1272,7 @@ slurm: `JOB_INFO.suspend_time`
 
 #### **`end_time`** Timestamp
 
-Time the job ended (or was cancelled), if ended
+Time the job ended (or was cancelled), if ended.
 
 sacct: `End`
 
@@ -1271,7 +1280,7 @@ slurm: `JOB_INFO.end_time`
 
 #### **`exit_code`** uint64
 
-Job exit code, if ended
+Job exit code, if ended.
 
 sacct: `ExitCode`
 
@@ -1403,7 +1412,7 @@ The canonical cluster name
 
 #### **`slurm`** bool
 
-The `slurm` attribute is true if at least some nodes are under Slurm management.
+True if at least some nodes are under Slurm management.
 
 #### **`partitions`** []ClusterPartition
 
@@ -1451,6 +1460,9 @@ yield a list of node names.  For example, `c[1-3,5]-[2-4].fox` yields `c1-2.fox`
 `c5-3.fox`, `c5-4.fox`.  In a valid range, the first number is no greater than the second
 number, and numbers are not repeated.  (The motivation for this feature is that some clusters
 have very many nodes and that they group well this way.)
+
+Note a HostnameRange represents one such compression pattern, not a list of them separated by
+commas; hence, in the data, it is normally used as []HostnameRange.
 
 Note that as this represents a set of Hostnames, the names can be modified by Sonar options in
 the same way as the Hostnames themselves.

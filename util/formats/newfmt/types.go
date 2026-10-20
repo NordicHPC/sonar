@@ -87,10 +87,12 @@ import (
 // the same in all cases.
 //
 // Field values are constrained by data types described below, and sometimes by additional
-// constraints described in prose.  Primitive types are as they are in Go: 64-bit integers and
-// floating point, and Unicode strings.  Numeric values outside the given ranges, non-Unicode
-// string encodings, malformed timestamps, malformed node-ranges or type-incorrect data in any
-// field can cause the entire top-level object containing them to be rejected by the back-end.
+// constraints described in prose.  Extra-constraining types (NonemptyString, NonnegativeFloat64,
+// and so on) are introduced as necessary to add important semantics.  Primitive types are as they
+// are in Go: 64-bit integers and floating point, and Unicode strings.  Numeric values outside the
+// given ranges, non-Unicode string encodings, malformed timestamps, malformed node-ranges or
+// type-incorrect data in any field can cause the entire top-level object containing them to be
+// rejected by the back-end.
 //
 // In a serialization format (such as JSON) that allows fields to be omitted, all fields except
 // those of a type derived from NonemptyString have default values, which are zero, empty string,
@@ -104,6 +106,9 @@ import (
 // descriptions, but if they are not then they should be kilobytes for memory, megahertz for
 // clocks, watts for power, and percentage points for relative utilization measures.  (Here,
 // Kilobyte (KB) = 2^10, Megabyte (MB) = 2^20, Gigabyte (GB) = 2^30 bytes, SI notwithstanding.)
+//
+// The first sentence of a field's documentation may be extracted and attached as an annotation on a
+// REST API.  Keep it reasonably brief.
 //
 // The top-level object for each output data type is the "...Envelope" object.
 //
@@ -275,8 +280,11 @@ type _preamble int
 // String value where an empty value is an error, not simply absence of data
 type NonemptyString string
 
-// Uint64 value where zero is an error, not simply absence of datga
+// Uint64 value where zero is an error, not simply absence of data
 type NonzeroUint uint64
+
+// Float64 value where negative, NaN and Infinity are errors
+type NonnegativeFloat64 float64
 
 // RFC3339 localtime+TZO with no sub-second precision: yyyy-mm-ddThh:mm:ss+hh:mm, "Z" for +00:00.
 type Timestamp NonemptyString
@@ -348,7 +356,7 @@ const (
 // jobs, and the data could record this.  For some agents, it may be desirable to report on eg
 // Python version (slurm-monitor does this).
 type MetadataObject struct {
-	// The name of the component that generated the data (eg "sonar", "slurm-monitor")
+	// The name of the component that generated the data. Example: "sonar", "slurm-monitor"
 	Producer NonemptyString `json:"producer"`
 
 	// The semver of the producer
@@ -360,9 +368,9 @@ type MetadataObject struct {
 	// An array of generator-dependent attribute values
 	Attrs []KVPair `json:"attrs,omitempty"`
 
-	// EXPERIMENTAL / UNDERSPECIFIED.  An API token to be used with
-	// Envelope.Data.Attributes.Cluster, it proves that the producer of the datum was authorized to
-	// produce data for that cluster name.
+	// An API token to be used with Envelope.Data.Attributes.Cluster. It proves that the producer of
+	// the datum was authorized to produce data for that cluster name.  EXPERIMENTAL /
+	// UNDERSPECIFIED.
 	Token string `json:"token,omitempty"`
 }
 
@@ -442,17 +450,17 @@ type SysinfoAttributes struct {
 	// The name of the host as it is known to itself
 	Node Hostname `json:"node"`
 
-	// Operating system name (the `sysname` field of `struct utsname`)
+	// Operating system name (struct utsname.sysname)
 	OsName NonemptyString `json:"os_name"`
 
-	// Operating system version (the `release` field of `struct utsname`)
+	// Operating system version (struct utsname.release)
 	OsRelease NonemptyString `json:"os_release"`
 
-	// Architecture name (the `machine` field of `struct utsname`)
+	// Architecture name (struct utsname.machine)
 	Architecture NonemptyString `json:"architecture"`
 
-	// Number of NUMA nodes (frequently smaller than the number of sockets), zero if we can't
-	// compute it
+	// Number of NUMA nodes, zero if we can't compute it.  Frequently smaller than the number of
+	// sockets.
 	NumaNodes uint64 `json:"numa_nodes"`
 
 	// Number of CPU sockets
@@ -470,18 +478,16 @@ type SysinfoAttributes struct {
 	// Primary memory in kilobytes
 	Memory NonzeroUint `json:"memory"`
 
-	// Base64-encoded text output (SVG source text) of `lstopo` or similar, using the base64
-	// alphabet from RFC4648
+	// Text output (SVG source text) of e.g. `lstopo`, base64 per RFC4648
 	TopoSVG string `json:"topo_svg,omitempty"`
 
-	// Base64-encoded text output (human-readable) of `hwloc-ls` or similar, using the base64
-	// alphabet from RFC4648
+	// Text output (human-readable) of e.g. `hwloc-ls`, base64 per RFC4648
 	TopoText string `json:"topo_text,omitempty"`
 
 	// Per-card information
 	Cards []SysinfoGpuCard `json:"cards,omitempty"`
 
-	// Square matrix of standard NUMA node-to-node distances (normalized to 10 for self distance),
+	// Square matrix of NUMA node-to-node distances, normalized to 10 for self distance,
 	// empty if we can't compute it
 	Distances [][]uint64 `json:"distances,omitempty"`
 }
@@ -504,7 +510,7 @@ type SysinfoGpuCard struct {
 	// UUID as reported by card.  See notes in preamble
 	UUID string `json:"uuid,omitempty"`
 
-	// Indicates an intra-system card address, eg PCI address
+	// An intra-system card address, eg PCI address
 	Address string `json:"address,omitempty"`
 
 	// A keyword, "NVIDIA", "AMD", "Intel" (others TBD)
@@ -603,13 +609,14 @@ type SampleSystem struct {
 	// The node's boot time
 	Boot Timestamp `json:"boot"`
 
-	// The state of individual cores.  These are sorted in index order, and the array is always dense and
-	// of length Sockets * CoresPerSocket * ThreadsPerCore (from SysinfoAttributes for the node).
+	// The state of individual cores (cpu seconds used since boot), cores sorted in index order.
+	// The array is always dense and of length Sockets * CoresPerSocket * ThreadsPerCore (from
+	// SysinfoAttributes for the node).
 	Cpus []SampleCpu `json:"cpus,omitempty"`
 
-	// The state of individual GPU devices.  These are sorted in card index order, but the array may
-	// be sparse (some indices missing) and may in principle change in length and index set from
-	// sample to sample.
+	// The state of individual GPU devices, cards sorted in card index order.  The array may be
+	// sparse (some indices missing) and may in principle change in length and index set from sample
+	// to sample.
 	Gpus []SampleGpu `json:"gpus,omitempty"`
 
 	// The state of individual disks
@@ -619,13 +626,13 @@ type SampleSystem struct {
 	UsedMemory uint64 `json:"used_memory,omitempty"`
 
 	// One-minute load average
-	Load1 float64 `json:"load1,omitempty"`
+	Load1 NonnegativeFloat64 `json:"load1,omitempty"`
 
 	// Five-minute load average
-	Load5 float64 `json:"load5,omitempty"`
+	Load5 NonnegativeFloat64 `json:"load5,omitempty"`
 
 	// Fifteen-minute load average
-	Load15 float64 `json:"load15,omitempty"`
+	Load15 NonnegativeFloat64 `json:"load15,omitempty"`
 
 	// Number of currently runnable scheduling entities (processes, threads)
 	RunnableEntities uint64 `json:"runnable_entities,omitempty"`
@@ -688,7 +695,7 @@ type SampleGpu struct {
 	// Compute element current clock
 	CEClock uint64 `json:"ce_clock,omitempty"`
 
-	// memory current clock
+	// Memory current clock
 	MemoryClock uint64 `json:"memory_clock,omitempty"`
 }
 
@@ -817,18 +824,18 @@ type SampleProcess struct {
 	// fork off a container as part of its work but itself not be running in a container.
 	InContainer bool `json:"in_container,omitempty"`
 
-	// The number of threads in the process, minus 1 - we don't count the process's main thread
-	// (allowing this fields to be omitted in transmission for most processes).
+	// The number of threads in the process, minus 1.  We don't count the process's main thread,
+	// allowing this fields to be omitted in transmission for most processes.
 	NumThreads uint64 `json:"num_threads,omitempty"`
 
 	// The running average CPU percentage over the true lifetime of the process as reported
 	// by the operating system. 100.0 corresponds to "one full core's worth of computation".
 	// See notes.
-	CpuAvg float64 `json:"cpu_avg,omitempty"`
+	CpuAvg NonnegativeFloat64 `json:"cpu_avg,omitempty"`
 
 	// The current sampled CPU utilization of the process, 100.0 corresponds to "one full core's
 	// worth of computation". See notes.
-	CpuUtil float64 `json:"cpu_util,omitempty"`
+	CpuUtil NonnegativeFloat64 `json:"cpu_util,omitempty"`
 
 	// Cumulative CPU time in seconds for the process over its lifetime. See notes.
 	CpuTime uint64 `json:"cpu_time,omitempty"`
@@ -839,14 +846,14 @@ type SampleProcess struct {
 	// Kilobytes written with all sorts of write calls (rounded up).
 	Written uint64 `json:"data_written,omitempty"`
 
-	// Kilobytes written but never flushed to physical media (i.e., held in RAM but then made
-	// obsolete by overwriting or file deletion or similar) (rounded up).
+	// Kilobytes written but never flushed to physical media (rounded up).  These are data held in
+	// RAM but then made obsolete by overwriting or file deletion or similar.
 	Cancelled uint64 `json:"data_cancelled,omitempty"`
 
 	// The number of additional samples for processes that are "the same" that have been rolled into
 	// this one. That is, if the value is 1, the record represents the sum of the sample data for
 	// two processes.  See "Rolled-up samples" in the postamble for more.
-	Rolledup int `json:"rolledup,omitempty"`
+	Rolledup uint64 `json:"rolledup,omitempty"`
 
 	// GPU sample data for all cards used by the process.
 	Gpus []SampleProcessGpu `json:"gpus,omitempty"`
@@ -879,13 +886,13 @@ type SampleProcessGpu struct {
 	//
 	// (The "gpu_" prefix here and below is sort of redundant but have been retained since it makes
 	// the fields analogous to the "cpu_" fields.)
-	GpuUtil float64 `json:"gpu_util,omitempty"`
+	GpuUtil NonnegativeFloat64 `json:"gpu_util,omitempty"`
 
 	// The current GPU memory used in kilobytes for the process on the card. See notes.
 	GpuMemory uint64 `json:"gpu_memory,omitempty"`
 
 	// The current GPU memory usage percentage for the process on the card. See notes.
-	GpuMemoryUtil float64 `json:"gpu_memory_util,omitempty"`
+	GpuMemoryUtil NonnegativeFloat64 `json:"gpu_memory_util,omitempty"`
 }
 
 // Jobs data are extracted from a single always-up master node on the cluster, and describe jobs
@@ -1102,7 +1109,8 @@ type SlurmJob struct {
 	// sacct: `AllocTRES`
 	AllocTRES string `json:"allocated_resources,omitempty"`
 
-	// Number of requested CPUs (assumed to be for the job in total, the documentation is not good).
+	// Number of requested CPUs for the job in total.  The documentation is not good - it's an
+	// assumption that this is for the job in total.
 	//
 	// sacct: `ReqCPUS`
 	//
@@ -1123,28 +1131,28 @@ type SlurmJob struct {
 	// slurm: `JOB_INFO.node_count`
 	ReqNodes uint64 `json:"requested_node_count,omitempty"`
 
-	// Time the job started, if started
+	// Time the job started, if started.
 	//
 	// sacct: `Start`
 	//
 	// slurm: `JOB_INFO.start_time`
 	Start Timestamp `json:"start_time"`
 
-	// Number of seconds the job was suspended
+	// Number of seconds the job was suspended.
 	//
 	// sacct: `Suspended`
 	//
 	// slurm: `JOB_INFO.suspend_time`
 	Suspended uint64 `json:"suspend_time,omitempty"`
 
-	// Time the job ended (or was cancelled), if ended
+	// Time the job ended (or was cancelled), if ended.
 	//
 	// sacct: `End`
 	//
 	// slurm: `JOB_INFO.end_time`
 	End Timestamp `json:"end_time"`
 
-	// Job exit code, if ended
+	// Job exit code, if ended.
 	//
 	// sacct: `ExitCode`
 	//
@@ -1251,7 +1259,7 @@ type ClusterAttributes struct {
 	// The canonical cluster name
 	Cluster Clustername `json:"cluster"`
 
-	// The `slurm` attribute is true if at least some nodes are under Slurm management.
+	// True if at least some nodes are under Slurm management.
 	Slurm bool `json:"slurm,omitempty"`
 
 	// Descriptions of the partitions on the cluster
@@ -1291,6 +1299,9 @@ type ClusterNodes struct {
 // `c5-3.fox`, `c5-4.fox`.  In a valid range, the first number is no greater than the second
 // number, and numbers are not repeated.  (The motivation for this feature is that some clusters
 // have very many nodes and that they group well this way.)
+//
+// Note a HostnameRange represents one such compression pattern, not a list of them separated by
+// commas; hence, in the data, it is normally used as []HostnameRange.
 //
 // Note that as this represents a set of Hostnames, the names can be modified by Sonar options in
 // the same way as the Hostnames themselves.
