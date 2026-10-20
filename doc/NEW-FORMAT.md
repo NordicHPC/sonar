@@ -440,15 +440,15 @@ The name of the host as it is known to itself
 
 #### **`os_name`** NonemptyString
 
-Operating system name (the `sysname` field of `struct utsname`)
+Operating system name (struct utsname.sysname)
 
 #### **`os_release`** NonemptyString
 
-Operating system version (the `release` field of `struct utsname`)
+Operating system version (struct utsname.release)
 
 #### **`architecture`** NonemptyString
 
-Architecture name (the `machine` field of `struct utsname`)
+Architecture name (struct utsname.machine)
 
 #### **`numa_nodes`** uint64
 
@@ -477,13 +477,11 @@ Primary memory in kilobytes
 
 #### **`topo_svg`** string
 
-Base64-encoded text output (SVG source text) of `lstopo` or similar, using the base64
-alphabet from RFC4648
+Text output (SVG source text) of e.g. `lstopo`, base64 per RFC4648
 
 #### **`topo_text`** string
 
-Base64-encoded text output (human-readable) of `hwloc-ls` or similar, using the base64
-alphabet from RFC4648
+Text output (human-readable) of e.g. `hwloc-ls`, base64 per RFC4648
 
 #### **`cards`** []SysinfoGpuCard
 
@@ -491,7 +489,7 @@ Per-card information
 
 #### **`distances`** [][]uint64
 
-Square matrix of standard NUMA node-to-node distances (normalized to 10 for self distance),
+Square matrix of NUMA node-to-node distances, normalized to 10 for self distance,
 empty if we can't compute it
 
 ### Type: `SysinfoGpuCard`
@@ -518,7 +516,7 @@ UUID as reported by card.  See notes in preamble
 
 #### **`address`** string
 
-Indicates an intra-system card address, eg PCI address
+An intra-system card address, eg PCI address
 
 #### **`manufacturer`** string
 
@@ -645,8 +643,9 @@ The node's boot time
 
 #### **`cpus`** []SampleCpu
 
-The state of individual cores, cores sorted in index order.  The array is always dense and of
-length Sockets * CoresPerSocket * ThreadsPerCore (from SysinfoAttributes for the node).
+The state of individual cores (cpu seconds used since boot), cores sorted in index order.
+The array is always dense and of length Sockets * CoresPerSocket * ThreadsPerCore (from
+SysinfoAttributes for the node).
 
 #### **`gpus`** []SampleGpu
 
@@ -754,7 +753,7 @@ Compute element current clock
 
 #### **`memory_clock`** uint64
 
-memory current clock
+Memory current clock
 
 ### Type: `SampleDisk`
 
@@ -901,8 +900,8 @@ fork off a container as part of its work but itself not be running in a containe
 
 #### **`num_threads`** uint64
 
-The number of threads in the process, minus 1 - we don't count the process's main thread
-(allowing this fields to be omitted in transmission for most processes).
+The number of threads in the process, minus 1.  We don't count the process's main thread,
+allowing this fields to be omitted in transmission for most processes.
 
 #### **`cpu_avg`** NonnegativeFloat64
 
@@ -929,10 +928,10 @@ Kilobytes written with all sorts of write calls (rounded up).
 
 #### **`data_cancelled`** uint64
 
-Kilobytes written but never flushed to physical media (i.e., held in RAM but then made
-obsolete by overwriting or file deletion or similar) (rounded up).
+Kilobytes written but never flushed to physical media (rounded up).  These are data held in
+RAM but then made obsolete by overwriting or file deletion or similar.
 
-#### **`rolledup`** int
+#### **`rolledup`** uint64
 
 The number of additional samples for processes that are "the same" that have been rolled into
 this one. That is, if the value is 1, the record represents the sum of the sample data for
@@ -1232,7 +1231,8 @@ sacct: `AllocTRES`
 
 #### **`requested_cpus`** uint64
 
-Number of requested CPUs (assumed to be for the job in total, the documentation is not good).
+Number of requested CPUs for the job in total.  The documentation is not good - it's an
+assumption that this is for the job in total.
 
 sacct: `ReqCPUS`
 
@@ -1256,7 +1256,7 @@ slurm: `JOB_INFO.node_count`
 
 #### **`start_time`** Timestamp
 
-Time the job started, if started
+Time the job started, if started.
 
 sacct: `Start`
 
@@ -1264,7 +1264,7 @@ slurm: `JOB_INFO.start_time`
 
 #### **`suspend_time`** uint64
 
-Number of seconds the job was suspended
+Number of seconds the job was suspended.
 
 sacct: `Suspended`
 
@@ -1272,7 +1272,7 @@ slurm: `JOB_INFO.suspend_time`
 
 #### **`end_time`** Timestamp
 
-Time the job ended (or was cancelled), if ended
+Time the job ended (or was cancelled), if ended.
 
 sacct: `End`
 
@@ -1280,7 +1280,7 @@ slurm: `JOB_INFO.end_time`
 
 #### **`exit_code`** uint64
 
-Job exit code, if ended
+Job exit code, if ended.
 
 sacct: `ExitCode`
 
@@ -1412,7 +1412,7 @@ The canonical cluster name
 
 #### **`slurm`** bool
 
-The `slurm` attribute is true if at least some nodes are under Slurm management.
+True if at least some nodes are under Slurm management.
 
 #### **`partitions`** []ClusterPartition
 
@@ -1460,6 +1460,9 @@ yield a list of node names.  For example, `c[1-3,5]-[2-4].fox` yields `c1-2.fox`
 `c5-3.fox`, `c5-4.fox`.  In a valid range, the first number is no greater than the second
 number, and numbers are not repeated.  (The motivation for this feature is that some clusters
 have very many nodes and that they group well this way.)
+
+Note a HostnameRange represents one such compression pattern, not a list of them separated by
+commas; hence, in the data, it is normally used as []HostnameRange.
 
 Note that as this represents a set of Hostnames, the names can be modified by Sonar options in
 the same way as the Hostnames themselves.

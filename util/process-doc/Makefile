@@ -6,7 +6,7 @@ OUTPUTS=NEW-FORMAT.md json_tags.rs types.spec.yaml huma-api.go
 all: $(OUTPUTS)
 
 # `install` is the old name, used here and there.
-generate install: $(OUTPUTS)
+generate install: process-doc $(OUTPUTS)
 	mv NEW-FORMAT.md ../../doc
 	mv json_tags.rs ../../src
 	mv types.spec.yaml ../../doc

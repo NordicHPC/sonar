@@ -94,15 +94,15 @@ SysinfoAttributes:
     os_name:
       type: 'NonemptyString'
       doc: >
-        Operating system name (the `sysname` field of `struct utsname`)
+        Operating system name (struct utsname.sysname)
     os_release:
       type: 'NonemptyString'
       doc: >
-        Operating system version (the `release` field of `struct utsname`)
+        Operating system version (struct utsname.release)
     architecture:
       type: 'NonemptyString'
       doc: >
-        Architecture name (the `machine` field of `struct utsname`)
+        Architecture name (struct utsname.machine)
     numa_nodes:
       type: 'uint64'
       doc: >
@@ -130,11 +130,11 @@ SysinfoAttributes:
     topo_svg:
       type: 'string'
       doc: >
-        Base64-encoded text output (SVG source text) of `lstopo` or similar, using the base64 alphabet from RFC4648
+        Text output (SVG source text) of e.g. `lstopo`, base64 per RFC4648
     topo_text:
       type: 'string'
       doc: >
-        Base64-encoded text output (human-readable) of `hwloc-ls` or similar, using the base64 alphabet from RFC4648
+        Text output (human-readable) of e.g. `hwloc-ls`, base64 per RFC4648
     cards:
       type: '[]SysinfoGpuCard'
       doc: >
@@ -142,7 +142,7 @@ SysinfoAttributes:
     distances:
       type: '[][]uint64'
       doc: >
-        Square matrix of standard NUMA node-to-node distances (normalized to 10 for self distance), empty if we can't compute it
+        Square matrix of NUMA node-to-node distances, normalized to 10 for self distance, empty if we can't compute it
 SysinfoGpuCard:
   fields:
     index:
@@ -156,7 +156,7 @@ SysinfoGpuCard:
     address:
       type: 'string'
       doc: >
-        Indicates an intra-system card address, eg PCI address
+        An intra-system card address, eg PCI address
     manufacturer:
       type: 'string'
       doc: >
@@ -260,7 +260,7 @@ SampleSystem:
     cpus:
       type: '[]SampleCpu'
       doc: >
-        The state of individual cores, cores sorted in index order.  The array is always dense and of length Sockets * CoresPerSocket * ThreadsPerCore (from SysinfoAttributes for the node).
+        The state of individual cores (cpu seconds used since boot), cores sorted in index order. The array is always dense and of length Sockets * CoresPerSocket * ThreadsPerCore (from SysinfoAttributes for the node).
     gpus:
       type: '[]SampleGpu'
       doc: >
@@ -350,7 +350,7 @@ SampleGpu:
     memory_clock:
       type: 'uint64'
       doc: >
-        memory current clock
+        Memory current clock
 SampleDisk:
   fields:
     name:
@@ -416,7 +416,7 @@ SampleProcess:
     num_threads:
       type: 'uint64'
       doc: >
-        The number of threads in the process, minus 1 - we don't count the process's main thread (allowing this fields to be omitted in transmission for most processes).
+        The number of threads in the process, minus 1.  We don't count the process's main thread, allowing this fields to be omitted in transmission for most processes.
     cpu_avg:
       type: 'NonnegativeFloat64'
       doc: >
@@ -440,9 +440,9 @@ SampleProcess:
     data_cancelled:
       type: 'uint64'
       doc: >
-        Kilobytes written but never flushed to physical media (i.e., held in RAM but then made obsolete by overwriting or file deletion or similar) (rounded up).
+        Kilobytes written but never flushed to physical media (rounded up).  These are data held in RAM but then made obsolete by overwriting or file deletion or similar.
     rolledup:
-      type: 'int'
+      type: 'uint64'
       doc: >
         The number of additional samples for processes that are "the same" that have been rolled into this one. That is, if the value is 1, the record represents the sum of the sample data for two processes.  See "Rolled-up samples" in the postamble for more.
     gpus:
@@ -590,7 +590,7 @@ SlurmJob:
     requested_cpus:
       type: 'uint64'
       doc: >
-        Number of requested CPUs (assumed to be for the job in total, the documentation is not good).  sacct: `ReqCPUS`  slurm: `JOB_INFO.cpus`
+        Number of requested CPUs for the job in total.  The documentation is not good - it's an assumption that this is for the job in total.  sacct: `ReqCPUS`  slurm: `JOB_INFO.cpus`
     requested_memory_per_node:
       type: 'uint64'
       doc: >
@@ -602,19 +602,19 @@ SlurmJob:
     start_time:
       type: 'Timestamp'
       doc: >
-        Time the job started, if started  sacct: `Start`  slurm: `JOB_INFO.start_time`
+        Time the job started, if started.  sacct: `Start`  slurm: `JOB_INFO.start_time`
     suspend_time:
       type: 'uint64'
       doc: >
-        Number of seconds the job was suspended  sacct: `Suspended`  slurm: `JOB_INFO.suspend_time`
+        Number of seconds the job was suspended.  sacct: `Suspended`  slurm: `JOB_INFO.suspend_time`
     end_time:
       type: 'Timestamp'
       doc: >
-        Time the job ended (or was cancelled), if ended  sacct: `End`  slurm: `JOB_INFO.end_time`
+        Time the job ended (or was cancelled), if ended.  sacct: `End`  slurm: `JOB_INFO.end_time`
     exit_code:
       type: 'uint64'
       doc: >
-        Job exit code, if ended  sacct: `ExitCode`  slurm: `JOB_INFO.exit_code.return_code`
+        Job exit code, if ended.  sacct: `ExitCode`  slurm: `JOB_INFO.exit_code.return_code`
     sacct:
       type: '*SacctData'
       doc: >
@@ -706,7 +706,7 @@ ClusterAttributes:
     slurm:
       type: 'bool'
       doc: >
-        The `slurm` attribute is true if at least some nodes are under Slurm management.
+        True if at least some nodes are under Slurm management.
     partitions:
       type: '[]ClusterPartition'
       doc: >

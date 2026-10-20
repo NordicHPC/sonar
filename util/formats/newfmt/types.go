@@ -450,13 +450,13 @@ type SysinfoAttributes struct {
 	// The name of the host as it is known to itself
 	Node Hostname `json:"node"`
 
-	// Operating system name (the `sysname` field of `struct utsname`)
+	// Operating system name (struct utsname.sysname)
 	OsName NonemptyString `json:"os_name"`
 
-	// Operating system version (the `release` field of `struct utsname`)
+	// Operating system version (struct utsname.release)
 	OsRelease NonemptyString `json:"os_release"`
 
-	// Architecture name (the `machine` field of `struct utsname`)
+	// Architecture name (struct utsname.machine)
 	Architecture NonemptyString `json:"architecture"`
 
 	// Number of NUMA nodes, zero if we can't compute it.  Frequently smaller than the number of
@@ -478,18 +478,16 @@ type SysinfoAttributes struct {
 	// Primary memory in kilobytes
 	Memory NonzeroUint `json:"memory"`
 
-	// Base64-encoded text output (SVG source text) of `lstopo` or similar, using the base64
-	// alphabet from RFC4648
+	// Text output (SVG source text) of e.g. `lstopo`, base64 per RFC4648
 	TopoSVG string `json:"topo_svg,omitempty"`
 
-	// Base64-encoded text output (human-readable) of `hwloc-ls` or similar, using the base64
-	// alphabet from RFC4648
+	// Text output (human-readable) of e.g. `hwloc-ls`, base64 per RFC4648
 	TopoText string `json:"topo_text,omitempty"`
 
 	// Per-card information
 	Cards []SysinfoGpuCard `json:"cards,omitempty"`
 
-	// Square matrix of standard NUMA node-to-node distances (normalized to 10 for self distance),
+	// Square matrix of NUMA node-to-node distances, normalized to 10 for self distance,
 	// empty if we can't compute it
 	Distances [][]uint64 `json:"distances,omitempty"`
 }
@@ -512,7 +510,7 @@ type SysinfoGpuCard struct {
 	// UUID as reported by card.  See notes in preamble
 	UUID string `json:"uuid,omitempty"`
 
-	// Indicates an intra-system card address, eg PCI address
+	// An intra-system card address, eg PCI address
 	Address string `json:"address,omitempty"`
 
 	// A keyword, "NVIDIA", "AMD", "Intel" (others TBD)
@@ -611,8 +609,9 @@ type SampleSystem struct {
 	// The node's boot time
 	Boot Timestamp `json:"boot"`
 
-	// The state of individual cores, cores sorted in index order.  The array is always dense and of
-	// length Sockets * CoresPerSocket * ThreadsPerCore (from SysinfoAttributes for the node).
+	// The state of individual cores (cpu seconds used since boot), cores sorted in index order.
+	// The array is always dense and of length Sockets * CoresPerSocket * ThreadsPerCore (from
+	// SysinfoAttributes for the node).
 	Cpus []SampleCpu `json:"cpus,omitempty"`
 
 	// The state of individual GPU devices, cards sorted in card index order.  The array may be
@@ -696,7 +695,7 @@ type SampleGpu struct {
 	// Compute element current clock
 	CEClock uint64 `json:"ce_clock,omitempty"`
 
-	// memory current clock
+	// Memory current clock
 	MemoryClock uint64 `json:"memory_clock,omitempty"`
 }
 
@@ -825,8 +824,8 @@ type SampleProcess struct {
 	// fork off a container as part of its work but itself not be running in a container.
 	InContainer bool `json:"in_container,omitempty"`
 
-	// The number of threads in the process, minus 1 - we don't count the process's main thread
-	// (allowing this fields to be omitted in transmission for most processes).
+	// The number of threads in the process, minus 1.  We don't count the process's main thread,
+	// allowing this fields to be omitted in transmission for most processes.
 	NumThreads uint64 `json:"num_threads,omitempty"`
 
 	// The running average CPU percentage over the true lifetime of the process as reported
@@ -847,14 +846,14 @@ type SampleProcess struct {
 	// Kilobytes written with all sorts of write calls (rounded up).
 	Written uint64 `json:"data_written,omitempty"`
 
-	// Kilobytes written but never flushed to physical media (i.e., held in RAM but then made
-	// obsolete by overwriting or file deletion or similar) (rounded up).
+	// Kilobytes written but never flushed to physical media (rounded up).  These are data held in
+	// RAM but then made obsolete by overwriting or file deletion or similar.
 	Cancelled uint64 `json:"data_cancelled,omitempty"`
 
 	// The number of additional samples for processes that are "the same" that have been rolled into
 	// this one. That is, if the value is 1, the record represents the sum of the sample data for
 	// two processes.  See "Rolled-up samples" in the postamble for more.
-	Rolledup int `json:"rolledup,omitempty"`
+	Rolledup uint64 `json:"rolledup,omitempty"`
 
 	// GPU sample data for all cards used by the process.
 	Gpus []SampleProcessGpu `json:"gpus,omitempty"`
@@ -1110,7 +1109,8 @@ type SlurmJob struct {
 	// sacct: `AllocTRES`
 	AllocTRES string `json:"allocated_resources,omitempty"`
 
-	// Number of requested CPUs (assumed to be for the job in total, the documentation is not good).
+	// Number of requested CPUs for the job in total.  The documentation is not good - it's an
+	// assumption that this is for the job in total.
 	//
 	// sacct: `ReqCPUS`
 	//
@@ -1131,28 +1131,28 @@ type SlurmJob struct {
 	// slurm: `JOB_INFO.node_count`
 	ReqNodes uint64 `json:"requested_node_count,omitempty"`
 
-	// Time the job started, if started
+	// Time the job started, if started.
 	//
 	// sacct: `Start`
 	//
 	// slurm: `JOB_INFO.start_time`
 	Start Timestamp `json:"start_time"`
 
-	// Number of seconds the job was suspended
+	// Number of seconds the job was suspended.
 	//
 	// sacct: `Suspended`
 	//
 	// slurm: `JOB_INFO.suspend_time`
 	Suspended uint64 `json:"suspend_time,omitempty"`
 
-	// Time the job ended (or was cancelled), if ended
+	// Time the job ended (or was cancelled), if ended.
 	//
 	// sacct: `End`
 	//
 	// slurm: `JOB_INFO.end_time`
 	End Timestamp `json:"end_time"`
 
-	// Job exit code, if ended
+	// Job exit code, if ended.
 	//
 	// sacct: `ExitCode`
 	//
@@ -1259,7 +1259,7 @@ type ClusterAttributes struct {
 	// The canonical cluster name
 	Cluster Clustername `json:"cluster"`
 
-	// The `slurm` attribute is true if at least some nodes are under Slurm management.
+	// True if at least some nodes are under Slurm management.
 	Slurm bool `json:"slurm,omitempty"`
 
 	// Descriptions of the partitions on the cluster
@@ -1299,6 +1299,9 @@ type ClusterNodes struct {
 // `c5-3.fox`, `c5-4.fox`.  In a valid range, the first number is no greater than the second
 // number, and numbers are not repeated.  (The motivation for this feature is that some clusters
 // have very many nodes and that they group well this way.)
+//
+// Note a HostnameRange represents one such compression pattern, not a list of them separated by
+// commas; hence, in the data, it is normally used as []HostnameRange.
 //
 // Note that as this represents a set of Hostnames, the names can be modified by Sonar options in
 // the same way as the Hostnames themselves.
