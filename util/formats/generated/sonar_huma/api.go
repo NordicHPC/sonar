@@ -3,7 +3,7 @@
 
 // For full documentation for all fields and types, see types.go
 
-// Version 0.19.0-devel
+// Version 0.19.0-pre3
 
 package sonar_huma
 
