@@ -40,6 +40,7 @@ import (
 	"fmt"
 	"go/ast"
 	"go/parser"
+	"go/printer"
 	"go/token"
 	"log"
 	"os"
@@ -131,6 +132,16 @@ func main() {
 						handleTypeAlias(item, td)
 					}
 				}
+			case token.IMPORT:
+				if *makeHuma {
+					printer.Fprint(os.Stdout, fset, item)
+					fmt.Println()
+				}
+			}
+		} else if item, ok := d.(*ast.FuncDecl); ok {
+			if *makeHuma {
+				printer.Fprint(os.Stdout, fset, item)
+				fmt.Println()
 			}
 		}
 	}
@@ -231,7 +242,7 @@ func handleTypeAlias(item *ast.GenDecl, td *ast.TypeSpec) {
 		printDoc(item, item.Doc)
 	case *makeHuma:
 		if td.Name.Name != "_preamble" && td.Name.Name != "_postamble" {
-			fmt.Printf("type %s = %s\n", td.Name.Name, td.Type)
+			fmt.Printf("type %s %s\n", td.Name.Name, td.Type)
 		}
 	}
 }

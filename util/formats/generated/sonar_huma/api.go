@@ -7,21 +7,33 @@
 
 package sonar_huma
 
-type NonemptyString = string
-type NonzeroUint = uint64
-type NonnegativeFloat64 = float64
-type Timestamp = NonemptyString
-type OptionalTimestamp = string
-type Hostname = NonemptyString
-type Clustername = NonemptyString
-type ExtendedUint = uint64
+import (
+	"errors"
+)
+
+type NonemptyString string
+type NonzeroUint uint64
+type NonnegativeFloat64 float64
+type Timestamp NonemptyString
+type OptionalTimestamp string
+type Hostname NonemptyString
+type Clustername NonemptyString
+type ExtendedUint uint64
 
 const ExtendedUintUnset ExtendedUint = 0
 const ExtendedUintInfinite ExtendedUint = 1
 const ExtendedUintBase ExtendedUint = 2
+
+func (e ExtendedUint) ToUint() (uint64, error) {
+	if e >= ExtendedUintBase {
+		return uint64(e - ExtendedUintBase), nil
+	}
+	return 0, errors.New("Not a finite numeric value")
+}
+
 const EpochTimeBase uint64 = 1577836800
 
-type DataType = NonemptyString
+type DataType NonemptyString
 
 const DataTagSample DataType = "sample"
 const DataTagSysinfo DataType = "sysinfo"
@@ -117,7 +129,7 @@ type SampleSystem struct {
 	RunnableEntities uint64             `json:"runnable_entities,omitempty" doc:"Number of currently runnable scheduling entities (processes, threads)"`
 	ExistingEntities uint64             `json:"existing_entities,omitempty" doc:"Number of currently existing sceduling entities"`
 }
-type SampleCpu = uint64
+type SampleCpu uint64
 type SampleGpu struct {
 	Index            uint64         `json:"index" doc:"Node-local card index"`
 	UUID             NonemptyString `json:"uuid" minLength:"1" doc:"Card UUID"`
@@ -251,4 +263,4 @@ type ClusterNodes struct {
 	Names  []HostnameRange `json:"names,omitempty" doc:"Constraint: The array of names may not be empty"`
 	States []string        `json:"states,omitempty" doc:"The state(s) of the nodes in the range"`
 }
-type HostnameRange = NonemptyString
+type HostnameRange NonemptyString
