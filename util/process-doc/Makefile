@@ -11,6 +11,10 @@ generate install: process-doc $(OUTPUTS)
 	mv json_tags.rs ../../src
 	mv types.spec.yaml ../../doc
 	mv huma-api.go ../formats/generated/sonar_huma
+	sed 's/package newfmt/package sonar_huma/' < ../formats/newfmt/decode_cluster.go > ../formats/generated/sonar_huma/decode_cluster.go
+	sed 's/package newfmt/package sonar_huma/' < ../formats/newfmt/decode_jobs.go > ../formats/generated/sonar_huma/decode_jobs.go
+	sed 's/package newfmt/package sonar_huma/' < ../formats/newfmt/decode_samples.go > ../formats/generated/sonar_huma/decode_samples.go
+	sed 's/package newfmt/package sonar_huma/' < ../formats/newfmt/decode_sysinfo.go > ../formats/generated/sonar_huma/decode_sysinfo.go
 
 version.go: ../../Cargo.toml version.bash
 	go generate
