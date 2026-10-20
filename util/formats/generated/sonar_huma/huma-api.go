@@ -16,17 +16,17 @@ type Hostname = NonemptyString
 type Clustername = NonemptyString
 type ExtendedUint = uint64
 
-const EXTENDED_UINT_UNSET ExtendedUint = 0
-const EXTENDED_UINT_INFINITE ExtendedUint = 1
-const EXTENDED_UINT_BASE ExtendedUint = 2
-const EPOCH_TIME_BASE uint64 = 1577836800
+const ExtendedUintUnset ExtendedUint = 0
+const ExtendedUintInfinite ExtendedUint = 1
+const ExtendedUintBase ExtendedUint = 2
+const EpochTimeBase uint64 = 1577836800
 
 type DataType = NonemptyString
 
-const DATA_TAG_SAMPLE DataType = "sample"
-const DATA_TAG_SYSINFO DataType = "sysinfo"
-const DATA_TAG_JOBS DataType = "job"
-const DATA_TAG_CLUSTER DataType = "cluster"
+const DataTagSample DataType = "sample"
+const DataTagSysinfo DataType = "sysinfo"
+const DataTagJobs DataType = "job"
+const DataTagCluster DataType = "cluster"
 
 type MetadataObject struct {
 	Producer NonemptyString `json:"producer" minLength:"1" doc:"The name of the component that generated the data"`

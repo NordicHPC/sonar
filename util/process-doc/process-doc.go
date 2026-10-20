@@ -150,7 +150,7 @@ func handleConst(v *ast.ValueSpec, d *ast.CommentGroup) {
 		}
 		fmt.Printf("pub const %s: %s = %s;\n", name, ty, value)
 	case *makeHuma:
-		name := transformName(v.Names[0].Name)
+		name := v.Names[0].Name
 		ty := v.Type
 		value := v.Values[0].(*ast.BasicLit).Value
 		fmt.Printf("const %s %s = %v\n", name, ty, value)
