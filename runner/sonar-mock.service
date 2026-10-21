@@ -26,11 +26,9 @@
 Description=Sonar test service
 After=local-fs.target remote-fs.target network.target
 
-# Fox compute nodes have SELinux disabled so it works OK to set user
-# and group here (in contrast to the ML nodes, see files for mlx).
-
 [Service]
-# User sonar, Group sonar
+# User sonar
+# Group sonar
 ExecStart=/usr/local/lib/sonar-test/sonar-daemon-runner /usr/local/lib/sonar-test/sonar-mock ignored.cfg sonar sonar
 
 [Install]
