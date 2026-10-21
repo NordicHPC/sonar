@@ -10,13 +10,13 @@
 # - modify the build commands below if necessary to set up tools and libraries
 
 Name:           sonar
-Version:        0.18.0
+Version:        0.19.0
 Release:        %autorelease
 Summary:        Continuous profiling daemon
 
 License:        MIT
 URL:            https://github.com/NordicHPC/sonar
-Source0:        https://github.com/NordicHPC/sonar/archive/refs/tags/v0.18.0.tar.gz
+Source0:        https://github.com/NordicHPC/sonar/archive/refs/tags/v0.19.0.tar.gz
 
 %description
 Sonar is an unprivileged continuous profiling daemon that collects data about jobs, processes,
@@ -50,17 +50,24 @@ cd ..
 SONAR_CUSTOM_GPUAPI=$SHIMDIR \
 cargo build --no-default-features --features=daemon,kafka,nvidia --profile=release-with-debug
 
+# Probably most installs want the privileged shim too
+( cd runner ; make )
+
 # Assets go into /usr/local/lib/sonar because that makes SELinux happy when running with systemd.
 %install
 install -p -D -m 0755 \
         -t %{buildroot}/usr/local/lib/sonar \
         %{_builddir}/sonar-%{version}/target/release-with-debug/sonar
+install -p -D -m 0755 \
+        -t %{buildroot}/usr/local/lib/sonar-daemon-runner \
+        %{_builddir}/sonar-%{version}/runner/sonar-daemon-runner
 install -p -D -m 0644 \
         -t %{buildroot}/usr/local/lib/sonar \
         %{_builddir}/sonar-%{version}/build-dist/rpm-assets/*
 
 %files
 /usr/local/lib/sonar
+/usr/local/lib/sonar-daemon-runner
 
 %changelog
 * Fri Feb 06 2026 Lars T Hansen <larstha@uio.no>
