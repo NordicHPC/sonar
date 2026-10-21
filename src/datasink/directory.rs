@@ -50,11 +50,11 @@ impl DataSink for DirectorySink {
 
         let mut db = std::fs::DirBuilder::new();
         db.recursive(true);
-        if db.create(&directory).is_err() {
+        if let Err(e) = db.create(&directory) {
             let _ = self
                 .control_and_errors
                 .send(Operation::MessageDeliveryError(
-                    "Can't create directory".to_string(),
+                    "Can't create directory: ".to_string() + &directory + "\n" + &e.to_string(),
                 ));
             return;
         }
@@ -63,22 +63,25 @@ impl DataSink for DirectorySink {
             .create(true)
             .open(&filename)
         {
-            Err(_) => {
+            Err(e) => {
                 let _ = self
                     .control_and_errors
                     .send(Operation::MessageDeliveryError(
-                        "Can't open file for append".to_string(),
+                        "Can't open file for append:".to_string()
+                            + &filename
+                            + "\n"
+                            + &e.to_string(),
                     ));
                 return;
             }
             Ok(f) => f,
         };
         match file.write_all(value.as_bytes()) {
-            Err(_) => {
+            Err(e) => {
                 let _ = self
                     .control_and_errors
                     .send(Operation::MessageDeliveryError(
-                        "Can't write to file".to_string(),
+                        "Can't write to file: ".to_string() + &filename + "\n" + &e.to_string(),
                     ));
             }
             Ok(_) => {}

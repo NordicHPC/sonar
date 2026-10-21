@@ -1,0 +1,35 @@
+# This is a test to run under systemd.  In /usr/local/lib/sonar-test we place these files:
+#
+#  - this file
+#  - sonar-daemon-runner
+#  - sonar-mock
+#
+# The user and group configured below should ideally be an unprivileged user, not somebody
+# who is in "wheel" or similar.
+#
+# The service is then added by
+#
+#   # systemctl enable --now /usr/local/lib/sonar-test/sonar-mock.service
+#
+# and it will run and exit, and output will end up in the log and may be viewed with
+#
+#   # systemctl status sonar-mock.service
+#
+# What we are interested in is to find out if the permissions of the child are laundered
+# correctly.  In particular, under "group list" in the output there should not be "0".
+#
+# The service can later be removed by
+#
+#   # systemctl disable sonar-mock.service
+
+[Unit]
+Description=Sonar test service
+After=local-fs.target remote-fs.target network.target
+
+[Service]
+# User sonar
+# Group sonar
+ExecStart=/usr/local/lib/sonar-test/sonar-daemon-runner /usr/local/lib/sonar-test/sonar-mock ignored.cfg sonar sonar
+
+[Install]
+WantedBy=multi-user.target
