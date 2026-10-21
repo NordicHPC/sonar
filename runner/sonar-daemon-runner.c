@@ -124,7 +124,6 @@ int sonar_daemon_runner(const char* sonar_path, const char* config_file, const c
         act.sa_handler = NULL;
         act.sa_sigaction = NULL;
         act.sa_flags = 0;
-        act.sa_restorer = NULL;
         sigemptyset(&act.sa_mask);
 
         act.sa_sigaction = sigchld_sigaction;
@@ -136,10 +135,10 @@ int sonar_daemon_runner(const char* sonar_path, const char* config_file, const c
         act.sa_sigaction = NULL;
         act.sa_flags = 0;
 
-        /* We're going to let I/O errors on read/write handle the case where the pipe is closed on the
-         * other end.  The Sonar child will inherit this setting for SIGPIPE and will have to install
-         * its own handler if it wants something else - but it doesn't, and anyway Rust stdlib ignores
-         * SIGPIPE by default, so this is fine.
+        /* We're going to let I/O errors on read/write handle the case where the pipe is closed on
+         * the other end.  The Sonar child will inherit this setting for SIGPIPE and will have to
+         * install its own handler if it wants something else - but it doesn't, and anyway Rust
+         * stdlib ignores SIGPIPE by default, so this is fine.
          */
         act.sa_handler = SIG_IGN;
         if (sigaction(SIGPIPE, &act, NULL) != 0) {
@@ -167,7 +166,10 @@ int sonar_daemon_runner(const char* sonar_path, const char* config_file, const c
         result_t r = server(up[0], down[1]);
         if (r != OK) {
             struct sigaction act;
-            memset(&act, 0, sizeof(act));
+            act.sa_sigaction = NULL;
+            act.sa_flags = 0;
+            sigemptyset(&act.sa_mask);
+            /* SIGCHLD+SIG_IGN will automatically prevent zombiefication of the child */
             act.sa_handler = SIG_IGN;
             sigaction(SIGCHLD, &act, NULL);
             kill(pid, SIGTERM);

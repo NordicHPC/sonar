@@ -37,7 +37,7 @@ int main(int argc, char** argv) {
         fprintf(stderr, "sonar-mock: should not run as root!\n");
         return 1;
     }
-#define NGIDS 20
+#  define NGIDS 20
     gid_t gids[NGIDS];
     int ngroups;
     if ((ngroups = getgroups(NGIDS, gids)) < 0) {
@@ -45,17 +45,17 @@ int main(int argc, char** argv) {
         return 1;
     }
 #  ifdef LOGGING
-    fprintf(stderr, "sonar-mock: running as uid=%u euid=%u gid=%u egid=%u\n",
-            (unsigned)getuid(), (unsigned)geteuid(), (unsigned)getgid(), (unsigned)getegid());
+    fprintf(stderr, "sonar-mock: running as uid=%u euid=%u gid=%u egid=%u\n", (unsigned)getuid(),
+        (unsigned)geteuid(), (unsigned)getgid(), (unsigned)getegid());
     fflush(stderr);
     fprintf(stderr, "group list\n");
-    for (int i=0 ; i < ngroups ; i++ ) {
+    for (int i = 0; i < ngroups; i++) {
         fprintf(stderr, "  %u\n", (unsigned)gids[i]);
     }
 #  endif
     /* should not be in group zero, but check - initgroups() should prevent this */
     int zero = 0;
-    for (int i=0 ; i < ngroups ; i++ ) {
+    for (int i = 0; i < ngroups; i++) {
         if (gids[i] == 0) {
             zero = 1;
         }
