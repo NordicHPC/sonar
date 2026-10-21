@@ -284,12 +284,15 @@ static void sonar(const char* path, const char* config, const char* user, const 
             return;
         }
         gid_t new_gid = gr.gr_gid;
+        /* Initgroups removes all supplementary groups of root (including group 0) and adds the
+         * supplementary groups of the new user.  If running under systemd this is unnecessary, but
+         * if running interactively as root or running setuid-root it's necessary to prevent the
+         * child from being able to access files that are group-accessible to root.
+         */
         if (initgroups(user, new_gid) != 0) {
             perror("initgroups");
             return;
         }
-        /* Unclear to me if the setgid() is really needed with the initgroups() but I suspect it is
-         * and it doesn't hurt. */
         if (setgid(new_gid) != 0) {
             perror("setgid");
             return;
