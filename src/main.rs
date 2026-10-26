@@ -88,6 +88,9 @@ enum Commands {
 
         /// Merge process records that have the same job ID and command name
         rollup: bool,
+
+        /// Include environment variables whose names match these strings
+        env: Option<String>,
     },
     /// Extract cluster information
     Cluster {
@@ -207,6 +210,7 @@ fn main() {
             lockdir,
             load,
             rollup,
+            env,
         } => {
             let opts = ps::PsOptions {
                 rollup: *rollup,
@@ -221,6 +225,11 @@ fn main() {
                     vec![]
                 },
                 exclude_commands: if let Some(s) = exclude_commands {
+                    s.split(',').map(|x| x.to_string()).collect::<Vec<String>>()
+                } else {
+                    vec![]
+                },
+                env: if let Some(s) = env {
                     s.split(',').map(|x| x.to_string()).collect::<Vec<String>>()
                 } else {
                     vec![]
@@ -434,6 +443,7 @@ fn command_line(args: Vec<String>) -> Commands {
                 let mut lockdir = None;
                 let mut load = false;
                 let mut rollup = false;
+                let mut env = None;
                 while next < args.len() {
                     let arg = args[next].as_ref();
                     next += 1;
@@ -480,6 +490,10 @@ fn command_line(args: Vec<String>) -> Commands {
                         (next, cluster) = (new_next, Some(value));
                     } else if let Some(new_next) = bool_arg(arg, &args, next, "--hostname-only") {
                         (next, hostname_only) = (new_next, true);
+                    } else if let Some((new_next, value)) =
+                        string_arg(arg, &args, next, "--env")
+                    {
+                        (next, env) = (new_next, Some(value));
                     } else {
                         usage(true);
                     }
@@ -496,6 +510,7 @@ fn command_line(args: Vec<String>) -> Commands {
                     lockdir,
                     load,
                     rollup,
+                    env,
                 }
             }
             "sysinfo" => {

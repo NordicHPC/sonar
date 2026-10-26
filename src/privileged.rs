@@ -42,6 +42,25 @@ pub fn get_exe_path(pid: u32, srv: &RootServer) -> Result<String, String> {
     Ok(resp.get_string()?)
 }
 
+pub fn get_env_vars(pid: u32, patterns: &[String], srv: &RootServer) -> Result<Vec<String>, String> {
+    // The intent is that each pattern can be just a substring S, a prefix substring ^S, a suffix
+    // substring S$, or an exact match ^S$.  These are not full regular expressions, even if the
+    // syntax is borrowed.  We could imagine expanding to regular expressions eventually.  Normally
+    // the S should contain only [-A-Za-z0-9_] but obviously env vars have no such restriction;
+    // for now, we should (in options parsing) restrict the input charset to those to allow for
+    // regexes or globs later.
+    //
+    // Initially the protocol would send an array of pattern strings and would receive an array of
+    // strings, possibly empty.  We probably want to limit the number of patterns somewhere.  We
+    // could strip ^ and $ here or in the root runner.  Assume for now that we syntax check in Rust
+    // and strip metachars in the root runner.
+    //
+    // TODO: syntax checking (both charset and metachars)
+    // TODO: limit on the number of patterns
+    // TODO: implement on the root runner side
+    todo!()
+}
+
 // Protocol logic implementation.  Any error return basically amounts to the root agent being broken
 // or having crashed and should lead to its use being disabled.
 

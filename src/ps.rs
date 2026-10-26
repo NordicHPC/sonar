@@ -37,6 +37,7 @@ pub struct PsOptions {
     pub exclude_system_jobs: bool,
     pub exclude_users: Vec<String>,
     pub exclude_commands: Vec<String>,
+    pub env: Vec<String>,
     pub lockdir: Option<String>,
     pub token: String,
     pub load: bool,
@@ -283,6 +284,7 @@ pub struct TheProcInfo {
     pub user: String,
     pub command: String,
     pub exe_path: String,
+    pub env_vars: Vec<String>,
     pub pid: Pid,
     pub ppid: Pid,
     pub rolledup: usize,
@@ -366,7 +368,7 @@ fn collect_sample_data(
         }
     }
 
-    let mut procinfo_by_pid = new_with_cpu_info(system, &processes);
+    let mut procinfo_by_pid = new_with_cpu_info(system, &processes, &opts.env);
 
     if system.is_interrupted() {
         return Ok(None);
@@ -467,6 +469,7 @@ fn is_container_root(v: &ProcInfo) -> bool {
 fn new_with_cpu_info(
     system: &dyn systemapi::SystemAPI,
     processes: &HashMap<Pid, systemapi::Process>,
+    env_patterns: &[String],
 ) -> ProcInfoTable {
     let mut procinfo_by_pid = ProcInfoTable::new();
     #[cfg(feature = "daemon")]
@@ -476,18 +479,33 @@ fn new_with_cpu_info(
             .get_jobs()
             .job_id_from_pid(system, proc.pid, processes);
         #[cfg(feature = "daemon")]
-        let exe_path = if let Some(srv) = root {
+        let (exe_path, env_vars) = if let Some(srv) = root {
+            let mut failed = false;
+            let mut exe_path = "".to_string();
+            let mut env_vars = vec![];
             if let Ok(s) = privileged::get_exe_path(proc.pid as u32, srv) {
-                s
+                exe_path = s;
             } else {
+                failed = true;
+            }
+            if !failed && env_patterns.len() > 0 {
+                if let Ok(vars) = privileged::get_env_vars(proc.pid as u32, env_patterns, srv) {
+                    env_vars = vars;
+                } else {
+                    failed = true;
+                }
+            }
+            if failed {
                 // The agent is broken.  Disable its further use here.  Then flag it as broken on
                 // the system; get_root_server() will subsequently return none.
                 root = None;
                 system.disable_root_server();
-                "".to_string()
+                ("".to_string(), vec![])
+            } else {
+                (exe_path, env_vars)
             }
         } else {
-            "".to_string()
+            ("".to_string(), vec![])
         };
         #[cfg(not(feature = "daemon"))]
         let exe_path = "".to_string();
@@ -497,6 +515,7 @@ fn new_with_cpu_info(
                 user: proc.user.clone(),
                 command: proc.command.clone(),
                 exe_path,
+                env_vars,
                 pid: proc.pid,
                 ppid: proc.ppid,
                 is_system_job: proc.uid < 1000,

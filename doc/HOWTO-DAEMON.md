@@ -180,6 +180,7 @@ rollup = <bool>                                 # default false
 exclude-users = <comma-separated strings>       # default []
 exclude-commands = <comma-separated strings>    # default []
 min-cpu-time = <duration value>                 # default none
+env = <comma-separated strings>                 # default none
 ```
 
 These are the normal options for `sonar sample`, see the Sonar documentation.
