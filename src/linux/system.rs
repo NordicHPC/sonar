@@ -9,6 +9,8 @@ use crate::linux::slurm;
 use crate::posix::hostname;
 use crate::posix::time;
 use crate::posix::users;
+#[cfg(feature = "daemon")]
+use crate::privileged;
 use crate::systemapi;
 use crate::types::{JobID, Pid, Uid};
 use crate::util::command;
@@ -42,6 +44,8 @@ const SINFO_TIMEOUT_S: u64 = 10;
 
 pub struct Builder {
     jm: Option<Box<dyn jobsapi::JobManager>>,
+    #[cfg(feature = "daemon")]
+    root: Option<privileged::RootServer>,
     cluster: String,
     hostname_only: bool,
     sacct: String,
@@ -55,6 +59,8 @@ impl Builder {
     pub fn new() -> Builder {
         Builder {
             jm: None,
+            #[cfg(feature = "daemon")]
+            root: None,
             cluster: "".to_string(),
             hostname_only: false,
             sacct: "sacct".to_string(),
@@ -84,6 +90,15 @@ impl Builder {
     pub fn with_jobmanager(self, jm: Box<dyn jobsapi::JobManager>) -> Builder {
         Builder {
             jm: Some(jm),
+            ..self
+        }
+    }
+
+    #[cfg(feature = "daemon")]
+    #[allow(dead_code)]
+    pub fn with_root_server(self, srv: privileged::RootServer) -> Builder {
+        Builder {
+            root: Some(srv),
             ..self
         }
     }
@@ -152,6 +167,10 @@ impl Builder {
             } else {
                 Box::new(jobsapi::NoJobManager::new())
             },
+            #[cfg(feature = "daemon")]
+            root: self.root,
+            #[cfg(feature = "daemon")]
+            root_disabled: Cell::new(false),
             fs,
             gpus: realgpu::RealGpu::new(hostname, boot_time),
             timestamp: RefCell::new(time::now_iso8601()),
@@ -182,6 +201,10 @@ pub struct System {
     #[allow(unused)]
     hostname_only: bool,
     cluster: String,
+    #[cfg(feature = "daemon")]
+    root: Option<privileged::RootServer>,
+    #[cfg(feature = "daemon")]
+    root_disabled: Cell<bool>,
     fs: RealProcFS,
     gpus: realgpu::RealGpu,
     jm: Box<dyn jobsapi::JobManager>,
@@ -259,6 +282,23 @@ impl systemapi::SystemAPI for System {
 
     fn get_jobs(&self) -> &dyn jobsapi::JobManager {
         &*self.jm
+    }
+
+    #[cfg(feature = "daemon")]
+    fn get_root_server(&self) -> Option<&privileged::RootServer> {
+        if self.root_disabled.get() {
+            None
+        } else {
+            match &self.root {
+                None => None,
+                Some(x) => Some(x),
+            }
+        }
+    }
+
+    #[cfg(feature = "daemon")]
+    fn disable_root_server(&self) {
+        self.root_disabled.set(true);
     }
 
     fn get_pid(&self) -> Pid {
