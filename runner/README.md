@@ -16,11 +16,12 @@ with very limited functionality); nobody has to entrust Sonar (and all its very 
 with root privileges.
 
 To audit the code, it is necessary to look at sonar-daemon-runner.c and its dependencies, see the
-Makefile.  Much of the code in this directory is test code that is not included in the production
-build and need not be audited or trusted.
+CMakeLists.txt.  Much of the code in this directory is test code that is not included in the
+production build and need not be audited or trusted.
 
-Generally, "make" will make sonar-daemon-runner for production; "make test" will build and run the
-selftests.
+To generate build artifacts, run `cmake -B build` to create the `build/` subdirectory, then
+`cmake --build build` to build the programs, which will appear in that subdirectory.  Run
+`ctest -test-dir build` to run the selftests.
 
 There are two interactive tests: `req_exe_for_pids.bash` will test the functionality end-to-end with
 both a mock Sonar and the real Sonar as client under an artificial workload and check the output,

@@ -1,3 +1,5 @@
+/* This is test code only, not part of the runner */
+
 #ifndef selftest_h_included
 #define selftest_h_included
 
@@ -10,6 +12,12 @@ void clear_channel(int c);
 
 #  define read(x, y, z) selftest_read(x, y, z)
 #  define write(x, y, z) selftest_write(x, y, z)
+
+void parse_selftest();
+void protocol_selftest();
+void exe_for_pids_selftest();
+void get_exe_selftest();
+void bytebuf_selftest();
 
 #endif
 

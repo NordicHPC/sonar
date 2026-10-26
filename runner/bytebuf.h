@@ -1,13 +1,14 @@
 #ifndef bytebuf_h_included
 #define bytebuf_h_included
 
+#include <stddef.h>
 #include <stdint.h>
 
 /* A bytebuf_t holds a growable array of bytes.  It is in one of three states: new, initialized, and
  * filled.  A buffer in the new state must be initialized before being used.  A buffer in the filled
  * state must be destroyed before going out of scope.
  *
- * A stack or heap allocated bytebuf_t (even if allocated with calloc) starts in the new state.  A
+ * A stack or heap allocated bytebuf_t (even if allocated with calloc) starts in the "new" state.  A
  * static bytebuf_t starts in the initialized state.
  */
 typedef struct {

@@ -121,7 +121,8 @@ enum {
     /* Server should report matching environment variables for PIDs.
      *
      * Request: Array(string) Array(pid): patterns followed by PIDs.  The patterns must be
-     * syntactically valid.
+     * syntactically valid, they must match the regex \^?[A-Za-z0-9_-]+\$? .  Validity will
+     * not be checked by the server.
      *
      * Response: Array({PID, Array({string,string})), all PIDs in the request will be represented in
      * the outer array in the order of the input array.  A pid may have no matching vars, ie the

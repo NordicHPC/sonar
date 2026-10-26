@@ -1,3 +1,5 @@
+/* This is test code only, not part of the runner */
+
 /* Really you want to run this under valgrind:
  *     valgrind --leak-check=full ./selftest
  */
@@ -14,12 +16,8 @@
 #undef read
 #undef write
 
-void parse_selftest();
-void protocol_selftest();
-void exe_for_pids_selftest();
-void get_exe_selftest();
-
 int main(int argc, char** argv) {
+    bytebuf_selftest();
     parse_selftest();
     protocol_selftest();
     exe_for_pids_selftest();

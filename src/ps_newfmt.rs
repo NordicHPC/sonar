@@ -202,6 +202,9 @@ fn format_newfmt_sample(proc_info: &ProcInfo) -> output::Object {
     if proc_info.exe_path != "" {
         fields.push_s(SAMPLE_PROCESS_EXE_PATH, proc_info.exe_path.clone());
     }
+    if proc_info.env_vars.len() > 0 {
+        todo!();
+    }
     if proc_info.pid != 0 {
         // Rolled-up processes have a synthesized non-zero pid in daemon mode, and a zero pid in
         // one-shot mode.

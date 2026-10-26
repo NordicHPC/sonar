@@ -17,6 +17,7 @@
  *
  * - Terminate (the child can ask the parent to exit with an exit code)
  * - Read /proc/pid/exe for one or more pids
+ * - Scan /proc/pid/environ for one or more variable name patterns
  *
  * As this runs as root, it needs to be as trustworthy and easily audited as we can make it.  Hence
  * it is simple, with straightforward abstractions and limited functionality.  Writing it in C was a
@@ -60,6 +61,7 @@
 #include <sys/types.h>
 #include <unistd.h>
 
+#include "alloc.h"
 #include "protocol.h"
 #include "sonar-daemon-runner.h"
 
@@ -133,6 +135,203 @@ result_t req_exe_for_pids(inbound_t* inbound, outbound_t* outbound) {
         }
     }
     return OK;
+}
+
+struct var_pat {
+    int prefix;
+    int suffix;
+    char* p;
+    size_t len;
+};
+
+// In a var, 'name' points to malloc'd storage, name and val are both 0-terminated within that
+// storage, freeing the name also frees the value.
+
+struct env_var {
+    char* name;
+    char* value;
+};
+
+int get_env_vars(uint32_t pid, struct var_pat* pats, uint32_t npats, struct env_var** result,
+    uint32_t* nresult) {
+    int r = 0;
+    char path[128];
+    FILE* f = NULL;
+    uint32_t cap = 0;
+    uint32_t nres = 0;
+    struct env_var* res = NULL;
+    bytebuf_t buf;
+    bytebuf_init(&buf);
+
+    *nresult = 0;
+    *result = NULL;
+
+    snprintf(path, sizeof(path), "/proc/%" PRIu32 "/environ", pid);
+    f = fopen(path, "r");
+    if (f == NULL) {
+        goto Done;
+    }
+    cap = 4;
+    res = realloc_array(NULL, cap, sizeof(struct env_var));
+    if (res == NULL) {
+        r = -1;
+        goto Done;
+    }
+    for (;;) {
+        /* Read the next variable */
+        for (;;) {
+            int c = fgetc(f);
+            if (c == EOF) {
+                goto Done;
+            }
+            if (c == 0) {
+                break;
+            }
+            if (bytebuf_append_byte(&buf, (uint8_t)c) != 0) {
+                r = -1;
+                goto Done;
+            }
+        }
+        char* v = (char*)bytebuf_take(&buf);
+        char* name = v;
+        char* value = v;
+        while (*value != '=') {
+            value++;
+        }
+        *value = 0;
+        value++;
+        /* At this point v is live and must be deallocated on failure and anchored on success. */
+        int matched = 0;
+        for (uint32_t i = 0; i < npats; i++) {
+            char* loc = strstr(name, pats[i].p);
+            if (loc == NULL) {
+                continue;
+            }
+            if (pats[i].prefix && loc != pats[i].p) {
+                continue;
+            }
+            if (pats[i].suffix && loc[pats[i].len] != 0) {
+                continue;
+            }
+            matched = 1;
+            break;
+        }
+        if (matched) {
+            if (cap == nres) {
+                uint32_t new_cap = 2 * cap;
+                struct env_var* new_res = realloc(res, new_cap * sizeof(struct env_var));
+                if (new_res == NULL) {
+                    r = -1;
+                    goto Done;
+                }
+                cap = new_cap;
+                res = new_res;
+            }
+            res[nres].name = name;
+            res[nres].value = value;
+            nres++;
+        } else {
+            free(v);
+        }
+    }
+Done:
+    bytebuf_destroy(&buf);
+    if (f != NULL) {
+        fclose(f);
+    }
+    if (r == 0) {
+        *result = res;
+        *nresult = nres;
+    } else {
+        for (uint32_t i = 0; i < nres; i++) {
+            free(res[i].name);
+        }
+        free(res);
+    }
+    return r;
+}
+
+result_t req_env_vars_for_pids(inbound_t* inbound, outbound_t* outbound) {
+    uint32_t npats = 0;
+    struct var_pat* pats = NULL;
+    uint32_t nvars = 0;
+    struct env_var* vars = NULL;
+    uint32_t npids = 0;
+    result_t r;
+    if ((r = decode_int(inbound, &npats)) != OK) {
+        goto Done;
+    }
+    pats = realloc_array(NULL, npats, sizeof(struct var_pat));
+    if (pats == NULL) {
+        perror("calloc");
+        r = ERR_ALLOC;
+        goto Done;
+    }
+    for (uint32_t j = 0; j < npats; j++) {
+        pats[j].p = NULL;
+    }
+    for (uint32_t j = 0; j < npats; j++) {
+        uint8_t* pat;
+        if ((r = decode_string(inbound, &pat)) != OK) {
+            goto Done;
+        }
+        size_t l = strlen((char*)pat);
+        if (*pat == '^') {
+            pats[j].prefix = 1;
+        }
+        if (pat[l - 1] == '$') {
+            pats[j].suffix = 1;
+            pat[l - 1] = 0;
+        }
+        pats[j].p = (char*)pat + pats[j].prefix;
+        pats[j].len = l - (pats[j].prefix + pats[j].suffix);
+    }
+    if ((r = decode_int(inbound, &npids)) != OK) {
+        goto Done;
+    }
+    if ((r = encode_byte(outbound, REQ_ENV_VARS_FOR_PIDS)) != OK) {
+        goto Done;
+    }
+    if ((r = encode_int(outbound, npids)) != OK) {
+        goto Done;
+    }
+    for (uint32_t i = 0; i < npids; i++) {
+        uint32_t pid;
+        if ((r = decode_int(inbound, &pid)) != OK) {
+            goto Done;
+        }
+        if ((r = encode_int(outbound, pid)) != OK) {
+            goto Done;
+        }
+        get_env_vars(pid, pats, npats, &vars, &nvars);
+        if ((r = encode_int(outbound, nvars)) != OK) {
+            goto Done;
+        }
+        for (uint32_t j = 0; j < nvars; j++) {
+            if ((r = encode_string(outbound, vars[j].name)) != OK) {
+                goto Done;
+            }
+            if ((r = encode_string(outbound, vars[j].value)) != OK) {
+                goto Done;
+            }
+        }
+        for (uint32_t j = 0; j < nvars; j++) {
+            free(vars[j].name);
+        }
+        free(vars);
+        vars = NULL;
+        nvars = 0;
+    }
+Done:
+    for (uint32_t j = 0; j < nvars; j++) {
+        free(vars[j].name);
+    }
+    free(vars);
+    for (uint32_t j = 0; j < npats; j++) {
+        free(pats[j].p - pats[j].prefix);
+    }
+    free(pats);
+    return r;
 }
 
 int sonar_daemon_runner(const char* sonar_path, const char* config_file, const char* user_name,
@@ -244,6 +443,14 @@ static result_t server(int input, int output) {
         }
         case REQ_EXE_FOR_PIDS:
             if ((r = req_exe_for_pids(&inbound, &outbound)) != OK) {
+                goto Done;
+            }
+            if ((r = send_message(output, &outbound)) != OK) {
+                goto Done;
+            }
+            continue;
+        case REQ_ENV_VARS_FOR_PIDS:
+            if ((r = req_env_vars_for_pids(&inbound, &outbound)) != OK) {
                 goto Done;
             }
             if ((r = send_message(output, &outbound)) != OK) {

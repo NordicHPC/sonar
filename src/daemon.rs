@@ -99,6 +99,7 @@ pub struct SampleIni {
     pub min_cpu_time: Option<Dur>,
     pub exclude_commands: Vec<String>,
     pub exclude_users: Vec<String>,
+    pub env_patterns: Vec<String>,
 }
 
 pub struct SysinfoIni {
@@ -379,6 +380,7 @@ pub fn daemon_mode(
             load: ini.sample.load,
             exclude_users: ini.sample.exclude_users.clone(),
             exclude_commands: ini.sample.exclude_commands.clone(),
+            env_patterns: ini.sample.env_patterns.clone(),
             lockdir: ini.global.lockdir.clone(),
             token: api_token.clone(),
             fmt: ps::Format::JSON,
@@ -797,6 +799,7 @@ fn parse_config(config_file: &str) -> Result<Ini, String> {
             min_cpu_time: None,
             exclude_commands: vec![],
             exclude_users: vec![],
+            env_patterns: vec![],
         },
         sysinfo: SysinfoIni {
             on_startup: true,
@@ -1061,6 +1064,12 @@ fn parse_config(config_file: &str) -> Result<Ini, String> {
                 "min-cpu-time" => {
                     ini.sample.min_cpu_time =
                         Some(parse_duration("sample.min-cpu-time", &value, true)?);
+                }
+                "env-patterns" => {
+                    ini.sample.env_patterns = parse_strings(&value)?;
+                    if let Err(e) = privileged::check_env_var_patterns(&ini.sample.env_patterns) {
+                        return Err(e);
+                    }
                 }
                 _ => return Err(format!("Invalid [sample]/[ps] setting name `{name}`")),
             },

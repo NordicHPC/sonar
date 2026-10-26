@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "alloc.h"
 #include "bytebuf.h"
 
 void bytebuf_init(bytebuf_t* b) {
@@ -23,26 +24,27 @@ uint8_t* bytebuf_take(bytebuf_t* b) {
     return xs;
 }
 
+#ifdef SELFTEST
+static const uint32_t initial_cap = 4;
+#else
+static const uint32_t initial_cap = 32;
+#endif
+
 static int ensure_free(bytebuf_t* b, uint32_t n) {
     if (b->cap - b->len >= n && n != 0) {
         return 0;
     }
-#ifdef SELFTEST
-    const uint32_t initial_cap = 4;
-#else
-    const uint32_t initial_cap = 32;
-#endif
     uint32_t new_cap = b->cap == 0 ? initial_cap : b->cap;
-    while (new_cap - b->len < n && new_cap <= 0x7FFFFFFF) {
-        new_cap *= 2;
-        if (new_cap > 0x7FFFFFFF) {
-            new_cap = 0x7FFFFFFF;
+    while (new_cap - b->len < n) {
+        if (alloc_mul(new_cap, 2, &new_cap) == -1) {
+            new_cap = ALLOC_MAX;
+            break;
         }
     }
     if (new_cap - b->len < n) {
         return -1;
     }
-    uint8_t* new_buf = realloc(b->buf, new_cap);
+    uint8_t* new_buf = realloc_array(b->buf, 1, new_cap);
     if (new_buf == NULL) {
         return -1;
     }

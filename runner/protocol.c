@@ -7,6 +7,7 @@
 #include <string.h>
 #include <unistd.h>
 
+#include "alloc.h"
 #include "protocol.h"
 #ifdef SELFTEST
 #  include "selftest.h" /* Override read() and write() */
@@ -71,7 +72,12 @@ result_t decode_string(inbound_t* m, uint8_t** s) {
     if ((r = ensure_available(m, len)) != OK) {
         return r;
     }
-    uint8_t* buf = malloc(len + 1);
+    uint32_t need;
+    if (alloc_add(len, 1, &need) != 0) {
+        perror("malloc");
+        return ERR_ALLOC;
+    }
+    uint8_t* buf = realloc_array(NULL, 1, need);
     if (buf == NULL) {
         perror("malloc");
         return ERR_ALLOC;
@@ -117,7 +123,7 @@ result_t recv_message(int input, inbound_t* m) {
         return r;
     }
     uint32_t nbytes = decode_u32(hdr);
-    uint8_t* payload = malloc(nbytes);
+    uint8_t* payload = realloc_array(NULL, 1, nbytes);
     if (payload == NULL) {
         perror("malloc");
         return ERR_ALLOC;
