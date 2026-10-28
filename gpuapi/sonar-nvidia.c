@@ -554,7 +554,6 @@ int nvml_device_probe_processes(uint32_t device, uint32_t* count) {
 
     unsigned running_procs_count = 0;
     int rc = deviceGetComputeRunningProcesses(dev, &running_procs_count, NULL);
-
     if (rc == NVML_SUCCESS) {
         if (running_procs_count != 0) {
             // got NVML_SUCCESS but expected running processes
@@ -599,35 +598,56 @@ int nvml_device_probe_processes(uint32_t device, uint32_t* count) {
     }
 
     unsigned long long t = (unsigned long long)(time(NULL) - PROBE_WINDOW_SECS) * 1000000;
-
     unsigned utilized_procs_count = 0;
+    // Docs describe a NULL-buffer size query, but list INVALID_ARGUMENT if the buffer is NULL
+    // and omit INSUFFICIENT_SIZE. In practice, NVML returns INSUFFICIENT_SIZE with
+    // the required count when samples exist, or NOT_FOUND when none do.
     rc = xnvmlDeviceGetProcessUtilization(dev, NULL, &utilized_procs_count, t);
-
-    // The return value of xnvmlDeviceGetProcessUtilization can be NVML_ERROR_NOT_FOUND if no samples are available,
-    // NVML_ERROR_INVALID_ARGUMENT if the device, utilization array, or sampling period are invalid, 
-    // or NVML_SUCCESS if the call succeeds. To get the required buffer size, the function is first called with 
-    // a NULL utilization array and NVML_ERROR_INVALID_ARGUMENT is therefore expected when querying the buffer size.
     if (rc == NVML_ERROR_NOT_FOUND) {
-        // no running processes found
-        utilized_procs_count = 0;
-    } else if (rc != NVML_ERROR_INVALID_ARGUMENT && rc != NVML_SUCCESS) {
-        free(running_procs);
+        if (utilized_procs_count != 0) {
+            // got NVML_ERROR_NOT_FOUND but no utilized processes
+            return -1;
+        }
+    } else if (rc == NVML_ERROR_INSUFFICIENT_SIZE) {
+        if (utilized_procs_count == 0) {
+            // got NVML_ERROR_INSUFFICIENT_SIZE but no utilized processes
+            return -1;
+        }
+    } else {
+        // unexpected error
         return -1;
     }
 
     nvmlProcessUtilizationSample_t* utilized_procs = NULL;
     if (utilized_procs_count > 0) {
-        utilized_procs = calloc(utilized_procs_count, sizeof(nvmlProcessUtilizationSample_t));
-        if (utilized_procs == NULL) {
-            free(running_procs);
-            return -1;
+        int i = 0;
+        // Avoid infinite loops by limiting the number of retries to 3 attempts.
+        while (i < 3) {
+            utilized_procs = calloc(utilized_procs_count, sizeof(nvmlProcessUtilizationSample_t));
+            if (utilized_procs == NULL) {
+                free(running_procs);
+                return -1;
+            }
+            rc = xnvmlDeviceGetProcessUtilization(dev, utilized_procs, &utilized_procs_count, t);
+            if (rc == NVML_SUCCESS) {
+                break;
+            } else if (rc == NVML_ERROR_NOT_FOUND) {
+                free(utilized_procs);
+                utilized_procs = NULL;
+                utilized_procs_count = 0;
+                break;
+            } else if (rc == NVML_ERROR_INSUFFICIENT_SIZE) {
+                free(utilized_procs);
+                utilized_procs = NULL;
+                i++;
+            } else {
+                free(running_procs);
+                free(utilized_procs);
+                return -1;
+            }
         }
-        rc = xnvmlDeviceGetProcessUtilization(dev, utilized_procs, &utilized_procs_count, t);
-        if (rc == NVML_ERROR_NOT_FOUND) {
-            free(utilized_procs);
-            utilized_procs = NULL;
-            utilized_procs_count = 0;
-        } else if (rc != NVML_SUCCESS) {
+        if (i == 3) {
+            // reached the maximum number of retries, give up
             free(running_procs);
             free(utilized_procs);
             return -1;
@@ -644,8 +664,8 @@ int nvml_device_probe_processes(uint32_t device, uint32_t* count) {
 
     info_count = 0;
     // Allocate at least 1 info structure.
-    unsigned total_count = running_procs_count + utilized_procs_count;
-    unsigned alloc_count = total_count == 0 ? 1 : total_count;
+    unsigned alloc_count = running_procs_count + utilized_procs_count;
+    alloc_count = alloc_count > 0 ? alloc_count : 1;
     infos = calloc(alloc_count, sizeof(struct nvml_gpu_process));
     if (infos == NULL) {
         free(running_procs);
