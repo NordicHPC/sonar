@@ -9,6 +9,7 @@
 #include <string.h>
 #include <unistd.h>
 
+#include "bytebuf.h"
 #include "selftest.h"
 #undef read
 #undef write
@@ -30,19 +31,14 @@ int main(int argc, char** argv) {
 
 static struct channel_t {
     int inp;
-    int outp;
-    int cap;
-    uint8_t* buf;
+    bytebuf_t bb;
 } channels[NCHAN];
 
 void clear_channel(int c) {
     assert(-c - 1 < NCHAN);
     struct channel_t* buffer = &channels[-c - 1];
+    bytebuf_destroy(&buffer->bb);
     buffer->inp = 0;
-    buffer->outp = 0;
-    buffer->cap = 0;
-    free(buffer->buf);
-    buffer->buf = NULL;
 }
 
 int selftest_read(int input, uint8_t* p, int n) {
@@ -52,9 +48,9 @@ int selftest_read(int input, uint8_t* p, int n) {
     /* TODO (testing): To improve this: read a max number of bytes per call, say, 5 */
     assert(-input - 1 < NCHAN);
     struct channel_t* buffer = &channels[-input - 1];
-    int avail = buffer->outp - buffer->inp;
+    int avail = buffer->bb.len - buffer->inp;
     int k = n > avail ? avail : n;
-    memcpy(p, buffer->buf + buffer->inp, k);
+    memcpy(p, buffer->bb.buf + buffer->inp, k);
     buffer->inp += k;
     return k;
 }
@@ -66,22 +62,9 @@ int selftest_write(int output, const uint8_t* p, int n) {
     /* TODO (testing): To improve this: write at most some number of bytes per call, say, 5 */
     assert(-output - 1 < NCHAN);
     struct channel_t* buffer = &channels[-output - 1];
-    int avail = buffer->cap - buffer->outp;
-    if (n > avail) {
-        int newcap = buffer->cap + n * 2;
-        uint8_t* new = malloc(newcap);
-        if (new == NULL) {
-            perror("malloc");
-            abort();
-        }
-        if (buffer->buf != NULL) {
-            memcpy(new, buffer->buf, buffer->outp);
-            free(buffer->buf);
-        }
-        buffer->buf = new;
-        buffer->cap = newcap;
+    if (bytebuf_append_bytes(&buffer->bb, p, n) == -1) {
+        fprintf(stderr, "Allocation failure\n");
+        abort();
     }
-    memcpy(buffer->buf + buffer->outp, p, n);
-    buffer->outp += n;
     return n;
 }
