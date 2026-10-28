@@ -106,6 +106,35 @@ void get_exe(uint32_t pid, char buf[PATH_MAX]) {
     buf[n < PATH_MAX ? n : PATH_MAX - 1] = 0;
 }
 
+result_t req_exe_for_pids(inbound_t* inbound, outbound_t* outbound) {
+    result_t r;
+    uint32_t nelem;
+    if ((r = decode_int(inbound, &nelem)) != OK) {
+        return r;
+    }
+    if ((r = encode_byte(outbound, REQ_EXE_FOR_PIDS)) != OK) {
+        return r;
+    }
+    if ((r = encode_int(outbound, nelem)) != OK) {
+        return r;
+    }
+    for (uint32_t i = 0; i < nelem; i++) {
+        uint32_t pid;
+        static char exebuf[PATH_MAX];
+        if ((r = decode_int(inbound, &pid)) != OK) {
+            return r;
+        }
+        get_exe(pid, exebuf);
+        if ((r = encode_int(outbound, pid)) != OK) {
+            return r;
+        }
+        if ((r = encode_string(outbound, exebuf)) != OK) {
+            return r;
+        }
+    }
+    return OK;
+}
+
 int sonar_daemon_runner(const char* sonar_path, const char* config_file, const char* user_name,
     const char* group_name, void (*sigchld_sigaction)(int, siginfo_t*, void*)) {
     int down[2];
@@ -213,36 +242,14 @@ static result_t server(int input, int output) {
             destroy_outbound(&outbound);
             exit(xcode);
         }
-        case REQ_EXE_FOR_PIDS: {
-            uint32_t nelem;
-            if ((r = decode_int(&inbound, &nelem)) != OK) {
+        case REQ_EXE_FOR_PIDS:
+            if ((r = req_exe_for_pids(&inbound, &outbound)) != OK) {
                 goto Done;
-            }
-            if ((r = encode_byte(&outbound, op)) != OK) {
-                goto Done;
-            }
-            if ((r = encode_int(&outbound, nelem)) != OK) {
-                goto Done;
-            }
-            for (uint32_t i = 0; i < nelem; i++) {
-                uint32_t pid;
-                static char exebuf[PATH_MAX];
-                if ((r = decode_int(&inbound, &pid)) != OK) {
-                    goto Done;
-                }
-                get_exe(pid, exebuf);
-                if ((r = encode_int(&outbound, pid)) != OK) {
-                    goto Done;
-                }
-                if ((r = encode_string(&outbound, exebuf)) != OK) {
-                    goto Done;
-                }
             }
             if ((r = send_message(output, &outbound)) != OK) {
                 goto Done;
             }
             continue;
-        }
         default:
             fprintf(stderr, "Unknown operation from child: %d\n", op);
             r = ERR_INVALID_OP;
