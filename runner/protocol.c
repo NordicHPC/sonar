@@ -133,52 +133,15 @@ result_t recv_message(int input, inbound_t* m) {
     return OK;
 }
 
-void init_outbound(outbound_t* m) {
-    m->len = m->cap = 0;
-    m->buf = NULL;
-}
+void init_outbound(outbound_t* m) { bytebuf_init(&m->b); }
 
-void destroy_outbound(outbound_t* m) {
-    free(m->buf);
-    m->len = m->cap = 0;
-    m->buf = NULL;
-}
-
-static result_t ensure_free(outbound_t* m, uint32_t n) {
-    if (m->cap - m->len >= n) {
-        return OK;
-    }
-#ifdef SELFTEST
-    const uint32_t initial_cap = 4;
-#else
-    const uint32_t initial_cap = 32;
-#endif
-    uint32_t new_cap = m->cap == 0 ? initial_cap : m->cap;
-    while (new_cap - m->len < n && new_cap <= 0x7FFFFFFF) {
-        new_cap *= 2;
-    }
-    if (new_cap - m->len < n) {
-        fprintf(
-            stderr, "Allocation size could not be computed for request of %" PRIu32 " bytes\n", n);
-        return ERR_TOOBIG;
-    }
-    uint8_t* new_buf = realloc(m->buf, new_cap);
-    if (new_buf == NULL) {
-        perror("realloc");
-        return ERR_ALLOC;
-    }
-    m->cap = new_cap;
-    m->buf = new_buf;
-    return OK;
-}
+void destroy_outbound(outbound_t* m) { bytebuf_destroy(&m->b); }
 
 result_t encode_byte(outbound_t* m, uint8_t b) {
-    result_t r;
-    if ((r = ensure_free(m, 1)) != OK) {
-        return r;
+    if (bytebuf_append_byte(&m->b, b) == -1) {
+        fprintf(stderr, "Failed to allocate\n");
+        return ERR_ALLOC;
     }
-    m->buf[m->len] = b;
-    m->len++;
     return OK;
 }
 
@@ -193,24 +156,24 @@ static inline void encode_u32(uint8_t* p, uint32_t n) {
 }
 
 result_t encode_int(outbound_t* m, uint32_t n) {
-    result_t r;
-    if ((r = ensure_free(m, 4)) != OK) {
-        return r;
+    uint8_t* p = bytebuf_reserve(&m->b, 4);
+    if (p == NULL) {
+        fprintf(stderr, "Failed to allocate\n");
+        return ERR_ALLOC;
     }
-    encode_u32(m->buf + m->len, n);
-    m->len += 4;
+    encode_u32(p, n);
     return OK;
 }
 
 result_t encode_string(outbound_t* m, const char* s) {
     uint32_t len = strlen(s);
-    result_t r;
-    if ((r = ensure_free(m, len + 4)) != OK) {
-        return r;
+    uint8_t* p = bytebuf_reserve(&m->b, len + 4);
+    if (p == NULL) {
+        fprintf(stderr, "Failed to allocate\n");
+        return ERR_ALLOC;
     }
-    encode_int(m, len);
-    memcpy(m->buf + m->len, s, len);
-    m->len += len;
+    encode_u32(p, len);
+    memcpy(p + 4, s, len);
     return OK;
 }
 
@@ -231,18 +194,18 @@ static result_t write_bytes(int output, uint8_t* p, size_t n) {
 }
 
 result_t send_message(int output, outbound_t* m) {
-    assert(m->buf != NULL);
+    assert(m->b.buf != NULL);
     /* TODO (optimization): Make space for the header in the buffer on initialization to be able to
      * make only one call to write(). */
-    if (m->len == 0) {
+    if (m->b.len == 0) {
         fprintf(stderr, "Cannot send empty message\n");
         return ERR_EMPTY_MSG;
     }
     uint8_t hdr[4];
-    encode_u32(hdr, m->len);
+    encode_u32(hdr, m->b.len);
     result_t r;
     if ((r = write_bytes(output, hdr, sizeof(hdr))) != OK) {
         return r;
     }
-    return write_bytes(output, m->buf, m->len);
+    return write_bytes(output, m->b.buf, m->b.len);
 }

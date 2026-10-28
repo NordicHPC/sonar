@@ -1,6 +1,5 @@
 .PHONY: default all format test clean
 TARGETS=sonar-daemon-runner sonar-daemon-runner-test sonar-mock selftest vladimir
-
 # Note _FORTIFY_SOURCE requires -O1 or better
 # Note _XOPEN_SOURCE is required for readlink()
 # Note _DEFAULT_SOURCE is required for initgroups()
@@ -14,16 +13,17 @@ all: $(TARGETS)
 clean:
 	rm -f $(TARGETS) *.o test_*.txt *~
 
-sonar-daemon-runner: sonar-daemon-runner.c sonar-daemon-runner.h protocol.c protocol.h Makefile
-	$(CC) $(FLAGS) -o sonar-daemon-runner sonar-daemon-runner.c protocol.c
+sonar-daemon-runner: sonar-daemon-runner.c sonar-daemon-runner.h protocol.c protocol.h bytebuf.c bytebuf.h Makefile
+	$(CC) $(FLAGS) -o sonar-daemon-runner sonar-daemon-runner.c protocol.c bytebuf.c
 
-sonar-daemon-runner-test: sonar-daemon-runner.c sonar-daemon-runner.h protocol.c protocol.h Makefile
-	$(CC) $(FLAGS) -DLOGGING -o sonar-daemon-runner-test sonar-daemon-runner.c protocol.c
+sonar-daemon-runner-test: sonar-daemon-runner.c sonar-daemon-runner.h protocol.c protocol.h bytebuf.c bytebuf.h Makefile
+	$(CC) $(FLAGS) -DLOGGING -o sonar-daemon-runner-test sonar-daemon-runner.c protocol.c bytebuf.c
 
-sonar-mock: sonar-mock.c sonar-mock.h protocol.c protocol.h parse.c parse.h Makefile
-	$(CC) $(FLAGS) -DLOGGING -o sonar-mock sonar-mock.c protocol.c parse.c
+sonar-mock: sonar-mock.c sonar-mock.h protocol.c protocol.h parse.c parse.h bytebuf.c bytebuf.h Makefile
+	$(CC) $(FLAGS) -DLOGGING -o sonar-mock sonar-mock.c protocol.c parse.c bytebuf.c
 
 selftest: selftest.c selftest.h \
+	bytebuf.c bytebuf.h \
 	parse.c parse.h parse_test.c \
 	protocol.c protocol.h protocol_test.c \
 	sonar-mock.c sonar-mock.h sonar-mock_test.c \
@@ -32,6 +32,7 @@ selftest: selftest.c selftest.h \
 	$(CC) $(FLAGS) -fsanitize=undefined -DLOGGING -DSELFTEST \
 		-o selftest \
 		selftest.c \
+		bytebuf.c \
 		parse.c parse_test.c \
 		protocol.c protocol_test.c \
 		sonar-mock.c sonar-mock_test.c \

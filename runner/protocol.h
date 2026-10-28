@@ -1,6 +1,7 @@
 #ifndef protocol_h_included
 #define protocol_h_included
 
+#include "bytebuf.h"
 #include <inttypes.h>
 
 /* The coding style in the component is that whoever initially generates a result code that is not
@@ -78,9 +79,7 @@ result_t recv_message(int input, inbound_t* m);
 
 /* The outbound message can be in the newly-created, initialized, or filled state. */
 typedef struct {
-    uint32_t len;
-    uint32_t cap;
-    uint8_t* buf;
+    bytebuf_t b;
 } outbound_t;
 
 /* The message *m must be in the newly-created state, it moves to the initialized state. */
@@ -112,12 +111,23 @@ enum {
 
     /* Server should report /proc/PID/exe for PIDs.
      *
-     * Request: Array of PIDs.
+     * Request: Array(PID).
      *
-     * Response: Array of PID/string structs, all PIDs in the request will be represented in this
+     * Response: Array({PID, string}), all PIDs in the request will be represented in this
      * array. Zero-length strings mean "no information for this PID" (eg process exited).
      */
     REQ_EXE_FOR_PIDS,
+
+    /* Server should report matching environment variables for PIDs.
+     *
+     * Request: Array(string) Array(pid): patterns followed by PIDs.  The patterns must be
+     * syntactically valid.
+     *
+     * Response: Array({PID, Array({string,string})), all PIDs in the request will be represented in
+     * the outer array in the order of the input array.  A pid may have no matching vars, ie the
+     * inner array may be empty.  Each string pair represents a var name and value.
+     */
+    REQ_ENV_VARS_FOR_PIDS,
 };
 
 #endif /* proto_h_included */

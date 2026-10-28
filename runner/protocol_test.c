@@ -18,9 +18,9 @@ void protocol_selftest() {
     init_outbound(&outbound);
 
     /* Whitebox - after init */
-    assert(outbound.len == 0);
-    assert(outbound.cap == 0);
-    assert(outbound.buf == NULL);
+    assert(outbound.b.len == 0);
+    assert(outbound.b.cap == 0);
+    assert(outbound.b.buf == NULL);
 
     /* Blackbox */
     assert(encode_byte(&outbound, 10) == OK);
@@ -33,16 +33,16 @@ void protocol_selftest() {
 
     /* Whitebox - after filling */
     /* This assumes various things about encoding. */
-    assert(outbound.len >= 1 + 4 + 4 + 11 + 1 + 4 + 4 + 15);
-    assert(outbound.len <= outbound.cap);
-    assert(outbound.buf != NULL);
+    assert(outbound.b.len >= 1 + 4 + 4 + 11 + 1 + 4 + 4 + 15);
+    assert(outbound.b.len <= outbound.b.cap);
+    assert(outbound.b.buf != NULL);
 
     destroy_outbound(&outbound);
 
     /* Whitebox - after destroy */
-    assert(outbound.len == 0);
-    assert(outbound.cap == 0);
-    assert(outbound.buf == NULL);
+    assert(outbound.b.len == 0);
+    assert(outbound.b.cap == 0);
+    assert(outbound.b.buf == NULL);
 
     inbound_t inbound;
     init_inbound(&inbound);
