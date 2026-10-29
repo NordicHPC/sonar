@@ -136,7 +136,7 @@ result_t req_exe_for_pids(inbound_t* inbound, outbound_t* outbound) {
     return OK;
 }
 
-struct pat {
+struct var_pat {
     int prefix;
     int suffix;
     char* p;
@@ -145,26 +145,23 @@ struct pat {
 // In a var, 'name' points to malloc'd storage, name and val are both 0-terminated within that storage,
 // freeing the name also frees the value.
 
-struct var {
+struct env_var {
     char* name;
     char* value;
 };
 
-int read_var(FILE* f, bytebuf_t* s) {
-    // FIXME
-    return 0;
-}
-
-int get_env_vars(
-    uint32_t pid, struct pat* pats, uint32_t npats, struct var** result, uint32_t* nresult) {
-    /* Note the result has the entire name=value string */
-    /* FIXME */
+int get_env_vars(uint32_t pid,
+                 struct var_pat* pats, uint32_t npats,
+                 struct env_var** result, uint32_t* nresult) {
     int r = 0;
     char path[128];
     snprintf(path, sizeof(path), "/proc/%" PRIu32 "/environ", pid);
     FILE* f = fopen(path, "r");
     *nresult = 0;
     *result = NULL;
+    uint32_t cap = 0;
+    uint32_t nres = 0;
+    struct env_var* res = NULL;
     if (f == NULL) {
         goto Done;
     }
@@ -173,9 +170,9 @@ int get_env_vars(
      * into a variable-sized strings, meanwhile keeping track of the '=' location.  Then we
      * can run a match on the name.
      */
-    uint32_t cap = 4;
-    uint32_t nres = 0;
-    struct var* res = calloc(cap, sizeof(struct var));
+    cap = 4;
+    nres = 0;
+    res = calloc(cap, sizeof(struct env_var));
     if (res == NULL) {
         r = -1;
         goto Done;
@@ -183,19 +180,29 @@ int get_env_vars(
     bytebuf_t buf;
     bytebuf_init(&buf);
     for (;;) {
-        if (!read_var(f, &buf)) {
-            bytebuf_destroy(&buf);
-            break;
+        for (;;) {
+            int c = fgetc(f);
+            if (c == EOF) {
+                goto Done;
+            }
+            if (c == 0) {
+                break;
+            }
+            if (bytebuf_append_byte(&buf, (uint8_t)c) != 0) {
+                r = -1;
+                goto Done;
+            }
         }
         char* v = (char*)bytebuf_take(&buf);
         char* name = v;
         char* value = v;
-        while (value != 0) {
+        while (*value != '=') {
             value++;
         }
+        *value = 0;
         value++;
         int matched = 0;
-        for ( int i=0 ; i < npats ; i++ ) {
+        for ( uint32_t i=0 ; i < npats ; i++ ) {
             char* loc = strstr(name, pats[i].p);
             if (loc == NULL) {
                 continue;
@@ -203,7 +210,7 @@ int get_env_vars(
             if (pats[i].prefix && loc != pats[i].p) {
                 continue;
             }
-            if (pats[i].suffix && *(loc + strlen(pats[i].p)) != 0) {  // wrong, could be oob
+            if (pats[i].suffix && *(loc + strlen(pats[i].p)) != 0) {  // FIXME: wrong, could be oob
                 continue;
             }
             matched = 1;
@@ -211,7 +218,7 @@ int get_env_vars(
         }
         if (matched) {
             if (cap == nres) {
-                // extend it
+                // FIXME: extend it
             }
             res[nres].name = name;
             res[nres].value = value;
@@ -221,21 +228,28 @@ int get_env_vars(
         }
     }
 Done:
+    bytebuf_destroy(&buf);
     fclose(f);
+    if (r == 0) {
+        *result = res;
+        *nresult = nres;
+    } else {
+        // FIXME: free res
+    }
     return r;
 }
 
 result_t req_env_vars_for_pids(inbound_t* inbound, outbound_t* outbound) {
-    uint32_t npids = 0;
     uint32_t npats = 0;
-    struct pat* pats = NULL;
+    struct var_pat* pats = NULL;
     uint32_t nvars = 0;
-    struct var* vars = NULL;
+    struct env_var* vars = NULL;
+    uint32_t npids = 0;
     result_t r;
     if ((r = decode_int(inbound, &npats)) != OK) {
         goto Done;
     }
-    pats = calloc(npats, sizeof(struct pat));
+    pats = calloc(npats, sizeof(struct var_pat));
     if (pats == NULL) {
         perror("calloc");
         r = ERR_ALLOC;
@@ -280,7 +294,7 @@ result_t req_env_vars_for_pids(inbound_t* inbound, outbound_t* outbound) {
         if ((r = encode_int(outbound, nvars)) != OK) {
             goto Done;
         }
-        for (int j = 0; j < nvars; j++) {
+        for (uint32_t j = 0; j < nvars; j++) {
             if ((r = encode_string(outbound, vars[j].name)) != OK) {
                 goto Done;
             }
@@ -288,7 +302,7 @@ result_t req_env_vars_for_pids(inbound_t* inbound, outbound_t* outbound) {
                 goto Done;
             }
         }
-        for (int j = 0; j < nvars; j++) {
+        for (uint32_t j = 0; j < nvars; j++) {
             free(vars[j].name);
         }
         free(vars);
@@ -296,7 +310,7 @@ result_t req_env_vars_for_pids(inbound_t* inbound, outbound_t* outbound) {
         nvars = 0;
     }
 Done:
-    for (int j = 0; j < nvars; j++) {
+    for (uint32_t j = 0; j < nvars; j++) {
         free(vars[j].name);
     }
     free(vars);
