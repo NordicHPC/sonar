@@ -32,6 +32,10 @@ static void exe_for_pid(uint32_t pid, const char* s) {
     printf("sonar-mock: pid=%" PRIu32 " path=%s\n", (unsigned)pid, s);
 }
 
+static void env_var_for_pid(uint32_t pid, const char* name, const char* value) {
+    printf("sonar-mock: pid=%" PRIu32 " name=%s value=%s\n", (unsigned)pid, name, value);
+}
+
 int main(int argc, char** argv) {
     if (getuid() == 0 || getgid() == 0) {
         fprintf(stderr, "sonar-mock: should not run as root!\n");
@@ -118,6 +122,7 @@ int main(int argc, char** argv) {
     fflush(stderr);
 #  endif
 
+    /* TEST CASE: REQ_EXE_FOR_PIDS */
     char* e;
     if ((e = getenv("REQ_EXE_FOR_PIDS")) != NULL) {
         long* pids;
@@ -133,6 +138,23 @@ int main(int argc, char** argv) {
             return 1;
         }
     }
+
+    /* TEST CASE: REQ_ENV_VARS_FOR_PIDS */
+    if ((e = getenv("REQ_ENV_VARS_FOR_PIDS")) != NULL) {
+        long* pids;
+        size_t npids;
+        if (parse_longs(e, &pids, &npids) != 0) {
+            fprintf(stderr, "sonar-mock: Bad pid list in REQ_EXE_FOR_PIDS: %s\n", e);
+            return 1;
+        }
+        printf("sonar-mock: env_vars_for_pids\n");
+        if (test_env_vars_for_pids(pids, npids, request_fd, response_fd, NULL, env_var_for_pid) != OK) {
+            /* TODO (testing): Print the exact error */
+            fprintf(stderr, "sonar-mock: I/O error");
+            return 1;
+        }
+    }
+
     /* Exiting (both here and above) should cause the runner parent to exit too.  The Sonar daemon
        never exits, for it to exit is a fatal error.  Hence we sleep a bit here to give the parent
        time to read all the traffic, and then we exit to force the parent to exit too.
@@ -211,6 +233,107 @@ result_t test_exe_for_pids(const long* pids, size_t npids, int request_fd, int r
         }
         pid_callback(pid, (const char*)s);
         free(s);
+    }
+    destroy_inbound(&inbound);
+    return OK;
+}
+
+const char* const patterns[] = {
+    "^SHELL",
+    "HELL",
+    "ARG",
+    "^PATH$",
+    "PATH$",
+};
+
+result_t test_env_vars_for_pids(const long* pids, size_t npids, int request_fd, int response_fd,
+                                void (*sent_hook)(), void (*var_callback)(uint32_t, const char*, const char*)) {
+    result_t r;
+
+    outbound_t outbound;
+    init_outbound(&outbound);
+    if ((r = encode_byte(&outbound, REQ_ENV_VARS_FOR_PIDS)) != OK) {
+        return r;
+    }
+    uint32_t npatterns = (uint32_t)(sizeof(patterns)/sizeof(patterns[0]));
+    if ((r = encode_int(&outbound, npatterns)) != OK) {
+        return r;
+    }
+    for (uint32_t i = 0 ; i < npatterns ; i++ ) {
+        if ((r = encode_string(&outbound, patterns[i])) != OK) {
+            return r;
+        }
+    }
+    if ((r = encode_int(&outbound, npids)) != OK) {
+        return r;
+    }
+    for (uint32_t i = 0; i < npids; i++) {
+        if ((r = encode_int(&outbound, pids[i])) != OK) {
+            return r;
+        }
+    }
+    r = send_message(request_fd, &outbound);
+    destroy_outbound(&outbound);
+    if (r != OK) {
+        fprintf(stderr, "sonar-mock: failed to send\n");
+        return r;
+    }
+
+    if (sent_hook != NULL) {
+        sent_hook();
+    }
+
+    inbound_t inbound;
+    init_inbound(&inbound);
+    if ((r = recv_message(response_fd, &inbound)) != OK) {
+        fprintf(stderr, "sonar-mock: failed to receive\n");
+        return r;
+    }
+    uint8_t op;
+    if ((r = decode_byte(&inbound, &op)) != OK) {
+        fprintf(stderr, "sonar-mock: missing opcode\n");
+        return r;
+    }
+    if (op != REQ_ENV_VARS_FOR_PIDS) {
+        fprintf(stderr, "sonar-mock: bad opcode\n");
+        return ERR_IO;
+    }
+    uint32_t nelem;
+    if ((r = decode_int(&inbound, &nelem)) != OK) {
+        fprintf(stderr, "sonar-mock: no array length\n");
+        return r;
+    }
+    if (nelem != npids) {
+        fprintf(stderr, "sonar-mock: bad element count\n");
+        return ERR_IO;
+    }
+    for (int i = 0; i < nelem; i++) {
+        uint32_t pid;
+        uint32_t nvars;
+        uint8_t* name = NULL;
+        uint8_t* value = NULL;
+        if ((r = decode_int(&inbound, &pid)) != OK) {
+            fprintf(stderr, "sonar-mock: no pid in result\n");
+            return r;
+        }
+        if ((r = decode_int(&inbound, &nvars)) != OK) {
+            fprintf(stderr, "sonar-mock: no vars in result\n");
+            return r;
+        }
+        for (int j=0 ; j < nvars ; j++) {
+            if ((r = decode_string(&inbound, &name)) != OK) {
+                fprintf(stderr, "sonar-mock: no name in result\n");
+                return r;
+            }
+            if ((r = decode_string(&inbound, &value)) != OK) {
+                fprintf(stderr, "sonar-mock: no value in result\n");
+                free(name);
+                return r;
+            }
+            var_callback(pid, (const char*)name, (const char*)value);
+            free(name);
+            free(value);
+        }
     }
     destroy_inbound(&inbound);
     return OK;

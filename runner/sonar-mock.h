@@ -6,4 +6,7 @@
 result_t test_exe_for_pids(const long* pids, size_t npids, int request_fd, int response_fd,
     void (*sent_hook)(), void (*pid_callback)(uint32_t, const char*));
 
+result_t test_env_vars_for_pids(const long* pids, size_t npids, int request_fd, int response_fd,
+                           void (*sent_hook)(), void (*vars_callback)(uint32_t, const char*, const char*));
+
 #endif

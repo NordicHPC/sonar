@@ -140,6 +140,7 @@ struct var_pat {
     int prefix;
     int suffix;
     char* p;
+    size_t len;
 };
 
 // In a var, 'name' points to malloc'd storage, name and val are both 0-terminated within that storage,
@@ -155,31 +156,29 @@ int get_env_vars(uint32_t pid,
                  struct env_var** result, uint32_t* nresult) {
     int r = 0;
     char path[128];
-    snprintf(path, sizeof(path), "/proc/%" PRIu32 "/environ", pid);
-    FILE* f = fopen(path, "r");
-    *nresult = 0;
-    *result = NULL;
+    FILE *f = NULL;
     uint32_t cap = 0;
     uint32_t nres = 0;
     struct env_var* res = NULL;
+    bytebuf_t buf;
+    bytebuf_init(&buf);
+
+    *nresult = 0;
+    *result = NULL;
+
+    snprintf(path, sizeof(path), "/proc/%" PRIu32 "/environ", pid);
+    f = fopen(path, "r");
     if (f == NULL) {
         goto Done;
     }
-    /* The file can be arbitrarily large and each value can also be arbitrarily large, as can the
-     * variable names I think.  So we read chars from the file until we get a NUL and accumulate
-     * into a variable-sized strings, meanwhile keeping track of the '=' location.  Then we
-     * can run a match on the name.
-     */
     cap = 4;
-    nres = 0;
     res = calloc(cap, sizeof(struct env_var));
     if (res == NULL) {
         r = -1;
         goto Done;
     }
-    bytebuf_t buf;
-    bytebuf_init(&buf);
     for (;;) {
+        /* Read the next variable */
         for (;;) {
             int c = fgetc(f);
             if (c == EOF) {
@@ -201,6 +200,7 @@ int get_env_vars(uint32_t pid,
         }
         *value = 0;
         value++;
+        /* At this point v is live and must be deallocated on failure and anchored on success. */
         int matched = 0;
         for ( uint32_t i=0 ; i < npats ; i++ ) {
             char* loc = strstr(name, pats[i].p);
@@ -210,7 +210,7 @@ int get_env_vars(uint32_t pid,
             if (pats[i].prefix && loc != pats[i].p) {
                 continue;
             }
-            if (pats[i].suffix && *(loc + strlen(pats[i].p)) != 0) {  // FIXME: wrong, could be oob
+            if (pats[i].suffix && loc[pats[i].len] != 0) {
                 continue;
             }
             matched = 1;
@@ -218,7 +218,14 @@ int get_env_vars(uint32_t pid,
         }
         if (matched) {
             if (cap == nres) {
-                // FIXME: extend it
+                uint32_t new_cap = 2 * cap;
+                struct env_var *new_res = realloc(res, new_cap * sizeof(struct env_var));
+                if (new_res == NULL) {
+                    r = -1;
+                    goto Done;
+                }
+                cap = new_cap;
+                res = new_res;
             }
             res[nres].name = name;
             res[nres].value = value;
@@ -229,12 +236,17 @@ int get_env_vars(uint32_t pid,
     }
 Done:
     bytebuf_destroy(&buf);
-    fclose(f);
+    if (f != NULL) {
+        fclose(f);
+    }
     if (r == 0) {
         *result = res;
         *nresult = nres;
     } else {
-        // FIXME: free res
+        for (uint32_t i=0 ; i < nres ; i++ ) {
+            free(res[i].name);
+        }
+        free(res);
     }
     return r;
 }
@@ -263,15 +275,16 @@ result_t req_env_vars_for_pids(inbound_t* inbound, outbound_t* outbound) {
         if ((r = decode_string(inbound, &pat)) != OK) {
             goto Done;
         }
+        size_t l = strlen((char*)pat);
         if (*pat == '^') {
             pats[j].prefix = 1;
         }
-        size_t l = strlen((char*)pat);
         if (pat[l - 1] == '$') {
             pats[j].suffix = 1;
             pat[l - 1] = 0;
         }
         pats[j].p = (char*)pat + pats[j].prefix;
+        pats[j].len = l - (pats[j].prefix + pats[j].suffix);
     }
     if ((r = decode_int(inbound, &npids)) != OK) {
         goto Done;
