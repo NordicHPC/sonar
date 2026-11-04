@@ -5,12 +5,9 @@ project(SonarDaemonRunner)
 # Note _FORTIFY_SOURCE requires -O1 or better
 # Note _DEFAULT_SOURCE is required for initgroups(), reallocarray()
 # Note _POSIX_C_SOURCE is somehow implied hence not specified
-set(gccopt -g -O1 -Wall -Werror -Wno-format-truncation -Wpedantic -std=c17)
-set(srcopt _FORTIFY_SOURCE=2 _DEFAULT_SOURCE)
+set(CMAKE_C_FLAGS "-g -O1 -Wall -Werror -Wno-format-truncation -Wpedantic -std=c17 -D_FORTIFY_SOURCE=2 -D_DEFAULT_SOURCE")
 
 add_executable(sonar-daemon-runner)
-target_compile_definitions(sonar-daemon-runner PRIVATE ${srcopt})
-target_compile_options(sonar-daemon-runner PRIVATE ${gccopt})
 target_sources(sonar-daemon-runner
   PRIVATE
     alloc.c
@@ -20,8 +17,7 @@ target_sources(sonar-daemon-runner
 )
 
 add_executable(sonar-daemon-runner-test)
-target_compile_definitions(sonar-daemon-runner-test PRIVATE LOGGING ${srcopt})
-target_compile_options(sonar-daemon-runner-test PRIVATE ${gccopt})
+target_compile_definitions(sonar-daemon-runner-test PRIVATE LOGGING)
 target_sources(sonar-daemon-runner-test
   PRIVATE
     alloc.c
@@ -31,8 +27,7 @@ target_sources(sonar-daemon-runner-test
 )
 
 add_executable(sonar-mock)
-target_compile_definitions(sonar-mock PRIVATE LOGGING ${srcopt})
-target_compile_options(sonar-mock PRIVATE ${gccopt})
+target_compile_definitions(sonar-mock PRIVATE LOGGING)
 target_sources(sonar-mock
   PRIVATE
     alloc.c
@@ -43,8 +38,8 @@ target_sources(sonar-mock
 )
 
 add_executable(selftest)
-target_compile_definitions(selftest PRIVATE LOGGING SELFTEST ${srcopt})
-target_compile_options(selftest PRIVATE ${gccopt} -fsanitize=undefined)
+target_compile_definitions(selftest PRIVATE LOGGING SELFTEST)
+target_compile_options(selftest PRIVATE -fsanitize=undefined)
 target_link_options(selftest PRIVATE -lubsan)
 target_sources(selftest
   PRIVATE
