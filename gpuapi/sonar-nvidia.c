@@ -292,17 +292,19 @@ static int deviceGetComputeRunningProcesses(
             return -1;
         }
 #    if NVML_API_VERSION >= 12
-        if (xnvmlDeviceGetComputeRunningProcesses_v3) {
-            if ((r = xnvmlDeviceGetComputeRunningProcesses_v3(dev, count, running_procs)) != 0) {
-                free(running_procs);
-                return r;
-            }
-        }
+        if (v3) {
+            r = xnvmlDeviceGetComputeRunningProcesses_v3(dev, count, running_procs);
+        } else
 #    endif
-        if ((r = xnvmlDeviceGetComputeRunningProcesses_v2(dev, count, running_procs)) != 0) {
+        if (v2) {
+            r = xnvmlDeviceGetComputeRunningProcesses_v2(dev, count, running_procs);
+        }
+
+        if (r != 0) {
             free(running_procs);
             return r;
         }
+
         for (unsigned i = 0; i < *count; i++) {
             infos[i].pid = running_procs[i].pid;
             infos[i].usedGpuMemory = running_procs[i].usedGpuMemory;
