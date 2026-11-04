@@ -49,6 +49,7 @@ target_link_options(selftest PRIVATE -lubsan)
 target_sources(selftest
   PRIVATE
     alloc.c
+    alloc_test.c
     bytebuf.c
     bytebuf_test.c
     parse.c
@@ -68,7 +69,7 @@ target_sources(vladimir PRIVATE vladimir.c)
 enable_testing()
 add_test(
   NAME    selftest
-  COMMAND valgrind --leak-check=full --trace-children=yes ./selftest
+  COMMAND valgrind --leak-check=full --trace-children=yes --error-exitcode=1 ./selftest
 )
 
 add_custom_target(format

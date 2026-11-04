@@ -172,7 +172,7 @@ int get_env_vars(uint32_t pid, struct var_pat* pats, uint32_t npats, struct env_
         goto Done;
     }
     cap = 4;
-    res = realloc_array(NULL, cap, sizeof(struct env_var));
+    res = grow_array(NULL, cap, sizeof(struct env_var));
     if (res == NULL) {
         r = -1;
         goto Done;
@@ -261,7 +261,7 @@ result_t req_env_vars_for_pids(inbound_t* inbound, outbound_t* outbound) {
     if ((r = decode_int(inbound, &npats)) != OK) {
         goto Done;
     }
-    pats = realloc_array(NULL, npats, sizeof(struct var_pat));
+    pats = grow_array(NULL, npats, sizeof(struct var_pat));
     if (pats == NULL) {
         perror("calloc");
         r = ERR_ALLOC;

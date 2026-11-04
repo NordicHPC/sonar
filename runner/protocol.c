@@ -77,7 +77,7 @@ result_t decode_string(inbound_t* m, uint8_t** s) {
         perror("malloc");
         return ERR_ALLOC;
     }
-    uint8_t* buf = realloc_array(NULL, 1, need);
+    uint8_t* buf = grow_array(NULL, 1, need);
     if (buf == NULL) {
         perror("malloc");
         return ERR_ALLOC;
@@ -123,7 +123,7 @@ result_t recv_message(int input, inbound_t* m) {
         return r;
     }
     uint32_t nbytes = decode_u32(hdr);
-    uint8_t* payload = realloc_array(NULL, 1, nbytes);
+    uint8_t* payload = grow_array(NULL, 1, nbytes);
     if (payload == NULL) {
         perror("malloc");
         return ERR_ALLOC;

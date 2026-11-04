@@ -19,11 +19,14 @@ int alloc_add(uint32_t a, uint32_t b, uint32_t* result);
  */
 int alloc_mul(uint32_t a, uint32_t b, uint32_t* result);
 
-/* Reallocate an array of nelem elements each of size elemsiz.  The input pointer may be NULL.  If
- * nelem * elemsiz overflows ALLOC_MAX or the allocation fails for other reasons, sets errno to
- * ENOMEM and returns NULL.  On a NULL return, the object pointed to by the input pointer has not
- * changed.
+/* Grow an array of nelem elements, each of size elemsiz, pointed to by inp.  Inp may be NULL, in
+ * which case a new array is allocated.  The new size may be no smaller than the old size, but may
+ * be the same.  The new size may be 0 if the old size is 0 or inp is NULL; the return value will be
+ * non-NULL in this case.  If nelem*elemsiz overflows ALLOC_MAX or the allocation fails for other
+ * reasons, sets errno to ENOMEM and returns NULL.  On a NULL return, the object pointed to by inp
+ * has not changed.  Even if the new size is the same as the old size the caller should not rely on
+ * the return value being equal to inp.
  */
-void* realloc_array(void* inp, size_t nelem, size_t elemsiz);
+void* grow_array(void* inp, size_t nelem, size_t elemsiz);
 
 #endif

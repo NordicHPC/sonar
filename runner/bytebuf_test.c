@@ -4,7 +4,6 @@
 
 #include "bytebuf.h"
 
-#ifdef SELFTEST
 void bytebuf_selftest() {
     bytebuf_t b;
     bytebuf_init(&b);
@@ -99,9 +98,4 @@ void bytebuf_selftest() {
 
     assert((p = bytebuf_take(&bb)) != NULL);
     free(p);
-
-    /* TODO: Test some shrinking too? */
-    /* TODO: What happens if we shrink to 0?  This should *NOT* free the buffer.  Doc should note this.
-       See realloc man page, it's complicated.  Maybe we should disallow shrinking. */
 }
-#endif

@@ -5,8 +5,8 @@
 #include <stdint.h>
 
 /* A bytebuf_t holds a growable array of bytes.  It is in one of three states: new, initialized, and
- * filled.  A buffer in the new state must be initialized before being used.  A buffer in the filled
- * state must be destroyed before going out of scope.
+ * filled.  A buffer in the new state must be initialized before being used.  A buffer must be in
+ * the new or initialized state when going out of scope, never in the filled state (or it leaks).
  *
  * A stack or heap allocated bytebuf_t (even if allocated with calloc) starts in the "new" state.  A
  * static bytebuf_t starts in the initialized state.

@@ -17,6 +17,7 @@
 #undef write
 
 int main(int argc, char** argv) {
+    alloc_selftest();
     bytebuf_selftest();
     parse_selftest();
     protocol_selftest();

@@ -13,11 +13,12 @@ void clear_channel(int c);
 #  define read(x, y, z) selftest_read(x, y, z)
 #  define write(x, y, z) selftest_write(x, y, z)
 
-void parse_selftest();
-void protocol_selftest();
+void alloc_selftest();
+void bytebuf_selftest();
 void exe_for_pids_selftest();
 void get_exe_selftest();
-void bytebuf_selftest();
+void parse_selftest();
+void protocol_selftest();
 
 #endif
 

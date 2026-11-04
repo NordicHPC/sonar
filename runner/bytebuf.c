@@ -44,7 +44,7 @@ static int ensure_free(bytebuf_t* b, uint32_t n) {
     if (new_cap - b->len < n) {
         return -1;
     }
-    uint8_t* new_buf = realloc_array(b->buf, 1, new_cap);
+    uint8_t* new_buf = grow_array(b->buf, 1, new_cap);
     if (new_buf == NULL) {
         return -1;
     }
@@ -76,6 +76,10 @@ int bytebuf_append_bytes(bytebuf_t* b, const uint8_t* cs, size_t nbytes) {
     if (p == NULL) {
         return -1;
     }
-    memcpy(p, cs, nbytes);
+    if (cs != NULL) {
+        memcpy(p, cs, nbytes);
+    } else {
+        assert(nbytes == 0);
+    }
     return 0;
 }
