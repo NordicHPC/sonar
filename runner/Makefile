@@ -1,3 +1,6 @@
+# This makefile is here only to make things easier for the Makefile in the parent directory.  When
+# working here, normally run the cmake commands directly.
+
 .PHONY: format test runner clean all
 
 # Default target

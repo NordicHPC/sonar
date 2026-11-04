@@ -26,14 +26,14 @@ void bytebuf_init(bytebuf_t* b);
 void bytebuf_destroy(bytebuf_t* b);
 
 /* The buffer *b must be in the filled state, it moves to the initialized state.  The memory buffer
- * is returned, it will never be NULL.
+ * or a portion thereof is returned, it will never be NULL.
  */
 uint8_t* bytebuf_take(bytebuf_t* b);
 
 /* Make nbytes available and return a pointer to the first byte.  Returns NULL on OOM.  The buffer b
  * must be in the initialized or filled state, it moves to the filled state (even if nbytes is 0).
- * Note the returned pointer will be invalidated by subsequent calls to all bytebuf methods apart
- * from bytebuf_take.
+ * Note the returned pointer will be invalidated by subsequent calls to all bytebuf methods,
+ * including bytebuf_take.
  */
 uint8_t* bytebuf_reserve(bytebuf_t* b, size_t nbytes);
 

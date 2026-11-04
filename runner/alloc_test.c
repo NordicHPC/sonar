@@ -22,4 +22,15 @@ void alloc_selftest() {
     assert((p = grow_array(p, 1, 4)) != NULL);
     ((uint32_t*)p)[0] = 0x12345678; /* Ditto */
     free(p);
+    assert((p = grow_array(NULL, 4, 1)) != NULL);
+    memset(p, 'x', 4);
+    /* For sure grows it but we can't guarantee that it moves it, but we can hope! */
+    assert((p = grow_array(p, 1533, 1)) != NULL);
+    char* cp = (char*)p;
+    assert(cp[0] == 'x');
+    assert(cp[1] == 'x');
+    assert(cp[2] == 'x');
+    assert(cp[3] == 'x');
+    free(p);
+    assert((p = grow_array(NULL, 0x10000, 0x10000)) == 0);
 }

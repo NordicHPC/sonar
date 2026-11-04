@@ -31,7 +31,7 @@ int parse_longs(const char* input, long** parsed, size_t* num_parsed) {
                     abort();
                 }
             }
-            long* new = grow_array(NULL, cap, sizeof(long));
+            long* new = grow_array(arr, cap, sizeof(long));
             if (new == NULL) {
                 abort();
             }

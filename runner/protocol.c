@@ -172,15 +172,31 @@ result_t encode_int(outbound_t* m, uint32_t n) {
 }
 
 result_t encode_string(outbound_t* m, const char* s) {
-    uint32_t len = strlen(s);
-    uint8_t* p = bytebuf_reserve(&m->b, len + 4);
-    if (p == NULL) {
-        fprintf(stderr, "Failed to allocate\n");
-        return ERR_ALLOC;
+    uint32_t len;
+    {
+        size_t slen = strlen(s);
+        if (slen > UINT32_MAX) {
+            goto Fail;
+        }
+        len = (uint32_t)slen;
+    }
+    uint8_t* p = NULL;
+    {
+        uint32_t sz;
+        if (alloc_add(len, 4, &sz) == -1) {
+            goto Fail;
+        }
+        p = bytebuf_reserve(&m->b, sz);
+        if (p == NULL) {
+            goto Fail;
+        }
     }
     encode_u32(p, len);
     memcpy(p + 4, s, len);
     return OK;
+Fail:
+    fprintf(stderr, "Failed to allocate\n");
+    return ERR_ALLOC;
 }
 
 static result_t write_bytes(int output, uint8_t* p, size_t n) {
