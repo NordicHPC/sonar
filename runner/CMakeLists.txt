@@ -66,9 +66,12 @@ target_sources(selftest
 add_executable(vladimir)
 target_sources(vladimir PRIVATE vladimir.c)
 
+add_custom_target(check COMMAND ${CMAKE_CTEST_COMMAND})
+add_dependencies(check selftest)
+
 enable_testing()
 add_test(
-  NAME    selftest
+  NAME    valgrind-selftest
   COMMAND valgrind --leak-check=full --trace-children=yes --error-exitcode=1 ./selftest
 )
 
