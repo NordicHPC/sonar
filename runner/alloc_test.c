@@ -32,5 +32,5 @@ void alloc_selftest() {
     assert(cp[2] == 'x');
     assert(cp[3] == 'x');
     free(p);
-    assert((p = grow_array(NULL, 0x10000, 0x10000)) == 0);
+    assert((p = grow_array(NULL, 0x10000, 0x10000)) == NULL);
 }
