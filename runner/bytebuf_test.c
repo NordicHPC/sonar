@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "alloc.h"
 #include "bytebuf.h"
 
 void bytebuf_selftest() {
@@ -98,4 +99,10 @@ void bytebuf_selftest() {
 
     assert((p = bytebuf_take(&bb)) != NULL);
     free(p);
+
+    assert(bytebuf_reserve(&bb, ALLOC_MAX + 1) == NULL);
+    /* It's technically unspecified if this is well-defined.  Here we assume that the length is
+       checked before any of the source data are read, but a valid implementation could read and
+       copy source data up to min(nbytes, ALLOC_MAX), and only then fail. */
+    assert(bytebuf_append_bytes(&bb, NULL, ALLOC_MAX + 1) == -1);
 }

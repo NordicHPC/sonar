@@ -54,6 +54,9 @@ static int ensure_free(bytebuf_t* b, uint32_t n) {
 }
 
 uint8_t* bytebuf_reserve(bytebuf_t* b, size_t nbytes) {
+    if (nbytes > UINT32_MAX) {
+        return NULL;
+    }
     if (ensure_free(b, (uint32_t)nbytes) == -1) {
         return NULL;
     }

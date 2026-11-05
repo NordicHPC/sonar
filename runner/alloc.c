@@ -27,6 +27,7 @@ int alloc_mul(uint32_t a, uint32_t b, uint32_t* result) {
 
 void* grow_array(void* inp, size_t nelem, size_t elemsiz) {
     if (nelem > UINT32_MAX || elemsiz > UINT32_MAX) {
+        errno = ENOMEM;
         return NULL;
     }
     uint32_t newsiz;
