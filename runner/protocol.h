@@ -1,6 +1,7 @@
 #ifndef protocol_h_included
 #define protocol_h_included
 
+#include "bytebuf.h"
 #include <inttypes.h>
 
 /* The coding style in the component is that whoever initially generates a result code that is not
@@ -35,15 +36,28 @@ typedef enum {
  * the opcode may be different (as documented below).
  *
  * Multiple messages can be sent back-to-back on the client->server pipe, the client need not wait
- * for the server to respond.  WARNING: A pipe has limited capacity and the system may deadlock if
- * one side keeps sending messages without interleaving sending activity with reading responses!
- * The reason for this is that the responding side will be unable to send responses until they are
- * consumed, and will stop consuming messages; the sending side may then be unable to send, and will
- * not be able to consume responses.
+ * for the server to respond.  However:
+ *
+ *   !!!WARNING!!!  A pipe has limited capacity and the system may deadlock if one side keeps
+ *   sending messages without interleaving sending activity with reading responses!  The reason for
+ *   this is that the responding side will be unable to send responses until they are consumed, and
+ *   thus will stop consuming messages; the sending side may then be unable to send, and will not be
+ *   able to consume responses.  This will not be an issue if all traffic is structured as
+ *   send/receive pairs where the server reads an entire message of arbitrary size, then processes
+ *   that fully, and only then sends an entire response of arbitrary size, while the client after
+ *   sending the initial message reads that entire response before sending the next message.  But it
+ *   may be an issue if the sender attempts to send multiple messages before reading any responses.
  *
  * The order of responses is *always* in the order of requests.  Every request has exactly one
  * response, with the same operation code.  If errors are possible then they are encoded in the
  * response, as detailed below.
+ *
+ * We assume that the communication between the server and client is sane, as we control both sides.
+ * If there's a risk that a too-large request (something that would be larger than the max
+ * allocation in the server) could be sent from Sonar, then Sonar must handle that limitation itself
+ * so as not to make the server exit.  Sonar has no limitations on the maximum size it can receive,
+ * though the server has a limitation on the maximum size of the response it can build.  The server
+ * should strive not to abort in this case, but rather send a partial result.
  */
 
 /* The inbound message can be in the newly-created, initialized, or filled state */
@@ -78,9 +92,7 @@ result_t recv_message(int input, inbound_t* m);
 
 /* The outbound message can be in the newly-created, initialized, or filled state. */
 typedef struct {
-    uint32_t len;
-    uint32_t cap;
-    uint8_t* buf;
+    bytebuf_t b;
 } outbound_t;
 
 /* The message *m must be in the newly-created state, it moves to the initialized state. */
@@ -112,9 +124,9 @@ enum {
 
     /* Server should report /proc/PID/exe for PIDs.
      *
-     * Request: Array of PIDs.
+     * Request: Array(PID).
      *
-     * Response: Array of PID/string structs, all PIDs in the request will be represented in this
+     * Response: Array({PID, string}), all PIDs in the request will be represented in this
      * array. Zero-length strings mean "no information for this PID" (eg process exited).
      */
     REQ_EXE_FOR_PIDS,

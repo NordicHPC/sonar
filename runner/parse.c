@@ -1,16 +1,19 @@
+/* This is test code only, not part of the runner */
+
 #include <errno.h>
 #include <limits.h>
 #include <stdlib.h>
 #include <string.h>
 
+#include "alloc.h"
 #include "parse.h"
 
 int parse_longs(const char* input, long** parsed, size_t* num_parsed) {
     *parsed = NULL;
     *num_parsed = 0;
 
-    size_t ix = 0;
-    size_t cap = 0;
+    uint32_t ix = 0;
+    uint32_t cap = 0;
     long* arr = NULL;
     for (;;) {
         errno = 0;
@@ -21,14 +24,16 @@ int parse_longs(const char* input, long** parsed, size_t* num_parsed) {
             return 1;
         }
         if (ix == cap) {
-            cap = cap == 0 ? 4 : cap * 2;
-            long* new = calloc(cap, sizeof(long));
+            if (cap == 0) {
+                cap = 4;
+            } else {
+                if (alloc_mul(cap, 2, &cap) == -1) {
+                    abort();
+                }
+            }
+            long* new = grow_array(arr, cap, sizeof(long));
             if (new == NULL) {
                 abort();
-            }
-            if (arr != NULL) {
-                memcpy(new, arr, ix * sizeof(long));
-                free(arr);
             }
             arr = new;
         }

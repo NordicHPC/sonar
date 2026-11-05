@@ -5,3 +5,4 @@ selftest
 vladimir
 *.o
 test_*.txt
+build

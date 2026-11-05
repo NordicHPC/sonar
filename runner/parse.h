@@ -1,3 +1,5 @@
+/* This is test code only, not part of the runner */
+
 #ifndef parse_h_included
 #define parse_h_included
 
