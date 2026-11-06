@@ -11,3 +11,7 @@ void get_exe_selftest() {
     assert(loc != NULL);
     assert(loc[8] == 0);
 }
+
+void get_env_var_selftest() {
+    // TODO
+}

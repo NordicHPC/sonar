@@ -93,7 +93,10 @@ static void sigchld(int sig, siginfo_t* si, void* data) {
 #endif
 
 /* Given a pid, try to get /proc/pid/exe, otherwise return empty string */
-void get_exe(uint32_t pid, char buf[PATH_MAX]) {
+#ifndef SELFTEST
+static
+#endif
+    void get_exe(uint32_t pid, char buf[PATH_MAX]) {
 #if defined(LOGGING) && defined(SELFTEST)
     fprintf(stderr, "get_exe %" PRIu32 "\n", pid);
     fflush(stderr);
@@ -108,7 +111,7 @@ void get_exe(uint32_t pid, char buf[PATH_MAX]) {
     buf[n < PATH_MAX ? n : PATH_MAX - 1] = 0;
 }
 
-result_t req_exe_for_pids(inbound_t* inbound, outbound_t* outbound) {
+static result_t req_exe_for_pids(inbound_t* inbound, outbound_t* outbound) {
     result_t r;
     uint32_t nelem;
     if ((r = decode_int(inbound, &nelem)) != OK) {
@@ -137,24 +140,12 @@ result_t req_exe_for_pids(inbound_t* inbound, outbound_t* outbound) {
     return OK;
 }
 
-/* In a var_pat, p - prefix points to malloc'd storage, len is strlen(p). */
-struct var_pat {
-    int prefix;
-    int suffix;
-    char* p;
-    size_t len;
-};
-
-/* In an env_var, 'name' points to malloc'd storage, name and val are both 0-terminated within that
-   storage, freeing the name also frees the value. */
-struct env_var {
-    char* name;
-    char* value;
-};
-
 /* On an error return, the out variables will be sane (empty), and the error can be ignored */
-int get_env_vars(uint32_t pid, struct var_pat* pats, uint32_t npats, struct env_var** result,
-    uint32_t* nresult) {
+#ifndef SELFTEST
+static
+#endif
+    int get_env_vars(uint32_t pid, struct var_pat* pats, uint32_t npats, struct env_var** result,
+        uint32_t* nresult) {
     int r = 0;
     char path[128];
     FILE* f = NULL;
@@ -260,7 +251,7 @@ Done:
     return r;
 }
 
-result_t req_env_vars_for_pids(inbound_t* inbound, outbound_t* outbound) {
+static result_t req_env_vars_for_pids(inbound_t* inbound, outbound_t* outbound) {
     uint32_t npats = 0;
     struct var_pat* pats = NULL;
     uint32_t nvars = 0;
