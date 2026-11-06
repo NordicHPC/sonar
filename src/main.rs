@@ -88,6 +88,9 @@ enum Commands {
 
         /// Merge process records that have the same job ID and command name
         rollup: bool,
+
+        /// Include environment variables whose names match these strings
+        env_patterns: Option<String>,
     },
     /// Extract cluster information
     Cluster {
@@ -207,6 +210,7 @@ fn main() {
             lockdir,
             load,
             rollup,
+            env_patterns,
         } => {
             let opts = ps::PsOptions {
                 rollup: *rollup,
@@ -222,6 +226,16 @@ fn main() {
                 },
                 exclude_commands: if let Some(s) = exclude_commands {
                     s.split(',').map(|x| x.to_string()).collect::<Vec<String>>()
+                } else {
+                    vec![]
+                },
+                env_patterns: if let Some(s) = env_patterns {
+                    let ps = s.split(',').map(|x| x.to_string()).collect::<Vec<String>>();
+                    if let Err(e) = privileged::check_env_var_patterns(&ps) {
+                        eprintln!("{e}");
+                        std::process::exit(USAGE_ERROR);
+                    }
+                    ps
                 } else {
                     vec![]
                 },
@@ -434,6 +448,7 @@ fn command_line(args: Vec<String>) -> Commands {
                 let mut lockdir = None;
                 let mut load = false;
                 let mut rollup = false;
+                let mut env_patterns = None;
                 while next < args.len() {
                     let arg = args[next].as_ref();
                     next += 1;
@@ -480,6 +495,10 @@ fn command_line(args: Vec<String>) -> Commands {
                         (next, cluster) = (new_next, Some(value));
                     } else if let Some(new_next) = bool_arg(arg, &args, next, "--hostname-only") {
                         (next, hostname_only) = (new_next, true);
+                    } else if let Some((new_next, value)) =
+                        string_arg(arg, &args, next, "--env-patterns")
+                    {
+                        (next, env_patterns) = (new_next, Some(value));
                     } else {
                         usage(true);
                     }
@@ -496,6 +515,7 @@ fn command_line(args: Vec<String>) -> Commands {
                     lockdir,
                     load,
                     rollup,
+                    env_patterns,
                 }
             }
             "sysinfo" => {
@@ -711,6 +731,8 @@ Options for `sample`:
       exists on startup [default: none]
   --load
       Print per-cpu and per-gpu load data
+  --env-patterns pattern,pattern...
+      Collect environment variables matching the patterns, see documentation
   --rollup
       Merge process records that have the same job ID and command name (on systems
       with stable job IDs only)
