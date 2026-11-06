@@ -137,6 +137,7 @@ result_t req_exe_for_pids(inbound_t* inbound, outbound_t* outbound) {
     return OK;
 }
 
+/* In a var_pat, p - prefix points to malloc'd storage, len is strlen(p). */
 struct var_pat {
     int prefix;
     int suffix;
@@ -144,14 +145,14 @@ struct var_pat {
     size_t len;
 };
 
-// In a var, 'name' points to malloc'd storage, name and val are both 0-terminated within that
-// storage, freeing the name also frees the value.
-
+/* In an env_var, 'name' points to malloc'd storage, name and val are both 0-terminated within that
+   storage, freeing the name also frees the value. */
 struct env_var {
     char* name;
     char* value;
 };
 
+/* On an error return, the out variables will be sane (empty), and the error can be ignored */
 int get_env_vars(uint32_t pid, struct var_pat* pats, uint32_t npats, struct env_var** result,
     uint32_t* nresult) {
     int r = 0;
@@ -160,6 +161,7 @@ int get_env_vars(uint32_t pid, struct var_pat* pats, uint32_t npats, struct env_
     uint32_t cap = 0;
     uint32_t nres = 0;
     struct env_var* res = NULL;
+    char* v = NULL;
     bytebuf_t buf;
     bytebuf_init(&buf);
 
@@ -192,7 +194,8 @@ int get_env_vars(uint32_t pid, struct var_pat* pats, uint32_t npats, struct env_
                 goto Done;
             }
         }
-        char* v = (char*)bytebuf_take(&buf);
+        v = (char*)bytebuf_take(&buf);
+        /* At this point v is live and must be deallocated on failure and anchored on success. */
         char* name = v;
         char* value = v;
         while (*value != '=') {
@@ -200,7 +203,6 @@ int get_env_vars(uint32_t pid, struct var_pat* pats, uint32_t npats, struct env_
         }
         *value = 0;
         value++;
-        /* At this point v is live and must be deallocated on failure and anchored on success. */
         int matched = 0;
         for (uint32_t i = 0; i < npats; i++) {
             char* loc = strstr(name, pats[i].p);
@@ -216,26 +218,33 @@ int get_env_vars(uint32_t pid, struct var_pat* pats, uint32_t npats, struct env_
             matched = 1;
             break;
         }
-        if (matched) {
-            if (cap == nres) {
-                uint32_t new_cap = 2 * cap;
-                struct env_var* new_res = realloc(res, new_cap * sizeof(struct env_var));
-                if (new_res == NULL) {
-                    r = -1;
-                    goto Done;
-                }
-                cap = new_cap;
-                res = new_res;
-            }
-            res[nres].name = name;
-            res[nres].value = value;
-            nres++;
-        } else {
+        if (!matched) {
             free(v);
+            v = NULL;
+            continue;
         }
+        if (cap == nres) {
+            uint32_t new_cap;
+            if (alloc_mul(cap, 2, &new_cap) != 0) {
+                r = -1;
+                goto Done;
+            }
+            struct env_var* new_res = grow_array(res, new_cap, sizeof(struct env_var));
+            if (new_res == NULL) {
+                r = -1;
+                goto Done;
+            }
+            cap = new_cap;
+            res = new_res;
+        }
+        v = NULL;
+        res[nres].name = name;
+        res[nres].value = value;
+        nres++;
     }
 Done:
     bytebuf_destroy(&buf);
+    free(v);
     if (f != NULL) {
         fclose(f);
     }
@@ -263,12 +272,15 @@ result_t req_env_vars_for_pids(inbound_t* inbound, outbound_t* outbound) {
     }
     pats = grow_array(NULL, npats, sizeof(struct var_pat));
     if (pats == NULL) {
-        perror("calloc");
+        perror("grow_array");
         r = ERR_ALLOC;
         goto Done;
     }
     for (uint32_t j = 0; j < npats; j++) {
         pats[j].p = NULL;
+        pats[j].prefix = 0;
+        pats[j].suffix = 0;
+        pats[j].len = 0;
     }
     for (uint32_t j = 0; j < npats; j++) {
         uint8_t* pat;
