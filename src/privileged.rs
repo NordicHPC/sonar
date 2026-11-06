@@ -150,7 +150,7 @@ impl RootServer {
         let mut size = szbuf[0] as usize;
         size |= (szbuf[1] as usize) << 8;
         size |= (szbuf[2] as usize) << 16;
-        size |= (szbuf[3] as usize) << 32;
+        size |= (szbuf[3] as usize) << 24;
         let mut incoming = Incoming::new(size);
         self.read(incoming.v.as_mut_slice())?;
         Ok(incoming)
