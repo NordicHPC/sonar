@@ -24,24 +24,25 @@ function join() {
     echo $xs
 }
 
-make all
+make
 ( cd .. ; cargo build )
 
-$(pwd)/vladimir &
-$(pwd)/vladimir &
-$(pwd)/vladimir &
+trap 'pkill vladimir; rm -f test_*.txt' EXIT
+
+$(pwd)/build/vladimir &
+$(pwd)/build/vladimir &
+$(pwd)/build/vladimir &
 join $(pgrep vladimir) > test_pids.txt
 echo $(whoami) $(groups | awk '{ print $1 }') > test_id.txt
 
 echo "Testing with sonar-mock"
-echo ./sonar-mock > test_exe.txt
+echo ./build/sonar-mock > test_exe.txt
 sudo ./req_exe_for_pids_stage2.bash
 count=0
 for p in $(pgrep vladimir) ; do
-    look="pid=$p path=$(pwd)/vladimir"
+    look="pid=$p path=$(pwd)/build/vladimir"
     if ! $(grep -q "$look" test_result.txt); then
         echo "Did not find $look"
-        pkill vladimir
         exit 1
     fi
     count=$((count+1))
@@ -61,10 +62,9 @@ jq -c -r '.value.data.attributes.jobs[].processes[] | {"exe":.exe, "pid":.pid}' 
 
 count=0
 for p in $(pgrep vladimir) ; do
-    look="{\"exe\":\"$(pwd)/vladimir\",\"pid\":$p}"
+    look="{\"exe\":\"$(pwd)/build/vladimir\",\"pid\":$p}"
     if ! $(grep -q "$look" test_results2.txt); then
         echo "Did not find $look"
-        pkill vladimir
         exit 1
     fi
     count=$((count+1))
@@ -75,6 +75,4 @@ if ((count != 3)); then
 fi
 echo "Testing with sonar OK"
 
-pkill vladimir
-rm -f test_*.txt
 echo "All OK"

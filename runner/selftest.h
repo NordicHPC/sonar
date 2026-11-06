@@ -16,6 +16,7 @@ void clear_channel(int c);
 void alloc_selftest();
 void bytebuf_selftest();
 void exe_for_pids_selftest();
+void get_env_var_selftest();
 void get_exe_selftest();
 void parse_selftest();
 void protocol_selftest();
