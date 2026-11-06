@@ -1,0 +1,28 @@
+name: Test C code formatting
+
+defaults:
+  run:
+    shell: bash
+
+on:
+  push:
+    branches: [ main, 'release_*' ]
+  pull_request:
+    branches: [ main, 'release_*' ]
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Display clang-format version
+      run: clang-format --version
+
+    - name: Format code
+      run: |
+        cd tests/ci
+        ./c-format.sh
