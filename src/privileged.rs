@@ -16,6 +16,7 @@ use std::os::unix::io::FromRawFd;
 #[allow(dead_code)]
 const REQ_EXIT: u8 = 0u8;
 const REQ_EXE_FOR_PIDS: u8 = 1u8;
+const REQ_ENV_VARS_FOR_PIDS: u8 = 2u8;
 
 // Given a real PID, read the /proc/PID/exe link.
 //
@@ -40,6 +41,97 @@ pub fn get_exe_path(pid: u32, srv: &RootServer) -> Result<String, String> {
     }
     let _pid = resp.get_u32()?;
     Ok(resp.get_string()?)
+}
+
+// Each pattern can be just a substring S, a prefix substring ^S, a suffix substring S$, or an exact
+// match ^S$.  These are not full regular expressions, even if the syntax is borrowed from regexes.
+// We could imagine expanding to regular expressions eventually.  The S must contain only
+// [-A-Za-z0-9_] (even if env vars have no such restriction); for now, we restrict the input charset
+// to those to allow for regexes later.
+//
+// Also limit the number of patterns to 100 and the total length to 10000; this should not really
+// matter since the config file is not user controlled, but it keeps us sane.
+pub fn check_env_var_patterns(patterns: &[String]) -> Result<(), String> {
+    if patterns.len() > 100 {
+        return Err("Too many env var patterns".to_string());
+    }
+    let mut l = 0;
+    for p in patterns {
+        l += p.len();
+    }
+    if l > 10000 {
+        return Err("Total pattern length too large".to_string());
+    }
+    for p in patterns {
+        let l = p.len();
+        let mut payload = false;
+        for (i, c) in p.chars().enumerate() {
+            if c >= 'A' && c <= 'Z'
+                || c >= 'a' && c <= 'z'
+                || c >= '0' && c <= '9'
+                || c == '-'
+                || c == '_'
+            {
+                payload = true;
+                continue;
+            }
+            if c == '^' && i == 0 {
+                continue;
+            }
+            if c == '$' && i == l - 1 {
+                continue;
+            }
+            return Err(format!("Invalid pattern {p}"));
+        }
+        if !payload {
+            return Err(format!("Invalid pattern {p}"));
+        }
+    }
+    Ok(())
+}
+
+#[derive(Default)]
+pub struct EnvVar {
+    pub name: String,
+    pub value: String,
+}
+
+pub fn get_env_vars(
+    pid: u32,
+    patterns: &[String],
+    srv: &RootServer,
+) -> Result<Vec<EnvVar>, String> {
+    let mut req = Outgoing::new();
+    req.put_u8(REQ_ENV_VARS_FOR_PIDS);
+    req.put_u32(patterns.len() as u32); // pattern count, checked earlier
+    for p in patterns {
+        req.put_string(p); // a pattern
+    }
+    req.put_u32(1u32); // 1 pid
+    req.put_u32(pid); // the pid
+    srv.send(req)?;
+
+    let mut resp = srv.receive()?;
+    if resp.get_u8()? != REQ_ENV_VARS_FOR_PIDS {
+        return Err("Bad op".to_string());
+    }
+    let r_pids = resp.get_u32()?;
+    if r_pids != 1 {
+        return Err("Bad array length".to_string());
+    }
+    // First and only array element
+    let r_pid = resp.get_u32()?;
+    if r_pid != pid {
+        return Err("Bad pid".to_string());
+    }
+    let r_vars = resp.get_u32()?;
+    let mut res = vec![];
+    for _ in 0..r_vars {
+        let name = resp.get_string()?;
+        let value = resp.get_string()?;
+        res.push(EnvVar { name, value });
+    }
+    Ok(res)
 }
 
 // Protocol logic implementation.  Any error return basically amounts to the root agent being broken
@@ -70,7 +162,14 @@ impl Outgoing {
         self.v.push((n & 255) as u8);
     }
 
-    // Missing because not needed yet: put_string
+    pub fn put_string(&mut self, s: &str) {
+        let bs = s.as_bytes();
+        if bs.len() > u32::MAX as usize {
+            panic!("String length should be checked before now");
+        }
+        self.put_u32(bs.len() as u32);
+        self.v.extend_from_slice(bs);
+    }
 }
 
 pub struct Incoming {
