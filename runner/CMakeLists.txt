@@ -1,4 +1,7 @@
-cmake_minimum_required(VERSION 3.50)
+# CMake 3.31 is what's on ubuntu-latest by default as of Q4 2026 (Ubuntu 24), and it's currently
+# good enough for us.
+
+cmake_minimum_required(VERSION 3.31)
 
 project(SonarDaemonRunner)
 
@@ -40,7 +43,7 @@ target_sources(sonar-mock
 add_executable(selftest)
 target_compile_definitions(selftest PRIVATE LOGGING SELFTEST)
 target_compile_options(selftest PRIVATE -fsanitize=undefined)
-target_link_options(selftest PRIVATE -lubsan)
+target_link_libraries(selftest ubsan)
 target_sources(selftest
   PRIVATE
     alloc.c
@@ -61,7 +64,7 @@ target_sources(selftest
 add_executable(vladimir)
 target_sources(vladimir PRIVATE vladimir.c)
 
-add_custom_target(check COMMAND ${CMAKE_CTEST_COMMAND})
+add_custom_target(check COMMAND ${CMAKE_CTEST_COMMAND} --verbose)
 add_dependencies(check selftest)
 
 enable_testing()

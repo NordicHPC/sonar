@@ -35,11 +35,12 @@ jobs:
     - name: Test
       run: cargo test --verbose
 
-      # one of the shell tests below needs jq
-    - name: Install jq
+    # many of the shell tests below need jq
+    # the root server selftest uses valgrind
+    - name: Install jq and valgrind
       run: |
         sudo apt-get update
-        sudo apt-get install -y jq
+        sudo apt-get install -y jq valgrind
 
     - name: Shell tests
       run: |
