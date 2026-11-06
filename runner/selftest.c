@@ -22,6 +22,7 @@ int main(int argc, char** argv) {
     parse_selftest();
     protocol_selftest();
     exe_for_pids_selftest();
+    get_env_var_selftest();
     get_exe_selftest();
 }
 
