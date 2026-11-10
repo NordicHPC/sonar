@@ -4,6 +4,7 @@ use crate::gpu;
 use crate::json_tags::*;
 use crate::output;
 use crate::posix::time::{format_iso8601, unix_time_to_tm};
+use crate::privileged::EnvVar;
 use crate::ps::{CState, ProcInfo, PsOptions, SampleData};
 use crate::systemapi;
 use crate::types::JobID;
@@ -203,7 +204,14 @@ fn format_newfmt_sample(proc_info: &ProcInfo) -> output::Object {
         fields.push_s(SAMPLE_PROCESS_EXE_PATH, proc_info.exe_path.clone());
     }
     if proc_info.env_vars.len() > 0 {
-        todo!();
+        let mut vars = output::Array::new();
+        for EnvVar { name, value } in &proc_info.env_vars {
+            let mut ev = output::Object::new();
+            ev.push_s(KV_PAIR_KEY, name.clone());
+            ev.push_s(KV_PAIR_VALUE, value.clone());
+            vars.push_o(ev);
+        }
+        fields.push_a(SAMPLE_PROCESS_ENV_VARS, vars);
     }
     if proc_info.pid != 0 {
         // Rolled-up processes have a synthesized non-zero pid in daemon mode, and a zero pid in

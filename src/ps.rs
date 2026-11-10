@@ -7,7 +7,7 @@ use crate::output;
 #[cfg(feature = "daemon")]
 use crate::pidmap::PidMap;
 #[cfg(feature = "daemon")]
-use crate::privileged;
+use crate::privileged::{self, EnvVar};
 use crate::ps_newfmt::format_newfmt;
 use crate::systemapi::{self, DiskInfo};
 use crate::types::{JobID, Pid, Uid};
@@ -284,7 +284,7 @@ pub struct TheProcInfo {
     pub user: String,
     pub command: String,
     pub exe_path: String,
-    pub env_vars: Vec<String>,
+    pub env_vars: Vec<EnvVar>,
     pub pid: Pid,
     pub ppid: Pid,
     pub rolledup: usize,

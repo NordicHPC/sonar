@@ -42,7 +42,7 @@ pub fn get_exe_path(pid: u32, srv: &RootServer) -> Result<String, String> {
     Ok(resp.get_string()?)
 }
 
-pub fn check_env_var_patterns(patterns: &[String]) -> Result<(), String> {
+pub fn check_env_var_patterns(_patterns: &[String]) -> Result<(), String> {
     // The intent is that each pattern can be just a substring S, a prefix substring ^S, a suffix
     // substring S$, or an exact match ^S$.  These are not full regular expressions, even if the
     // syntax is borrowed.  We could imagine expanding to regular expressions eventually.  Normally
@@ -51,11 +51,17 @@ pub fn check_env_var_patterns(patterns: &[String]) -> Result<(), String> {
     todo!()
 }
 
+#[derive(Default)]
+pub struct EnvVar {
+    pub name: String,
+    pub value: String,
+}
+
 pub fn get_env_vars(
-    pid: u32,
-    patterns: &[String],
-    srv: &RootServer,
-) -> Result<Vec<String>, String> {
+    _pid: u32,
+    _patterns: &[String],
+    _srv: &RootServer,
+) -> Result<Vec<EnvVar>, String> {
     // Initially the protocol would send an array of pattern strings and would receive an array of
     // strings, possibly empty.  We probably want to limit the number of patterns somewhere.  We
     // could strip ^ and $ here or in the root runner.  Assume for now that we syntax check in Rust
