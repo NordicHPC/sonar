@@ -153,13 +153,12 @@ impl Outgoing {
     }
 
     pub fn put_string(&mut self, s: &str) {
-        if s.len() > u32::MAX as usize {
+        let bs = s.as_bytes();
+        if bs.len() > u32::MAX as usize {
             panic!("String length should be checked before now");
         }
-        self.put_u32(s.len() as u32);
-        for b in s.as_bytes() {
-            self.v.push(*b);
-        }
+        self.put_u32(bs.len() as u32);
+        self.v.extend_from_slice(bs);
     }
 }
 
