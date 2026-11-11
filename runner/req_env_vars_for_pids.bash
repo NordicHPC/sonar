@@ -29,7 +29,7 @@ make
 
 # I guess to keep this test case completely separated from the other one we should use estragon
 # here, not vladimir.
-trap 'pkill vladimir; rm -f test_ev4p_*.txt' EXIT
+#trap 'pkill vladimir; rm -f test_ev4p_*.txt' EXIT
 
 $(pwd)/build/vladimir &
 $(pwd)/build/vladimir &
@@ -61,12 +61,13 @@ if ((count != 3)); then
 fi
 echo "Testing with sonar-mock OK"
 
-# Sonar not ready yet
+echo "Testing with sonar"
+echo ../target/debug/sonar > test_ev4p_exe.txt
+sudo ./req_env_vars_for_pids_stage2.bash
 
-# echo "Testing with sonar"
-# echo ../target/debug/sonar > test_ev4p_exe.txt
-# sudo ./req_env_vars_for_pids_stage2.bash
-# # In this case, test_ev4p_result.txt should be raw JSON output
+cat test_ev4p_result.txt
+
+# In this case, test_ev4p_result.txt should be raw JSON output
 # jq -c -r '.value.data.attributes.jobs[].processes[] | {"exe":.exe, "pid":.pid}' < test_ev4p_result.txt | grep vladimir > test_ev4p_results2.txt
 # #cat test_ev4p_results2.txt
 
@@ -83,6 +84,6 @@ echo "Testing with sonar-mock OK"
 #     echo "Bad count: " $count
 #     exit 1
 # fi
-# echo "Testing with sonar OK"
+echo "Testing with sonar OK"
 
 echo "All OK"
