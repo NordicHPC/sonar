@@ -144,7 +144,7 @@ int get_env_vars(uint32_t pid, struct var_pat* pats, uint32_t npats, struct env_
 #if defined(LOGGING) && defined(SELFTEST)
     fprintf(stderr, "get_env_vars %" PRIu32 "\n", pid);
     for (uint32_t i = 0 ; i < npats ; i++ ) {
-        fprintf(stderr, "  %s (%d) prefix=%d prefix=%d\n", pats[i].p, (int)pats[i].len, pats[i].prefix, pats[i].suffix);
+        fprintf(stderr, "  %s (%d) prefix=%d suffix=%d\n", pats[i].p, (int)pats[i].len, pats[i].prefix, pats[i].suffix);
     }
     fflush(stderr);
 #endif
@@ -173,29 +173,46 @@ int get_env_vars(uint32_t pid, struct var_pat* pats, uint32_t npats, struct env_
         goto Done;
     }
     for (;;) {
-        /* Read the next variable */
+        /* Read the next variable.  According to proc_pid_environ(5) every entry is terminated by
+         * NUL, and there may be an extra NUL at the end.  Entries cannot contain NUL.  According to
+         * environ(7) the name=value is a convention, not part of the file format.
+         */
         for (;;) {
             int c = fgetc(f);
             if (c == EOF) {
                 goto Done;
             }
-            if (c == 0) {
-                break;
-            }
             if (bytebuf_append_byte(&buf, (uint8_t)c) != 0) {
                 r = -1;
                 goto Done;
+            }
+            if (c == 0) {
+                break;
             }
         }
         v = (char*)bytebuf_take(&buf);
         /* At this point v is live and must be deallocated on failure and anchored on success. */
         char* name = v;
         char* value = v;
-        while (*value != '=') {
+        /* Look for '=' if present */
+        while (*value && *value != '=') {
             value++;
         }
-        *value = 0;
-        value++;
+        /* If no '=' then take it that value is empty, otherwise terminate the name and point to the
+         * value.
+         */
+        if (*value == '=') {
+            *value = 0;
+            value++;
+        }
+        /* Entries with empty names are ignored, should they occur; this also handles a trailing NUL
+         * in the file.
+         */
+        if (!*name) {
+            free(v);
+            v = NULL;
+            continue;
+        }
         int matched = 0;
         for (uint32_t i = 0; i < npats; i++) {
             char* loc = strstr(name, pats[i].p);
@@ -241,6 +258,13 @@ Done:
     if (f != NULL) {
         fclose(f);
     }
+#if defined(LOGGING) && defined(SELFTEST)
+    fprintf(stderr, " =>\n");
+    for (uint32_t i = 0 ; i < nres ; i++ ) {
+        fprintf(stderr, "  %s %s\n", res[i].name, res[i].value);
+    }
+    fflush(stderr);
+#endif
     if (r == 0) {
         *result = res;
         *nresult = nres;
