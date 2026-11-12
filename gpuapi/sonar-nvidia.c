@@ -298,7 +298,7 @@ static int deviceGetComputeRunningProcesses(
             r = xnvmlDeviceGetComputeRunningProcesses_v3(dev, count, running_procs);
         } else
 #    endif
-        if (v2) {
+            if (v2) {
             r = xnvmlDeviceGetComputeRunningProcesses_v2(dev, count, running_procs);
         }
 
@@ -664,7 +664,7 @@ int nvml_device_probe_processes(uint32_t device, uint32_t* count) {
     nvmlMemory_t mem;
     rc = xnvmlDeviceGetMemoryInfo(dev, &mem);
     if (rc != NVML_SUCCESS) {
-        free(running_procs);    
+        free(running_procs);
         free(utilized_procs);
         return -1;
     }
