@@ -1,0 +1,3 @@
+Third-party components used by Sonar components are covered by their
+own open-source, non-infective licenses.  See go-licenses.txt and
+rust-licenses.txt in this directory for a list.
