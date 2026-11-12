@@ -52,11 +52,12 @@ format:
 	( cd runner ; $(MAKE) format )
 
 # (Re)generate all files that are generated
-generate: CITATION.cff
+generate:
 	( cd build-dist ; $(MAKE) generate )
 	( cd util ; $(MAKE) generate )
 	( cd tests ; $(MAKE) generate )
 	( cd src/gpu ; $(MAKE) generate )
+	( cd util ; $(MAKE) licenses ; mv go-licenses.txt rust-licenses.txt .. )
 
 CITATION.cff: Cargo.toml
 	python3 citation-version.py Cargo.toml CITATION.cff

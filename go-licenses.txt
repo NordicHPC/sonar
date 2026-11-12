@@ -1,0 +1,16 @@
+anonymize     MIT
+github.com/klauspost/compress     Apache-2.0
+github.com/klauspost/compress     BSD-3-Clause
+github.com/klauspost/compress/internal/snapref     BSD-3-Clause
+github.com/klauspost/compress     MIT
+github.com/klauspost/compress/s2     BSD-3-Clause
+github.com/klauspost/compress/zstd/internal/xxhash     MIT
+github.com/lars-t-hansen/ini     Apache-2.0
+github.com/NordicHPC/sonar/util/formats     MIT
+github.com/NordicHPC/sonar/util/formats/newfmt     MIT
+github.com/pierrec/lz4/v4     BSD-3-Clause
+github.com/twmb/franz-go/pkg     BSD-3-Clause
+github.com/twmb/franz-go/pkg/kmsg     BSD-3-Clause
+ingest-kafka     MIT
+kprox     MIT
+process-doc     MIT

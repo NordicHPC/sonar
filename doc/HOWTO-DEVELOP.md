@@ -186,7 +186,6 @@ With the branches come some additional rules for how to move patches around:
   changed to "backported-to-release".  No older release branches shall automatically be considered
   for backports.
 
-
 ### Policies for changing Rust edition and minimum Rust version
 
 Policy for changing the minimum Rust version:
@@ -239,6 +238,12 @@ A site that does not need Kafka can turn that off.  The main outstanding issue a
 for a site that will always upload data via the Kafka HTTP proxy, we could disable the rdkafka
 library and leave the HTTP upload support in place, but can't currently do so.
 
+### Licenses of dependencies
+
+Sonar is MIT-licensed and should not include GPL code (a consequence of wanting to place as few
+restrictions on the use of the code as possible).  `make generate` will scan the Rust and Go
+dependency trees and regenerate `go-licenses.txt` and `rust-licenses.txt` in the root directory, and
+scan those files for undesired licenses.  Any diffs to these files should be examined carefully.
 
 ## Bindgen
 
