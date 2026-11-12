@@ -608,15 +608,18 @@ int nvml_device_probe_processes(uint32_t device, uint32_t* count) {
     if (rc == NVML_ERROR_NOT_FOUND) {
         if (utilized_procs_count != 0) {
             // got NVML_ERROR_NOT_FOUND but no utilized processes
+            free(running_procs);
             return -1;
         }
     } else if (rc == NVML_ERROR_INSUFFICIENT_SIZE) {
         if (utilized_procs_count == 0) {
             // got NVML_ERROR_INSUFFICIENT_SIZE but no utilized processes
+            free(running_procs);
             return -1;
         }
     } else {
         // unexpected error
+        free(running_procs);
         return -1;
     }
 
