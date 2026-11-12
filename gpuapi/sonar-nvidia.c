@@ -172,6 +172,7 @@ static int load_nvml() {
       LOGIT(str);                                                                                  \
       if ((var = dlsym(lib, str)) == NULL) {                                                       \
           LOGIT(" ** Symbol failed");                                                              \
+          dlclose(lib);                                                                            \
           lib = NULL;                                                                              \
           return -1;                                                                               \
       }
@@ -221,6 +222,7 @@ static int load_nvml() {
     DLSYM(xnvmlSystemGetCudaDriverVersion, "nvmlSystemGetCudaDriverVersion");
 
     if (xnvmlInit() != 0) {
+        dlclose(lib);
         lib = NULL;
         return -1;
     }
