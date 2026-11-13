@@ -162,6 +162,7 @@ type SampleProcess struct {
 	ResidentMemory uint64             `json:"resident_memory,omitempty" doc:"Kilobytes of private resident memory"`
 	VirtualMemory  uint64             `json:"virtual_memory,omitempty" doc:"Kilobytes of virtual data+stack memory"`
 	Cmd            string             `json:"cmd,omitempty" doc:"The command (not the command line), zombie processes get an extra <defunct> annotation at the end, a la ps"`
+	ExePath        string             `json:"exe,omitempty" doc:"The executable path, if available (privileged)"`
 	Pid            uint64             `json:"pid,omitempty" doc:"Process ID"`
 	ParentPid      uint64             `json:"ppid,omitempty" doc:"Parent-process ID"`
 	InContainer    bool               `json:"in_container,omitempty" doc:"True if deemed a part of a container"`
