@@ -537,6 +537,130 @@ static unsigned info_count = 0;
    sonar does not know what its own sampling window is.
 */
 #  define PROBE_WINDOW_SECS 5
+
+#  define NVML_PROCESS_QUERY_MAX_ATTEMPTS 3
+
+typedef struct {
+    processInfo_t* items;
+    unsigned count;
+} running_processes_t;
+
+typedef struct {
+    nvmlProcessUtilizationSample_t* items;
+    unsigned count;
+} utilized_processes_t;
+
+/*
+ * Get the list of utilized processes on the given device since the specified timestamp.
+ * Returns 0 on success, -1 on failure.
+ * result must be empty on entry; free any existing result->items before calling.
+ * Caller is responsible for freeing the items in result->items if the function succeeds.
+ */
+static int get_utilized_processes(
+    nvmlDevice_t dev, unsigned long long timestamp, utilized_processes_t* result) {
+
+    if (result == NULL) {
+        return -1;
+    }
+
+    result->items = NULL;
+    result->count = 0;
+
+    /* NVML returns INSUFFICIENT_SIZE when samples exist, or NOT_FOUND when none do. */
+    int rc = xnvmlDeviceGetProcessUtilization(dev, NULL, &result->count, timestamp);
+
+    if (rc == NVML_ERROR_INSUFFICIENT_SIZE) {
+        if (result->count == 0) {
+            return -1;
+        }
+    } else if (rc == NVML_SUCCESS || rc == NVML_ERROR_NOT_FOUND) {
+        if (result->count == 0) {
+            return 0;
+        }
+        return -1;
+    } else {
+        return -1;
+    }
+
+    for (int attempt = 0; attempt < NVML_PROCESS_QUERY_MAX_ATTEMPTS; attempt++) {
+        nvmlProcessUtilizationSample_t* items = calloc(result->count, sizeof(*items));
+        if (items == NULL) {
+            return -1;
+        }
+
+        rc = xnvmlDeviceGetProcessUtilization(dev, items, &result->count, timestamp);
+        if (rc == NVML_SUCCESS) {
+            result->items = items;
+            return 0;
+        } else if (rc == NVML_ERROR_NOT_FOUND) {
+            free(items);
+            result->count = 0;
+            return 0;
+        } else if (rc == NVML_ERROR_INSUFFICIENT_SIZE) {
+            free(items);
+            if (result->count == 0) {
+                return -1;
+            }
+        } else {
+            free(items);
+            return -1;
+        }
+    }
+
+    return -1;
+}
+
+/*
+ * Get the list of running processes on the given device.
+ * Returns 0 on success, -1 on failure.
+ * result must be empty on entry; free any existing result->items before calling.
+ * Caller is responsible for freeing the items in result->items if the function succeeds.
+ */
+static int get_running_processes(nvmlDevice_t dev, running_processes_t* result) {
+    if (result == NULL) {
+        return -1;
+    }
+
+    result->items = NULL;
+    result->count = 0;
+
+    int rc = deviceGetComputeRunningProcesses(dev, &result->count, NULL);
+    if (rc == NVML_ERROR_INSUFFICIENT_SIZE) {
+        if (result->count == 0) {
+            return -1;
+        }
+    } else if (rc == NVML_SUCCESS) {
+        if (result->count == 0) {
+            return 0;
+        }
+        return -1;
+    } else {
+        return -1;
+    }
+
+    for (int attempt = 0; attempt < NVML_PROCESS_QUERY_MAX_ATTEMPTS; attempt++) {
+        processInfo_t* items = calloc(result->count, sizeof(*items));
+        if (items == NULL) {
+            return -1;
+        }
+
+        rc = deviceGetComputeRunningProcesses(dev, &result->count, items);
+        if (rc == NVML_SUCCESS) {
+            result->items = items;
+            return 0;
+        } else if (rc == NVML_ERROR_INSUFFICIENT_SIZE) {
+            free(items);
+            if (result->count == 0) {
+                return -1;
+            }
+        } else {
+            free(items);
+            return -1;
+        }
+    }
+    return -1;
+}
+
 #endif /* SONAR_NVIDIA_GPU */
 
 int nvml_device_probe_processes(uint32_t device, uint32_t* count) {
@@ -547,157 +671,64 @@ int nvml_device_probe_processes(uint32_t device, uint32_t* count) {
     if (load_nvml() == -1) {
         return -1;
     }
-    if (count == NULL) {
-        return -1;
-    }
 
     nvmlDevice_t dev;
     if (deviceGetHandleByIndex(device, &dev) != 0) {
         return -1;
     }
 
-    unsigned running_procs_count = 0;
-    int rc = deviceGetComputeRunningProcesses(dev, &running_procs_count, NULL);
-    if (rc == NVML_SUCCESS) {
-        if (running_procs_count != 0) {
-            // got NVML_SUCCESS but expected running processes
-            return -1;
-        }
-    } else if (rc == NVML_ERROR_INSUFFICIENT_SIZE) {
-        if (running_procs_count == 0) {
-            // got NVML_ERROR_INSUFFICIENT_SIZE but no running processes
-            return -1;
-        }
-    } else {
-        // got an unexpected error
+    running_processes_t running_procs = { .items = NULL, .count = 0 };
+    int rc = get_running_processes(dev, &running_procs);
+    if (rc != 0) {
         return -1;
-    }
-
-    processInfo_t* running_procs = NULL;
-    if (running_procs_count > 0) {
-        int i = 0;
-        // Avoid infinite loops by limiting the number of retries to 3 attempts.
-        while (i < 3) {
-            running_procs = calloc(running_procs_count, sizeof(processInfo_t));
-            if (running_procs == NULL) {
-                return -1;
-            }
-            rc = deviceGetComputeRunningProcesses(dev, &running_procs_count, running_procs);
-            if (rc == NVML_SUCCESS) {
-                break;
-            } else if (rc == NVML_ERROR_INSUFFICIENT_SIZE) {
-                free(running_procs);
-                running_procs = NULL;
-                i++;
-            } else {
-                free(running_procs);
-                return -1;
-            }
-        }
-        if (i == 3) {
-            // reached the maximum number of retries, give up
-            free(running_procs);
-            return -1;
-        }
     }
 
     unsigned long long t = (unsigned long long)(time(NULL) - PROBE_WINDOW_SECS) * 1000000;
-    unsigned utilized_procs_count = 0;
-    // Docs describe a NULL-buffer size query, but list INVALID_ARGUMENT if the buffer is NULL
-    // and omit INSUFFICIENT_SIZE. In practice, NVML returns INSUFFICIENT_SIZE with
-    // the required count when samples exist, or NOT_FOUND when none do.
-    rc = xnvmlDeviceGetProcessUtilization(dev, NULL, &utilized_procs_count, t);
-    if (rc == NVML_ERROR_NOT_FOUND) {
-        if (utilized_procs_count != 0) {
-            // got NVML_ERROR_NOT_FOUND but no utilized processes
-            free(running_procs);
-            return -1;
-        }
-    } else if (rc == NVML_ERROR_INSUFFICIENT_SIZE) {
-        if (utilized_procs_count == 0) {
-            // got NVML_ERROR_INSUFFICIENT_SIZE but no utilized processes
-            free(running_procs);
-            return -1;
-        }
-    } else {
-        // unexpected error
-        free(running_procs);
+    utilized_processes_t utilized_procs = { .items = NULL, .count = 0 };
+    rc = get_utilized_processes(dev, t, &utilized_procs);
+    if (rc != 0) {
+        free(running_procs.items);
         return -1;
-    }
-
-    nvmlProcessUtilizationSample_t* utilized_procs = NULL;
-    if (utilized_procs_count > 0) {
-        int i = 0;
-        // Avoid infinite loops by limiting the number of retries to 3 attempts.
-        while (i < 3) {
-            utilized_procs = calloc(utilized_procs_count, sizeof(nvmlProcessUtilizationSample_t));
-            if (utilized_procs == NULL) {
-                free(running_procs);
-                return -1;
-            }
-            rc = xnvmlDeviceGetProcessUtilization(dev, utilized_procs, &utilized_procs_count, t);
-            if (rc == NVML_SUCCESS) {
-                break;
-            } else if (rc == NVML_ERROR_NOT_FOUND) {
-                free(utilized_procs);
-                utilized_procs = NULL;
-                utilized_procs_count = 0;
-                break;
-            } else if (rc == NVML_ERROR_INSUFFICIENT_SIZE) {
-                free(utilized_procs);
-                utilized_procs = NULL;
-                i++;
-            } else {
-                free(running_procs);
-                free(utilized_procs);
-                return -1;
-            }
-        }
-        if (i == 3) {
-            // reached the maximum number of retries, give up
-            free(running_procs);
-            free(utilized_procs);
-            return -1;
-        }
     }
 
     nvmlMemory_t mem;
     rc = xnvmlDeviceGetMemoryInfo(dev, &mem);
     if (rc != NVML_SUCCESS) {
-        free(running_procs);
-        free(utilized_procs);
+        free(running_procs.items);
+        free(utilized_procs.items);
         return -1;
     }
 
     info_count = 0;
-    // Allocate at least 1 info structure.
-    unsigned alloc_count = running_procs_count + utilized_procs_count;
+    // Allocate at least 1 info structure as calloc may (or may not) return
+    // NULL if alloc_count == 0.
+    unsigned alloc_count = running_procs.count + utilized_procs.count;
     alloc_count = alloc_count > 0 ? alloc_count : 1;
     infos = calloc(alloc_count, sizeof(struct nvml_gpu_process));
     if (infos == NULL) {
-        free(running_procs);
-        free(utilized_procs);
+        free(running_procs.items);
+        free(utilized_procs.items);
         return -1;
     }
-    for (unsigned i = 0; i < running_procs_count; i++) {
-        infos[i].pid = running_procs[i].pid;
-        infos[i].mem_size = running_procs[i].usedGpuMemory / 1024;
+    for (unsigned i = 0; i < running_procs.count; i++) {
+        infos[i].pid = running_procs.items[i].pid;
+        infos[i].mem_size = running_procs.items[i].usedGpuMemory / 1024;
     }
-    info_count = running_procs_count;
-    for (unsigned i = 0; i < utilized_procs_count; i++) {
+    info_count = running_procs.count;
+    for (unsigned i = 0; i < utilized_procs.count; i++) {
         unsigned j;
-        for (j = 0; j < info_count && infos[j].pid != utilized_procs[i].pid; j++) { }
+        for (j = 0; j < info_count && infos[j].pid != utilized_procs.items[i].pid; j++) { }
         if (j == info_count) {
-            infos[j].pid = utilized_procs[i].pid;
-            infos[j].mem_size = (utilized_procs[i].memUtil * mem.used) / 100 / 1024;
+            infos[j].pid = utilized_procs.items[i].pid;
+            infos[j].mem_size = (utilized_procs.items[i].memUtil * mem.used) / 100 / 1024;
             info_count++;
         }
-        infos[j].mem_util = utilized_procs[i].memUtil;
-        infos[j].gpu_util = utilized_procs[i].smUtil;
+        infos[j].mem_util = utilized_procs.items[i].memUtil;
+        infos[j].gpu_util = utilized_procs.items[i].smUtil;
     }
 
-    free(running_procs);
-    free(utilized_procs);
+    free(running_procs.items);
+    free(utilized_procs.items);
 
     *count = info_count;
     return 0;
@@ -727,6 +758,7 @@ void nvml_free_processes() {
     if (infos != NULL) {
         free(infos);
         infos = NULL;
+        info_count = 0;
     }
 #endif
 }
