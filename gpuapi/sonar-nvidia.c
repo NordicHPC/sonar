@@ -14,6 +14,7 @@
 #include <assert.h>
 #include <dlfcn.h>
 #include <inttypes.h>
+#include <limits.h>
 #include <stddef.h>
 #include <stdio.h> /* snprintf(), we can fix this if we don't want the baggage */
 #include <stdlib.h>
@@ -694,6 +695,12 @@ int nvml_device_probe_processes(uint32_t device, uint32_t* count) {
     nvmlMemory_t mem;
     rc = xnvmlDeviceGetMemoryInfo(dev, &mem);
     if (rc != NVML_SUCCESS) {
+        free(running_procs.items);
+        free(utilized_procs.items);
+        return -1;
+    }
+
+    if (utilized_procs.count > UINT_MAX - running_procs.count) {
         free(running_procs.items);
         free(utilized_procs.items);
         return -1;
