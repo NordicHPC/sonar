@@ -572,7 +572,8 @@ static int get_utilized_processes(
 
     if (rc == NVML_ERROR_INSUFFICIENT_SIZE) {
         if (result->count == 0) {
-            return -1;
+            // INSUFFICIENT_SIZE with count 0 means no samples exist.
+            return 0;
         }
     } else if (rc == NVML_SUCCESS || rc == NVML_ERROR_NOT_FOUND) {
         if (result->count == 0) {
@@ -600,7 +601,7 @@ static int get_utilized_processes(
         } else if (rc == NVML_ERROR_INSUFFICIENT_SIZE) {
             free(items);
             if (result->count == 0) {
-                return -1;
+                return 0;
             }
         } else {
             free(items);
@@ -628,7 +629,8 @@ static int get_running_processes(nvmlDevice_t dev, running_processes_t* result) 
     int rc = deviceGetComputeRunningProcesses(dev, &result->count, NULL);
     if (rc == NVML_ERROR_INSUFFICIENT_SIZE) {
         if (result->count == 0) {
-            return -1;
+            // INSUFFICIENT_SIZE with count 0 means no samples exist.
+            return 0;
         }
     } else if (rc == NVML_SUCCESS) {
         if (result->count == 0) {
@@ -652,7 +654,7 @@ static int get_running_processes(nvmlDevice_t dev, running_processes_t* result) 
         } else if (rc == NVML_ERROR_INSUFFICIENT_SIZE) {
             free(items);
             if (result->count == 0) {
-                return -1;
+                return 0;
             }
         } else {
             free(items);
