@@ -11,7 +11,6 @@
      /storage/software/CUDAcore/11.1.1/targets/x86_64-linux/include/nvml.h
 */
 
-#include <assert.h>
 #include <dlfcn.h>
 #include <inttypes.h>
 #include <limits.h>
@@ -397,7 +396,7 @@ int nvml_device_get_card_info(uint32_t device, struct nvml_card_info* infobuf) {
         if (n_arch < sizeof(arch_names) / sizeof(arch_names[0])) {
             archname = arch_names[n_arch];
         }
-        strcpy(infobuf->architecture, archname);
+        strtcpy(infobuf->architecture, archname, sizeof(infobuf->architecture));
     }
 #  endif
 
@@ -485,7 +484,6 @@ int nvml_device_get_card_state(uint32_t device, struct nvml_card_state* infobuf)
         if (pstate == NVML_PSTATE_UNKNOWN) {
             infobuf->perf_state = PERF_STATE_UNKNOWN;
         } else {
-            assert(pstate >= 0);
             infobuf->perf_state = (int)pstate;
         }
     }
@@ -567,7 +565,9 @@ static int get_utilized_processes(
     result->items = NULL;
     result->count = 0;
 
-    /* NVML returns INSUFFICIENT_SIZE when samples exist, or NOT_FOUND when none do. */
+    /* INSUFFICIENT_SIZE with a non-zero count means there are samples available and
+       the buffer is too small. INSUFFICIENT_SIZE with a zero count or NOT_FOUND means
+       there are no samples. */
     int rc = xnvmlDeviceGetProcessUtilization(dev, NULL, &result->count, timestamp);
 
     if (rc == NVML_ERROR_INSUFFICIENT_SIZE) {
@@ -629,7 +629,7 @@ static int get_running_processes(nvmlDevice_t dev, running_processes_t* result) 
     int rc = deviceGetComputeRunningProcesses(dev, &result->count, NULL);
     if (rc == NVML_ERROR_INSUFFICIENT_SIZE) {
         if (result->count == 0) {
-            // INSUFFICIENT_SIZE with count 0 means no samples exist.
+            // INSUFFICIENT_SIZE with count 0 means no processes exist.
             return 0;
         }
     } else if (rc == NVML_SUCCESS) {
