@@ -3,6 +3,8 @@
 
 // Version 0.19.0-devel
 
+#![allow(unused)]
+
 pub const EXTENDED_UINT_UNSET: u64 = 0;
 pub const EXTENDED_UINT_INFINITE: u64 = 1;
 pub const EXTENDED_UINT_BASE: u64 = 2;
@@ -104,6 +106,7 @@ pub const SAMPLE_PROCESS_RESIDENT_MEMORY: &str = "resident_memory"; // uint64
 pub const SAMPLE_PROCESS_VIRTUAL_MEMORY: &str = "virtual_memory"; // uint64
 pub const SAMPLE_PROCESS_CMD: &str = "cmd"; // string
 pub const SAMPLE_PROCESS_EXE_PATH: &str = "exe"; // string
+pub const SAMPLE_PROCESS_ENV_VARS: &str = "environ"; // []KVPair
 pub const SAMPLE_PROCESS_PID: &str = "pid"; // uint64
 pub const SAMPLE_PROCESS_PARENT_PID: &str = "ppid"; // uint64
 pub const SAMPLE_PROCESS_IN_CONTAINER: &str = "in_container"; // bool

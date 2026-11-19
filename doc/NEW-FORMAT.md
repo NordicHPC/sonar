@@ -877,6 +877,10 @@ the end, a la ps.
 
 The executable path, if available (privileged).
 
+#### **`environ`** []KVPair
+
+Selected environment variables, if available (privileged).
+
 #### **`pid`** uint64
 
 Process ID.  Normally Pid is non-zero.  For rolled-up samples in daemon mode (where a set of

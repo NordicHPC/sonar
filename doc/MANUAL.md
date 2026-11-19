@@ -208,6 +208,17 @@ The `min-cpu-time` attribute can be set to not report processes and jobs whose c
 is less than the value; a value of 60s seems to cull many uninteresting things.  The default is
 zero.
 
+The `env-patterns` attribute can be set to a comma-separated list of patterns that match the names
+of environment variables.  The patterns are strings of `[A-Za-z0-9_-]` optionally prefixed by `^` to
+denote start-of-name and suffixed by `$` to denote end-of-name.  For example, `^HOME$` matches only
+`HOME` but `HOME` matches `XHOMEY` and many others.  Variable matching is only performed if Sonar is
+run under the control of the privileged daemon runner.  **NOTE:** With low probability, and probably
+only in some container-like configurations of Linux, there is a chance that Sonar will hang forever
+when examining environment variables, due to a complex set of circumstances.  This is not a Sonar
+problem per se but it means that it would be worth watching out for unexpected gaps in the data
+stream.  See the discussion [here](https://github.com/NordicHPC/sonar/issues/121) for everything we
+know so far about this.
+
 The `rollup` attribute can be set to true to merge processes that have no children, have the same
 parent, and have the same command name, into a single pseudo-process.  This is especially meaningful
 for compressing data on large HPC nodes running MPI jobs.  However, some nuance in the data is
