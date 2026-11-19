@@ -71,7 +71,7 @@ add_dependencies(check selftest)
 enable_testing()
 add_test(
   NAME    valgrind-selftest
-  COMMAND valgrind --leak-check=full --trace-children=yes --error-exitcode=1 ./selftest
+  COMMAND ../run_selftest.bash
 )
 
 add_custom_target(format
