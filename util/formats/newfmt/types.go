@@ -805,6 +805,9 @@ type SampleProcess struct {
 	// The executable path, if available (privileged).
 	ExePath string `json:"exe,omitempty"`
 
+	// Selected environment variables, if available (privileged).
+	EnvVars []KVPair `json:"environ,omitempty"`
+
 	// Process ID.  Normally Pid is non-zero.  For rolled-up samples in daemon mode (where a set of
 	// similar processes that changes over time is rolled up as one process that has no obvious
 	// representative Pid), it is a synthesized non-zero value outside the system's Pid range; see

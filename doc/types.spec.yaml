@@ -405,6 +405,10 @@ SampleProcess:
       type: 'string'
       doc: >
         The executable path, if available (privileged).
+    environ:
+      type: '[]KVPair'
+      doc: >
+        Selected environment variables, if available (privileged).
     pid:
       type: 'uint64'
       doc: >

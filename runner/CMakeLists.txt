@@ -1,5 +1,5 @@
-# CMake 3.31 is what's on ubuntu-latest by default as of Q4 2026 (Ubuntu 24), and it's currently
-# good enough for us.
+# CMake 3.31 is what's on github ubuntu-latest by default as of Q4 2026 (Ubuntu 24), and it's
+# currently good enough for us.
 
 cmake_minimum_required(VERSION 3.31)
 
@@ -19,6 +19,7 @@ target_sources(sonar-daemon-runner
     sonar-daemon-runner.c
 )
 
+# This is as the release version except with logging.
 add_executable(sonar-daemon-runner-test)
 target_compile_definitions(sonar-daemon-runner-test PRIVATE LOGGING)
 target_sources(sonar-daemon-runner-test
@@ -70,7 +71,7 @@ add_dependencies(check selftest)
 enable_testing()
 add_test(
   NAME    valgrind-selftest
-  COMMAND valgrind --leak-check=full --trace-children=yes --error-exitcode=1 ./selftest
+  COMMAND ../run_selftest.bash
 )
 
 add_custom_target(format
