@@ -4,6 +4,10 @@ version = "0.19.0-devel"
 edition = "2024"
 repository = "https://github.com/NordicHPC/sonar"
 
+# Unwinding is unlikely to have been tested and only testing depends on it.
+[profile.release]
+panic = "abort"
+
 # We want this for building RPMs reliably with older rpmbuild (as on Saga) since it can't deal with
 # the default level of debug information in Rust release builds (ie none).
 [profile.release-with-debug]

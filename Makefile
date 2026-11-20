@@ -29,9 +29,7 @@ release:
 	CARGO_TARGET_DIR=target/$(ARCH) cargo build --release
 	$(MAKE) runner
 
-runner: runner/build/sonar-daemon-runner
-
-runner/build/sonar-daemon-runner: runner/*.c runner/*.h runner/CMakeLists.txt
+runner:
 	( cd runner ; $(MAKE) runner )
 
 build: generate format release
