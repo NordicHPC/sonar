@@ -238,6 +238,17 @@ A site that does not need Kafka can turn that off.  The main outstanding issue a
 for a site that will always upload data via the Kafka HTTP proxy, we could disable the rdkafka
 library and leave the HTTP upload support in place, but can't currently do so.
 
+### Updating dependencies
+
+For Rust, the dependencies can be updated to the latest non-breaking version with `cargo update`.
+
+For Go, the dependencies can be updated to the latest non-breaking version with `go get -u`.  (Due
+to some old github shenaningans this sometimes picks up a Sonar version 0.99.x; be sure to revert
+that.)
+
+When updating dependencies it is important to run `make generate` to rebuild the license lists so
+as to pick up changes.
+
 ### Licenses of dependencies
 
 Sonar is MIT-licensed and should not include GPL code (a consequence of wanting to place as few
