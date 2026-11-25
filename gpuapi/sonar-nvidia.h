@@ -66,9 +66,10 @@ struct nvml_card_state {
 /* Clear the infobuf and fill it with available information. */
 int nvml_device_get_card_state(uint32_t device_index, struct nvml_card_state* infobuf);
 
-/* Probe the card's process tables and save the information in an internal data structure, returning
-   the number of processes.  On success, the data structure is always allocated even if count = 0,
-   and the data structure must be freed with nvml_free_processes(). */
+/* Probe the card's process tables and save the information in an internal data structure,
+   storing the number of processes in *count. count must not be NULL. On success, the data
+   structure is always allocated even if *count is 0. The result table must be freed
+   with nvml_free_processes(). Returns 0 on success. */
 int nvml_device_probe_processes(uint32_t device_index, uint32_t* count);
 
 struct nvml_gpu_process {

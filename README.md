@@ -45,6 +45,7 @@ post-processors and analyses, but you can also use these existing tools (both un
 - [Lars T. Hansen](https://github.com/lars-t-hansen)
 - Henrik Rojas Nagel
 - [Thomas Roehr](https://github.com/2maz)
+- [Torstein Winterseth](https://github.com/kvikende)
 
 ## Similar and related tools
 
