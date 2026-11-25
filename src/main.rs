@@ -225,6 +225,7 @@ fn main() {
                 } else {
                     vec![]
                 },
+                env_patterns: vec![],
                 lockdir: lockdir.clone(),
                 fmt: ps::Format::JSON,
                 cpu_util: true,

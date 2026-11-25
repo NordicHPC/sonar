@@ -7,7 +7,7 @@ use crate::output;
 #[cfg(feature = "daemon")]
 use crate::pidmap::PidMap;
 #[cfg(feature = "daemon")]
-use crate::privileged;
+use crate::privileged::{self, EnvVar};
 use crate::ps_newfmt::format_newfmt;
 use crate::systemapi::{self, DiskInfo};
 use crate::types::{JobID, Pid, Uid};
@@ -37,6 +37,7 @@ pub struct PsOptions {
     pub exclude_system_jobs: bool,
     pub exclude_users: Vec<String>,
     pub exclude_commands: Vec<String>,
+    pub env_patterns: Vec<String>,
     pub lockdir: Option<String>,
     pub token: String,
     pub load: bool,
@@ -283,6 +284,8 @@ pub struct TheProcInfo {
     pub user: String,
     pub command: String,
     pub exe_path: String,
+    #[cfg(feature = "daemon")]
+    pub env_vars: Vec<EnvVar>,
     pub pid: Pid,
     pub ppid: Pid,
     pub rolledup: usize,
@@ -366,7 +369,7 @@ fn collect_sample_data(
         }
     }
 
-    let mut procinfo_by_pid = new_with_cpu_info(system, &processes);
+    let mut procinfo_by_pid = new_with_cpu_info(system, &processes, &opts.env_patterns);
 
     if system.is_interrupted() {
         return Ok(None);
@@ -467,6 +470,7 @@ fn is_container_root(v: &ProcInfo) -> bool {
 fn new_with_cpu_info(
     system: &dyn systemapi::SystemAPI,
     processes: &HashMap<Pid, systemapi::Process>,
+    #[allow(unused)] env_patterns: &[String],
 ) -> ProcInfoTable {
     let mut procinfo_by_pid = ProcInfoTable::new();
     #[cfg(feature = "daemon")]
@@ -476,18 +480,33 @@ fn new_with_cpu_info(
             .get_jobs()
             .job_id_from_pid(system, proc.pid, processes);
         #[cfg(feature = "daemon")]
-        let exe_path = if let Some(srv) = root {
+        let (exe_path, env_vars) = if let Some(srv) = root {
+            let mut failed = false;
+            let mut exe_path = "".to_string();
+            let mut env_vars = vec![];
             if let Ok(s) = privileged::get_exe_path(proc.pid as u32, srv) {
-                s
+                exe_path = s;
             } else {
+                failed = true;
+            }
+            if !failed && env_patterns.len() > 0 {
+                if let Ok(vars) = privileged::get_env_vars(proc.pid as u32, env_patterns, srv) {
+                    env_vars = vars;
+                } else {
+                    failed = true;
+                }
+            }
+            if failed {
                 // The agent is broken.  Disable its further use here.  Then flag it as broken on
                 // the system; get_root_server() will subsequently return none.
                 root = None;
                 system.disable_root_server();
-                "".to_string()
+                ("".to_string(), vec![])
+            } else {
+                (exe_path, env_vars)
             }
         } else {
-            "".to_string()
+            ("".to_string(), vec![])
         };
         #[cfg(not(feature = "daemon"))]
         let exe_path = "".to_string();
@@ -497,6 +516,8 @@ fn new_with_cpu_info(
                 user: proc.user.clone(),
                 command: proc.command.clone(),
                 exe_path,
+                #[cfg(feature = "daemon")]
+                env_vars,
                 pid: proc.pid,
                 ppid: proc.ppid,
                 is_system_job: proc.uid < 1000,
@@ -723,6 +744,8 @@ fn rollup_processes(procinfo_by_pid: ProcInfoTable) -> Vec<ProcInfo> {
         if proc_info.job_id == 0 || proc_info.has_children || !proc_info.is_slurm {
             rolledup.push(proc_info);
         } else {
+            // I suppose if we have the exe we could use that instead of command, for better
+            // precision, but it probably matters very little.
             let key = (proc_info.job_id, proc_info.ppid, proc_info.command.clone());
             if let Some(x) = index.get(&key) {
                 let p = &mut rolledup[*x];
@@ -741,6 +764,11 @@ fn rollup_processes(procinfo_by_pid: ProcInfoTable) -> Vec<ProcInfo> {
                 p.gpu_mem_percentage += proc_info.gpu_mem_percentage;
                 p.gpu_mem_size_kib += proc_info.gpu_mem_size_kib;
                 p.rolledup += 1;
+                // Note we do not currently aggregate the environment variables or exe, instead just
+                // keeping the values from the first element entered into the set.  This is probably
+                // good enough, and would normally only fail if the user asks for env vars that are
+                // purposely different, such as the SLURM subjob ID variables - and that would be
+                // weird in combination with rollup.
             } else {
                 let x = rolledup.len();
                 index.insert(key, x);

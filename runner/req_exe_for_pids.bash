@@ -24,24 +24,25 @@ function join() {
     echo $xs
 }
 
-make all
+make
 ( cd .. ; cargo build )
 
-$(pwd)/vladimir &
-$(pwd)/vladimir &
-$(pwd)/vladimir &
-join $(pgrep vladimir) > test_pids.txt
-echo $(whoami) $(groups | awk '{ print $1 }') > test_id.txt
+trap 'pkill vladimir; rm -f test_exe_*.txt' EXIT
+
+$(pwd)/build/vladimir &
+$(pwd)/build/vladimir &
+$(pwd)/build/vladimir &
+join $(pgrep vladimir) > test_exe_pids.txt
+echo $(whoami) $(groups | awk '{ print $1 }') > test_exe_id.txt
 
 echo "Testing with sonar-mock"
-echo ./sonar-mock > test_exe.txt
+echo ./build/sonar-mock > test_exe_exe.txt
 sudo ./req_exe_for_pids_stage2.bash
 count=0
 for p in $(pgrep vladimir) ; do
-    look="pid=$p path=$(pwd)/vladimir"
-    if ! $(grep -q "$look" test_result.txt); then
+    look="pid=$p path=$(pwd)/build/vladimir"
+    if ! $(grep -q "$look" test_exe_result.txt); then
         echo "Did not find $look"
-        pkill vladimir
         exit 1
     fi
     count=$((count+1))
@@ -53,18 +54,19 @@ fi
 echo "Testing with sonar-mock OK"
 
 echo "Testing with sonar"
-echo ../target/debug/sonar > test_exe.txt
+echo ../target/debug/sonar > test_exe_exe.txt
 sudo ./req_exe_for_pids_stage2.bash
-# In this case, test_result.txt should be raw JSON output
-jq -c -r '.value.data.attributes.jobs[].processes[] | {"exe":.exe, "pid":.pid}' < test_result.txt | grep vladimir > test_results2.txt
-#cat test_results2.txt
+
+# In this case, test_exe_result.txt should be raw JSON output wrapped in the stdout envelope,
+# ie, the top-level "value" attribute has the output from Sonar.
+
+jq -c -r '.value.data.attributes.jobs[].processes[] | {"exe":.exe, "pid":.pid}' < test_exe_result.txt | grep vladimir > test_exe_result2.txt
 
 count=0
 for p in $(pgrep vladimir) ; do
-    look="{\"exe\":\"$(pwd)/vladimir\",\"pid\":$p}"
-    if ! $(grep -q "$look" test_results2.txt); then
+    look="{\"exe\":\"$(pwd)/build/vladimir\",\"pid\":$p}"
+    if ! $(grep -q "$look" test_exe_result2.txt); then
         echo "Did not find $look"
-        pkill vladimir
         exit 1
     fi
     count=$((count+1))
@@ -75,6 +77,4 @@ if ((count != 3)); then
 fi
 echo "Testing with sonar OK"
 
-pkill vladimir
-rm -f test_*.txt
 echo "All OK"
